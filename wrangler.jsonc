@@ -1,0 +1,16 @@
+{
+  // ==========================================
+  // Cloudflare Worker Config - amircollider
+  // AmirCollider Games - OAuth Proxy v6.7.3
+  // ==========================================
+  "name": "amircollider",
+  "main": "worker.js",
+  "compatibility_date": "2025-08-03",
+  "d1_databases": [
+    {
+      "binding": "NEON_KATANA_DB",
+      "database_name": "neon-katana-db",
+      "database_id": "790fc372-1b4d-4e5a-996f-bf92cde2d19c"
+    }
+  ]
+}
