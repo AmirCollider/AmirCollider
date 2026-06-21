@@ -10,25 +10,56 @@ import { createHtmlResponse, createJsonResponse } from '../utils.js'
 const AUTH_COOKIE = 'amir_testsite_auth'
 const COOKIE_MAX_AGE = 60 * 60 * 2 // 2 ساعت
 
-function isAuthenticated(request, env) {
+// ==========================================
+// Cookie Signing Helpers - HMAC-SHA256
+// AmirCollider Games - Test Panel Auth
+// ==========================================
+async function signToken(token, secret) {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  )
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(token))
+  return Array.from(new Uint8Array(sig), b => b.toString(16).padStart(2, '0')).join('')
+}
+
+// ==========================================
+// Constant-Time String Compare
+// ==========================================
+function safeEqual(a, b) {
+  if (a.length !== b.length) return false
+  let diff = 0
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return diff === 0
+}
+
+// ==========================================
+// Auth Check - Verifies Signed Cookie
+// ==========================================
+async function isAuthenticated(request, env) {
+  if (!env.TestSitePassword) return false
   const cookies = request.headers.get('Cookie') || ''
   const match = cookies.match(new RegExp(`${AUTH_COOKIE}=([^;]+)`))
   if (!match) return false
   const parts = match[1].split('__')
-  if (parts.length < 2) return false
-  const embeddedPassword = parts.slice(1).join('__')
-  return embeddedPassword === env.TestSitePassword
+  if (parts.length !== 2) return false
+  const [token, signature] = parts
+  const expected = await signToken(token, env.TestSitePassword)
+  return safeEqual(signature, expected)
 }
 
 export async function handleTestSite(url, request, gameId, requestId, GAMES, env) {
-  if (!isAuthenticated(request, env)) {
+  if (!(await isAuthenticated(request, env))) {
     return Response.redirect(`${url.origin}/testsite/login`, 302)
   }
   return createHtmlResponse(createTestDashboardPage(GAMES, url.origin, CONFIG.VERSION))
 }
 
 export async function handleTestSiteLogin(url, request, gameId, requestId, GAMES, env) {
-  if (isAuthenticated(request, env)) {
+  if (await isAuthenticated(request, env)) {
     return Response.redirect(`${url.origin}/testsite`, 302)
   }
   const failed = url.searchParams.get('error') === '1'
@@ -54,11 +85,13 @@ export async function handleTestSiteLoginPost(url, request, gameId, requestId, G
     b => b.toString(16).padStart(2, '0')
   ).join('')
 
+  const signature = await signToken(sessionToken, env.TestSitePassword)
+
   return new Response(null, {
     status: 302,
     headers: {
       'Location': `${url.origin}/testsite`,
-      'Set-Cookie': `${AUTH_COOKIE}=${sessionToken}__${env.TestSitePassword}; Path=/testsite; HttpOnly; Secure; SameSite=Strict; Max-Age=${COOKIE_MAX_AGE}`
+      'Set-Cookie': `${AUTH_COOKIE}=${sessionToken}__${signature}; Path=/testsite; HttpOnly; Secure; SameSite=Strict; Max-Age=${COOKIE_MAX_AGE}`
     }
   })
 }
