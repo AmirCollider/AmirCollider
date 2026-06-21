@@ -30,7 +30,7 @@ export function logWarning(message, context = {}) {
 // Request ID Generator
 // ==========================================
 export function generateRequestId() {
-  return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  return `req_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
 }
 
 // ==========================================

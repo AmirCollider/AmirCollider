@@ -207,38 +207,11 @@ async function handleDatabasePatch(url, request, gameId, requestId, GAMES, envVa
     }, 400)
   }
 
-  const token = request.headers.get('Authorization')?.replace('Bearer ', '')
+  const dbPath = url.pathname.replace('/database/patch/', '')
 
-if (!token) {
-  return createJsonResponse({
-    error: 'unauthorized',
-    message: 'Authorization token required',
-    requestId
-  }, 401)
-}
+  const ownership = await verifyTokenOwnership(request, dbPath, requestId)
+  if (ownership.error) return ownership.error
 
-const tokenInfoResponse = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`)
-const tokenInfo = await tokenInfoResponse.json()
-
-if (!tokenInfoResponse.ok || tokenInfo.error_description) {
-  return createJsonResponse({
-    error: 'invalid_token',
-    message: 'Token is invalid or expired',
-    requestId
-  }, 401)
-}
-
-const tokenPlayerId = tokenInfo.email.split('@')[0].toLowerCase().substring(0, 15)
-
-const dbPath = url.pathname.replace('/database/patch/', '')
-const userMatch = dbPath.match(/^games\/[^/]+\/users\/([^/]+)/)
-if (userMatch && userMatch[1] !== tokenPlayerId) {
-  return createJsonResponse({
-    error: 'forbidden',
-    message: 'You can only modify your own data',
-    requestId
-  }, 403)
-}
   const body = await request.text()
 
   logInfo('Database PATCH request', { requestId, gameId, path: dbPath, bodyLength: body.length })
@@ -361,31 +334,25 @@ function matchRoute(path, method) {
     }
     return route.path === path && route.method === method
   })
-  
+
   if (staticRoute) return staticRoute
-  
-  const dynamicRoute = ROUTES.find(route => {
-    if (!route.dynamic) return false
+
+  for (const route of ROUTES) {
+    if (!route.dynamic || route.method !== method) continue
+
     const pattern = route.path.replace(/:\w+/g, '([^/]+)')
-    const regex = new RegExp(`^${pattern}$`)
-    return regex.test(path) && route.method === method
-  })
-  
-  if (dynamicRoute) {
-    const pattern = dynamicRoute.path.replace(/:\w+/g, '([^/]+)')
-    const regex = new RegExp(`^${pattern}$`)
-    const matches = path.match(regex)
-    
+    const matches = path.match(new RegExp(`^${pattern}$`))
+    if (!matches) continue
+
+    const paramNames = (route.path.match(/:\w+/g) || []).map(p => p.slice(1))
     const params = {}
-    if (matches) {
-      const paramNames = (dynamicRoute.path.match(/:\w+/g) || []).map(p => p.slice(1))
-      paramNames.forEach((name, index) => {
-        params[name] = decodeURIComponent(matches[index + 1])
-      })
-    }
-    return { ...dynamicRoute, params }
+    paramNames.forEach((name, index) => {
+      params[name] = decodeURIComponent(matches[index + 1])
+    })
+
+    return { ...route, params }
   }
-  
+
   return null
 }
 
@@ -1111,6 +1078,53 @@ async function handleRefreshToken(url, request, gameId, requestId, GAMES, envVar
 // ==========================================
 // Database Handlers
 // ==========================================
+
+// ==========================================
+// Verify Bearer Token + Path Ownership
+// AmirCollider Games - D1 Write Guard
+// ==========================================
+async function verifyTokenOwnership(request, dbPath, requestId) {
+  const token = request.headers.get('Authorization')?.replace('Bearer ', '')
+
+  if (!token) {
+    return {
+      error: createJsonResponse({
+        error: 'unauthorized',
+        message: 'Authorization token required',
+        requestId
+      }, 401)
+    }
+  }
+
+  const tokenInfoResponse = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`)
+  const tokenInfo = await tokenInfoResponse.json()
+
+  if (!tokenInfoResponse.ok || tokenInfo.error_description) {
+    return {
+      error: createJsonResponse({
+        error: 'invalid_token',
+        message: 'Token is invalid or expired',
+        requestId
+      }, 401)
+    }
+  }
+
+  const tokenPlayerId = tokenInfo.email.split('@')[0].toLowerCase().substring(0, 15)
+
+  const uidMatch = dbPath.match(/^games\/[^/]+\/users\/([^/]+)/)
+  if (uidMatch && uidMatch[1] !== tokenPlayerId) {
+    return {
+      error: createJsonResponse({
+        error: 'forbidden',
+        message: 'You can only modify your own data',
+        requestId
+      }, 403)
+    }
+  }
+
+  return { tokenPlayerId }
+}
+
 async function handleDatabaseGet(url, request, gameId, requestId, GAMES, envVars) {
   const game = validateGameId(gameId, GAMES)
   if (!game) {
@@ -1243,41 +1257,12 @@ async function handleDatabaseSet(url, request, gameId, requestId, GAMES, envVars
     }, 400)
   }
 
-  const token = request.headers.get('Authorization')?.replace('Bearer ', '')
+  const dbPath = url.pathname.replace('/database/set/', '')
 
-if (!token) {
-  return createJsonResponse({
-    error: 'unauthorized',
-    message: 'Authorization token required',
-    requestId
-  }, 401)
-}
+  const ownership = await verifyTokenOwnership(request, dbPath, requestId)
+  if (ownership.error) return ownership.error
 
-const tokenInfoResponse = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`)
-const tokenInfo = await tokenInfoResponse.json()
-
-if (!tokenInfoResponse.ok || tokenInfo.error_description) {
-  return createJsonResponse({
-    error: 'invalid_token',
-    message: 'Token is invalid or expired',
-    requestId
-  }, 401)
-}
-
-const tokenPlayerId = tokenInfo.email.split('@')[0].toLowerCase().substring(0, 15)
-
-const dbPath = url.pathname.replace('/database/set/', '')
-
-const uidMatch = dbPath.match(/^games\/[^/]+\/users\/([^/]+)/)
-if (uidMatch && uidMatch[1] !== tokenPlayerId) {
-  return createJsonResponse({
-    error: 'forbidden',
-    message: 'You can only modify your own data',
-    requestId
-  }, 403)
-}
-
-const body = await request.text()
+  const body = await request.text()
 
   logInfo('Database SET request', { requestId, gameId, path: dbPath, method: request.method, bodyLength: body.length })
 
