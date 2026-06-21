@@ -217,10 +217,6 @@ function createMetricsPage(metricsData, baseUrl, GAMES) {
             <span style="font-weight: bold; opacity: 0.8;">Time Window:</span>
             <span style="font-weight: bold;">${metricsData.security.rateLimitWindow / 1000}s</span>
           </div>
-          <div class="info-row">
-            <span style="font-weight: bold; opacity: 0.8;">CSRF Protection:</span>
-            <span style="font-weight: bold; color: #4caf50;">✓ فعال</span>
-          </div>
         </div>
         <div class="info-card">
           <div class="info-row">

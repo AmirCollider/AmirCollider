@@ -34,7 +34,6 @@ export async function handleHealthWithUI(url, request, gameId, requestId, GAMES)
     security: {
       rateLimit: `${SECURITY.RATE_LIMIT_PER_IP} requests per ${SECURITY.RATE_LIMIT_WINDOW / 1000}s`,
       sessionMaxAge: `${CONFIG.SESSION_MAX_AGE_MS / 1000 / 60 / 60 / 24} days`,
-      csrfProtection: 'enabled',
       secureHeaders: 'enabled'
     },
     endpoints: {

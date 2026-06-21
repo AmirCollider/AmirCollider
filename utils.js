@@ -51,27 +51,6 @@ export function validateEnvironmentVariables(envVars) {
   return true
 }
 
-// ==========================================
-// Security Helpers
-// ==========================================
-export function generateCSRFToken() {
-  const array = new Uint8Array(SECURITY.CSRF_TOKEN_LENGTH)
-  crypto.getRandomValues(array)
-  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('')
-}
-
-export function validateCSRFToken(request, storedToken) {
-  const headerToken = request.headers.get('X-CSRF-Token')
-  const cookieToken = getCookie(request, SECURITY.CSRF_COOKIE_NAME)
-  return (headerToken === storedToken || cookieToken === storedToken)
-}
-
-export function getCookie(request, name) {
-  const cookies = request.headers.get('Cookie') || ''
-  const match = cookies.match(new RegExp(`${name}=([^;]+)`))
-  return match ? match[1] : null
-}
-
 export function isRateLimited(ip) {
   const now = Date.now()
   const record = rateLimitStore.get(ip)
@@ -103,30 +82,6 @@ export function sanitizeInput(input) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;')
     .trim()
-}
-
-export function validateSessionData(sessionData) {
-  if (!sessionData || typeof sessionData !== 'object') {
-    logWarning('Session validation failed: invalid type')
-    return false
-  }
-
-  if (!sessionData.uid || !sessionData.token || !sessionData.timestamp) {
-    logWarning('Session validation failed: missing fields', {
-      hasUid: !!sessionData.uid,
-      hasToken: !!sessionData.token,
-      hasTimestamp: !!sessionData.timestamp
-    })
-    return false
-  }
-
-  const age = Date.now() - sessionData.timestamp
-  if (age > CONFIG.SESSION_MAX_AGE_MS) {
-    logWarning('Session validation failed: expired', { age, maxAge: CONFIG.SESSION_MAX_AGE_MS })
-    return false
-  }
-
-  return true
 }
 
 // ==========================================

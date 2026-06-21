@@ -462,7 +462,6 @@ function createDashboardPage(GAMES, baseUrl, routesCount) {
           '🔗 تعداد Endpoints: ' + data.endpoints + '<br>' +
           '⏱️ Token Max Age: ' + (data.config.tokenMaxAge / 1000) + 's<br>' +
           '🪙 Session Max Age: ' + (data.config.sessionMaxAge / 1000 / 60 / 60 / 24) + ' days<br>' +
-          '🔐 CSRF Protection: ' + (data.security.csrfEnabled ? 'فعال' : 'غیرفعال') + '<br>' +
           '<a href="' + baseUrl + '/metrics" target="_blank" style="color:#4caf50;text-decoration:none;margin-top:10px;display:inline-block;">🔗 مشاهده صفحه کامل</a>';
         } catch (error) {
         result.className = 'result-box result-error';

@@ -10,8 +10,7 @@ import {
   logInfo, logError, logWarning,
   generateRequestId,
   validateEnvironmentVariables,
-  generateCSRFToken, validateCSRFToken, getCookie,
-  isRateLimited, sanitizeInput, validateSessionData,
+  isRateLimited, sanitizeInput,
   validateGameId,
   createJsonResponse, createHtmlResponse,
   create404Response, createErrorResponse, createErrorPage
