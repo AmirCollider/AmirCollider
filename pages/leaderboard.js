@@ -92,65 +92,6 @@ export async function handleLeaderboardUnified(url, request, gameId, requestId, 
 
       logInfo('D1 leaderboard retrieved', { requestId, gameId, total })
 
-    // ── Firebase (iraknife-hit) ──────────────────────────────
-    } else if (game.firebase?.db) {
-      const leaderboardUrl = `${game.firebase.db}/games/${gameId}/leaderboard.json`
-      logInfo('Fetching from Firebase', { requestId, url: leaderboardUrl })
-
-      const response = await fetch(leaderboardUrl)
-
-      if (!response.ok) {
-        logWarning('Leaderboard fetch failed', { requestId, status: response.status, gameId })
-        return createJsonResponse({
-          error: 'firebase_error',
-          message: `Firebase returned status ${response.status}`,
-          requestId
-        }, response.status)
-      }
-
-      const leaderboardData = await response.json()
-
-      if (!leaderboardData || typeof leaderboardData !== 'object' || Object.keys(leaderboardData).length === 0) {
-        logWarning('No leaderboard data found', { requestId, gameId })
-        return _returnEmpty(request, game, url.origin, limit, requestId)
-      }
-
-      const leaderboardArray = Object.entries(leaderboardData)
-        .map(([uid, data]) => {
-          if (typeof data !== 'object' || data === null) return null
-          const highScore = parseInt(data.highScore || data.score || 0)
-          if (highScore <= 0) return null
-          return {
-            uid,
-            displayName: data.displayName || data.username || 'Unknown User',
-            highScore,
-            photoURL: data.photoURL || '',
-            selectedKnife: (data.selectedKnife && data.selectedKnife.trim() !== '') ? data.selectedKnife : 'Knife_01',
-            gameId: data.gameId || gameId,
-            timestamp: data.timestamp || Date.now()
-          }
-        })
-        .filter(Boolean)
-
-      if (leaderboardArray.length === 0) {
-        return _returnEmpty(request, game, url.origin, limit, requestId)
-      }
-
-      leaderboardArray.sort((a, b) => {
-        if (b.highScore !== a.highScore) return b.highScore - a.highScore
-        return (b.timestamp || 0) - (a.timestamp || 0)
-      })
-
-      total = leaderboardArray.length
-      topPlayers = leaderboardArray.slice(0, limit).map((player, index) => ({
-        rank: index + 1,
-        displayName: player.displayName,
-        highScore: player.highScore,
-        photoURL: player.photoURL,
-        selectedKnife: player.selectedKnife,
-        gameId: player.gameId
-      }))
-
     } else {
       return createJsonResponse({
         error: 'no_database',

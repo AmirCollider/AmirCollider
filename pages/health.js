@@ -39,7 +39,7 @@ export async function handleHealthWithUI(url, request, gameId, requestId, GAMES)
     },
     endpoints: {
       oauth: ['GET /oauth/auth', 'GET /oauth/callback', 'POST /oauth/token'],
-      firebase: ['POST /auth/google', 'POST /auth/refresh', 'POST /auth/validate', 'POST /auth/check'],
+      auth: ['POST /auth/refresh', 'POST /auth/validate', 'POST /auth/check'],
       database: ['GET /database/get/{path}', 'POST /database/set/{path}', 'PUT /database/set/{path}'],
       profile: ['GET /profile/{uid}'],
       leaderboard: ['GET /{gameId}/leaderboard', 'GET /{gameId}/leaderboard/{limit}'],
