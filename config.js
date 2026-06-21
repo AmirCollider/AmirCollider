@@ -1,7 +1,7 @@
 export const SECURITY = {
   CSRF_TOKEN_LENGTH: 32,
   MAX_REQUEST_SIZE: 10 * 1024 * 1024,
-  RATE_LIMIT_PER_IP: 50, 
+  RATE_LIMIT_PER_IP: 50,
   RATE_LIMIT_WINDOW: 60000,
   SESSION_COOKIE_NAME: 'amir_db_session',
   CSRF_COOKIE_NAME: 'amir_csrf_token',
