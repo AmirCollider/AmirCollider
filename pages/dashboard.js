@@ -31,7 +31,7 @@ function createDashboardPage(GAMES, baseUrl, routesCount) {
 <html dir="rtl" lang="fa">
 <head>
   ${getPageHead({
-    title: `AmirCollider Proxy - OAuth Management v${CONFIG.VERSION}`,
+    title: `AmirCollider Proxy - OAuth & Firebase Management v${CONFIG.VERSION}`,
     amirLogo
   })}
   <style>

@@ -438,12 +438,136 @@ function createNeonKatanaCard(id, game, baseUrl) {
 }
 
 // ==========================================
+// کارت اختصاصی: IraKnife Hit
+// ==========================================
+function createIraKnifeHitCard(id, game, baseUrl) {
+  return `
+    <style>
+      @keyframes shimmerKnife {
+        0%   { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+      }
+      @keyframes floatKnife {
+        0%, 100% { transform: translateY(0px) rotate(1deg); }
+        50%       { transform: translateY(-7px) rotate(-1.5deg); }
+      }
+      @keyframes glowPulseRed {
+        0%, 100% { box-shadow: 0 0 18px 3px rgba(229,57,53,0.35), 0 8px 32px rgba(183,28,28,0.25); }
+        50%       { box-shadow: 0 0 36px 8px rgba(229,57,53,0.6), 0 12px 40px rgba(183,28,28,0.45); }
+      }
+    </style>
+
+    <div class="game-card" style="
+      border: 1.5px solid rgba(229,57,53,0.45);
+      background: linear-gradient(160deg,
+        rgba(229,57,53,0.12) 0%,
+        rgba(18,10,10,0.55) 50%,
+        rgba(136,14,79,0.09) 100%
+      );
+      position: relative;
+      overflow: hidden;
+      border-radius: 20px;
+      backdrop-filter: blur(6px);
+    ">
+
+      <!-- نوار گرادیانت بالا -->
+      <div style="
+        position: absolute; top: 0; left: 0; right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, transparent, #E53935, #B71C1C, #E53935, transparent);
+        background-size: 200% 100%;
+        animation: shimmerKnife 2.5s infinite linear;
+      "></div>
+
+      <!-- هاله پس‌زمینه -->
+      <div style="
+        position: absolute; top: -40px; right: -40px;
+        width: 200px; height: 200px;
+        background: radial-gradient(circle, rgba(229,57,53,0.12) 0%, transparent 70%);
+        pointer-events: none;
+      "></div>
+
+      <div class="game-header" style="margin-top: 14px; align-items: center;">
+
+        <!-- لوگو با انیمیشن float -->
+        <div style="
+          width: 92px; height: 92px;
+          border-radius: 22px;
+          border: 2.5px solid rgba(229,57,53,0.65);
+          overflow: hidden;
+          background: linear-gradient(135deg, #fff0f0, #ffffff);
+          display: flex; align-items: center; justify-content: center;
+          animation: floatKnife 3.8s ease-in-out infinite, glowPulseRed 3s ease-in-out infinite;
+          flex-shrink: 0;
+        ">
+          <img
+            src="${game.logo}"
+            alt="${game.name}"
+            style="width:100%;height:100%;object-fit:cover;"
+            onerror="this.style.display='none';this.parentElement.innerHTML='${game.icon}';"
+          >
+        </div>
+
+        <div style="flex: 1; padding-right: 4px;">
+          <h2 style="
+            color: #EF9A9A;
+            font-size: 1.3em;
+            letter-spacing: 0.5px;
+            text-shadow: 0 2px 12px rgba(229,57,53,0.5);
+            margin: 0 0 6px 0;
+          ">${game.name}</h2>
+
+          <div style="
+            font-size: 0.88em;
+            opacity: 0.82;
+            line-height: 1.5;
+          ">${game.description}</div>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px;">
+            <span style="
+              background: rgba(229,57,53,0.2);
+              color: #FF8A80;
+              padding: 4px 13px;
+              border-radius: 20px;
+              font-size: 0.78em;
+              font-weight: 700;
+              border: 1px solid rgba(229,57,53,0.4);
+              letter-spacing: 0.3px;
+            ">🔪 پرتاپ چاقو</span>
+            <span style="
+              background: rgba(76,175,80,0.2);
+              color: #69d977;
+              padding: 4px 13px;
+              border-radius: 20px;
+              font-size: 0.78em;
+              font-weight: 700;
+              border: 1px solid rgba(76,175,80,0.45);
+            ">✓ فعال</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- خط جداکننده -->
+      <div style="
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(229,57,53,0.35), transparent);
+        margin: 18px 0 14px;
+      "></div>
+
+      ${createTestButtons(id, baseUrl)}
+      ${createMyketButton(game)}
+    </div>
+  `
+}
+
+// ==========================================
 // MAP کارت‌های اختصاصی
 // برای اضافه کردن بازی جدید، فقط اینجا
 // یک آیتم اضافه کنید
 // ==========================================
 const CUSTOM_CARD_RENDERERS = {
-  'neon-katana': createNeonKatanaCard
+  'neon-katana': createNeonKatanaCard,
+  'iraknife-hit': createIraKnifeHitCard
 }
 
 // ==========================================

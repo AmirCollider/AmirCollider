@@ -51,6 +51,7 @@ export function validateEnvironmentVariables(envVars) {
   return true
 }
 
+
 export function isRateLimited(ip) {
   const now = Date.now()
   const record = rateLimitStore.get(ip)

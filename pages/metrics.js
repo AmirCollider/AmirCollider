@@ -23,8 +23,7 @@ export async function handleMetrics(url, request, gameId, requestId, GAMES, _env
     security: {
       rateLimit: SECURITY.RATE_LIMIT_PER_IP,
       rateLimitWindow: SECURITY.RATE_LIMIT_WINDOW,
-      sessionMaxAge: CONFIG.SESSION_MAX_AGE_MS,
-      csrfEnabled: true
+      sessionMaxAge: CONFIG.SESSION_MAX_AGE_MS
     },
     config: {
       stateExpiry: CONFIG.STATE_EXPIRY_MS,

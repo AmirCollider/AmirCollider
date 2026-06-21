@@ -27,7 +27,10 @@ export async function handlePingWithUI(url, request, gameId, requestId, GAMES) {
 
   const start = Date.now()
   try {
-    await fetch(`${url.origin}/`, {
+    const pingTarget = game.firebase?.db
+      ? `${game.firebase.db}/.json?shallow=true`
+      : `${url.origin}/`
+    await fetch(pingTarget, {
       method: 'HEAD',
       signal: AbortSignal.timeout(CONFIG.PING_TIMEOUT_MS)
     })

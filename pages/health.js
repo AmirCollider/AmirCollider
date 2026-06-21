@@ -33,12 +33,12 @@ export async function handleHealthWithUI(url, request, gameId, requestId, GAMES)
     worker_url: url.origin,
     security: {
       rateLimit: `${SECURITY.RATE_LIMIT_PER_IP} requests per ${SECURITY.RATE_LIMIT_WINDOW / 1000}s`,
-      sessionMaxAge: `${CONFIG.SESSION_MAX_AGE_MS / 1000 / 60 / 60 / 24} days`,
+      sessionMaxAge: `${CONFIG.SESSION_MAX_AGE_MS / 1000 / 60 / 60 / 24} days`,     
       secureHeaders: 'enabled'
     },
     endpoints: {
       oauth: ['GET /oauth/auth', 'GET /oauth/callback', 'POST /oauth/token'],
-      auth: ['POST /auth/refresh', 'POST /auth/validate', 'POST /auth/check'],
+      firebase: ['POST /auth/google', 'POST /auth/refresh', 'POST /auth/validate', 'POST /auth/check'],
       database: ['GET /database/get/{path}', 'POST /database/set/{path}', 'PUT /database/set/{path}'],
       profile: ['GET /profile/{uid}'],
       leaderboard: ['GET /{gameId}/leaderboard', 'GET /{gameId}/leaderboard/{limit}'],
