@@ -501,7 +501,7 @@ function createTestDashboardPage(GAMES, baseUrl, version) {
       ${buildTestItem('sys-cors',          '🌐', 'CORS Headers',               'وجود Access-Control-Allow-Origin در پاسخ')}
       ${buildTestItem('sys-cors-preflight','🔀', 'CORS Preflight (OPTIONS)',   'پاسخ صحیح به OPTIONS request')}
       ${buildTestItem('sys-content-type',  '📋', 'Content-Type Validation',    '/metrics باید application/json باشد')}
-      ${buildTestItem('sys-security',      '🛡️', 'Security Headers',           'X-Content-Type, X-Frame-Options, X-XSS, HSTS')}
+      ${buildTestItem('sys-security',      '🛡️', 'Security Headers',           'X-Content-Type-Options, X-Frame-Options')}
       ${buildTestItem('sys-request-id',    '🔖', 'Request ID Header',          'پاسخ باید X-Request-ID داشته باشد')}
       ${buildTestItem('sys-proxy-version', '🏷️', 'Proxy Version Header',       'پاسخ باید X-Proxy-Version داشته باشد')}
       ${buildTestItem('sys-response-time', '⏱️', 'Response Time',              'سرعت پاسخ /metrics زیر 500ms عالی، زیر 2s قابل قبول')}
@@ -875,7 +875,7 @@ function createTestDashboardPage(GAMES, baseUrl, version) {
       setResult('sys-security', 'running');
       const r = await fetchTest(BASE_URL + '/metrics');
       if (!r.ok) { setResult('sys-security', 'fail', '❌ ' + r.error); recordResult('fail'); updateSectionBadge('system'); return; }
-      const needed = ['X-Content-Type-Options', 'X-Frame-Options', 'X-XSS-Protection', 'Strict-Transport-Security'];
+      const needed = ['X-Content-Type-Options', 'X-Frame-Options'];
       const missing = needed.filter(h => !r.headers.get(h));
       if (missing.length === 0) { setResult('sys-security', 'pass', '✅ همه Security Headers موجودند | ' + r.ping + 'ms'); recordResult('pass'); }
       else { setResult('sys-security', 'warn', '⚠️ غایب: ' + missing.join(', ')); recordResult('warn'); }

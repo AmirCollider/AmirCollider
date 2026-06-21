@@ -326,7 +326,7 @@ function createDashboardPage(GAMES, baseUrl, routesCount) {
         </div>
       </div>
       <h1>AmirCollider Proxy</h1>
-      <p style="margin: 10px 0;">OAuth Proxy & Firebase Management System</p>
+      <p style="margin: 10px 0;">OAuth Proxy Management System</p>
       <span class="version">v${CONFIG.VERSION} Enhanced</span>
     </div>
 
