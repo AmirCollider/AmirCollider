@@ -4,7 +4,7 @@
 // AmirCollider Games - Worker Proxy
 // ==========================================
 
-const MYKET_LOGO_URL = 'https://drive.google.com/thumbnail?id=1aSr-w6djqBfi0JwmudYBHG9P-eATTcIq&sz=w200'
+const MYKET_LOGO_URL = '/assets/MyketLogo.png'
 
 // ==========================================
 // دکمه‌های تست مشترک بین همه کارت‌ها
