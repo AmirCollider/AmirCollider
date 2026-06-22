@@ -469,9 +469,9 @@ function createDashboardPage(GAMES, baseUrl, routesCount) {
       }
     }
 
-    console.log('%c🎮 AmirCollider Proxy v${CONFIG.VERSION}', 'color:#4caf50;font-size:20px;font-weight:bold;');
-    console.log('%c🔥 Production Ready - All Issues Fixed', 'color:#2196f3;font-size:14px;');
-    console.log('%c🛡️ Enhanced Security & Optimized Performance', 'color:#ff9800;font-size:12px;');
+    console.log('%cAmirCollider Proxy v${CONFIG.VERSION}', 'color:#4caf50;font-size:20px;font-weight:bold;');
+    console.log('%cProduction Ready', 'color:#2196f3;font-size:14px;');
+    console.log('%cEnhanced Security & Optimized Performance', 'color:#ff9800;font-size:12px;');
   </script>
 </body>
 </html>`
