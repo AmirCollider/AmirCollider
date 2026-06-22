@@ -129,7 +129,7 @@ export function createErrorResponse(error, requestId, game) {
     name: 'AmirCollider Games',
     icon: '',
     color: '#f44336',
-    logo: 'https://drive.google.com/thumbnail?id=1kwjfUTVmbHOtJbl0DbXoOq9-BWitQBnw&sz=w200'
+    logo: CONFIG.AMIR_LOGO
   }
 
   if (error.needsHtml) {
