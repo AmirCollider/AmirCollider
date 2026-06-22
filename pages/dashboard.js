@@ -11,8 +11,8 @@ import { createGamesCardsHTML } from './GamesCards.js'
 
 // ==========================================
 // Handler: Dashboard
-// routesCount از worker.js پاس می‌شود تا
-// وابستگی مستقیم به ROUTES حذف شود
+// routesCount is passed in from worker.js
+// to remove the direct dependency on ROUTES
 // ==========================================
 export async function handleDashboard(url, request, gameId, requestId, GAMES, _env, availableEndpoints = []) {
   return createHtmlResponse(
