@@ -7,7 +7,7 @@
 const MYKET_LOGO_URL = '/assets/MyketLogo.png'
 
 // ==========================================
-// دکمه‌های تست مشترک بین همه کارت‌ها
+// Shared test buttons used by all cards
 // ==========================================
 function createTestButtons(id, baseUrl) {
   const btnBase = `
@@ -198,7 +198,7 @@ function createTestButtons(id, baseUrl) {
 }
 
 // ==========================================
-// دکمه مایکت (اگر آدرس داشت)
+ // Myket button (if a URL is present)
 // ==========================================
 function createMyketButton(game) {
   if (!game.myketUrl) return ''
@@ -274,7 +274,7 @@ function createMyketButton(game) {
 }
 
 // ==========================================
-// کارت پیش‌فرض (برای بازی‌های بدون کارت اختصاصی)
+// Default card (for games without a dedicated card)
 // ==========================================
 function createDefaultGameCard(id, game, baseUrl) {
   return `
@@ -315,7 +315,7 @@ function createDefaultGameCard(id, game, baseUrl) {
 }
 
 // ==========================================
-// کارت اختصاصی: Neon Katana
+// Dedicated card: Neon Katana
 // ==========================================
 function createNeonKatanaCard(id, game, baseUrl) {
   return `
@@ -438,16 +438,16 @@ function createNeonKatanaCard(id, game, baseUrl) {
 }
 
 // ==========================================
-// MAP کارت‌های اختصاصی
-// برای اضافه کردن بازی جدید، فقط اینجا
-// یک آیتم اضافه کنید
+// MAP of dedicated cards
+// To add a new game, just add
+// one item here
 // ==========================================
 const CUSTOM_CARD_RENDERERS = {
   'neon-katana': createNeonKatanaCard
 }
 
 // ==========================================
-// ساخت یک کارت (اختصاصی یا پیش‌فرض)
+// Build one card (dedicated or default)
 // ==========================================
 function createGameCard(id, game, baseUrl) {
   const customRenderer = CUSTOM_CARD_RENDERERS[id]
@@ -458,7 +458,7 @@ function createGameCard(id, game, baseUrl) {
 }
 
 // ==========================================
-// گرید کامل کارت‌های بازی
+ // Full grid of game cards
 // ==========================================
 export function createGamesCardsHTML(GAMES, baseUrl) {
   return `
