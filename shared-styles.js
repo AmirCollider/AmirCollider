@@ -272,14 +272,14 @@ export function getLogosHTML(amirLogo, gameLogo, gameName) {
       <div class="logo-container">
         <div class="logo-circle">
           <img src="${amirLogo}" alt="AmirCollider Logo"
-               onerror="this.onerror=null;this.src='https://drive.google.com/uc?export=view&id=1kwjfUTVmbHOtJbl0DbXoOq9-BWitQBnw';">
+               onerror="this.onerror=null;this.src='/assets/AmirColliderLogo.png';">
         </div>
         <div class="logo-label">AmirCollider</div>
       </div>
       <div class="logo-container">
         <div class="logo-circle">
           <img src="${gameLogo}" alt="${gameName} Logo"
-               onerror="this.onerror=null;this.src='https://drive.google.com/thumbnail?id=1X198sJb0HIMm_1ENKeX9CWuwWsHlnshD&sz=w200';">
+               onerror="this.onerror=null;this.src='/assets/NeonKatanaLogo.png';">
         </div>
         <div class="logo-label">${gameName}</div>
       </div>
