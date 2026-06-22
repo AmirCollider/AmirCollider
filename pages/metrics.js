@@ -10,9 +10,8 @@ import { createJsonResponse, createHtmlResponse } from '../utils.js'
 
 // ==========================================
 // Handler: Metrics
-// نکته: ROUTES از worker.js به صورت
-// availableEndpoints پاس می‌شود تا
-// وابستگی مستقیم به ROUTES حذف شود
+// availableEndpoints is passed in from worker.js
+// to remove the direct dependency on ROUTES
 // ==========================================
 export async function handleMetrics(url, request, gameId, requestId, GAMES, _env, availableEndpoints = []) {
   const metricsData = {
@@ -62,7 +61,7 @@ function createMetricsPage(metricsData, baseUrl, GAMES) {
   ${getPageHead({
     title: `📊 Metrics Dashboard - AmirCollider Proxy v${metricsData.version}`,
     amirLogo,
-    description: 'Real-time metrics and statistics for AmirCollider Proxy OAuth & Firebase Management System'
+    description: 'Real-time metrics and statistics for AmirCollider Proxy OAuth Management System'
   })}
   <style>
     ${getSharedCSS(game.color)}
