@@ -4,7 +4,7 @@
 // AmirCollider Games - Worker Proxy
 // ==========================================
 
-import { CONFIG, SECURITY } from '../config.js'
+import { CONFIG } from '../config.js'
 import { getSharedCSS, getLogosHTML, getPageHead } from '../shared-styles.js'
 import { createJsonResponse, createHtmlResponse } from '../utils.js'
 
@@ -20,8 +20,6 @@ export async function handleMetrics(url, request, gameId, requestId, GAMES, _env
     games: Object.keys(GAMES).length,
     endpoints: availableEndpoints.length,
     security: {
-      rateLimit: SECURITY.RATE_LIMIT_PER_IP,
-      rateLimitWindow: SECURITY.RATE_LIMIT_WINDOW,
       sessionMaxAge: CONFIG.SESSION_MAX_AGE_MS,
       csrfEnabled: true
     },
@@ -193,11 +191,6 @@ function createMetricsPage(metricsData, baseUrl, GAMES) {
         <div class="stat-label">API Endpoints</div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon">🔒</div>
-        <div class="stat-value">${metricsData.security.rateLimit}</div>
-        <div class="stat-label">Rate Limit / دقیقه</div>
-      </div>
-      <div class="stat-card">
         <div class="stat-icon">⚡</div>
         <div class="stat-value">Stateless</div>
         <div class="stat-label">Worker Mode</div>
@@ -207,16 +200,6 @@ function createMetricsPage(metricsData, baseUrl, GAMES) {
     <div class="info-section">
       <h2><span>🛡️</span> Security Configuration</h2>
       <div class="info-grid">
-        <div class="info-card">
-          <div class="info-row">
-            <span style="font-weight: bold; opacity: 0.8;">Rate Limit:</span>
-            <span style="font-weight: bold;">${metricsData.security.rateLimit} requests</span>
-          </div>
-          <div class="info-row">
-            <span style="font-weight: bold; opacity: 0.8;">Time Window:</span>
-            <span style="font-weight: bold;">${metricsData.security.rateLimitWindow / 1000}s</span>
-          </div>
-        </div>
         <div class="info-card">
           <div class="info-row">
             <span style="font-weight: bold; opacity: 0.8;">Session Max Age:</span>
