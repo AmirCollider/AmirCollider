@@ -321,6 +321,7 @@ const ROUTES = [
 { path: '/testsite/login', method: 'POST', handler: handleTestSiteLoginPost },
 { path: '/testsite/logout', method: 'POST', handler: handleTestSiteLogout },
   { path: '/metrics', method: 'GET', handler: handleMetrics },
+  { path: '/assets/', method: 'GET', handler: handleAsset, prefix: true },
   { path: '/:gameId/health', method: 'GET', handler: handleHealthWithUI, dynamic: true },
   { path: '/:gameId/ping', method: 'GET', handler: handlePingWithUI, dynamic: true },
   { path: '/database/patch/', method: 'PATCH', handler: handleDatabasePatch, prefix: true },
@@ -627,6 +628,40 @@ async function handleUserProfile(url, request, gameId, requestId, GAMES, envVars
     logError('Profile fetch error', { requestId, gameId, uid, error: error.message })
     return createHtmlResponse(createErrorPage('خطای سرور', game), 500)
   }
+}
+
+// ==========================================
+// Static Asset Handler (R2 - amircolliderr2)
+// ==========================================
+async function handleAsset(url, request, gameId, requestId, GAMES, envVars) {
+  const key = decodeURIComponent(url.pathname.replace('/assets/', ''))
+
+  if (!key || key.includes('..') || key.includes('/')) {
+    return createJsonResponse({ error: 'invalid_asset', message: 'Invalid asset path', requestId }, 400)
+  }
+
+  const bucket = envVars.ASSETS
+  if (!bucket) {
+    return createJsonResponse({ error: 'r2_not_bound', message: 'R2 binding "ASSETS" not found', requestId }, 500)
+  }
+
+  const object = await bucket.get(key)
+  if (!object) {
+    return createJsonResponse({ error: 'asset_not_found', message: `Asset "${key}" not found`, requestId }, 404)
+  }
+
+  const extMap = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml', ico: 'image/x-icon' }
+  const ext = key.split('.').pop().toLowerCase()
+  const contentType = object.httpMetadata?.contentType || extMap[ext] || 'application/octet-stream'
+
+  return new Response(object.body, {
+    status: 200,
+    headers: {
+      'Content-Type': contentType,
+      'Cache-Control': 'public, max-age=31536000, immutable',
+      'ETag': object.httpEtag
+    }
+  })
 }
 
 // ==========================================
