@@ -6,11 +6,10 @@
 import { getSharedCSS, getLogosHTML, getPageHead } from './shared-styles.js'
 import { CONFIG, SECURITY, CORS_HEADERS, getGamesConfig } from './config.js'
 import {
-  rateLimitStore,
   logInfo, logError, logWarning,
   generateRequestId,
   validateEnvironmentVariables,
-  isRateLimited, sanitizeInput,
+  sanitizeInput,
   validateGameId,
   createJsonResponse, createHtmlResponse,
   create404Response, createErrorResponse, createErrorPage
