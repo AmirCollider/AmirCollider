@@ -316,10 +316,10 @@ function createLeaderboardPage(players, game, baseUrl, total, limit, requestId, 
       ${players.map((player, index) => `
         <div class="player-row" style="--index: ${index}; background: ${getRankColor(player.rank)};">
           <div class="rank-badge">${getRankIcon(player.rank)}</div>
-          <img src="${player.photoURL || `https://via.placeholder.com/60?text=${encodeURIComponent(player.displayName.charAt(0))}`}"
+          <img src="${player.photoURL || `https://placehold.co/60?text=${encodeURIComponent(player.displayName.charAt(0))}`}"
                alt="${sanitizeInput(player.displayName)}"
                class="player-avatar"
-               onerror="this.src='https://via.placeholder.com/60?text=${encodeURIComponent(player.displayName.charAt(0))}'">
+               onerror="this.src='https://placehold.co/60?text=${encodeURIComponent(player.displayName.charAt(0))}'">
           <div class="player-info">
             <div class="player-name">${sanitizeInput(player.displayName)}</div>
           </div>
