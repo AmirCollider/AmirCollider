@@ -2299,7 +2299,7 @@ function createUserProfilePage(userData, game, gameId) {
 <body>
   <div class="container">
     <div class="profile-header">
-      <img src="${userData.photoURL || 'https://via.placeholder.com/150'}" alt="Avatar" class="avatar">
+     <img src="${userData.photoURL || 'https://placehold.co/150'}" alt="Avatar" class="avatar">
       <div class="username">${sanitizeInput(userData.displayName || userData.username)}</div>
       <div style="font-size: 1.1em; opacity: 0.9; margin-bottom: 20px;">${sanitizeInput(userData.email)}</div>
       <div style="background: rgba(76,175,80,0.3); color: #4caf50; padding: 8px 20px; border-radius: 20px; display: inline-block; font-weight: bold; border: 2px solid #4caf50; margin-top: 10px;">${game.icon} ${game.name}</div>
