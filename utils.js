@@ -69,7 +69,7 @@ export function validateGameId(gameId, GAMES) {
   if (!gameId || gameId === 'undefined') {
     const firstGameId = Object.keys(GAMES)[0]
     if (firstGameId) {
-      console.log(`ℹ️ No gameId provided, using first game: ${firstGameId}`)
+      console.log(`No gameId provided, using first game: ${firstGameId}`)
       return GAMES[firstGameId]
     }
     return null
@@ -78,7 +78,7 @@ export function validateGameId(gameId, GAMES) {
   const game = GAMES[gameId]
 
   if (!game) {
-    console.warn(`⚠️ Invalid game ID: ${gameId}`, {
+    console.warn(`Invalid game ID: ${gameId}`, {
       providedGameId: gameId,
       availableGames: Object.keys(GAMES)
     })
