@@ -1,7 +1,5 @@
 export const SECURITY = {
   MAX_REQUEST_SIZE: 10 * 1024 * 1024,
-  RATE_LIMIT_PER_IP: 50,
-  RATE_LIMIT_WINDOW: 60000,
   SECURE_HEADERS: {
     'X-Content-Type-Options': 'nosniff',
     'X-Frame-Options': 'DENY',
