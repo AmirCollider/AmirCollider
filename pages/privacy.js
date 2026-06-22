@@ -358,29 +358,7 @@ function createPrivacyPage(game, gameId, baseUrl) {
       <span data-lang-fa>ما از پروتکل‌های امنیتی استاندارد برای محافظت از اطلاعات شما استفاده می‌کنیم:</span>
       <span data-lang-en>We use industry-standard security protocols to protect your information:</span>
     </p>
-    <ul>
-      <li>
-        <strong><span data-lang-fa>پایش مستمر: </span><span data-lang-en>Continuous monitoring: </span></strong>
-        <span data-lang-fa>نظارت ۲۴/۷ بر امنیت سیستم</span>
-        <span data-lang-en>24/7 monitoring of system security</span>
-      </li>
-      <li>
-        <strong><span data-lang-fa>محدودیت دسترسی: </span><span data-lang-en>Access control: </span></strong>
-        <span data-lang-fa>فقط کارمندان مجاز به داده‌ها دسترسی دارند</span>
-        <span data-lang-en>Only authorized personnel have access to data</span>
-      </li>
-      <li>
-        <strong><span data-lang-fa>رمزگذاری اتصالات: </span><span data-lang-en>Connection encryption: </span></strong>
-        <span data-lang-fa>تمام داده‌ها با پروتکل HTTPS/TLS رمزگذاری می‌شوند</span>
-        <span data-lang-en>All data is encrypted in transit using HTTPS/TLS protocol</span>
-      </li>
-      <li>
-        <strong><span data-lang-fa>D1 Cloudflare Database: </span><span data-lang-en>D1 Cloudflare Database: </span></strong>
-        <span data-lang-fa>ذخیره‌سازی امن داده‌ها با پایگاه داده Cloudflare D1</span>
-        <span data-lang-en>Secure data storage powered by Cloudflare D1 database</span>
-      </li>
-    </ul>
-
+    
     <!-- ═══════════════ 5. NO DATA SHARING ═══════════════ -->
     <h2><span class="section-icon">🚫</span>
       <span data-lang-fa>عدم اشتراک‌گذاری اطلاعات</span>
