@@ -181,7 +181,7 @@ return finalResponse
       name: 'AmirCollider Games',
       icon: '🎮',
       color: '#f44336',
-      logo: 'https://drive.google.com/thumbnail?id=1kwjfUTVmbHOtJbl0DbXoOq9-BWitQBnw&sz=w200'
+      logo: CONFIG.AMIR_LOGO
     };
     
     return createErrorResponse(error, requestId, defaultGame)
@@ -1444,7 +1444,7 @@ function createAuthRedirectPage(googleAuthUrl, game, baseUrl) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="google-site-verification" content="uFvaRQchIco-iyGmdsNknLK7mL5Asxg47GjaOQmhf0Q" />
   <title>در حال انتقال به Google - AmirCollider Proxy</title>
-  <link rel="icon" href="https://drive.google.com/uc?export=download&id=1kwjfUTVmbHOtJbl0DbXoOq9-BWitQBnw" type="image/png">
+  <link rel="icon" href="${CONFIG.AMIR_LOGO}" type="image/png">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
