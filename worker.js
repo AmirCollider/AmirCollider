@@ -38,11 +38,9 @@ export default {
 // Username Validation
 // ==========================================
 const PROFANITY_LIST = [
-  'fuck', 'shit', 'bitch', 'asshole', 'bastard', 'damn', 'cunt',
-  'cock', 'dick', 'pussy', 'ass', 'piss', 'crap', 'slut', 'whore',
-  'faggot', 'nigger', 'nigga', 'retard', 'nazi', 'kike', 'spic',
-  'fag', 'homo', 'rape', 'kill', 'sex', 'porn', 'nude', 'naked',
-  'jerk', 'idiot', 'moron', 'loser', 'stupid', 'dumb', 'ugly'
+  'fuck', 'shit', 'bitch', 'asshole', 'bastard', 'cunt',
+  'pussy', 'slut', 'whore', 'faggot', 'nigger', 'nigga',
+  'retard', 'kike', 'porn'
 ]
 
 function validateUsername(username) {
@@ -241,7 +239,7 @@ if (userMatch && userMatch[1] !== tokenPlayerId) {
     if (!db) {
       return createJsonResponse({
         error: 'db_not_bound',
-        message: `D1 binding "${game.d1Binding}" پیدا نشد`,
+        message: `D1 binding "${game.d1Binding}" not found`,
         requestId
       }, 500)
     }
@@ -298,7 +296,7 @@ if (!d1UserMatch) {
         UPDATE players SET ${updates.join(', ')} WHERE player_id = ?
       `).bind(...values).run()
 
-      logInfo('✅ D1 PATCH completed', { requestId, gameId, uid, fields: updates.length })
+      logInfo('D1 PATCH completed', { requestId, gameId, uid, fields: updates.length })
 
       return createJsonResponse({ success: true, requestId }, 200)
 
@@ -668,7 +666,7 @@ async function handleAsset(url, request, gameId, requestId, GAMES, envVars) {
 // 1. New Function: Android Auth Logic (FIXED SYNTAX)
 // ==========================================
 function buildAndroidAuthUrl(url, request, game, stateData, finalRedirectUri) {
-  logInfo('🤖 Building Android Auth URL', { 
+  logInfo('Building Android Auth URL', { 
     requestId: stateData.requestId, 
     gameId: stateData.gameId 
   });
@@ -689,7 +687,7 @@ function buildAndroidAuthUrl(url, request, game, stateData, finalRedirectUri) {
   googleAuthUrl.searchParams.set('hl', 'fa');
   googleAuthUrl.searchParams.set('state', btoa(JSON.stringify(stateData)));
 
-  logInfo('✅ Android Auth URL generated', { 
+  logInfo('Android Auth URL generated', { 
     requestId: stateData.requestId, 
     gameId: stateData.gameId, 
     clientId: detectedClientId.substring(0, 20) + '...',
@@ -703,7 +701,7 @@ function buildAndroidAuthUrl(url, request, game, stateData, finalRedirectUri) {
 // 2. New Function: Web/Desktop Auth Logic (FIXED SYNTAX)
 // ==========================================
 function buildWebAuthUrl(url, request, game, stateData, finalRedirectUri) {
-  logInfo('💻 Building Web Auth URL', { 
+  logInfo('Building Web Auth URL', { 
     requestId: stateData.requestId, 
     gameId: stateData.gameId 
   });
@@ -721,7 +719,7 @@ function buildWebAuthUrl(url, request, game, stateData, finalRedirectUri) {
   googleAuthUrl.searchParams.set('hl', 'fa');
   googleAuthUrl.searchParams.set('state', btoa(JSON.stringify(stateData)));
 
-  logInfo('✅ Web Auth URL generated', { 
+  logInfo('Web Auth URL generated', { 
     requestId: stateData.requestId, 
     gameId: stateData.gameId, 
     clientId: clientId.substring(0, 20) + '...' 
@@ -806,7 +804,7 @@ async function handleOAuthAuth(url, request, gameId, requestId, GAMES, envVars) 
     userAgent: userAgent.substring(0, 100)
   };
 
-  logInfo('🎯 OAuth Auth initiated', {
+  logInfo('OAuth Auth initiated', {
     requestId: requestId,
     gameId: gameId,
     originalRedirectUri: redirectUri,
@@ -883,7 +881,7 @@ return createHtmlResponse(createDesktopSuccessPage(code, game, url.origin))
 }
 
 // ==========================================
-// ✅ Fixed Token Exchange Handler - Android PKCE Support
+// Token Exchange Handler - Android PKCE Support
 // ==========================================
 async function handleTokenExchange(url, request, gameId, requestId, GAMES, envVars) {
   const game = validateGameId(gameId, GAMES)
@@ -941,7 +939,7 @@ async function handleTokenExchange(url, request, gameId, requestId, GAMES, envVa
   const clientSecret = game.oauth.secret
   redirectUri = `${url.origin}/oauth/callback`
 
-  logInfo(isAndroid ? '🤖 Android token exchange (using Web Client)' : '💻 Web token exchange', {
+  logInfo(isAndroid ? 'Android token exchange (using Web Client)' : 'Web token exchange', {
     requestId,
     gameId,
     redirectUri,
@@ -978,7 +976,7 @@ async function handleTokenExchange(url, request, gameId, requestId, GAMES, envVa
   })
 
   try {
-    logInfo('📤 Sending request to Google', { 
+    logInfo('Sending request to Google', { 
       requestId, 
       gameId,
       tokenUrl,
@@ -1025,7 +1023,7 @@ async function handleTokenExchange(url, request, gameId, requestId, GAMES, envVa
       }, googleResponse.status)
     }
 
-    logInfo('✅ Token exchanged successfully', { 
+    logInfo('Token exchanged successfully', { 
       requestId, 
       gameId, 
       isAndroid,
@@ -1082,7 +1080,7 @@ async function handleRefreshToken(url, request, gameId, requestId, GAMES, envVar
 
   try {
     // ── D1 path: neon-katana ──────────────────────────────
-    // برای neon-katana از Google OAuth token refresh استفاده میکنیم
+    // For neon-katana, use Google OAuth token refresh
     if (game.d1Binding) {
       const tokenUrl = `https://oauth2.googleapis.com/token`
       const tokenBody = new URLSearchParams({
@@ -1171,7 +1169,7 @@ async function handleDatabaseGet(url, request, gameId, requestId, GAMES, envVars
       if (!db) {
         return createJsonResponse({
           error: 'db_not_bound',
-          message: `D1 binding "${game.d1Binding}" پیدا نشد`,
+          message: `D1 binding "${game.d1Binding}" not found`,
           requestId
         }, 500)
       }
@@ -1207,7 +1205,7 @@ async function handleDatabaseGet(url, request, gameId, requestId, GAMES, envVars
         }, 200)
       }
 
-      // مسیر: games/neon-katana/users/{uid}/highScore
+      // Path: games/neon-katana/users/{uid}/highScore
       const scoreMatch = dbPath.match(/^games\/[^/]+\/users\/([^/]+)\/highScore$/)
       if (scoreMatch) {
         const uid = scoreMatch[1]
@@ -1218,7 +1216,7 @@ async function handleDatabaseGet(url, request, gameId, requestId, GAMES, envVars
         return createJsonResponse(player ? player.high_score : 0, 200)
       }
 
-      // مسیر: leaderboard
+      // Path: leaderboard
       if (dbPath.includes('leaderboard')) {
         const { results } = await db.prepare(`
           SELECT username, username AS displayName, high_score AS highScore,
@@ -1314,7 +1312,7 @@ const body = await request.text()
     if (!db) {
       return createJsonResponse({
         error: 'db_not_bound',
-        message: `D1 binding "${game.d1Binding}" پیدا نشد`,
+        message: `D1 binding "${game.d1Binding}" not found`,
         requestId
       }, 500)
     }
@@ -1349,7 +1347,7 @@ const body = await request.text()
         const currentHighScore = player.high_score || 0
 
         if (newScore <= currentHighScore) {
-          logInfo('⚠️ New score not higher', { requestId, uid, newScore, currentHighScore })
+          logInfo('New score not higher', { requestId, uid, newScore, currentHighScore })
           return createJsonResponse({
             success: false,
             message: 'Score not higher than current high score',
@@ -1365,7 +1363,7 @@ const body = await request.text()
           WHERE player_id = ?
         `).bind(newScore, Date.now(), uid).run()
 
-        logInfo('🏆 High score updated in D1', { requestId, uid, previousScore: currentHighScore, newScore })
+        logInfo('High score updated in D1', { requestId, uid, previousScore: currentHighScore, newScore })
 
         return createJsonResponse({
           success: true,
@@ -1377,7 +1375,7 @@ const body = await request.text()
         }, 200)
       }
 
-      // 🎯 ذخیره اطلاعات کاربر
+      // Save user data
       const userMatch = dbPath.match(/^games\/([^/]+)\/users\/([^/]+)$/)
       if (userMatch) {
         const uid = userMatch[2]
@@ -1417,7 +1415,7 @@ const body = await request.text()
           await db.prepare(`UPDATE players SET ${updates.join(', ')} WHERE player_id = ?`).bind(...values).run()
         }
 
-        logInfo('✅ User data updated in D1', { requestId, uid })
+        logInfo('User data updated in D1', { requestId, uid })
         return createJsonResponse({ success: true, requestId }, 200)
       }
 
@@ -1428,7 +1426,7 @@ const body = await request.text()
       }, 400)
 
     } catch (error) {
-      logError('❌ D1 SET error', { requestId, gameId, path: dbPath, error: error.message })
+      logError('D1 SET error', { requestId, gameId, path: dbPath, error: error.message })
       return createJsonResponse({ error: 'database_error', message: error.message, requestId }, 500)
     }
   }
@@ -1925,7 +1923,7 @@ function createAndroidSuccessPage(androidScheme, game, baseUrl) {
       console.log('🔄 Auto-opening game...');
       openGame();
       
-      // اگر بعد از 5 ثانیه باز نشد، دکمه Manual نشان بده
+      /// If not opened after 5 seconds, show the Manual button
       setTimeout(() => {
         showManualButton();
       }, 5000);
