@@ -127,7 +127,7 @@ async function handleRequest(request, env, ctx) {
 
   const url = new URL(request.url)
   const path = url.pathname
-  const gameId = request.headers.get('X-Game-ID') || url.searchParams.get('game') || 'neon-katana'
+  const gameId = request.headers.get('X-Game-ID') || url.searchParams.get('game') || Object.keys(GAMES)[0]
   const requestId = generateRequestId()
 
   const logContext = {
@@ -647,7 +647,7 @@ function buildAndroidAuthUrl(url, request, game, stateData, finalRedirectUri) {
     gameId: stateData.gameId 
   });
 
-  const detectedClientId = game.oauth.web; // ✅ تغییر از android به web
+  const detectedClientId = game.oauth.web; // Google requires the Web client_id for server-side code exchange, even on Android
   const scope = url.searchParams.get('scope') || 'openid profile email';
   const responseType = url.searchParams.get('response_type') || 'code';
 
@@ -808,7 +808,7 @@ async function handleOAuthCallback(url, request, gameId, requestId, GAMES) {
   language: 'fa', 
   isAndroid: false, 
   originalRedirectUri: '', 
-  gameId: 'neon-katana',
+  gameId: Object.keys(GAMES)[0],
   requestId: requestId
 }
 
