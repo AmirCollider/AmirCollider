@@ -7,11 +7,6 @@ import { SECURITY, CONFIG, CORS_HEADERS } from './config.js'
 import { getSharedCSS, getPageHead } from './shared-styles.js'
 
 // ==========================================
-// Rate Limit Store (in-memory, per isolate)
-// ==========================================
-export const rateLimitStore = new Map()
-
-// ==========================================
 // Logging
 // ==========================================
 export function logInfo(message, context = {}) {
@@ -49,28 +44,6 @@ export function validateEnvironmentVariables(envVars) {
   }
 
   return true
-}
-
-export function isRateLimited(ip) {
-  const now = Date.now()
-  const record = rateLimitStore.get(ip)
-
-  if (!record) {
-    rateLimitStore.set(ip, { count: 1, resetTime: now + SECURITY.RATE_LIMIT_WINDOW })
-    return false
-  }
-
-  if (now > record.resetTime) {
-    rateLimitStore.set(ip, { count: 1, resetTime: now + SECURITY.RATE_LIMIT_WINDOW })
-    return false
-  }
-
-  if (record.count >= SECURITY.RATE_LIMIT_PER_IP) {
-    return true
-  }
-
-  record.count++
-  return false
 }
 
 export function sanitizeInput(input) {
