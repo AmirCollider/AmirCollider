@@ -1,5 +1,4 @@
 export const SECURITY = {
-  MAX_REQUEST_SIZE: 10 * 1024 * 1024,
   SECURE_HEADERS: {
     'X-Content-Type-Options': 'nosniff',
     'X-Frame-Options': 'DENY',
@@ -27,7 +26,7 @@ export const CONFIG = {
 export const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, User-Agent, X-Game-ID, X-Request-ID, X-CSRF-Token',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, User-Agent, X-Game-ID, X-Request-ID',
   'Access-Control-Max-Age': '86400'
 }
 
