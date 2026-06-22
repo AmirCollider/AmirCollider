@@ -3,7 +3,7 @@
 // Health Check Page Handler
 // ==========================================
 
-import { CONFIG, SECURITY } from '../config.js'
+import { CONFIG } from '../config.js'
 import { getSharedCSS, getLogosHTML, getPageHead } from '../shared-styles.js'
 import { validateGameId, createJsonResponse, createHtmlResponse } from '../utils.js'
 
@@ -32,7 +32,6 @@ export async function handleHealthWithUI(url, request, gameId, requestId, GAMES)
     },
     worker_url: url.origin,
     security: {
-      rateLimit: `${SECURITY.RATE_LIMIT_PER_IP} requests per ${SECURITY.RATE_LIMIT_WINDOW / 1000}s`,
       sessionMaxAge: `${CONFIG.SESSION_MAX_AGE_MS / 1000 / 60 / 60 / 24} days`,
       secureHeaders: 'enabled'
     },
@@ -129,19 +128,15 @@ function createHealthPage(healthData, game, baseUrl, gameId) {
         </div>
       </div>
 
-      <div class="info-card">
+     <div class="info-card">
         <h3>🔒 Security</h3>
-        <div class="info-row">
-          <span>Rate Limit:</span>
-          <strong>${healthData.security.rateLimit}</strong>
-        </div>
         <div class="info-row">
           <span>Session Age:</span>
           <strong>${healthData.security.sessionMaxAge}</strong>
         </div>
         <div class="info-row">
-          <span>CSRF:</span>
-          <strong>${healthData.security.csrfProtection}</strong>
+          <span>Secure Headers:</span>
+          <strong>${healthData.security.secureHeaders}</strong>
         </div>
       </div>
     </div>
