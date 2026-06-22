@@ -17,7 +17,7 @@ import {
 } from '../utils.js'
 
 // ==========================================
-// Helper: رنگ رتبه
+// Helper: Rank Color
 // ==========================================
 function getRankColor(rank) {
   if (rank === 1) return 'linear-gradient(135deg, #FFD700, #FFA500)'
@@ -27,7 +27,7 @@ function getRankColor(rank) {
 }
 
 // ==========================================
-// Helper: آیکون رتبه
+// Helper: Rank Icon
 // ==========================================
 function getRankIcon(rank) {
   if (rank === 1) return '🥇'
