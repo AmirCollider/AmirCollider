@@ -20,8 +20,8 @@ export const CONFIG = {
   SESSION_MAX_AGE_MS: 7 * 24 * 60 * 60 * 1000,
   AUTO_COPY_CODE: true,
   SUPPORT_EMAIL: 'amircollider@yahoo.com',
-  AMIR_LOGO: 'https://drive.google.com/thumbnail?id=1kwjfUTVmbHOtJbl0DbXoOq9-BWitQBnw&sz=w200',
-  DEFAULT_GAME_LOGO: 'https://drive.google.com/uc?export=view&id=1X198sJb0HIMm_1ENKeX9CWuwWsHlnshD'
+  AMIR_LOGO: '/assets/AmirColliderLogo.png',
+  DEFAULT_GAME_LOGO: '/assets/DefaultGameLogo.png'
 }
 
 export const CORS_HEADERS = {
@@ -38,7 +38,7 @@ export function getGamesConfig(envVars) {
       icon: '⚔️🍉',
       color: '#FF5722',
       description: 'بازی شمشیر نئونی',
-      logo: 'https://drive.google.com/thumbnail?id=1X198sJb0HIMm_1ENKeX9CWuwWsHlnshD&sz=w200',
+      logo: '/assets/NeonKatanaLogo.png',
       myketUrl: 'https://myket.ir/app/com.AmirColliderGames.NeonKatana',
       d1Binding: 'NEON_KATANA_DB',
       package: 'com.AmirColliderGames.NeonKatana',
