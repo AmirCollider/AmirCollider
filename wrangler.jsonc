@@ -12,5 +12,11 @@
       "database_name": "neon-katana-db",
       "database_id": "790fc372-1b4d-4e5a-996f-bf92cde2d19c"
     }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "ASSETS",
+      "bucket_name": "amircolliderr2"
+    }
   ]
 }
