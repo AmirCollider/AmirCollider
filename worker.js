@@ -108,14 +108,6 @@ async function handleRequest(request, env, ctx) {
   }
 
   const GAMES = getGamesConfig(env)
-  
-  if (isRateLimited(clientIP)) {
-    return createJsonResponse({
-      error: 'rate_limit_exceeded',
-      message: 'Too many requests. Please try again later.',
-      retryAfter: SECURITY.RATE_LIMIT_WINDOW / 1000
-    }, 429)
-  }
 
   if (request.method === 'OPTIONS') {
     return new Response(null, { 
