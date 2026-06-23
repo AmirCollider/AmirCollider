@@ -1,10 +1,36 @@
 // ==========================================
 // OAuth Proxy v6.7.3 - Secure Version
-// AmirCollider Games - Environment Variables
+// AmirCollider Games - Worker Core (routing, auth, data API)
+// ==========================================
+//
+// Edge entry point for every AmirCollider game client.
+//
+// Login surface (stable contract — Unity, mobile app, web game all depend on it):
+//   GET  /oauth/auth        -> start Google sign-in (web / desktop / android)
+//   GET  /oauth/callback    -> Google returns here; delivers the code to the client
+//   POST /oauth/token       -> exchange authorization code for tokens
+//   POST /auth/refresh      -> refresh an expired session
+//   POST /auth/validate     -> verify an id_token against a stored player
+//   POST /auth/check        -> check whether a player exists
+//   GET  /profile/{uid}     -> server-rendered player profile
+//
+// Data surface (per-game, token-guarded where it mutates):
+//   GET  /database/get/...      POST|PUT /database/set/...      PATCH|POST /database/patch/...
+//
+// Design notes:
+//   - Every page is theme-aware (light/dark/auto) and tri-lingual (fa/en/ja)
+//     with correct RTL/LTR, rendered through the shared design system.
+//   - Google-facing OAuth state is HMAC-signed and expiry-checked, so it
+//     cannot be forged or tampered with in transit.
+//   - Logs are structured and redacted: no secrets, no authorization codes,
+//     no raw upstream error bodies, and nothing returned to the client beyond
+//     a stable error code.
+//
+// Adding a game: edit GAME_REGISTRY in config.js only. No change is needed here.
 // ==========================================
 
 import { getSharedCSS, getLogosHTML, getPageHead } from './shared-styles.js'
-import { CONFIG, SECURITY, CORS_HEADERS, getGamesConfig } from './config.js'
+import { CONFIG, CORS_HEADERS, SECURITY, LANGUAGES, getGamesConfig } from './config.js'
 import {
   logInfo, logError, logWarning,
   generateRequestId,
@@ -34,81 +60,244 @@ export default {
   }
 }
 
+
 // ==========================================
-// Username Validation
+// Username Policy
+// Length and character rules plus a blocklist of slurs. Messages are returned
+// in all three UI languages so the client can localize without a round-trip.
 // ==========================================
-const PROFANITY_LIST = [
+const USERNAME_BLOCKLIST = [
   'fuck', 'shit', 'bitch', 'asshole', 'bastard', 'cunt',
   'pussy', 'slut', 'whore', 'faggot', 'nigger', 'nigga',
   'retard', 'kike', 'porn'
 ]
 
 function validateUsername(username) {
+  const fail = (code, fa, en, ja) => ({
+    errorCode: code,
+    messagePersian: fa,
+    messageEnglish: en,
+    messageJapanese: ja
+  })
+
   if (typeof username !== 'string') {
-    return {
-      errorCode: 'username_invalid',
-      messagePersian: 'نام کاربری نامعتبر است',
-      messageEnglish: 'Invalid username'
-    }
+    return fail('username_invalid', 'نام کاربری نامعتبر است', 'Invalid username', 'ユーザー名が無効です')
   }
-
   if (username.length < 3 || username.length > 12) {
-    return {
-      errorCode: 'username_too_long',
-      messagePersian: 'نام کاربری باید بین ۳ تا ۱۲ حرف باشد',
-      messageEnglish: 'Username must be between 3 and 12 characters'
-    }
+    return fail(
+      'username_too_long',
+      'نام کاربری باید بین ۳ تا ۱۲ حرف باشد',
+      'Username must be between 3 and 12 characters',
+      'ユーザー名は3〜12文字にしてください'
+    )
   }
-
   if (!/^[A-Za-z0-9]+$/.test(username)) {
     if (/\s/.test(username)) {
-      return {
-        errorCode: 'username_has_space',
-        messagePersian: 'از فاصله یا نماد ها نمیتوان استفاده کرد',
-        messageEnglish: 'Spaces or symbols are not allowed'
-      }
+      return fail(
+        'username_has_space',
+        'از فاصله یا نماد‌ها نمی‌توان استفاده کرد',
+        'Spaces or symbols are not allowed',
+        'スペースや記号は使用できません'
+      )
     }
-    return {
-      errorCode: 'username_invalid_chars',
-      messagePersian: 'فقط از حروف و اعداد انگلیسی استفاده شود',
-      messageEnglish: 'Only English letters and numbers are allowed'
-    }
+    return fail(
+      'username_invalid_chars',
+      'فقط از حروف و اعداد انگلیسی استفاده شود',
+      'Only English letters and numbers are allowed',
+      '英数字のみ使用できます'
+    )
   }
-
   const lower = username.toLowerCase()
-  const hasProfanity = PROFANITY_LIST.some(word => lower.includes(word))
-  if (hasProfanity) {
-    return {
-      errorCode: 'username_profanity',
-      messagePersian: 'استفاده از الفاظ نامناسب مجاز نیست',
-      messageEnglish: 'Inappropriate language is not allowed'
-    }
+  if (USERNAME_BLOCKLIST.some(word => lower.includes(word))) {
+    return fail(
+      'username_profanity',
+      'استفاده از الفاظ نامناسب مجاز نیست',
+      'Inappropriate language is not allowed',
+      '不適切な表現は使用できません'
+    )
   }
-
   return null
 }
 
+
+// ==========================================
+// Request Helpers - Language & Theme
+// Resolves the active locale (?lang -> cookie -> Accept-Language -> default)
+// and an explicit theme override, mirroring the rest of the site so every
+// page renders with the same direction and palette the visitor expects.
+// ==========================================
+function parseCookies(request) {
+  const header = request && request.headers ? request.headers.get('Cookie') : ''
+  const out = {}
+  if (!header) return out
+  for (const part of header.split(';')) {
+    const i = part.indexOf('=')
+    if (i === -1) continue
+    out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim())
+  }
+  return out
+}
+
+function langFromAcceptHeader(request) {
+  const header = request && request.headers ? request.headers.get('Accept-Language') : ''
+  if (!header) return null
+  for (const piece of header.toLowerCase().split(',')) {
+    const code = piece.split(';')[0].trim().slice(0, 2)
+    if (LANGUAGES.supported.includes(code)) return code
+  }
+  return null
+}
+
+function resolveLang(code) {
+  return LANGUAGES.supported.includes(code) ? code : LANGUAGES.default
+}
+
+function resolveRequestLang(url, request, cookies) {
+  const fromQuery = url && url.searchParams ? url.searchParams.get('lang') : null
+  if (fromQuery && LANGUAGES.supported.includes(fromQuery)) return fromQuery
+  if (cookies.lang && LANGUAGES.supported.includes(cookies.lang)) return cookies.lang
+  return langFromAcceptHeader(request) || LANGUAGES.default
+}
+
+function resolveRequestTheme(cookies) {
+  return cookies.theme === 'light' || cookies.theme === 'dark' ? cookies.theme : null
+}
+
+function dirFor(code) {
+  return LANGUAGES.meta[resolveLang(code)].dir
+}
+
+
+// ==========================================
+// Output Safety
+// HTML-escape for direct markup interpolation and a script-string encoder for
+// safely embedding untrusted values inside inline <script> blocks.
+// ==========================================
+function escapeHtml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function jsString(value) {
+  return JSON.stringify(String(value == null ? '' : value)).replace(/</g, '\\u003c')
+}
+
+
+// ==========================================
+// OAuth State - Signing
+// The Google-facing state is HMAC-SHA256 signed with a worker-wide secret and
+// carries an issue timestamp. Forged or modified state fails verification, so
+// callback delivery and the carried redirect target cannot be spoofed.
+// ==========================================
+const TEXT_ENCODER = new TextEncoder()
+const TEXT_DECODER = new TextDecoder()
+
+function base64UrlFromBytes(bytes) {
+  let binary = ''
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+function bytesFromBase64Url(value) {
+  const padded = value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (value.length % 4)) % 4)
+  const binary = atob(padded)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return bytes
+}
+
+function constantTimeEqual(a, b) {
+  if (a.length !== b.length) return false
+  let diff = 0
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return diff === 0
+}
+
+function getStateSecret(GAMES, env) {
+  if (env && env.STATE_SIGNING_SECRET) return env.STATE_SIGNING_SECRET
+  const first = GAMES[Object.keys(GAMES)[0]]
+  return (first && first.oauth && first.oauth.secret) || ''
+}
+
+async function hmacSign(payload, secret) {
+  const key = await crypto.subtle.importKey(
+    'raw', TEXT_ENCODER.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  )
+  const signature = await crypto.subtle.sign('HMAC', key, TEXT_ENCODER.encode(payload))
+  return base64UrlFromBytes(new Uint8Array(signature))
+}
+
+async function encodeState(data, secret) {
+  const payload = base64UrlFromBytes(TEXT_ENCODER.encode(JSON.stringify(data)))
+  const signature = await hmacSign(payload, secret)
+  return `${payload}.${signature}`
+}
+
+async function decodeState(state, secret) {
+  if (typeof state !== 'string' || state.indexOf('.') === -1) return { valid: false, data: null }
+  const [payload, signature] = state.split('.')
+  if (!payload || !signature) return { valid: false, data: null }
+
+  const expected = await hmacSign(payload, secret)
+  if (!constantTimeEqual(expected, signature)) return { valid: false, data: null }
+
+  try {
+    return { valid: true, data: JSON.parse(TEXT_DECODER.decode(bytesFromBase64Url(payload))) }
+  } catch {
+    return { valid: false, data: null }
+  }
+}
+
+// Best-effort read of the client-supplied state (unsigned, used only as a hint
+// for platform detection). Never trusted for security decisions.
+function readClientStateHint(state) {
+  if (!state) return null
+  try {
+    return JSON.parse(atob(state))
+  } catch {
+    return null
+  }
+}
+
+
+// ==========================================
+// Platform Detection
+// Classifies a request as android or web from explicit params, the redirect
+// scheme, the user agent, or a client state hint.
+// ==========================================
+function detectAndroid({ explicitPlatform, headerPlatform, redirectUri, userAgent, clientStateHint }) {
+  if (explicitPlatform === 'android' || headerPlatform === 'android') return true
+  if (redirectUri && redirectUri.includes(':/') && !redirectUri.startsWith('http')) return true
+  if (userAgent && /Android/i.test(userAgent)) return true
+  if (clientStateHint && (clientStateHint.platform === 'android' || clientStateHint.isAndroid === true)) return true
+  return false
+}
+
+
 // ==========================================
 // Main Request Handler
+// Validates configuration, resolves the route, applies the shared CORS and
+// security headers once, and tags the response with a trace id.
 // ==========================================
 async function handleRequest(request, env, ctx) {
-  const clientIP = request.headers.get('CF-Connecting-IP') || 'unknown'
-  
   try {
     validateEnvironmentVariables(env)
   } catch (error) {
     logError('Environment validation failed', { error: error.message })
     return createJsonResponse({
       error: 'configuration_error',
-      message: 'Server configuration incomplete. Please contact administrator.',
-      details: error.message
+      message: 'Server configuration incomplete. Please contact the administrator.'
     }, 500)
   }
 
   const GAMES = getGamesConfig(env)
 
   if (request.method === 'OPTIONS') {
-    return new Response(null, { 
+    return new Response(null, {
       status: 204,
       headers: { ...CORS_HEADERS, ...SECURITY.SECURE_HEADERS }
     })
@@ -118,38 +307,25 @@ async function handleRequest(request, env, ctx) {
   const path = url.pathname
   const gameId = request.headers.get('X-Game-ID') || url.searchParams.get('game') || Object.keys(GAMES)[0]
   const requestId = generateRequestId()
-
-  const logContext = {
-    requestId,
-    gameId,
-    path,
-    method: request.method,
-    ip: clientIP,
-    timestamp: new Date().toISOString()
-  }
+  const logContext = { requestId, gameId, path, method: request.method }
 
   try {
     logInfo('Request received', logContext)
 
     const route = matchRoute(path, request.method)
     if (!route) {
-      const routeExistsWithDifferentMethod = ROUTES.some(r => {
+      const existsWithOtherMethod = ROUTES.some(r => {
         if (r.prefix) return path.startsWith(r.path)
-        if (r.dynamic) {
-          const pattern = r.path.replace(/:\w+/g, '([^/]+)')
-          return new RegExp(`^${pattern}$`).test(path)
-        }
+        if (r.dynamic) return new RegExp(`^${r.path.replace(/:\w+/g, '([^/]+)')}$`).test(path)
         return r.path === path
       })
-
-      if (routeExistsWithDifferentMethod) {
+      if (existsWithOtherMethod) {
         return createJsonResponse({
           error: 'method_not_allowed',
           message: 'Method not allowed for this endpoint',
           requestId
         }, 405)
       }
-
       return create404Response(requestId)
     }
 
@@ -157,173 +333,46 @@ async function handleRequest(request, env, ctx) {
     const availableEndpoints = ROUTES.map(r => `${r.method} ${r.path}`)
     const response = await route.handler(url, request, resolvedGameId, requestId, GAMES, env, availableEndpoints)
 
-const finalHeaders = new Headers(response.headers)
-Object.entries(CORS_HEADERS).forEach(([key, value]) => finalHeaders.set(key, value))
-Object.entries(SECURITY.SECURE_HEADERS).forEach(([key, value]) => finalHeaders.set(key, value))
-finalHeaders.set('X-Request-ID', requestId)
-finalHeaders.set('X-Proxy-Version', CONFIG.VERSION)
+    const headers = new Headers(response.headers)
+    for (const [key, value] of Object.entries(CORS_HEADERS)) headers.set(key, value)
+    for (const [key, value] of Object.entries(SECURITY.SECURE_HEADERS)) headers.set(key, value)
+    headers.set('X-Request-ID', requestId)
 
-const finalResponse = new Response(response.body, {
-  status: response.status,
-  statusText: response.statusText,
-  headers: finalHeaders
-})
+    const finalResponse = new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers
+    })
 
-logInfo('Request completed', { ...logContext, status: finalResponse.status })
-return finalResponse
+    logInfo('Request completed', { ...logContext, status: finalResponse.status })
+    return finalResponse
 
   } catch (error) {
-    logError('Request failed', { ...logContext, error: error.message, stack: error.stack })
-    
-    const defaultGame = {
+    logError('Request failed', { ...logContext, error: error.message })
+    return createErrorResponse(error, requestId, {
       name: 'AmirCollider Games',
-      icon: '🎮',
       color: '#f44336',
       logo: CONFIG.AMIR_LOGO
-    };
-    
-    return createErrorResponse(error, requestId, defaultGame)
+    })
   }
 }
 
-async function handleDatabasePatch(url, request, gameId, requestId, GAMES, envVars) {
-  const game = validateGameId(gameId, GAMES)
-  if (!game) {
-    return createJsonResponse({
-      error: 'invalid_game',
-      message: 'Database not configured for this game',
-      requestId
-    }, 400)
-  }
-
-  const token = request.headers.get('Authorization')?.replace('Bearer ', '')
-
-if (!token) {
-  return createJsonResponse({
-    error: 'unauthorized',
-    message: 'Authorization token required',
-    requestId
-  }, 401)
-}
-
-const tokenInfoResponse = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`)
-const tokenInfo = await tokenInfoResponse.json()
-
-if (!tokenInfoResponse.ok || tokenInfo.error_description) {
-  return createJsonResponse({
-    error: 'invalid_token',
-    message: 'Token is invalid or expired',
-    requestId
-  }, 401)
-}
-
-const tokenPlayerId = tokenInfo.email.split('@')[0].toLowerCase().substring(0, 15)
-
-const dbPath = url.pathname.replace('/database/patch/', '')
-const userMatch = dbPath.match(/^games\/[^/]+\/users\/([^/]+)/)
-if (userMatch && userMatch[1] !== tokenPlayerId) {
-  return createJsonResponse({
-    error: 'forbidden',
-    message: 'You can only modify your own data',
-    requestId
-  }, 403)
-}
-  const body = await request.text()
-
-  logInfo('Database PATCH request', { requestId, gameId, path: dbPath, bodyLength: body.length })
-
-  // ── D1 path: neon-katana ────────────────────────────────
-  if (game.d1Binding) {
-    const db = envVars[game.d1Binding]
-
-    if (!db) {
-      return createJsonResponse({
-        error: 'db_not_bound',
-        message: `D1 binding "${game.d1Binding}" not found`,
-        requestId
-      }, 500)
-    }
-
-    try {
-      let patchData
-      try {
-        patchData = JSON.parse(body)
-      } catch {
-        return createJsonResponse({ error: 'invalid_json', message: 'Body must be valid JSON', requestId }, 400)
-      }
-
-      const d1UserMatch = dbPath.match(/^games\/[^/]+\/users\/([^/]+)/)
-if (!d1UserMatch) {
-        return createJsonResponse({
-          error: 'unknown_path',
-          message: `Path not supported for D1: ${dbPath}`,
-          requestId
-        }, 400)
-      }
-
-      const uid = d1UserMatch[1]
-      const updates = []
-      const values = []
-
-      if (patchData.username !== undefined) {
-        const usernameError = validateUsername(patchData.username)
-        if (usernameError) {
-          return createJsonResponse({
-            error: usernameError.errorCode,
-            messagePersian: usernameError.messagePersian,
-            messageEnglish: usernameError.messageEnglish,
-            requestId
-          }, 400)
-        }
-        updates.push('username = ?')
-        values.push(patchData.username)
-      }
-      if (patchData.selectedColor !== undefined)   { updates.push('selected_color = ?');   values.push(patchData.selectedColor) }
-      if (patchData.purchasedColors !== undefined) { updates.push('purchased_colors = ?'); values.push(JSON.stringify(patchData.purchasedColors)) }
-      if (patchData.purchasedItems !== undefined)  { updates.push('purchased_items = ?');  values.push(JSON.stringify(patchData.purchasedItems)) }
-      if (patchData.totalPlayTime !== undefined)   { updates.push('total_play_time = ?');  values.push(patchData.totalPlayTime) }
-      if (patchData.gamesPlayed !== undefined)     { updates.push('games_played = ?');     values.push(patchData.gamesPlayed) }
-
-      if (updates.length === 0) {
-        return createJsonResponse({ error: 'no_fields', message: 'No valid fields to update', requestId }, 400)
-      }
-
-      updates.push('last_login = ?')
-      values.push(Date.now())
-      values.push(uid)
-
-      await db.prepare(`
-        UPDATE players SET ${updates.join(', ')} WHERE player_id = ?
-      `).bind(...values).run()
-
-      logInfo('D1 PATCH completed', { requestId, gameId, uid, fields: updates.length })
-
-      return createJsonResponse({ success: true, requestId }, 200)
-
-    } catch (error) {
-      logError('D1 PATCH error', { requestId, gameId, path: dbPath, error: error.message })
-      return createJsonResponse({ error: 'database_error', message: error.message, requestId }, 500)
-    }
-  }
-
-  return createJsonResponse({ error: 'unsupported_game', message: 'This game does not support PATCH operations', requestId }, 400)
-}
 
 // ==========================================
-// Routing Configuration
+// Routing Table
+// Order is irrelevant: static and prefix routes are matched before dynamic
+// ones by matchRoute. Add new endpoints here.
 // ==========================================
 const ROUTES = [
   { path: '/', method: 'GET', handler: handleDashboard },
-{ path: '/testsite', method: 'GET', handler: handleTestSite },
-{ path: '/testsite/login', method: 'GET', handler: handleTestSiteLogin },
-{ path: '/testsite/login', method: 'POST', handler: handleTestSiteLoginPost },
-{ path: '/testsite/logout', method: 'POST', handler: handleTestSiteLogout },
+  { path: '/testsite', method: 'GET', handler: handleTestSite },
+  { path: '/testsite/login', method: 'GET', handler: handleTestSiteLogin },
+  { path: '/testsite/login', method: 'POST', handler: handleTestSiteLoginPost },
+  { path: '/testsite/logout', method: 'POST', handler: handleTestSiteLogout },
   { path: '/metrics', method: 'GET', handler: handleMetrics },
   { path: '/assets/', method: 'GET', handler: handleAsset, prefix: true },
   { path: '/:gameId/health', method: 'GET', handler: handleHealthWithUI, dynamic: true },
   { path: '/:gameId/ping', method: 'GET', handler: handlePingWithUI, dynamic: true },
-  { path: '/database/patch/', method: 'PATCH', handler: handleDatabasePatch, prefix: true },
-  { path: '/database/patch/', method: 'POST', handler: handleDatabasePatch, prefix: true },
   { path: '/:gameId/privacy', method: 'GET', handler: handlePrivacyPolicyWithGame, dynamic: true },
   { path: '/:gameId/terms', method: 'GET', handler: handleTermsWithGame, dynamic: true },
   { path: '/:gameId/leaderboard', method: 'GET', handler: handleLeaderboardUnified, dynamic: true },
@@ -337,308 +386,860 @@ const ROUTES = [
   { path: '/profile/', method: 'GET', handler: handleUserProfile, prefix: true },
   { path: '/database/get/', method: 'GET', handler: handleDatabaseGet, prefix: true },
   { path: '/database/set/', method: 'POST', handler: handleDatabaseSet, prefix: true },
-  { path: '/database/set/', method: 'PUT', handler: handleDatabaseSet, prefix: true }
+  { path: '/database/set/', method: 'PUT', handler: handleDatabaseSet, prefix: true },
+  { path: '/database/patch/', method: 'PATCH', handler: handleDatabasePatch, prefix: true },
+  { path: '/database/patch/', method: 'POST', handler: handleDatabasePatch, prefix: true }
 ]
 
+
 // ==========================================
-// Enhanced Route Matcher 
+// Route Matcher
+// Resolves a path/method to a route, extracting :params for dynamic routes.
 // ==========================================
 function matchRoute(path, method) {
   const staticRoute = ROUTES.find(route => {
     if (route.dynamic) return false
-    if (route.prefix) {
-      return path.startsWith(route.path) && route.method === method
-    }
+    if (route.prefix) return path.startsWith(route.path) && route.method === method
     return route.path === path && route.method === method
   })
-  
   if (staticRoute) return staticRoute
-  
+
   const dynamicRoute = ROUTES.find(route => {
-    if (!route.dynamic) return false
-    const pattern = route.path.replace(/:\w+/g, '([^/]+)')
-    const regex = new RegExp(`^${pattern}$`)
-    return regex.test(path) && route.method === method
+    if (!route.dynamic || route.method !== method) return false
+    return new RegExp(`^${route.path.replace(/:\w+/g, '([^/]+)')}$`).test(path)
   })
-  
-  if (dynamicRoute) {
-    const pattern = dynamicRoute.path.replace(/:\w+/g, '([^/]+)')
-    const regex = new RegExp(`^${pattern}$`)
-    const matches = path.match(regex)
-    
-    const params = {}
-    if (matches) {
-      const paramNames = (dynamicRoute.path.match(/:\w+/g) || []).map(p => p.slice(1))
-      paramNames.forEach((name, index) => {
-        params[name] = decodeURIComponent(matches[index + 1])
+  if (!dynamicRoute) return null
+
+  const regex = new RegExp(`^${dynamicRoute.path.replace(/:\w+/g, '([^/]+)')}$`)
+  const matches = path.match(regex)
+  const paramNames = (dynamicRoute.path.match(/:\w+/g) || []).map(p => p.slice(1))
+  const params = {}
+  if (matches) {
+    paramNames.forEach((name, index) => { params[name] = decodeURIComponent(matches[index + 1]) })
+  }
+  return { ...dynamicRoute, params }
+}
+
+
+// ==========================================
+// OAuth: Build Google Authorization URL
+// One builder for every platform. Android server-side code exchange requires
+// the Web client_id, so it is used for both; only web allows a client_id
+// override via query.
+// ==========================================
+function buildGoogleAuthUrl(url, game, stateValue, isAndroid, lang) {
+  const clientId = isAndroid
+    ? game.oauth.web
+    : (url.searchParams.get('client_id') || game.oauth.web)
+  const scope = url.searchParams.get('scope') || 'openid profile email'
+  const responseType = url.searchParams.get('response_type') || 'code'
+
+  const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth')
+  authUrl.searchParams.set('client_id', clientId)
+  authUrl.searchParams.set('redirect_uri', `${url.origin}/oauth/callback`)
+  authUrl.searchParams.set('response_type', responseType)
+  authUrl.searchParams.set('scope', scope)
+  authUrl.searchParams.set('access_type', 'offline')
+  authUrl.searchParams.set('prompt', 'consent')
+  authUrl.searchParams.set('hl', resolveLang(lang))
+  authUrl.searchParams.set('state', stateValue)
+  return authUrl
+}
+
+
+// ==========================================
+// OAuth: Start Authorization
+// Validates the request, classifies the platform, issues a signed state, and
+// hands off to Google via a localized redirect page.
+// ==========================================
+async function handleOAuthAuth(url, request, gameId, requestId, GAMES, env) {
+  const game = validateGameId(gameId, GAMES)
+  if (!game) {
+    return createJsonResponse({ error: 'invalid_game', message: 'Game configuration not found', requestId }, 400)
+  }
+
+  const redirectUri = url.searchParams.get('redirect_uri')
+  if (!redirectUri) {
+    logWarning('Missing redirect_uri', { requestId, gameId })
+    return createJsonResponse({
+      error: 'invalid_request',
+      error_description: 'Missing redirect_uri parameter',
+      requestId
+    }, 400)
+  }
+
+  const clientState = url.searchParams.get('state') || ''
+  const userAgent = request.headers.get('User-Agent') || ''
+  const cookies = parseCookies(request)
+  const lang = resolveRequestLang(url, request, cookies)
+  const theme = resolveRequestTheme(cookies)
+
+  const isAndroid = detectAndroid({
+    explicitPlatform: url.searchParams.get('platform'),
+    redirectUri,
+    userAgent,
+    clientStateHint: readClientStateHint(clientState)
+  })
+
+  const stateData = {
+    originalRedirectUri: redirectUri,
+    originalState: clientState,
+    language: lang,
+    isAndroid,
+    platform: isAndroid ? 'android' : 'web',
+    gameId,
+    requestId,
+    timestamp: Date.now()
+  }
+
+  const signedState = await encodeState(stateData, getStateSecret(GAMES, env))
+  const authUrl = buildGoogleAuthUrl(url, game, signedState, isAndroid, lang)
+
+  logInfo('OAuth authorization started', { requestId, gameId, platform: stateData.platform })
+
+  return createHtmlResponse(renderRedirectPage(authUrl.toString(), game, lang, theme))
+}
+
+
+// ==========================================
+// OAuth: Callback
+// Verifies the signed state, then delivers the authorization code to the
+// caller by platform: android deep link, desktop loopback, or copy page.
+// ==========================================
+async function handleOAuthCallback(url, request, gameId, requestId, GAMES, env) {
+  const code = url.searchParams.get('code')
+  const state = url.searchParams.get('state')
+  const oauthError = url.searchParams.get('error')
+
+  const cookies = parseCookies(request)
+  const theme = resolveRequestTheme(cookies)
+
+  const decoded = await decodeState(state, getStateSecret(GAMES, env))
+  if (state && !decoded.valid) {
+    logWarning('Invalid OAuth state', { requestId })
+    return createHtmlResponse(renderExpiredPage(LANGUAGES.default, theme))
+  }
+
+  const stateData = decoded.data || { language: LANGUAGES.default, isAndroid: false, gameId: Object.keys(GAMES)[0] }
+  const lang = resolveLang(stateData.language)
+  const game = validateGameId(stateData.gameId, GAMES)
+
+  if (stateData.timestamp && (Date.now() - stateData.timestamp) > CONFIG.STATE_EXPIRY_MS) {
+    logWarning('State expired', { requestId, gameId: stateData.gameId })
+    return createHtmlResponse(renderExpiredPage(lang, theme))
+  }
+
+  if (oauthError) {
+    logWarning('OAuth error from provider', { requestId, gameId: stateData.gameId, error: oauthError })
+    return createHtmlResponse(renderOAuthErrorPage(oauthError, game, lang, theme))
+  }
+
+  if (!code || !stateData.originalRedirectUri) {
+    return createJsonResponse({
+      error: 'invalid_callback',
+      error_description: 'Missing code or redirect URI',
+      requestId
+    }, 400)
+  }
+
+  logInfo('OAuth callback received', { requestId, gameId: stateData.gameId, platform: stateData.isAndroid ? 'android' : 'web' })
+
+  if (stateData.isAndroid) {
+    const deepLink = `${game.deepLink.scheme}://${game.deepLink.host}?code=${encodeURIComponent(code)}`
+    return createHtmlResponse(renderAndroidSuccessPage(deepLink, game, lang, theme))
+  }
+
+  if (stateData.originalRedirectUri.startsWith('http://localhost')) {
+    return createHtmlResponse(renderLoopbackSuccessPage(code, stateData.originalRedirectUri, game, lang, theme))
+  }
+
+  return createHtmlResponse(renderDesktopSuccessPage(code, game, url.origin, lang, theme))
+}
+
+
+// ==========================================
+// OAuth: Token Exchange
+// Swaps an authorization code for tokens. The upstream error body is logged
+// server-side but never returned to the caller; the client only sees a stable
+// error code and the upstream status.
+// ==========================================
+async function handleTokenExchange(url, request, gameId, requestId, GAMES, env) {
+  const game = validateGameId(gameId, GAMES)
+  if (!game) {
+    return createJsonResponse({ error: 'invalid_game', message: 'Game configuration not found', requestId }, 400)
+  }
+
+  let rawBody
+  try {
+    rawBody = await request.text()
+  } catch {
+    return createJsonResponse({ error: 'invalid_body', message: 'Failed to read request body', requestId }, 400)
+  }
+
+  const params = new URLSearchParams(rawBody)
+  const code = params.get('code')
+  if (!code) {
+    return createJsonResponse({ error: 'missing_code', message: 'Authorization code is required', requestId }, 400)
+  }
+
+  const isAndroid = detectAndroid({
+    explicitPlatform: params.get('platform'),
+    headerPlatform: request.headers.get('X-Platform'),
+    redirectUri: params.get('redirect_uri')
+  })
+
+  const clientId = game.oauth.web
+  const clientSecret = game.oauth.secret
+  const redirectUri = `${url.origin}/oauth/callback`
+
+  if (!clientId || !clientSecret) {
+    logError('OAuth client not configured', { requestId, gameId })
+    return createJsonResponse({ error: 'configuration_error', message: 'OAuth client not configured', requestId }, 500)
+  }
+
+  const googleParams = new URLSearchParams({
+    code,
+    client_id: clientId,
+    client_secret: clientSecret,
+    redirect_uri: redirectUri,
+    grant_type: 'authorization_code'
+  })
+
+  try {
+    const googleResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': `${game.name}-Proxy/${CONFIG.VERSION}`
+      },
+      body: googleParams.toString()
+    })
+
+    const responseText = await googleResponse.text()
+
+    if (!googleResponse.ok) {
+      logError('Token exchange rejected by provider', {
+        requestId, gameId,
+        platform: isAndroid ? 'android' : 'web',
+        status: googleResponse.status,
+        providerError: safeErrorCode(responseText)
       })
+      return createJsonResponse({
+        error: 'token_exchange_failed',
+        status: googleResponse.status,
+        requestId
+      }, googleResponse.status)
     }
-    return { ...dynamicRoute, params }
+
+    let tokens
+    try {
+      tokens = JSON.parse(responseText)
+    } catch {
+      logError('Token exchange returned malformed JSON', { requestId, gameId })
+      return createJsonResponse({ error: 'invalid_provider_response', requestId }, 502)
+    }
+
+    logInfo('Token exchanged', { requestId, gameId, platform: isAndroid ? 'android' : 'web' })
+    return createJsonResponse(tokens, 200)
+
+  } catch (error) {
+    logError('Token exchange network error', { requestId, gameId, error: error.message })
+    return createJsonResponse({ error: 'network_error', message: 'Upstream request failed', requestId }, 502)
   }
-  
-  return null
 }
 
+// Extracts only the upstream error identifier for logging, never the body.
+function safeErrorCode(body) {
+  try {
+    const parsed = JSON.parse(body)
+    return parsed.error || 'unknown'
+  } catch {
+    return 'unparsable'
+  }
+}
+
+
 // ==========================================
-// Auth Handlers
+// OAuth: Refresh Token
+// Exchanges a refresh token for a fresh id_token via Google.
 // ==========================================
-async function handleValidateToken(url, request, gameId, requestId, GAMES, envVars) {
+async function handleRefreshToken(url, request, gameId, requestId, GAMES, env) {
   const game = validateGameId(gameId, GAMES)
   if (!game) {
-    return createJsonResponse({
-      error: 'invalid_game',
-      message: 'Game configuration not found',
-      valid: false,
-      requestId
-    }, 400)
-  }
-
-  const token = request.headers.get('Authorization')?.replace('Bearer ', '')
-
-  if (!token) {
-    return createJsonResponse({
-      error: 'missing_token',
-      message: 'Authorization token is required',
-      valid: false,
-      requestId
-    }, 401)
+    return createJsonResponse({ error: 'invalid_game', message: 'Game configuration not found', requestId }, 400)
   }
 
   let body
   try {
     body = await request.json()
-  } catch (e) {
-    return createJsonResponse({
-      error: 'invalid_json',
-      message: 'Request body must be valid JSON',
-      valid: false,
-      requestId
-    }, 400)
+  } catch {
+    return createJsonResponse({ error: 'invalid_json', message: 'Request body must be valid JSON', requestId }, 400)
   }
 
-  const { uid } = body
-
-  if (!uid) {
-    return createJsonResponse({
-      error: 'missing_uid',
-      message: 'User ID is required',
-      valid: false,
-      requestId
-    }, 400)
+  const refreshToken = body.refreshToken
+  if (!refreshToken) {
+    return createJsonResponse({ error: 'missing_refresh_token', message: 'Refresh token is required', requestId }, 400)
+  }
+  if (!game.d1Binding) {
+    return createJsonResponse({ success: false, error: 'unsupported_game', message: 'Game not supported', requestId }, 400)
   }
 
   try {
-    // ── D1 path: neon-katana ──────────────────────────────
-    if (game.d1Binding) {
-      const tokenInfoResponse = await fetch(
-        `https://oauth2.googleapis.com/tokeninfo?id_token=${token}`
-      )
-      const tokenInfo = await tokenInfoResponse.json()
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+        client_id: game.oauth.web,
+        client_secret: game.oauth.secret
+      }).toString()
+    })
 
-      if (!tokenInfoResponse.ok || tokenInfo.error_description) {
-        logWarning('Token validation failed', { requestId, gameId, uid })
-        return createJsonResponse({
-          valid: false,
-          error: 'invalid_token',
-          message: tokenInfo.error_description || 'Invalid token',
-          requestId
-        }, 200)
-      }
+    const tokenData = await tokenResponse.json().catch(() => ({}))
 
-      const db = envVars[game.d1Binding]
-      const player = await db.prepare(`
-        SELECT player_id, email, profile_pic_url, username FROM players
-        WHERE player_id = ? LIMIT 1
-      `).bind(uid).first()
-
-      if (!player) {
-        return createJsonResponse({
-          valid: false,
-          error: 'user_not_found',
-          message: 'User not found in database',
-          requestId
-        }, 200)
-      }
-
-      logInfo('Token validated successfully', { requestId, gameId, uid })
-
-      return createJsonResponse({
-        valid: true,
-        user: {
-          uid: player.player_id,
-          email: player.email,
-          displayName: player.username,
-          photoURL: player.profile_pic_url
-        },
-        requestId
-      }, 200)
+    if (!tokenResponse.ok || tokenData.error) {
+      logWarning('Token refresh rejected', { requestId, gameId, providerError: tokenData.error || 'unknown' })
+      return createJsonResponse({ success: false, error: 'refresh_failed', message: 'Failed to refresh token', requestId }, 400)
     }
 
+    logInfo('Token refreshed', { requestId, gameId })
+    return createJsonResponse({
+      success: true,
+      id_token: tokenData.id_token,
+      refresh_token: tokenData.refresh_token || refreshToken,
+      expires_in: tokenData.expires_in || 3600,
+      requestId
+    }, 200)
+
+  } catch (error) {
+    logError('Token refresh error', { requestId, gameId, error: error.message })
+    return createJsonResponse({ success: false, error: 'refresh_error', message: 'Upstream request failed', requestId }, 502)
+  }
+}
+
+
+// ==========================================
+// Token Verification Helper
+// Validates a Google id_token and returns its info, or null when invalid.
+// ==========================================
+async function verifyIdToken(token) {
+  if (!token) return null
+  const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(token)}`)
+  if (!response.ok) return null
+  const info = await response.json().catch(() => null)
+  if (!info || info.error_description) return null
+  return info
+}
+
+function playerIdFromEmail(email) {
+  return String(email || '').split('@')[0].toLowerCase().substring(0, 15)
+}
+
+
+// ==========================================
+// Auth: Validate Token
+// Confirms an id_token is valid and the referenced player exists.
+// ==========================================
+async function handleValidateToken(url, request, gameId, requestId, GAMES, env) {
+  const game = validateGameId(gameId, GAMES)
+  if (!game) {
+    return createJsonResponse({ error: 'invalid_game', message: 'Game configuration not found', valid: false, requestId }, 400)
+  }
+
+  const token = request.headers.get('Authorization')?.replace('Bearer ', '')
+  if (!token) {
+    return createJsonResponse({ error: 'missing_token', message: 'Authorization token is required', valid: false, requestId }, 401)
+  }
+
+  let body
+  try {
+    body = await request.json()
+  } catch {
+    return createJsonResponse({ error: 'invalid_json', message: 'Request body must be valid JSON', valid: false, requestId }, 400)
+  }
+
+  const uid = body.uid
+  if (!uid) {
+    return createJsonResponse({ error: 'missing_uid', message: 'User ID is required', valid: false, requestId }, 400)
+  }
+  if (!game.d1Binding) {
     return createJsonResponse({ valid: false, error: 'unsupported_game', message: 'Game not supported', requestId }, 400)
+  }
+
+  try {
+    const tokenInfo = await verifyIdToken(token)
+    if (!tokenInfo) {
+      logWarning('Token validation failed', { requestId, gameId })
+      return createJsonResponse({ valid: false, error: 'invalid_token', message: 'Invalid token', requestId }, 200)
+    }
+
+    const db = env[game.d1Binding]
+    const player = await db.prepare(
+      'SELECT player_id, email, profile_pic_url, username FROM players WHERE player_id = ? LIMIT 1'
+    ).bind(uid).first()
+
+    if (!player) {
+      return createJsonResponse({ valid: false, error: 'user_not_found', message: 'User not found in database', requestId }, 200)
+    }
+
+    logInfo('Token validated', { requestId, gameId })
+    return createJsonResponse({
+      valid: true,
+      user: {
+        uid: player.player_id,
+        email: player.email,
+        displayName: player.username,
+        photoURL: player.profile_pic_url
+      },
+      requestId
+    }, 200)
 
   } catch (error) {
-    logError('Token validation error', { requestId, gameId, uid, error: error.message })
-    return createJsonResponse({
-      valid: false,
-      error: 'validation_error',
-      message: error.message,
-      requestId
-    }, 500)
+    logError('Token validation error', { requestId, gameId, error: error.message })
+    return createJsonResponse({ valid: false, error: 'validation_error', message: 'Validation failed', requestId }, 500)
   }
 }
 
-async function handleCheckUserExists(url, request, gameId, requestId, GAMES, envVars) {
+
+// ==========================================
+// Auth: Check User Exists
+// Returns whether a player record exists for the given uid.
+// ==========================================
+async function handleCheckUserExists(url, request, gameId, requestId, GAMES, env) {
   const game = validateGameId(gameId, GAMES)
   if (!game) {
-    return createJsonResponse({
-      error: 'invalid_game',
-      message: 'Game configuration not found',
-      exists: false,
-      requestId
-    }, 400)
+    return createJsonResponse({ error: 'invalid_game', message: 'Game configuration not found', exists: false, requestId }, 400)
   }
 
   let body
   try {
     body = await request.json()
-  } catch (e) {
-    return createJsonResponse({
-      error: 'invalid_json',
-      message: 'Request body must be valid JSON',
-      exists: false,
-      requestId
-    }, 400)
+  } catch {
+    return createJsonResponse({ error: 'invalid_json', message: 'Request body must be valid JSON', exists: false, requestId }, 400)
   }
 
-  const { uid } = body
-
+  const uid = body.uid
   if (!uid) {
-    return createJsonResponse({
-      error: 'missing_uid',
-      message: 'User ID is required',
-      exists: false,
-      requestId
-    }, 400)
+    return createJsonResponse({ error: 'missing_uid', message: 'User ID is required', exists: false, requestId }, 400)
   }
 
   const token = request.headers.get('Authorization')?.replace('Bearer ', '')
-
   if (!token) {
-    return createJsonResponse({
-      error: 'missing_token',
-      message: 'Authorization token is required',
-      exists: false,
-      requestId
-    }, 401)
+    return createJsonResponse({ error: 'missing_token', message: 'Authorization token is required', exists: false, requestId }, 401)
+  }
+  if (!game.d1Binding) {
+    return createJsonResponse({ exists: false, error: 'unsupported_game', message: 'Game not supported', requestId }, 400)
   }
 
   try {
-    // ── D1 path: neon-katana ──────────────────────────────
-    if (game.d1Binding) {
-      const db = envVars[game.d1Binding]
-      const player = await db.prepare(`
-        SELECT player_id, email, username, profile_pic_url
-        FROM players WHERE player_id = ? LIMIT 1
-      `).bind(uid).first()
+    const db = env[game.d1Binding]
+    const player = await db.prepare(
+      'SELECT player_id, email, username, profile_pic_url FROM players WHERE player_id = ? LIMIT 1'
+    ).bind(uid).first()
 
-      if (!player) {
-        return createJsonResponse({
-          exists: false,
-          message: 'User not found in database',
-          requestId
-        }, 200)
-      }
-
-      logInfo('User exists in D1', { requestId, gameId, uid })
-
-      return createJsonResponse({
-        exists: true,
-        message: 'User exists',
-        user: {
-          uid: player.player_id,
-          email: player.email,
-          displayName: player.username,
-          photoURL: player.profile_pic_url
-        },
-        requestId
-      }, 200)
+    if (!player) {
+      return createJsonResponse({ exists: false, message: 'User not found in database', requestId }, 200)
     }
 
-    return createJsonResponse({ exists: false, error: 'unsupported_game', message: 'Game not supported', requestId }, 400)
+    logInfo('User exists', { requestId, gameId })
+    return createJsonResponse({
+      exists: true,
+      message: 'User exists',
+      user: {
+        uid: player.player_id,
+        email: player.email,
+        displayName: player.username,
+        photoURL: player.profile_pic_url
+      },
+      requestId
+    }, 200)
 
   } catch (error) {
-    logError('Check user error', { requestId, gameId, uid, error: error.message })
-    return createJsonResponse({
-      exists: false,
-      error: 'check_error',
-      message: error.message,
-      requestId
-    }, 500)
+    logError('Check user error', { requestId, gameId, error: error.message })
+    return createJsonResponse({ exists: false, error: 'check_error', message: 'Lookup failed', requestId }, 500)
   }
 }
 
-async function handleUserProfile(url, request, gameId, requestId, GAMES, envVars) {
+
+// ==========================================
+// Page: User Profile
+// Server-rendered, theme-aware, tri-lingual player profile.
+// ==========================================
+async function handleUserProfile(url, request, gameId, requestId, GAMES, env) {
   const game = validateGameId(gameId, GAMES)
+  const cookies = parseCookies(request)
+  const lang = resolveRequestLang(url, request, cookies)
+  const theme = resolveRequestTheme(cookies)
+  const t = key => authText(lang, key)
+
   if (!game) {
-    return createHtmlResponse(createErrorPage('بازی پیدا نشد', game), 404)
+    return createHtmlResponse(createErrorPage(t('gameNotFound'), null, lang), 404)
   }
 
   const uid = url.pathname.replace('/profile/', '')
-
   if (!uid) {
-    return createHtmlResponse(createErrorPage('شناسه کاربر الزامی است', game), 400)
+    return createHtmlResponse(createErrorPage(t('userIdRequired'), game, lang), 400)
+  }
+  if (!game.d1Binding) {
+    return createHtmlResponse(createErrorPage(t('gameNotSupported'), game, lang), 400)
   }
 
   try {
-    // ── D1 path: neon-katana ──────────────────────────────
-    if (game.d1Binding) {
-      const db = envVars[game.d1Binding]
-      const player = await db.prepare(`
-        SELECT * FROM players WHERE player_id = ? LIMIT 1
-      `).bind(uid).first()
-
-      if (!player) {
-        return createHtmlResponse(createErrorPage('کاربر یافت نشد', game), 404)
-      }
-
-      const userData = {
-        uid: player.player_id,
-        email: player.email,
-        username: player.username,
-        displayName: player.username,
-        photoURL: player.profile_pic_url,
-        highScore: player.high_score,
-        gamesPlayed: player.games_played,
-        totalPlayTime: player.total_play_time,
-        selectedColor: player.selected_color,
-        purchasedColors: JSON.parse(player.purchased_colors || '["FFFFFF"]'),
-        purchasedItems: JSON.parse(player.purchased_items || '{}'),
-        createdAt: player.created_at,
-        lastLogin: player.last_login
-      }
-
-      return createHtmlResponse(createUserProfilePage(userData, game, gameId))
+    const db = env[game.d1Binding]
+    const player = await db.prepare('SELECT * FROM players WHERE player_id = ? LIMIT 1').bind(uid).first()
+    if (!player) {
+      return createHtmlResponse(createErrorPage(t('userNotFound'), game, lang), 404)
     }
 
-    return createHtmlResponse(createErrorPage('Game not supported', game), 400)
+    const userData = {
+      uid: player.player_id,
+      email: player.email,
+      username: player.username,
+      displayName: player.username,
+      photoURL: player.profile_pic_url,
+      highScore: player.high_score,
+      gamesPlayed: player.games_played,
+      createdAt: player.created_at,
+      lastLogin: player.last_login
+    }
+
+    return createHtmlResponse(renderProfilePage(userData, game, gameId, lang, theme))
 
   } catch (error) {
-    logError('Profile fetch error', { requestId, gameId, uid, error: error.message })
-    return createHtmlResponse(createErrorPage('خطای سرور', game), 500)
+    logError('Profile fetch error', { requestId, gameId, error: error.message })
+    return createHtmlResponse(createErrorPage(t('serverError'), game, lang), 500)
   }
 }
 
-// ==========================================
-// Static Asset Handler (R2 - amircolliderr2)
-// ==========================================
-async function handleAsset(url, request, gameId, requestId, GAMES, envVars) {
-  const key = decodeURIComponent(url.pathname.replace('/assets/', ''))
 
+// ==========================================
+// Data: Read
+// Public leaderboard / score reads are open; user record reads require a token.
+// ==========================================
+async function handleDatabaseGet(url, request, gameId, requestId, GAMES, env) {
+  const game = validateGameId(gameId, GAMES)
+  if (!game) {
+    return createJsonResponse({ error: 'invalid_game', message: 'Database not configured for this game', requestId }, 400)
+  }
+
+  const token = request.headers.get('Authorization')?.replace('Bearer ', '')
+  const dbPath = url.pathname.replace('/database/get/', '')
+  const isPublicPath = ['topScores', 'globalTopScores', 'leaderboard'].some(p => dbPath.includes(p))
+
+  if (!isPublicPath && !token) {
+    return createJsonResponse({ error: 'unauthorized', message: 'Authorization token required', requestId }, 401)
+  }
+  if (!game.d1Binding) {
+    return createJsonResponse({ error: 'unsupported_game', message: 'This game does not support GET operations', requestId }, 400)
+  }
+
+  logInfo('Database GET', { requestId, gameId, public: isPublicPath })
+
+  try {
+    const db = env[game.d1Binding]
+    if (!db) {
+      return createJsonResponse({ error: 'db_not_bound', message: `D1 binding "${game.d1Binding}" not found`, requestId }, 500)
+    }
+
+    const userMatch = dbPath.match(/^games\/[^/]+\/users\/([^/]+)$/)
+    if (userMatch) {
+      const player = await db.prepare('SELECT * FROM players WHERE player_id = ? LIMIT 1').bind(userMatch[1]).first().catch(() => null)
+      if (!player) {
+        return createJsonResponse({ error: 'not_found', message: 'User not found', requestId }, 404)
+      }
+      return createJsonResponse(mapPlayer(player), 200)
+    }
+
+    const scoreMatch = dbPath.match(/^games\/[^/]+\/users\/([^/]+)\/highScore$/)
+    if (scoreMatch) {
+      const player = await db.prepare('SELECT high_score FROM players WHERE player_id = ? LIMIT 1').bind(scoreMatch[1]).first()
+      return createJsonResponse(player ? player.high_score : 0, 200)
+    }
+
+    if (dbPath.includes('leaderboard')) {
+      const { results } = await db.prepare(`
+        SELECT username, username AS displayName, high_score AS highScore,
+               profile_pic_url AS photoURL, selected_color AS selectedColor
+        FROM players ORDER BY high_score DESC LIMIT 100
+      `).all()
+      const mapped = (results || []).map((row, index) => ({
+        rank: index + 1,
+        username: row.username || 'Unknown User',
+        displayName: row.displayName || 'Unknown User',
+        highScore: row.highScore || 0,
+        photoURL: row.photoURL || '',
+        selectedColor: row.selectedColor || 'FFFFFF'
+      }))
+      return createJsonResponse(mapped, 200)
+    }
+
+    return createJsonResponse({ error: 'unknown_path', message: 'Path not supported', requestId }, 400)
+
+  } catch (error) {
+    logError('Database GET error', { requestId, gameId, error: error.message })
+    return createJsonResponse({ error: 'database_error', message: 'Database operation failed', requestId }, 500)
+  }
+}
+
+
+// ==========================================
+// Data: Write
+// Writes high scores or profile fields. The token owner may only modify their
+// own records.
+// ==========================================
+async function handleDatabaseSet(url, request, gameId, requestId, GAMES, env) {
+  const game = validateGameId(gameId, GAMES)
+  if (!game) {
+    return createJsonResponse({ error: 'invalid_game', message: 'Database not configured for this game', requestId }, 400)
+  }
+
+  const token = request.headers.get('Authorization')?.replace('Bearer ', '')
+  if (!token) {
+    return createJsonResponse({ error: 'unauthorized', message: 'Authorization token required', requestId }, 401)
+  }
+
+  const tokenInfo = await verifyIdToken(token)
+  if (!tokenInfo) {
+    return createJsonResponse({ error: 'invalid_token', message: 'Token is invalid or expired', requestId }, 401)
+  }
+  const tokenPlayerId = playerIdFromEmail(tokenInfo.email)
+
+  const dbPath = url.pathname.replace('/database/set/', '')
+  const ownerMatch = dbPath.match(/^games\/[^/]+\/users\/([^/]+)/)
+  if (ownerMatch && ownerMatch[1] !== tokenPlayerId) {
+    return createJsonResponse({ error: 'forbidden', message: 'You can only modify your own data', requestId }, 403)
+  }
+
+  const body = await request.text()
+  if (!game.d1Binding) {
+    return createJsonResponse({ error: 'unsupported_game', message: 'This game does not support SET operations', requestId }, 400)
+  }
+
+  logInfo('Database SET', { requestId, gameId, method: request.method })
+
+  try {
+    const db = env[game.d1Binding]
+    if (!db) {
+      return createJsonResponse({ error: 'db_not_bound', message: `D1 binding "${game.d1Binding}" not found`, requestId }, 500)
+    }
+
+    const highScoreMatch = dbPath.match(/^games\/([^/]+)\/users\/([^/]+)\/highScore$/)
+    if (highScoreMatch) {
+      const uid = highScoreMatch[2]
+      const newScore = parseInt(body, 10)
+      if (isNaN(newScore) || newScore < 0) {
+        return createJsonResponse({ error: 'invalid_score', message: 'Score must be a non-negative number', requestId }, 400)
+      }
+
+      const player = await db.prepare('SELECT high_score FROM players WHERE player_id = ? LIMIT 1').bind(uid).first()
+      if (!player) {
+        return createJsonResponse({ error: 'user_not_found', message: 'Player not found in database', requestId }, 404)
+      }
+
+      const currentHighScore = player.high_score || 0
+      if (newScore <= currentHighScore) {
+        return createJsonResponse({
+          success: false,
+          message: 'Score not higher than current high score',
+          currentHighScore,
+          submittedScore: newScore,
+          requestId
+        }, 200)
+      }
+
+      await db.prepare(
+        'UPDATE players SET high_score = ?, games_played = games_played + 1, last_login = ? WHERE player_id = ?'
+      ).bind(newScore, Date.now(), uid).run()
+
+      logInfo('High score updated', { requestId, gameId })
+      return createJsonResponse({
+        success: true,
+        message: 'High score updated successfully',
+        previousHighScore: currentHighScore,
+        newHighScore: newScore,
+        improvement: newScore - currentHighScore,
+        requestId
+      }, 200)
+    }
+
+    const userMatch = dbPath.match(/^games\/([^/]+)\/users\/([^/]+)$/)
+    if (userMatch) {
+      const uid = userMatch[2]
+      let userData
+      try {
+        userData = JSON.parse(body)
+      } catch {
+        return createJsonResponse({ error: 'invalid_json', message: 'Body must be valid JSON', requestId }, 400)
+      }
+
+      const fieldError = applyProfileFields(userData)
+      if (fieldError) {
+        return createJsonResponse({ ...fieldError, requestId }, 400)
+      }
+
+      const { updates, values } = buildProfileUpdate(userData)
+      if (updates.length > 0) {
+        updates.push('last_login = ?')
+        values.push(Date.now(), uid)
+        await db.prepare(`UPDATE players SET ${updates.join(', ')} WHERE player_id = ?`).bind(...values).run()
+      }
+
+      logInfo('User data updated', { requestId, gameId })
+      return createJsonResponse({ success: true, requestId }, 200)
+    }
+
+    return createJsonResponse({ error: 'unknown_path', message: 'Path not supported', requestId }, 400)
+
+  } catch (error) {
+    logError('Database SET error', { requestId, gameId, error: error.message })
+    return createJsonResponse({ error: 'database_error', message: 'Database operation failed', requestId }, 500)
+  }
+}
+
+
+// ==========================================
+// Data: Patch
+// Partial profile update for the authenticated owner.
+// ==========================================
+async function handleDatabasePatch(url, request, gameId, requestId, GAMES, env) {
+  const game = validateGameId(gameId, GAMES)
+  if (!game) {
+    return createJsonResponse({ error: 'invalid_game', message: 'Database not configured for this game', requestId }, 400)
+  }
+
+  const token = request.headers.get('Authorization')?.replace('Bearer ', '')
+  if (!token) {
+    return createJsonResponse({ error: 'unauthorized', message: 'Authorization token required', requestId }, 401)
+  }
+
+  const tokenInfo = await verifyIdToken(token)
+  if (!tokenInfo) {
+    return createJsonResponse({ error: 'invalid_token', message: 'Token is invalid or expired', requestId }, 401)
+  }
+  const tokenPlayerId = playerIdFromEmail(tokenInfo.email)
+
+  const dbPath = url.pathname.replace('/database/patch/', '')
+  const ownerMatch = dbPath.match(/^games\/[^/]+\/users\/([^/]+)/)
+  if (ownerMatch && ownerMatch[1] !== tokenPlayerId) {
+    return createJsonResponse({ error: 'forbidden', message: 'You can only modify your own data', requestId }, 403)
+  }
+
+  const body = await request.text()
+  if (!game.d1Binding) {
+    return createJsonResponse({ error: 'unsupported_game', message: 'This game does not support PATCH operations', requestId }, 400)
+  }
+
+  logInfo('Database PATCH', { requestId, gameId })
+
+  try {
+    const db = env[game.d1Binding]
+    if (!db) {
+      return createJsonResponse({ error: 'db_not_bound', message: `D1 binding "${game.d1Binding}" not found`, requestId }, 500)
+    }
+
+    if (!ownerMatch) {
+      return createJsonResponse({ error: 'unknown_path', message: 'Path not supported', requestId }, 400)
+    }
+
+    let patchData
+    try {
+      patchData = JSON.parse(body)
+    } catch {
+      return createJsonResponse({ error: 'invalid_json', message: 'Body must be valid JSON', requestId }, 400)
+    }
+
+    const fieldError = applyProfileFields(patchData)
+    if (fieldError) {
+      return createJsonResponse({ ...fieldError, requestId }, 400)
+    }
+
+    const { updates, values } = buildProfileUpdate(patchData, true)
+    if (updates.length === 0) {
+      return createJsonResponse({ error: 'no_fields', message: 'No valid fields to update', requestId }, 400)
+    }
+
+    updates.push('last_login = ?')
+    values.push(Date.now(), ownerMatch[1])
+    await db.prepare(`UPDATE players SET ${updates.join(', ')} WHERE player_id = ?`).bind(...values).run()
+
+    logInfo('Profile patched', { requestId, gameId })
+    return createJsonResponse({ success: true, requestId }, 200)
+
+  } catch (error) {
+    logError('Database PATCH error', { requestId, gameId, error: error.message })
+    return createJsonResponse({ error: 'database_error', message: 'Database operation failed', requestId }, 500)
+  }
+}
+
+
+// ==========================================
+// Player Field Mapping
+// Shared serialization and update-builder logic for the players table.
+// ==========================================
+function mapPlayer(player) {
+  return {
+    uid: player.player_id,
+    email: player.email,
+    username: player.username,
+    displayName: player.username,
+    photoURL: player.profile_pic_url,
+    highScore: player.high_score,
+    gamesPlayed: player.games_played,
+    totalPlayTime: player.total_play_time,
+    selectedColor: player.selected_color,
+    purchasedColors: JSON.parse(player.purchased_colors || '["FFFFFF"]'),
+    purchasedItems: JSON.parse(player.purchased_items || '{}'),
+    createdAt: player.created_at,
+    lastLogin: player.last_login
+  }
+}
+
+// Validates fields that have constraints. Returns an error object to send back,
+// or null when the data is acceptable.
+function applyProfileFields(data) {
+  if (data.username !== undefined) {
+    const usernameError = validateUsername(data.username)
+    if (usernameError) {
+      return {
+        error: usernameError.errorCode,
+        messagePersian: usernameError.messagePersian,
+        messageEnglish: usernameError.messageEnglish,
+        messageJapanese: usernameError.messageJapanese
+      }
+    }
+  }
+  return null
+}
+
+// Builds the column/value lists for an UPDATE from a profile payload.
+function buildProfileUpdate(data, includeGamesPlayed = false) {
+  const updates = []
+  const values = []
+  const push = (column, value) => { updates.push(`${column} = ?`); values.push(value) }
+
+  if (data.username !== undefined) push('username', data.username)
+  if (data.selectedColor !== undefined) push('selected_color', data.selectedColor)
+  if (data.purchasedColors !== undefined) push('purchased_colors', JSON.stringify(data.purchasedColors))
+  if (data.purchasedItems !== undefined) push('purchased_items', JSON.stringify(data.purchasedItems))
+  if (data.totalPlayTime !== undefined) push('total_play_time', data.totalPlayTime)
+  if (includeGamesPlayed && data.gamesPlayed !== undefined) push('games_played', data.gamesPlayed)
+
+  return { updates, values }
+}
+
+
+// ==========================================
+// Static Asset Handler (R2)
+// Serves immutable assets from the bound R2 bucket with path-traversal guards.
+// ==========================================
+async function handleAsset(url, request, gameId, requestId, GAMES, env) {
+  const key = decodeURIComponent(url.pathname.replace('/assets/', ''))
   if (!key || key.includes('..') || key.includes('/')) {
     return createJsonResponse({ error: 'invalid_asset', message: 'Invalid asset path', requestId }, 400)
   }
 
-  const bucket = envVars.ASSETS
+  const bucket = env.ASSETS
   if (!bucket) {
     return createJsonResponse({ error: 'r2_not_bound', message: 'R2 binding "ASSETS" not found', requestId }, 500)
   }
@@ -648,7 +1249,10 @@ async function handleAsset(url, request, gameId, requestId, GAMES, envVars) {
     return createJsonResponse({ error: 'asset_not_found', message: `Asset "${key}" not found`, requestId }, 404)
   }
 
-  const extMap = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml', ico: 'image/x-icon' }
+  const extMap = {
+    png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+    gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml', ico: 'image/x-icon'
+  }
   const ext = key.split('.').pop().toLowerCase()
   const contentType = object.httpMetadata?.contentType || extMap[ext] || 'application/octet-stream'
 
@@ -662,1690 +1266,507 @@ async function handleAsset(url, request, gameId, requestId, GAMES, envVars) {
   })
 }
 
+
 // ==========================================
-// 1. New Function: Android Auth Logic (FIXED SYNTAX)
+// Auth Flow Pages - i18n
+// Strings for the redirect, success, error and profile pages in all three
+// supported languages. Add a language by adding one block here.
 // ==========================================
-function buildAndroidAuthUrl(url, request, game, stateData, finalRedirectUri) {
-  logInfo('Building Android Auth URL', { 
-    requestId: stateData.requestId, 
-    gameId: stateData.gameId 
-  });
-
-  const detectedClientId = game.oauth.web; // Google requires the Web client_id for server-side code exchange, even on Android
-  const scope = url.searchParams.get('scope') || 'openid profile email';
-  const responseType = url.searchParams.get('response_type') || 'code';
-
-  const proxyRedirectUri = `${url.origin}/oauth/callback`;
-
-  const googleAuthUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-  googleAuthUrl.searchParams.set('client_id', detectedClientId);
-  googleAuthUrl.searchParams.set('redirect_uri', proxyRedirectUri);
-  googleAuthUrl.searchParams.set('response_type', responseType);
-  googleAuthUrl.searchParams.set('scope', scope);
-  googleAuthUrl.searchParams.set('access_type', 'offline');
-  googleAuthUrl.searchParams.set('prompt', 'consent');
-  googleAuthUrl.searchParams.set('hl', 'fa');
-  googleAuthUrl.searchParams.set('state', btoa(JSON.stringify(stateData)));
-
-  logInfo('Android Auth URL generated', { 
-    requestId: stateData.requestId, 
-    gameId: stateData.gameId, 
-    clientId: detectedClientId.substring(0, 20) + '...',
-    redirectUri: proxyRedirectUri
-  });
-  
-  return googleAuthUrl;
+const AUTH_I18N = {
+  fa: {
+    locale: 'fa-IR',
+    langName: 'فارسی',
+    themeToLight: 'حالت روشن',
+    themeToDark: 'حالت تاریک',
+    redirectTitle: 'در حال انتقال به Google',
+    redirectBody: 'در حال انتقال به صفحه ورود امن Google…',
+    pleaseWait: 'لطفاً منتظر بمانید',
+    continueManually: 'اگر به‌صورت خودکار منتقل نشدید، اینجا کلیک کنید',
+    authSuccess: 'ورود موفقیت‌آمیز بود',
+    secureBadge: 'اتصال امن',
+    copyCode: 'کپی کردن کد',
+    copied: 'کد کپی شد',
+    codeReady: 'کد ورود شما آماده است',
+    backToGame: 'بازگشت به بازی',
+    backToSite: 'بازگشت به سایت',
+    canClose: 'می‌توانید این پنجره را ببندید',
+    transferring: 'در حال انتقال اطلاعات به بازی…',
+    gameReady: 'بازی آماده است؛ این پنجره را ببندید',
+    returningToGame: 'در حال بازگشت به بازی…',
+    manualReturn: 'بازگشت دستی به بازی',
+    signInError: 'خطا در ورود',
+    errorCode: 'کد خطا',
+    errorBody: 'در فرآیند احراز هویت خطایی رخ داد.',
+    tryAgain: 'لطفاً دوباره تلاش کنید یا با پشتیبانی تماس بگیرید.',
+    close: 'بستن',
+    sessionExpired: 'جلسه منقضی شده است',
+    expiredBody: 'زمان درخواست شما به پایان رسیده است.',
+    tryAgainShort: 'لطفاً دوباره تلاش کنید.',
+    profile: 'پروفایل',
+    highScore: 'بالاترین امتیاز',
+    gamesPlayed: 'بازی‌های انجام‌شده',
+    accountInfo: 'اطلاعات حساب',
+    userId: 'شناسه کاربری',
+    lastLogin: 'آخرین ورود',
+    joined: 'تاریخ ثبت‌نام',
+    backHome: 'بازگشت به خانه',
+    enterGame: 'ورود به بازی',
+    gameNotFound: 'بازی پیدا نشد.',
+    userIdRequired: 'شناسه کاربر الزامی است.',
+    userNotFound: 'کاربر یافت نشد.',
+    serverError: 'خطای داخلی سرور رخ داد.',
+    gameNotSupported: 'این بازی پشتیبانی نمی‌شود.'
+  },
+  en: {
+    locale: 'en-US',
+    langName: 'English',
+    themeToLight: 'Light mode',
+    themeToDark: 'Dark mode',
+    redirectTitle: 'Redirecting to Google',
+    redirectBody: 'Redirecting to Google’s secure sign-in…',
+    pleaseWait: 'Please wait',
+    continueManually: 'If you are not redirected automatically, click here',
+    authSuccess: 'Signed in successfully',
+    secureBadge: 'Secure connection',
+    copyCode: 'Copy code',
+    copied: 'Code copied',
+    codeReady: 'Your sign-in code is ready',
+    backToGame: 'Back to game',
+    backToSite: 'Back to site',
+    canClose: 'You can close this window',
+    transferring: 'Transferring data to the game…',
+    gameReady: 'The game is ready. You can close this window.',
+    returningToGame: 'Returning to the game…',
+    manualReturn: 'Return to the game manually',
+    signInError: 'Sign-in error',
+    errorCode: 'Error code',
+    errorBody: 'Something went wrong during authentication.',
+    tryAgain: 'Please try again or contact support.',
+    close: 'Close',
+    sessionExpired: 'Session expired',
+    expiredBody: 'Your request has timed out.',
+    tryAgainShort: 'Please try again.',
+    profile: 'Profile',
+    highScore: 'High score',
+    gamesPlayed: 'Games played',
+    accountInfo: 'Account information',
+    userId: 'User ID',
+    lastLogin: 'Last login',
+    joined: 'Joined',
+    backHome: 'Back home',
+    enterGame: 'Enter game',
+    gameNotFound: 'Game not found.',
+    userIdRequired: 'User ID is required.',
+    userNotFound: 'User not found.',
+    serverError: 'An internal server error occurred.',
+    gameNotSupported: 'This game is not supported.'
+  },
+  ja: {
+    locale: 'ja-JP',
+    langName: '日本語',
+    themeToLight: 'ライトモード',
+    themeToDark: 'ダークモード',
+    redirectTitle: 'Google にリダイレクトしています',
+    redirectBody: 'Google の安全なサインインに移動しています…',
+    pleaseWait: 'お待ちください',
+    continueManually: '自動的に移動しない場合はこちらをクリック',
+    authSuccess: 'サインインに成功しました',
+    secureBadge: '安全な接続',
+    copyCode: 'コードをコピー',
+    copied: 'コードをコピーしました',
+    codeReady: 'サインインコードの準備ができました',
+    backToGame: 'ゲームに戻る',
+    backToSite: 'サイトに戻る',
+    canClose: 'このウィンドウを閉じてかまいません',
+    transferring: 'ゲームにデータを転送しています…',
+    gameReady: 'ゲームの準備ができました。このウィンドウを閉じてください。',
+    returningToGame: 'ゲームに戻っています…',
+    manualReturn: '手動でゲームに戻る',
+    signInError: 'サインインエラー',
+    errorCode: 'エラーコード',
+    errorBody: '認証中に問題が発生しました。',
+    tryAgain: 'もう一度お試しいただくか、サポートにお問い合わせください。',
+    close: '閉じる',
+    sessionExpired: 'セッションが期限切れです',
+    expiredBody: 'リクエストがタイムアウトしました。',
+    tryAgainShort: 'もう一度お試しください。',
+    profile: 'プロフィール',
+    highScore: 'ハイスコア',
+    gamesPlayed: 'プレイ回数',
+    accountInfo: 'アカウント情報',
+    userId: 'ユーザーID',
+    lastLogin: '最終ログイン',
+    joined: '登録日',
+    backHome: 'ホームに戻る',
+    enterGame: 'ゲームに入る',
+    gameNotFound: 'ゲームが見つかりません。',
+    userIdRequired: 'ユーザーIDが必要です。',
+    userNotFound: 'ユーザーが見つかりません。',
+    serverError: 'サーバー内部エラーが発生しました。',
+    gameNotSupported: 'このゲームはサポートされていません。'
+  }
 }
 
-// ==========================================
-// 2. New Function: Web/Desktop Auth Logic (FIXED SYNTAX)
-// ==========================================
-function buildWebAuthUrl(url, request, game, stateData, finalRedirectUri) {
-  logInfo('Building Web Auth URL', { 
-    requestId: stateData.requestId, 
-    gameId: stateData.gameId 
-  });
-  const clientId = url.searchParams.get('client_id') || game.oauth.web;
-  const scope = url.searchParams.get('scope') || 'openid profile email';
-  const responseType = url.searchParams.get('response_type') || 'code';
-
-  const googleAuthUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-  googleAuthUrl.searchParams.set('client_id', clientId);
-  googleAuthUrl.searchParams.set('redirect_uri', finalRedirectUri);
-  googleAuthUrl.searchParams.set('response_type', responseType);
-  googleAuthUrl.searchParams.set('scope', scope);
-  googleAuthUrl.searchParams.set('access_type', 'offline');
-  googleAuthUrl.searchParams.set('prompt', 'consent');
-  googleAuthUrl.searchParams.set('hl', 'fa');
-  googleAuthUrl.searchParams.set('state', btoa(JSON.stringify(stateData)));
-
-  logInfo('Web Auth URL generated', { 
-    requestId: stateData.requestId, 
-    gameId: stateData.gameId, 
-    clientId: clientId.substring(0, 20) + '...' 
-  });
-
-  return googleAuthUrl;
+function authText(lang, key) {
+  const pack = AUTH_I18N[resolveLang(lang)]
+  return pack[key] != null ? pack[key] : AUTH_I18N[LANGUAGES.default][key]
 }
 
+
 // ==========================================
-// OAuth Handlers
+// Auth Flow Pages - Shared Chrome
+// Inline SVG icons, the pre-paint theme bootstrap, and a tiny runtime that
+// powers the language/theme controls without a heavy client bundle.
 // ==========================================
-async function handleOAuthAuth(url, request, gameId, requestId, GAMES, envVars) {
-  // 1. Validate Game
-  const game = validateGameId(gameId, GAMES);
-  if (!game) {
-    return createJsonResponse({
-      error: 'invalid_game',
-      message: 'Game configuration not found',
-      requestId: requestId
-    }, 400);
-  }
+const PAGE_ICONS = {
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+  alert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="13"/><line x1="12" y1="16.5" x2="12" y2="16.5"/></svg>',
+  clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  contrast: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v18a9 9 0 0 0 0-18z" fill="currentColor" stroke="none"/></svg>',
+  lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>'
+}
 
-  // 2. Get initial parameters
-  const redirectUri = url.searchParams.get('redirect_uri');
-  const state = url.searchParams.get('state') || '';
-  const platform = url.searchParams.get('platform');
-  const userAgent = request.headers.get('User-Agent') || '';
+function themeBootScript() {
+  return `<script>(function(){try{var t=localStorage.getItem('ac_theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>`
+}
 
-  if (!redirectUri) {
-    logError('Missing redirect_uri', { requestId: requestId, gameId: gameId });
-    return createJsonResponse({
-      error: 'invalid_request',
-      error_description: 'Missing redirect_uri parameter',
-      requestId: requestId
-    }, 400);
-  }
-
-  // 3. --- Platform Detection Logic ---
-  const isMobile = /Android|iPhone|iPad|iPod/i.test(userAgent);
-  const isAndroidUA = /Android/i.test(userAgent);
-  let isAndroid = false;
-  let detectedPlatform = 'web'; // Default
-
-  if (platform === 'android') {
-    isAndroid = true;
-    detectedPlatform = 'android (explicit param)';
-  }
-  else if (redirectUri.includes(':/') && !redirectUri.startsWith('http')) {
-    isAndroid = true;
-    detectedPlatform = 'android (deep link)';
-  }
-  else if (isAndroidUA) {
-    isAndroid = true;
-    detectedPlatform = 'android (user-agent)';
-  }
-  else if (state) {
-    try {
-      const stateData = JSON.parse(atob(state));
-      if (stateData.platform === 'android' || stateData.isAndroid === true) {
-        isAndroid = true;
-        detectedPlatform = 'android (state flag)';
+function chromeScript() {
+  return `<script>
+    (function(){
+      function applyLabel(){
+        var b=document.getElementById('themeBtn'); if(!b) return;
+        var dark=document.documentElement.getAttribute('data-theme')==='dark'||
+                 (!document.documentElement.getAttribute('data-theme')&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);
+        b.setAttribute('aria-label', b.getAttribute(dark?'data-to-light':'data-to-dark')||'');
       }
-    } catch (e) {
-      // Invalid state, ignore
+      window.acToggleTheme=function(){
+        var cur=document.documentElement.getAttribute('data-theme');
+        var dark=cur==='dark'||(!cur&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);
+        var next=dark?'light':'dark';
+        document.documentElement.setAttribute('data-theme',next);
+        try{localStorage.setItem('ac_theme',next);}catch(e){}
+        document.cookie='theme='+next+';path=/;max-age=31536000;samesite=lax';
+        applyLabel();
+      };
+      window.acSetLang=function(code){
+        try{localStorage.setItem('ac_lang',code);}catch(e){}
+        document.cookie='lang='+code+';path=/;max-age=31536000;samesite=lax';
+        var u=new URL(window.location.href); u.searchParams.set('lang',code); window.location.href=u.toString();
+      };
+      applyLabel();
+    })();
+  </script>`
+}
+
+function renderTopbar(lang) {
+  const current = resolveLang(lang)
+  const seg = LANGUAGES.supported.map(code =>
+    `<button type="button" lang="${code}" aria-pressed="${code === current ? 'true' : 'false'}" onclick="acSetLang('${code}')">${escapeHtml(AUTH_I18N[code].langName)}</button>`
+  ).join('')
+
+  return `
+    <div class="ac-topbar">
+      <div class="ac-seg" role="group">${seg}</div>
+      <button type="button" id="themeBtn" class="ac-icon-btn" onclick="acToggleTheme()"
+              data-to-dark="${escapeHtml(authText(lang, 'themeToDark'))}"
+              data-to-light="${escapeHtml(authText(lang, 'themeToLight'))}">${PAGE_ICONS.contrast}</button>
+    </div>`
+}
+
+// Auth-page-specific styles layered on top of the shared design system.
+function authPageCSS() {
+  return `
+    body { display: flex; flex-direction: column; align-items: center; }
+    .ac-topbar {
+      width: 100%; max-width: var(--maxw); margin-inline: auto;
+      display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-block-end: 18px;
     }
-  }
-  // --- End of Detection ---
-
-  // 4. Set worker callback and State Data
-  const finalRedirectUri = `${url.origin}/oauth/callback`;
-
-  const stateData = {
-    originalRedirectUri: redirectUri,
-    originalState: state,
-    language: 'fa',
-    isAndroid: isAndroid,
-    isMobile: isMobile,
-    platform: isAndroid ? 'android' : 'web',
-    gameId: gameId,
-    timestamp: Date.now(),
-    requestId: requestId,
-    userAgent: userAgent.substring(0, 100)
-  };
-
-  logInfo('OAuth Auth initiated', {
-    requestId: requestId,
-    gameId: gameId,
-    originalRedirectUri: redirectUri,
-    finalRedirectUri: finalRedirectUri,
-    detectedPlatform: detectedPlatform
-  });
-
-  let googleAuthUrl;
-
-  if (isAndroid) {
-    googleAuthUrl = buildAndroidAuthUrl(url, request, game, stateData, finalRedirectUri);
-  } else {
-    googleAuthUrl = buildWebAuthUrl(url, request, game, stateData, finalRedirectUri);
-  }
-
-  return createHtmlResponse(createAuthRedirectPage(googleAuthUrl.toString(), game, url.origin));
-}
-
-async function handleOAuthCallback(url, request, gameId, requestId, GAMES) {
-  const code = url.searchParams.get('code')
-  const state = url.searchParams.get('state')
-  const error = url.searchParams.get('error')
-
-  let stateData = { 
-  language: 'fa', 
-  isAndroid: false, 
-  originalRedirectUri: '', 
-  gameId: Object.keys(GAMES)[0],
-  requestId: requestId
-}
-
-  try {
-    if (state) {
-      stateData = JSON.parse(atob(state))
-      if (stateData.timestamp && (Date.now() - stateData.timestamp) > CONFIG.STATE_EXPIRY_MS) {
-        logWarning('State expired', { requestId, gameId: stateData.gameId })
-        return createHtmlResponse(createExpiredStatePage())
-      }
+    .ac-seg { display: inline-flex; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+    .ac-seg button {
+      border: none; background: transparent; color: var(--text-dim); font: inherit; font-weight: 600;
+      padding: 7px 12px; cursor: pointer; transition: color 0.2s ease, background 0.2s ease;
     }
-  } catch (e) {
-    logError('State parsing error', { requestId, error: e.message })
-  }
-
-  const game = validateGameId(stateData.gameId, GAMES)
-
-  if (error) {
-    logWarning('OAuth error received', { requestId, gameId: stateData.gameId, error })
-    return createHtmlResponse(createOAuthErrorPage(error, game))
-  }
-
-  if (!code || !stateData.originalRedirectUri) {
-    return createJsonResponse({
-      error: 'invalid_callback',
-      error_description: 'Missing code or redirect URI',
-      requestId
-    }, 400)
-  }
-
-  logInfo('OAuth callback successful', { 
-    requestId: stateData.requestId || requestId, 
-    gameId: stateData.gameId, 
-    isAndroid: stateData.isAndroid 
-  })
-
-  if (stateData.isAndroid) {
-    const androidScheme = `${game.deepLink.scheme}://${game.deepLink.host}?code=${encodeURIComponent(code)}`
-    return createHtmlResponse(createAndroidSuccessPage(androidScheme, game, url.origin))
-  }
-
-  if (stateData.originalRedirectUri && stateData.originalRedirectUri.startsWith('http://localhost')) {
-  return createHtmlResponse(createPCSuccessPage(code, stateData.originalRedirectUri, game))
-}
-return createHtmlResponse(createDesktopSuccessPage(code, game, url.origin))
-}
-
-// ==========================================
-// Token Exchange Handler - Android PKCE Support
-// ==========================================
-async function handleTokenExchange(url, request, gameId, requestId, GAMES, envVars) {
-  const game = validateGameId(gameId, GAMES)
-  if (!game) {
-    return createJsonResponse({
-      error: 'invalid_game',
-      message: 'Game configuration not found',
-      requestId
-    }, 400)
-  }
-
-  let body
-  try {
-    body = await request.text()
-  } catch (e) {
-    return createJsonResponse({
-      error: 'invalid_body',
-      message: 'Failed to read request body',
-      requestId
-    }, 400)
-  }
-
-  const params = new URLSearchParams(body)
-  
-  const code = params.get('code')
-  let redirectUri = params.get('redirect_uri')
-  const platform = params.get('platform')
-  const xPlatform = request.headers.get('X-Platform')
-  
-  if (!code) {
-    return createJsonResponse({
-      error: 'missing_code',
-      message: 'Authorization code is required',
-      requestId
-    }, 400)
-  }
-
-  let isAndroid = false
-  let detectedPlatform = 'web' 
-
-  if (platform === 'android') {
-    isAndroid = true
-    detectedPlatform = 'android (explicit param)'
-  }
-  else if (xPlatform === 'android') {
-    isAndroid = true
-    detectedPlatform = 'android (X-Platform header)'
-  }
-  else if (redirectUri && redirectUri.includes(':/') && !redirectUri.startsWith('http')) {
-    isAndroid = true
-    detectedPlatform = 'android (deep link redirect_uri)'
-  }
-
-  const clientId = game.oauth.web
-  const clientSecret = game.oauth.secret
-  redirectUri = `${url.origin}/oauth/callback`
-
-  logInfo(isAndroid ? 'Android token exchange (using Web Client)' : 'Web token exchange', {
-    requestId,
-    gameId,
-    redirectUri,
-    platform: isAndroid ? (platform || xPlatform || 'detected') : 'web',
-    clientId: clientId.substring(0, 20) + '...',
-    hasSecret: true
-  })
-  
-  if (!clientId) {
-    logError('Client ID not configured', { requestId, gameId, isAndroid })
-    return createJsonResponse({
-      error: 'configuration_error',
-      message: `Client ID not configured for ${isAndroid ? 'Android' : 'Web'}`,
-      requestId
-    }, 500)
-  }
-  
-  if (!clientSecret) {
-    logError('Client Secret not configured', { requestId, gameId })
-    return createJsonResponse({
-      error: 'configuration_error',
-      message: 'Client Secret not configured',
-      requestId
-    }, 500)
-  }
-
-  const tokenUrl = 'https://oauth2.googleapis.com/token'
-  const googleParams = new URLSearchParams({
-    code: code,
-    client_id: clientId,
-    client_secret: clientSecret,
-    redirect_uri: redirectUri,
-    grant_type: 'authorization_code'
-  })
-
-  try {
-    logInfo('Sending request to Google', { 
-      requestId, 
-      gameId,
-      tokenUrl,
-      redirectUri 
-    })
-
-    const googleResponse = await fetch(tokenUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': `${game.name}-Proxy/${CONFIG.VERSION}`
-      },
-      body: googleParams.toString()
-    })
-
-    const responseText = await googleResponse.text()
-
-    if (!googleResponse.ok) {
-      logError('Google token exchange failed', { 
-        requestId, 
-        gameId, 
-        isAndroid,
-        platform: platform || xPlatform || 'unknown',
-        status: googleResponse.status,
-        response: responseText,
-        sentRedirectUri: redirectUri,
-        usedClientId: clientId.substring(0, 20) + '...'
-      })
-      
-      return createJsonResponse({
-        error: 'token_exchange_failed',
-        details: responseText,
-        status: googleResponse.status,
-        debug: {
-          isAndroid,
-          platform: platform || xPlatform || 'unknown',
-          sentRedirectUri: redirectUri,
-          clientId: clientId.substring(0, 20) + '...',
-          hasCode: true,
-          hasSecret: true,
-          detectedPlatform: detectedPlatform
-        },
-        requestId
-      }, googleResponse.status)
+    .ac-seg button[aria-pressed="true"] { color: #fff; background: var(--accent); }
+    .ac-icon-btn {
+      width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center;
+      border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text);
+      cursor: pointer; transition: transform 0.2s ease, background 0.2s ease;
     }
-
-    logInfo('Token exchanged successfully', { 
-      requestId, 
-      gameId, 
-      isAndroid,
-      platform: platform || xPlatform || 'detected'
-    })
-    
-    return createJsonResponse(JSON.parse(responseText), 200)
-
-  } catch (error) {
-    logError('Token exchange error', { 
-      requestId, 
-      gameId, 
-      error: error.message
-    })
-    
-    return createJsonResponse({
-      error: 'network_error',
-      message: error.message,
-      requestId
-    }, 500)
-  }
-}
-
-async function handleRefreshToken(url, request, gameId, requestId, GAMES, envVars) {
-  const game = validateGameId(gameId, GAMES)
-  if (!game) {
-    return createJsonResponse({
-      error: 'invalid_game',
-      message: 'Game configuration not found',
-      requestId
-    }, 400)
-  }
-
-  let body
-  try {
-    body = await request.json()
-  } catch (e) {
-    return createJsonResponse({
-      error: 'invalid_json',
-      message: 'Request body must be valid JSON',
-      requestId
-    }, 400)
-  }
-
-  const { refreshToken } = body
-
-  if (!refreshToken) {
-    return createJsonResponse({
-      error: 'missing_refresh_token',
-      message: 'Refresh token is required',
-      requestId
-    }, 400)
-  }
-
-  try {
-    // ── D1 path: neon-katana ──────────────────────────────
-    // For neon-katana, use Google OAuth token refresh
-    if (game.d1Binding) {
-      const tokenUrl = `https://oauth2.googleapis.com/token`
-      const tokenBody = new URLSearchParams({
-        grant_type: 'refresh_token',
-        refresh_token: refreshToken,
-        client_id: game.oauth.web,
-        client_secret: game.oauth.secret
-      })
-
-      const tokenResponse = await fetch(tokenUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: tokenBody.toString()
-      })
-
-      const tokenData = await tokenResponse.json()
-
-      if (!tokenResponse.ok || tokenData.error) {
-        logError('Google token refresh failed', { requestId, gameId, error: tokenData.error })
-        return createJsonResponse({
-          success: false,
-          error: 'refresh_failed',
-          message: tokenData.error_description || 'Failed to refresh token',
-          requestId
-        }, 400)
-      }
-
-      logInfo('Google token refreshed successfully', { requestId, gameId })
-
-      return createJsonResponse({
-        success: true,
-        id_token: tokenData.id_token,
-        refresh_token: tokenData.refresh_token || refreshToken,
-        expires_in: tokenData.expires_in || 3600,
-        requestId
-      }, 200)
+    .ac-icon-btn:hover { transform: translateY(-2px); }
+    .ac-icon-btn svg { width: 20px; height: 20px; }
+    .ac-card { max-width: 540px; width: 100%; text-align: center; }
+    .ac-status-icon {
+      width: 92px; height: 92px; margin: 6px auto 18px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; border: 3px solid currentColor;
     }
-
-    return createJsonResponse({ success: false, error: 'unsupported_game', message: 'Game not supported', requestId }, 400)
-
-  } catch (error) {
-    logError('Token refresh error', { requestId, gameId, error: error.message })
-    return createJsonResponse({
-      success: false,
-      error: 'refresh_error',
-      message: error.message,
-      requestId
-    }, 500)
-  }
-}
-
-// ==========================================
-// Database Handlers
-// ==========================================
-async function handleDatabaseGet(url, request, gameId, requestId, GAMES, envVars) {
-  const game = validateGameId(gameId, GAMES)
-  if (!game) {
-    return createJsonResponse({
-      error: 'invalid_game',
-      message: 'Database not configured for this game',
-      requestId
-    }, 400)
-  }
-
-  const token = request.headers.get('Authorization')?.replace('Bearer ', '')
-  const dbPath = url.pathname.replace('/database/get/', '')
-
-  const publicPaths = ['topScores', 'globalTopScores', 'leaderboard']
-  const isPublicPath = publicPaths.some(p => dbPath.includes(p))
-
-  if (!isPublicPath && !token) {
-    return createJsonResponse({
-      error: 'unauthorized',
-      message: 'Authorization token required',
-      requestId
-    }, 401)
-  }
-
-  logInfo('Database GET request', { requestId, gameId, path: dbPath, hasToken: !!token, isPublic: isPublicPath })
-
-  try {
-    // ── D1 path: neon-katana ──────────────────────────────
-    if (game.d1Binding) {
-      const db = envVars[game.d1Binding]
-
-      if (!db) {
-        return createJsonResponse({
-          error: 'db_not_bound',
-          message: `D1 binding "${game.d1Binding}" not found`,
-          requestId
-        }, 500)
-      }
-      const userMatch = dbPath.match(/^games\/[^/]+\/users\/([^/]+)$/)
-      if (userMatch) {
-        const uid = userMatch[1]
-        const player = await db.prepare(`
-        SELECT * FROM players WHERE player_id = ? LIMIT 1
-      `).bind(uid).first().catch(() => null)
-
-      if (!player) {
-        return createJsonResponse({
-          error: 'not_found',
-          message: 'User not found',
-          requestId
-        }, 404)
-      }
-
-        return createJsonResponse({
-          uid: player.player_id,
-          email: player.email,
-          username: player.username,
-          displayName: player.username,
-          photoURL: player.profile_pic_url,
-          highScore: player.high_score,
-          gamesPlayed: player.games_played,
-          totalPlayTime: player.total_play_time,
-          selectedColor: player.selected_color,
-          purchasedColors: JSON.parse(player.purchased_colors || '["FFFFFF"]'),
-          purchasedItems: JSON.parse(player.purchased_items || '{}'),
-          createdAt: player.created_at,
-          lastLogin: player.last_login
-        }, 200)
-      }
-
-      // Path: games/neon-katana/users/{uid}/highScore
-      const scoreMatch = dbPath.match(/^games\/[^/]+\/users\/([^/]+)\/highScore$/)
-      if (scoreMatch) {
-        const uid = scoreMatch[1]
-        const player = await db.prepare(`
-          SELECT high_score FROM players WHERE player_id = ? LIMIT 1
-        `).bind(uid).first()
-
-        return createJsonResponse(player ? player.high_score : 0, 200)
-      }
-
-      // Path: leaderboard
-      if (dbPath.includes('leaderboard')) {
-        const { results } = await db.prepare(`
-          SELECT username, username AS displayName, high_score AS highScore,
-                 profile_pic_url AS photoURL, selected_color AS selectedColor
-          FROM players
-          ORDER BY high_score DESC
-          LIMIT 100
-        `).all()
-
-        const mapped = (results || []).map((row, index) => ({
-          rank: index + 1,
-          username: row.username || 'Unknown User',
-          displayName: row.displayName || 'Unknown User',
-          highScore: row.highScore || 0,
-          photoURL: row.photoURL || '',
-          selectedColor: row.selectedColor || 'FFFFFF'
-        }))
-
-        return createJsonResponse(mapped, 200)
-      }
-
-      return createJsonResponse({
-        error: 'unknown_path',
-        message: `Path not supported for D1: ${dbPath}`,
-        requestId
-      }, 400)
+    .ac-status-icon svg { width: 46px; height: 46px; }
+    .ac-status-icon.ok { color: var(--ok); }
+    .ac-status-icon.err { color: var(--err); }
+    .ac-status-icon.warn { color: var(--warn); }
+    .ac-game-name { font-size: 1.15em; font-weight: 700; margin-block: 4px 14px; color: var(--text); }
+    .ac-badge {
+      display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; border-radius: 20px;
+      font-size: 0.85em; font-weight: 700; color: var(--ok);
+      background: rgba(var(--ok-rgb), 0.16); border: 1px solid rgba(var(--ok-rgb), 0.5);
     }
-
-    return createJsonResponse({ error: 'unsupported_game', message: 'This game does not support GET operations', requestId }, 400)
-
-  } catch (error) {
-    logError('Database GET error', { requestId, gameId, path: dbPath, error: error.message })
-    return createJsonResponse({
-      error: 'database_error',
-      message: error.message,
-      requestId
-    }, 500)
-  }
-}
-
-async function handleDatabaseSet(url, request, gameId, requestId, GAMES, envVars) {
-  const game = validateGameId(gameId, GAMES)
-  if (!game) {
-    return createJsonResponse({
-      error: 'invalid_game',
-      message: 'Database not configured for this game',
-      requestId
-    }, 400)
-  }
-
-  const token = request.headers.get('Authorization')?.replace('Bearer ', '')
-
-if (!token) {
-  return createJsonResponse({
-    error: 'unauthorized',
-    message: 'Authorization token required',
-    requestId
-  }, 401)
-}
-
-const tokenInfoResponse = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`)
-const tokenInfo = await tokenInfoResponse.json()
-
-if (!tokenInfoResponse.ok || tokenInfo.error_description) {
-  return createJsonResponse({
-    error: 'invalid_token',
-    message: 'Token is invalid or expired',
-    requestId
-  }, 401)
-}
-
-const tokenPlayerId = tokenInfo.email.split('@')[0].toLowerCase().substring(0, 15)
-
-const dbPath = url.pathname.replace('/database/set/', '')
-
-const uidMatch = dbPath.match(/^games\/[^/]+\/users\/([^/]+)/)
-if (uidMatch && uidMatch[1] !== tokenPlayerId) {
-  return createJsonResponse({
-    error: 'forbidden',
-    message: 'You can only modify your own data',
-    requestId
-  }, 403)
-}
-
-const body = await request.text()
-
-  logInfo('Database SET request', { requestId, gameId, path: dbPath, method: request.method, bodyLength: body.length })
-
-  // ── D1 path: neon-katana ────────────────────────────────
-  if (game.d1Binding) {
-    const db = envVars[game.d1Binding]
-
-    if (!db) {
-      return createJsonResponse({
-        error: 'db_not_bound',
-        message: `D1 binding "${game.d1Binding}" not found`,
-        requestId
-      }, 500)
+    .ac-badge svg { width: 15px; height: 15px; }
+    .ac-spinner {
+      width: 54px; height: 54px; margin: 22px auto; border-radius: 50%;
+      border: 5px solid var(--border); border-top-color: var(--accent); animation: acSpin 0.8s linear infinite;
     }
-
-    try {
-      const highScoreMatch = dbPath.match(/^games\/([^/]+)\/users\/([^/]+)\/highScore$/)
-      if (highScoreMatch) {
-        const uid = highScoreMatch[2]
-        const newScore = parseInt(body)
-
-        if (isNaN(newScore) || newScore < 0) {
-          return createJsonResponse({
-            error: 'invalid_score',
-            message: 'Score must be a non-negative number',
-            requestId
-          }, 400)
-        }
-
-        const player = await db.prepare(`
-          SELECT high_score, username, profile_pic_url, selected_color
-          FROM players WHERE player_id = ? LIMIT 1
-        `).bind(uid).first()
-
-        if (!player) {
-          return createJsonResponse({
-            error: 'user_not_found',
-            message: 'Player not found in database',
-            requestId
-          }, 404)
-        }
-
-        const currentHighScore = player.high_score || 0
-
-        if (newScore <= currentHighScore) {
-          logInfo('New score not higher', { requestId, uid, newScore, currentHighScore })
-          return createJsonResponse({
-            success: false,
-            message: 'Score not higher than current high score',
-            currentHighScore,
-            submittedScore: newScore,
-            requestId
-          }, 200)
-        }
-
-        await db.prepare(`
-          UPDATE players
-          SET high_score = ?, games_played = games_played + 1, last_login = ?
-          WHERE player_id = ?
-        `).bind(newScore, Date.now(), uid).run()
-
-        logInfo('High score updated in D1', { requestId, uid, previousScore: currentHighScore, newScore })
-
-        return createJsonResponse({
-          success: true,
-          message: 'High score updated successfully',
-          previousHighScore: currentHighScore,
-          newHighScore: newScore,
-          improvement: newScore - currentHighScore,
-          requestId
-        }, 200)
-      }
-
-      // Save user data
-      const userMatch = dbPath.match(/^games\/([^/]+)\/users\/([^/]+)$/)
-      if (userMatch) {
-        const uid = userMatch[2]
-        let userData
-        try {
-          userData = JSON.parse(body)
-        } catch {
-          return createJsonResponse({ error: 'invalid_json', message: 'Body must be valid JSON', requestId }, 400)
-        }
-
-        const now = Date.now()
-        const updates = []
-        const values = []
-
-        if (userData.username !== undefined) {
-          const usernameError = validateUsername(userData.username)
-          if (usernameError) {
-            return createJsonResponse({
-              error: usernameError.errorCode,
-              messagePersian: usernameError.messagePersian,
-              messageEnglish: usernameError.messageEnglish,
-              requestId
-            }, 400)
-          }
-          updates.push('username = ?')
-          values.push(userData.username)
-        }
-        if (userData.selectedColor !== undefined) { updates.push('selected_color = ?'); values.push(userData.selectedColor) }
-        if (userData.purchasedColors !== undefined) { updates.push('purchased_colors = ?'); values.push(JSON.stringify(userData.purchasedColors)) }
-        if (userData.purchasedItems !== undefined) { updates.push('purchased_items = ?'); values.push(JSON.stringify(userData.purchasedItems)) }
-        if (userData.totalPlayTime !== undefined) { updates.push('total_play_time = ?'); values.push(userData.totalPlayTime) }
-
-        if (updates.length > 0) {
-          updates.push('last_login = ?')
-          values.push(now)
-          values.push(uid)
-          await db.prepare(`UPDATE players SET ${updates.join(', ')} WHERE player_id = ?`).bind(...values).run()
-        }
-
-        logInfo('User data updated in D1', { requestId, uid })
-        return createJsonResponse({ success: true, requestId }, 200)
-      }
-
-      return createJsonResponse({
-        error: 'unknown_path',
-        message: `Path not supported for D1: ${dbPath}`,
-        requestId
-      }, 400)
-
-    } catch (error) {
-      logError('D1 SET error', { requestId, gameId, path: dbPath, error: error.message })
-      return createJsonResponse({ error: 'database_error', message: error.message, requestId }, 500)
-    }
-  }
-
-  return createJsonResponse({ error: 'unsupported_game', message: 'This game does not support SET operations', requestId }, 400)
+    .ac-muted { color: var(--text-dim); font-size: 0.95em; margin-block-start: 10px; }
+    .ac-status-text { font-size: 1.05em; margin-block-start: 8px; }
+    @keyframes acSpin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .ac-spinner { animation-duration: 0.001ms; } }
+  `
 }
 
-function createAuthRedirectPage(googleAuthUrl, game, baseUrl) {
+// Base shell every auth-flow page shares: head, design tokens, chrome, body.
+function renderAuthShell({ title, lang, theme, brandColor, body, script = '', includeChrome = true }) {
+  const code = resolveLang(lang)
+  const dir = dirFor(code)
+  const themeAttr = theme === 'light' || theme === 'dark' ? ` data-theme="${theme}"` : ''
+
   return `<!DOCTYPE html>
-<html lang="fa" dir="rtl">
+<html lang="${code}" dir="${dir}"${themeAttr}>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="google-site-verification" content="uFvaRQchIco-iyGmdsNknLK7mL5Asxg47GjaOQmhf0Q" />
-  <title>در حال انتقال به Google - AmirCollider Proxy</title>
-  <link rel="icon" href="${CONFIG.AMIR_LOGO}" type="image/png">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: Tahoma, Arial, sans-serif;
-      background: linear-gradient(135deg, ${game.color}, #764ba2);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      overflow: hidden;
-    }
-    .container {
-      background: rgba(255,255,255,0.1);
-      padding: 60px 50px;
-      border-radius: 25px;
-      backdrop-filter: blur(25px);
-      box-shadow: 0 30px 70px rgba(0,0,0,0.4);
-      text-align: center;
-      max-width: 500px;
-      width: 90%;
-      animation: slideUp 0.7s ease;
-      position: relative;
-      z-index: 10;
-    }
-    @keyframes slideUp {
-      from { opacity: 0; transform: translateY(40px) scale(0.9); }
-      to { opacity: 1; transform: translateY(0) scale(1); }
-    }
-    .spinner {
-      width: 80px;
-      height: 80px;
-      border: 6px solid rgba(255,255,255,0.2);
-      border-top-color: white;
-      border-radius: 50%;
-      animation: spin 1.2s linear infinite;
-      margin: 30px auto;
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    .game-icon {
-      font-size: 80px;
-      margin-bottom: 20px;
-      animation: bounce 1s infinite;
-    }
-    @keyframes bounce {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-10px); }
-    }
-    .progress-bar {
-      width: 100%;
-      height: 6px;
-      background: rgba(255,255,255,0.2);
-      border-radius: 10px;
-      margin-top: 20px;
-      overflow: hidden;
-    }
-    .progress-fill {
-      height: 100%;
-      background: linear-gradient(90deg, #4caf50, #8bc34a);
-      animation: progress 2s ease-in-out infinite;
-    }
-    @keyframes progress {
-      0% { width: 0%; }
-      50% { width: 70%; }
-      100% { width: 100%; }
-    }
-  </style>
+  ${getPageHead({ title, amirLogo: CONFIG.AMIR_LOGO })}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  ${themeBootScript()}
+  <style>${getSharedCSS(brandColor)}${authPageCSS()}</style>
 </head>
 <body>
-  <div class="container">
-    <div class="game-icon">${game.icon}</div>
-    <h1>ورود با Google</h1>
-    <p style="margin: 15px 0; font-size: 1.1em;"><strong>${game.name}</strong></p>
-    <div class="spinner"></div>
-    <p>در حال انتقال به صفحه ورود امن Google...</p>
-    <div class="progress-bar">
-      <div class="progress-fill"></div>
-    </div>
-    <p style="margin-top: 15px; font-size: 0.9em; opacity: 0.8;">لطفاً منتظر بمانید</p>
+  ${includeChrome ? renderTopbar(lang) : ''}
+  <div class="container ac-card">
+    ${body}
   </div>
-  <script>
-    setTimeout(() => {
-      window.location.href = '${googleAuthUrl}';
-    }, ${CONFIG.REDIRECT_TIMEOUT_MS});
-  </script>
+  ${includeChrome ? chromeScript() : ''}
+  ${script}
 </body>
 </html>`
 }
 
-function createDesktopSuccessPage(code, game, baseUrl) {
-  return `<!DOCTYPE html>
-<html lang="fa" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="google-site-verification" content="uFvaRQchIco-iyGmdsNknLK7mL5Asxg47GjaOQmhf0Q" />
-  <title>ورود موفق - AmirCollider Proxy</title>
-  <link rel="icon" href="https://drive.google.com/uc?export=download&id=1kwjfUTVmbHOtJbl0DbXoOq9-BWitQBnw" type="image/png">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: Tahoma, Arial, sans-serif;
-      background: linear-gradient(135deg, #4CAF50, #8BC34A);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      overflow: hidden;
-    }
-    .container {
-      background: rgba(255,255,255,0.15);
-      padding: 60px;
-      border-radius: 30px;
-      backdrop-filter: blur(25px);
-      text-align: center;
-      max-width: 600px;
-      box-shadow: 0 30px 80px rgba(0,0,0,0.3);
-      animation: scaleIn 0.5s ease;
-      position: relative;
-      z-index: 10;
-    }
-    @keyframes scaleIn {
-      from { opacity: 0; transform: scale(0.9); }
-      to { opacity: 1; transform: scale(1); }
-    }
-    .success-icon {
-      font-size: 100px;
-      animation: checkmark 0.8s ease;
-    }
-    @keyframes checkmark {
-      0% { transform: scale(0) rotate(-45deg); }
-      50% { transform: scale(1.2) rotate(0deg); }
-      100% { transform: scale(1) rotate(0deg); }
-    }
-    .game-icon {
-      font-size: 4em;
-      margin: 20px 0;
-    }
-    .code-box {
-      background: rgba(255,235,59,0.2);
-      padding: 25px;
-      border-radius: 15px;
-      margin: 30px 0;
-      border: 2px solid #ffeb3b;
-    }
-    .copy-status {
-      margin-top: 15px;
-      padding: 12px;
-      border-radius: 8px;
-      font-weight: bold;
-      font-size: 1.1em;
-      background: rgba(76,175,80,0.3);
-      color: #4caf50;
-      border: 2px solid #4caf50;
-      animation: fadeIn 0.5s ease;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(-10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .action-buttons {
-      display: flex;
-      gap: 15px;
-      justify-content: center;
-      margin-top: 30px;
-      flex-wrap: wrap;
-    }
-    .action-btn {
-      background: rgba(255,255,255,0.3);
-      color: white;
-      border: 2px solid white;
-      padding: 15px 30px;
-      border-radius: 10px;
-      cursor: pointer;
-      font-size: 1em;
-      font-weight: bold;
-      transition: all 0.3s;
-      text-decoration: none;
-      display: inline-block;
-    }
-    .action-btn:hover {
-      background: rgba(255,255,255,0.4);
-      transform: scale(1.05);
-    }
-    .security-badge {
-      background: rgba(76,175,80,0.3);
-      color: #4caf50;
-      padding: 8px 16px;
-      border-radius: 20px;
-      display: inline-block;
-      margin-top: 10px;
-      font-size: 0.9em;
-      border: 1px solid #4caf50;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="success-icon">✅</div>
-    <div class="game-icon">${game?.icon || '🎮'}</div>
-    <h1>احراز هویت موفق!</h1>
-    <p style="font-size: 1.2em; margin: 10px 0;"><strong>${game?.name || 'AmirCollider Games'}</strong></p>
-    <div class="security-badge">🔒 امنیت بالا</div>
-    
-    <div class="code-box">
-      <p style="font-size: 1.3em; margin-bottom: 15px;"><strong>کد احراز هویت</strong></p>
-      <button onclick="copyCodeManually()" class="action-btn" style="width: 100%; font-size: 1.1em; padding: 18px;">
-        📋 کپی کردن کد
-      </button>
-      <div class="copy-status" id="copyStatus">✅ کد به صورت خودکار کپی شد!</div>
-      <p style="font-size: 0.85em; margin-top: 15px; opacity: 0.9;">ℹ️ کد امنیتی شما آماده استفاده است</p>
-    </div>
-    
-    <div class="action-buttons">
-      <button onclick="returnToGame()" class="action-btn">🎮 بازگشت به بازی</button>
-      <a href="${baseUrl}" class="action-btn">🌐 بازگشت به سایت</a>
-    </div>
-    
-    <p style="margin-top: 30px; opacity: 0.9; font-size: 0.9em;">این پنجره را می‌توانید ببندید</p>
-  </div>
-  <script>
-    const authCode = ${JSON.stringify(code)};
-    
-    function copyCodeManually() {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(authCode).then(() => {
-          showCopyStatus('✅ کد دوباره کپی شد!');
-        }).catch(err => {
-          fallbackCopy(authCode);
-        });
-      } else {
-        fallbackCopy(authCode);
-      }
-    }
-    
-    function showCopyStatus(message) {
-      const status = document.getElementById('copyStatus');
-      status.textContent = message;
-      status.style.display = 'block';
-    }
-    
-    function returnToGame() {
-      if (window.opener) {
-        window.close();
-      } else {
-        window.close();
-        setTimeout(() => {
-          alert('لطفاً این صفحه را ببندید و به بازی برگردید');
-        }, 500);
-      }
-    }
-    
-    function autoCopyCode() {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(authCode).then(() => {
-          console.log('✅ کد خودکار کپی شد');
-        }).catch(err => {
-          fallbackCopy(authCode);
-        });
-      } else {
-        fallbackCopy(authCode);
-      }
-    }
-    
-    function fallbackCopy(text) {
-      const textarea = document.createElement('textarea');
-      textarea.value = text;
-      textarea.style.position = 'fixed';
-      textarea.style.opacity = '0';
-      document.body.appendChild(textarea);
-      textarea.select();
-      try {
-        document.execCommand('copy');
-        showCopyStatus('✅ کد کپی شد!');
-      } catch (err) {
-        alert('خطا در کپی');
-      }
-      document.body.removeChild(textarea);
-    }
-    
-    autoCopyCode();
-  </script>
-</body>
-</html>`
+
+// ==========================================
+// Page: Redirect to Google
+// Localized interstitial that forwards the browser to Google's sign-in.
+// ==========================================
+function renderRedirectPage(googleAuthUrl, game, lang, theme) {
+  const safeUrl = escapeHtml(googleAuthUrl)
+  const body = `
+    ${getLogosHTML(CONFIG.AMIR_LOGO, game.logo, game.name)}
+    <h1>${escapeHtml(authText(lang, 'redirectTitle'))}</h1>
+    <div class="ac-game-name">${escapeHtml(game.name)}</div>
+    <div class="ac-spinner"></div>
+    <p class="ac-status-text">${escapeHtml(authText(lang, 'redirectBody'))}</p>
+    <p class="ac-muted">${escapeHtml(authText(lang, 'pleaseWait'))}</p>
+    <div class="btn-container">
+      <a class="btn" href="${safeUrl}" rel="nofollow">${escapeHtml(authText(lang, 'continueManually'))}</a>
+    </div>`
+  const script = `<script>
+    setTimeout(function(){ window.location.href = ${jsString(googleAuthUrl)}; }, ${CONFIG.REDIRECT_TIMEOUT_MS});
+  </script>`
+  return renderAuthShell({
+    title: `${authText(lang, 'redirectTitle')} - AmirCollider Proxy`,
+    lang, theme, brandColor: game.color, body, script
+  })
 }
 
+
 // ==========================================
-// ✅ FIXED: Android Success Page با Deep Link بهتر
+// Page: Desktop Success (copy-code)
+// Shown to web/desktop callers; auto-copies the code and offers a copy button.
 // ==========================================
-function createAndroidSuccessPage(androidScheme, game, baseUrl) {
-  const code = androidScheme.split('code=')[1] || androidScheme.split('?code=')[1] || '';
-  
-  if (!code) {
-    logError('❌ No code found in androidScheme', { androidScheme });
-  } else {
-    logInfo('✅ Code extracted for deep link', { 
-      codeLength: code.length,
-      codePreview: code.substring(0, 20) + '...'
-    });
-  }
-
-  const deepLinkScheme = `${game.deepLink.scheme}://${game.deepLink.host}?code=${code}`;
-
-  logInfo('🔗 Generated deep link', { 
-    scheme: game.deepLink.scheme,
-    host: game.deepLink.host,
-    deepLinkScheme: deepLinkScheme 
-  });
-
-  return `<!DOCTYPE html>
-<html lang="fa" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ورود موفق - ${game.name}</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: Tahoma, Arial, sans-serif;
-      background: linear-gradient(135deg, #4CAF50, #8BC34A);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      text-align: center;
-      overflow: hidden;
-    }
-    .container {
-      padding: 40px;
-      animation: fadeIn 0.5s ease;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
-    .game-icon {
-      font-size: 5em;
-      margin-bottom: 20px;
-      animation: bounce 1s infinite;
-    }
-    @keyframes bounce {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-15px); }
-    }
-    .success-circle {
-      width: 120px;
-      height: 120px;
-      border: 6px solid white;
-      border-radius: 50%;
-      margin: 20px auto;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 60px;
-      animation: pulse 1.5s infinite;
-    }
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.1); }
-    }
-    .spinner {
-      width: 60px;
-      height: 60px;
-      border: 5px solid rgba(255,255,255,0.3);
-      border-top-color: white;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin: 30px auto;
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    .debug-info {
-      margin-top: 30px;
-      padding: 20px;
-      background: rgba(0,0,0,0.3);
-      border-radius: 10px;
-      font-size: 0.9em;
-      text-align: left;
-      font-family: monospace;
-      display: none; /* مخفی در production */
-    }
-    .manual-open {
-      margin-top: 20px;
-      padding: 15px 30px;
-      background: rgba(255,255,255,0.3);
-      border: 2px solid white;
-      border-radius: 10px;
-      color: white;
-      font-weight: bold;
-      cursor: pointer;
-      display: none;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="success-circle">✔</div>
-    <div class="game-icon">${game?.icon || '🎮'}</div>
-    <h1>ورود موفقیت‌آمیز!</h1>
-    <p style="font-size: 1.2em; margin: 15px 0;"><strong>${game?.name || 'AmirCollider Games'}</strong></p>
-    <div class="spinner"></div>
-    <p>در حال بازگشت به بازی...</p>
-    
-    <!-- دکمه Manual (فقط اگر automatic کار نکرد) -->
-    <button id="manualOpen" class="manual-open" onclick="openGame()">
-      🎮 بازگشت دستی به بازی
-    </button>
-
-    <!-- Debug Info (فقط برای توسعه) -->
-    <div class="debug-info" id="debugInfo">
-      <strong>🔍 Debug Info:</strong><br>
-      Deep Link: ${deepLinkScheme}<br>
-      Code Length: ${code.length}<br>
-      Game: ${game?.name}<br>
-      Scheme: ${game?.deepLink?.scheme}
+function renderDesktopSuccessPage(code, game, baseUrl, lang, theme) {
+  const body = `
+    <div class="ac-status-icon ok">${PAGE_ICONS.check}</div>
+    <h1>${escapeHtml(authText(lang, 'authSuccess'))}</h1>
+    <div class="ac-game-name">${escapeHtml(game?.name || 'AmirCollider Games')}</div>
+    <span class="ac-badge">${PAGE_ICONS.lock}${escapeHtml(authText(lang, 'secureBadge'))}</span>
+    <p class="ac-muted" style="margin-block-start:18px;">${escapeHtml(authText(lang, 'codeReady'))}</p>
+    <div class="btn-container">
+      <button type="button" class="btn" onclick="acCopyCode()">${escapeHtml(authText(lang, 'copyCode'))}</button>
+      <a class="btn btn-secondary" href="${escapeHtml(baseUrl)}">${escapeHtml(authText(lang, 'backToSite'))}</a>
     </div>
-  </div>
+    <p class="ac-muted" id="copyStatus" style="display:none;"></p>
+    <p class="ac-muted" style="margin-block-start:22px;">${escapeHtml(authText(lang, 'canClose'))}</p>`
+  const script = `<script>
+    var authCode = ${jsString(code)};
+    var copiedLabel = ${jsString(authText(lang, 'copied'))};
+    function acShowCopied(){ var s=document.getElementById('copyStatus'); if(s){ s.textContent=copiedLabel; s.style.display='block'; } }
+    function acFallbackCopy(text){
+      var ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.select();
+      try{ document.execCommand('copy'); acShowCopied(); }catch(e){} document.body.removeChild(ta);
+    }
+    window.acCopyCode=function(){
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        navigator.clipboard.writeText(authCode).then(acShowCopied).catch(function(){ acFallbackCopy(authCode); });
+      } else { acFallbackCopy(authCode); }
+    };
+    acCopyCode();
+  </script>`
+  return renderAuthShell({
+    title: `${authText(lang, 'authSuccess')} - AmirCollider Proxy`,
+    lang, theme, brandColor: game?.color || '#4caf50', body, script
+  })
+}
 
-  <script>
-    const deepLink = ${JSON.stringify(deepLinkScheme)};
-    const code = ${JSON.stringify(code)};
-    
-    console.log('🔗 Android Success Page Loaded');
-    console.log('   Deep Link:', deepLink);
-    console.log('   Code Length:', code.length);
-    console.log('   Code Preview:', code.substring(0, 20) + '...');
 
-    function openGame() {
-      console.log('🚀 Opening game with deep link...');
-      
+// ==========================================
+// Page: Loopback Success (desktop localhost)
+// Delivers the code to a local redirect URI used by Unity/desktop loopback.
+// ==========================================
+function renderLoopbackSuccessPage(code, localRedirectUri, game, lang, theme) {
+  const callbackUrl = `${localRedirectUri}?code=${encodeURIComponent(code)}`
+  const body = `
+    <div class="ac-status-icon ok">${PAGE_ICONS.check}</div>
+    <h1>${escapeHtml(authText(lang, 'authSuccess'))}</h1>
+    <div class="ac-game-name">${escapeHtml(game.name)}</div>
+    <div class="ac-spinner"></div>
+    <p class="ac-status-text" id="status">${escapeHtml(authText(lang, 'transferring'))}</p>
+    <p class="ac-muted" style="margin-block-start:22px;">${escapeHtml(authText(lang, 'canClose'))}</p>`
+  const script = `<script>
+    var ready = ${jsString(authText(lang, 'gameReady'))};
+    function done(){ var s=document.getElementById('status'); if(s) s.textContent=ready; }
+    fetch(${jsString(callbackUrl)}).then(done).catch(done);
+  </script>`
+  return renderAuthShell({
+    title: `${authText(lang, 'authSuccess')} - AmirCollider Proxy`,
+    lang, theme, brandColor: game.color, body, script
+  })
+}
+
+
+// ==========================================
+// Page: Android Success (deep link)
+// Opens the game via its registered deep link and offers a manual fallback.
+// ==========================================
+function renderAndroidSuccessPage(deepLink, game, lang, theme) {
+  const body = `
+    <div class="ac-status-icon ok">${PAGE_ICONS.check}</div>
+    <h1>${escapeHtml(authText(lang, 'authSuccess'))}</h1>
+    <div class="ac-game-name">${escapeHtml(game?.name || 'AmirCollider Games')}</div>
+    <div class="ac-spinner"></div>
+    <p class="ac-status-text">${escapeHtml(authText(lang, 'returningToGame'))}</p>
+    <div class="btn-container">
+      <button type="button" id="manualOpen" class="btn" style="display:none;" onclick="acOpenGame()">${escapeHtml(authText(lang, 'manualReturn'))}</button>
+    </div>
+    <p class="ac-muted" style="margin-block-start:22px;">${escapeHtml(authText(lang, 'canClose'))}</p>`
+  const script = `<script>
+    var deepLink = ${jsString(deepLink)};
+    function acShowManual(){ var b=document.getElementById('manualOpen'); if(b) b.style.display='inline-flex'; }
+    window.acOpenGame=function(){
       try {
         window.location.href = deepLink;
-        console.log('✅ Attempted via window.location');
-        
-        setTimeout(() => {
-          try {
-            window.open(deepLink, '_self');
-            console.log('✅ Attempted via window.open');
-          } catch (e) {
-            console.warn('⚠️ window.open failed:', e);
-          }
-        }, 500);
-
-        setTimeout(() => {
-          try {
-            const iframe = document.createElement('iframe');
-            iframe.style.display = 'none';
-            iframe.src = deepLink;
-            document.body.appendChild(iframe);
-            console.log('✅ Attempted via iframe');
-            
-            setTimeout(() => {
-              document.body.removeChild(iframe);
-            }, 2000);
-          } catch (e) {
-            console.warn('⚠️ iframe method failed:', e);
-          }
-        }, 1000);
-
-      } catch (error) {
-        console.error('❌ All methods failed:', error);
-        showManualButton();
-      }
-    }
-
-    function showManualButton() {
-      const btn = document.getElementById('manualOpen');
-      btn.style.display = 'inline-block';
-      console.log('⚠️ Showing manual open button');
-    }
-
-    setTimeout(() => {
-      console.log('🔄 Auto-opening game...');
-      openGame();
-      
-      /// If not opened after 5 seconds, show the Manual button
-      setTimeout(() => {
-        showManualButton();
-      }, 5000);
-    }, 1000);
-
-    if (window.location.hostname === 'localhost' || 
-        window.location.search.includes('debug=true')) {
-      document.getElementById('debugInfo').style.display = 'block';
-      console.log('🐛 Debug mode enabled');
-    }
-  </script>
-</body>
-</html>`;
-}
-
-function createPCSuccessPage(code, localRedirectUri, game) {
-  const callbackUrl = `${localRedirectUri}?code=${encodeURIComponent(code)}`
-  
-  return `<!DOCTYPE html>
-<html lang="fa" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ورود موفق - ${game.name}</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: Tahoma, Arial, sans-serif;
-      background: linear-gradient(135deg, #4CAF50, #8BC34A);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      text-align: center;
-    }
-    .container {
-      padding: 60px 50px;
-      background: rgba(255,255,255,0.15);
-      border-radius: 30px;
-      backdrop-filter: blur(25px);
-      max-width: 500px;
-      width: 90%;
-      animation: fadeIn 0.5s ease;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: scale(0.95); }
-      to   { opacity: 1; transform: scale(1); }
-    }
-    .success-circle {
-      width: 120px;
-      height: 120px;
-      border: 6px solid white;
-      border-radius: 50%;
-      margin: 0 auto 25px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 55px;
-    }
-    .game-icon { font-size: 4em; margin: 15px 0; }
-    .spinner {
-      width: 50px;
-      height: 50px;
-      border: 4px solid rgba(255,255,255,0.3);
-      border-top-color: white;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin: 25px auto;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .status { font-size: 1.1em; opacity: 0.9; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="success-circle">✔</div>
-    <div class="game-icon">${game.icon}</div>
-    <h1>ورود موفقیت‌آمیز!</h1>
-    <p style="font-size:1.2em; margin:10px 0;"><strong>${game.name}</strong></p>
-    <div class="spinner"></div>
-    <p class="status" id="status">در حال انتقال اطلاعات به بازی...</p>
-    <p style="margin-top:20px; opacity:0.8; font-size:0.9em;">این پنجره را می‌توانید ببندید</p>
-  </div>
-  <script>
-    fetch(${JSON.stringify(callbackUrl)})
-      .then(() => {
-        document.getElementById('status').textContent = 'بازی آماده است! این پنجره را ببندید.'
-      })
-      .catch(() => {
-        document.getElementById('status').textContent = 'بازی آماده است! این پنجره را ببندید.'
-      })
-  </script>
-</body>
-</html>`
-}
-
-function createOAuthErrorPage(error, game) {
-  return `<!DOCTYPE html>
-<html lang="fa" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="google-site-verification" content="uFvaRQchIco-iyGmdsNknLK7mL5Asxg47GjaOQmhf0Q" />
-  <title>خطا در ورود - AmirCollider Proxy</title>
-  <link rel="icon" href="${game?.logo || ''}" type="image/png">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: Tahoma, Arial, sans-serif;
-      background: linear-gradient(135deg, #f44336, #e91e63);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      text-align: center;
-    }
-    .container {
-      background: rgba(255,255,255,0.15);
-      padding: 60px;
-      border-radius: 30px;
-      backdrop-filter: blur(25px);
-      max-width: 500px;
-      animation: shake 0.5s ease;
-    }
-    @keyframes shake {
-      0%, 100% { transform: translateX(0); }
-      25% { transform: translateX(-10px); }
-      75% { transform: translateX(10px); }
-    }
-    .error-icon {
-      font-size: 100px;
-      margin-bottom: 20px;
-      animation: errorPulse 1.5s infinite;
-    }
-    @keyframes errorPulse {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.1); }
-    }
-    .error-code {
-      background: rgba(0,0,0,0.3);
-      padding: 10px 20px;
-      border-radius: 10px;
-      display: inline-block;
-      margin: 15px 0;
-      font-family: monospace;
-    }
-    .retry-btn {
-      background: rgba(255,255,255,0.3);
-      color: white;
-      border: 2px solid white;
-      padding: 15px 40px;
-      border-radius: 10px;
-      cursor: pointer;
-      font-size: 1.1em;
-      font-weight: bold;
-      margin-top: 30px;
-      transition: all 0.3s;
-    }
-    .retry-btn:hover {
-      background: rgba(255,255,255,0.4);
-      transform: scale(1.05);
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="error-icon">❌</div>
-    <h1>خطا در ورود</h1>
-    <div class="error-code">کد خطا: <strong>${sanitizeInput(error)}</strong></div>
-    <p style="margin: 20px 0;">متأسفانه در فرآیند احراز هویت خطایی رخ داده است.</p>
-    <p>لطفاً دوباره تلاش کنید یا با پشتیبانی تماس بگیرید</p>
-    <button class="retry-btn" onclick="window.close()">بستن پنجره</button>
-  </div>
-</body>
-</html>`
-}
-
-function createExpiredStatePage() {
-  return `<!DOCTYPE html>
-<html lang="fa" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="google-site-verification" content="uFvaRQchIco-iyGmdsNknLK7mL5Asxg47GjaOQmhf0Q" />
-  <title>جلسه منقضی شده - AmirCollider Proxy</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: Tahoma, Arial, sans-serif;
-      background: linear-gradient(135deg, #ff9800, #ff5722);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      text-align: center;
-    }
-    .container {
-      background: rgba(255,255,255,0.15);
-      padding: 60px;
-      border-radius: 30px;
-      backdrop-filter: blur(25px);
-      max-width: 500px;
-      animation: fadeIn 0.5s ease;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: scale(0.9); }
-      to { opacity: 1; transform: scale(1); }
-    }
-    .warning-icon {
-      font-size: 100px;
-      margin-bottom: 20px;
-      animation: swing 1s ease-in-out infinite;
-    }
-    @keyframes swing {
-      0%, 100% { transform: rotate(-5deg); }
-      50% { transform: rotate(5deg); }
-    }
-    .timer {
-      font-size: 3em;
-      font-weight: bold;
-      margin: 20px 0;
-      color: #ffeb3b;
-    }
-    button {
-      background: rgba(255,255,255,0.3);
-      color: white;
-      border: 2px solid white;
-      padding: 15px 40px;
-      border-radius: 10px;
-      cursor: pointer;
-      font-size: 1.1em;
-      font-weight: bold;
-      margin-top: 30px;
-      transition: all 0.3s;
-    }
-    button:hover {
-      background: rgba(255,255,255,0.4);
-      transform: scale(1.05);
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="warning-icon">⚠️</div>
-    <h1>جلسه منقضی شده</h1>
-    <div class="timer">⏱️</div>
-    <p style="margin: 20px 0; font-size: 1.1em;">زمان درخواست شما به پایان رسیده است</p>
-    <p>لطفاً دوباره تلاش کنید</p>
-    <button onclick="window.close()">بستن</button>
-  </div>
-</body>
-</html>`
+        setTimeout(function(){ try{ window.open(deepLink,'_self'); }catch(e){} }, 400);
+      } catch (e) { acShowManual(); }
+    };
+    setTimeout(function(){ acOpenGame(); setTimeout(acShowManual, 4000); }, 800);
+  </script>`
+  return renderAuthShell({
+    title: `${authText(lang, 'authSuccess')} - ${game?.name || 'AmirCollider'}`,
+    lang, theme, brandColor: game?.color || '#4caf50', body, script
+  })
 }
 
 
-function createUserProfilePage(userData, game, gameId) {
-  return `<!DOCTYPE html>
-<html lang="fa" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="google-site-verification" content="uFvaRQchIco-iyGmdsNknLK7mL5Asxg47GjaOQmhf0Q" />
-  <title>پروفایل ${sanitizeInput(userData.displayName || userData.username)} - AmirCollider Proxy</title>
-  <link rel="icon" href="https://drive.google.com/uc?export=download&id=1kwjfUTVmbHOtJbl0DbXoOq9-BWitQBnw" type="image/png">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: Tahoma, Arial, sans-serif;
-      background: linear-gradient(135deg, ${game.color}, #764ba2);
-      min-height: 100vh;
-      padding: 20px;
-      color: white;
-    }
-    .container {
-      max-width: 900px;
-      margin: 0 auto;
-      animation: fadeIn 0.6s ease;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .profile-header {
-      background: rgba(255,255,255,0.1);
-      backdrop-filter: blur(25px);
-      padding: 40px;
-      border-radius: 25px;
-      text-align: center;
-      margin-bottom: 30px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-    }
-    .avatar {
-      width: 150px;
-      height: 150px;
-      border-radius: 50%;
-      border: 5px solid white;
-      margin: 0 auto 20px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-      animation: avatarPulse 2s infinite;
-    }
-    @keyframes avatarPulse {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.05); }
-    }
-    .username {
-      font-size: 2.5em;
-      font-weight: bold;
-      margin-bottom: 10px;
-      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-    }
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 20px;
-      margin-bottom: 30px;
-    }
-    .stat-card {
-      background: rgba(255,255,255,0.1);
-      backdrop-filter: blur(25px);
-      padding: 30px;
-      border-radius: 20px;
-      text-align: center;
-      box-shadow: 0 15px 40px rgba(0,0,0,0.2);
-      transition: all 0.3s;
-    }
-    .stat-card:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 20px 50px rgba(0,0,0,0.3);
-    }
-    .stat-icon { font-size: 3em; margin-bottom: 15px; }
-    .stat-value { font-size: 2em; font-weight: bold; color: #ffeb3b; margin-bottom: 10px; }
-    .info-card {
-      background: rgba(255,255,255,0.1);
-      backdrop-filter: blur(25px);
-      padding: 30px;
-      border-radius: 20px;
-      margin-bottom: 20px;
-      box-shadow: 0 15px 40px rgba(0,0,0,0.2);
-    }
-    .info-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 15px 0;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
-    }
-    .info-row:last-child { border-bottom: none; }
-    .btn {
-      background: rgba(255,255,255,0.2);
-      color: white;
-      border: 2px solid white;
-      padding: 15px 30px;
-      border-radius: 10px;
-      cursor: pointer;
-      font-size: 1em;
-      font-weight: bold;
-      transition: all 0.3s;
-      text-decoration: none;
-      display: inline-block;
-      margin: 5px;
-    }
-    .btn:hover {
-      background: rgba(255,255,255,0.3);
-      transform: scale(1.05);
-    }
-    .btn-primary { background: linear-gradient(135deg, #4caf50, #8bc34a); border: none; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="profile-header">
-     <img src="${userData.photoURL || 'https://placehold.co/150'}" alt="Avatar" class="avatar">
-      <div class="username">${sanitizeInput(userData.displayName || userData.username)}</div>
-      <div style="font-size: 1.1em; opacity: 0.9; margin-bottom: 20px;">${sanitizeInput(userData.email)}</div>
-      <div style="background: rgba(76,175,80,0.3); color: #4caf50; padding: 8px 20px; border-radius: 20px; display: inline-block; font-weight: bold; border: 2px solid #4caf50; margin-top: 10px;">${game.icon} ${game.name}</div>
+// ==========================================
+// Page: OAuth Error
+// Localized provider-error page with the upstream error code shown safely.
+// ==========================================
+function renderOAuthErrorPage(error, game, lang, theme) {
+  const body = `
+    <div class="ac-status-icon err">${PAGE_ICONS.alert}</div>
+    <h1>${escapeHtml(authText(lang, 'signInError'))}</h1>
+    <p class="version-badge" style="color:var(--err);background:rgba(var(--err-rgb),0.16);border-color:rgba(var(--err-rgb),0.5);">
+      ${escapeHtml(authText(lang, 'errorCode'))}: ${escapeHtml(sanitizeInput(error))}
+    </p>
+    <p class="ac-status-text">${escapeHtml(authText(lang, 'errorBody'))}</p>
+    <p class="ac-muted">${escapeHtml(authText(lang, 'tryAgain'))}</p>
+    <div class="btn-container">
+      <button type="button" class="btn" onclick="window.close()">${escapeHtml(authText(lang, 'close'))}</button>
+    </div>`
+  return renderAuthShell({
+    title: `${authText(lang, 'signInError')} - AmirCollider Proxy`,
+    lang, theme, brandColor: game?.color || '#f44336', body
+  })
+}
+
+
+// ==========================================
+// Page: Expired Session
+// Shown when the signed state is invalid or past its expiry window.
+// ==========================================
+function renderExpiredPage(lang, theme) {
+  const body = `
+    <div class="ac-status-icon warn">${PAGE_ICONS.clock}</div>
+    <h1>${escapeHtml(authText(lang, 'sessionExpired'))}</h1>
+    <p class="ac-status-text">${escapeHtml(authText(lang, 'expiredBody'))}</p>
+    <p class="ac-muted">${escapeHtml(authText(lang, 'tryAgainShort'))}</p>
+    <div class="btn-container">
+      <button type="button" class="btn" onclick="window.close()">${escapeHtml(authText(lang, 'close'))}</button>
+    </div>`
+  return renderAuthShell({
+    title: `${authText(lang, 'sessionExpired')} - AmirCollider Proxy`,
+    lang, theme, brandColor: '#ff9800', body
+  })
+}
+
+
+// ==========================================
+// Page: User Profile
+// Theme-aware, direction-correct player profile rendered from D1 data.
+// ==========================================
+function renderProfilePage(userData, game, gameId, lang, theme) {
+  const code = resolveLang(lang)
+  const locale = AUTH_I18N[code].locale
+  const formatDate = value => {
+    try { return new Date(value || Date.now()).toLocaleString(locale) } catch { return '' }
+  }
+
+  const stats = [
+    { value: userData.highScore || 0, label: authText(lang, 'highScore') },
+    { value: userData.gamesPlayed || 0, label: authText(lang, 'gamesPlayed') }
+  ].map(s => `
+      <div class="info-card" style="text-align:center;">
+        <div style="font-size:2em;font-weight:800;color:var(--accent);">${escapeHtml(String(s.value))}</div>
+        <div class="ac-muted">${escapeHtml(s.label)}</div>
+      </div>`).join('')
+
+  const rows = [
+    [authText(lang, 'userId'), userData.username],
+    [authText(lang, 'lastLogin'), formatDate(userData.lastLogin)],
+    [authText(lang, 'joined'), formatDate(userData.createdAt)]
+  ].map(([label, value]) => `
+      <div class="info-row"><span class="ac-muted">${escapeHtml(label)}</span><span style="font-weight:700;">${escapeHtml(String(value || ''))}</span></div>`).join('')
+
+  const body = `
+    <div style="text-align:center;">
+      <img src="${escapeHtml(userData.photoURL || '/assets/DefaultGameLogo.png')}" alt=""
+           style="width:120px;height:120px;border-radius:50%;border:4px solid var(--surface-2);object-fit:cover;"
+           onerror="this.onerror=null;this.src='/assets/DefaultGameLogo.png';">
+      <h1 style="margin-block-start:16px;">${escapeHtml(userData.displayName || userData.username)}</h1>
+      <p class="ac-muted">${escapeHtml(userData.email || '')}</p>
+      <span class="version-badge">${escapeHtml(game.name)}</span>
     </div>
 
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-icon">🏆</div>
-        <div class="stat-value">${userData.highScore || 0}</div>
-        <div style="font-size: 1em; opacity: 0.9;">بالاترین امتیاز</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">🎮</div>
-        <div class="stat-value">${userData.gamesPlayed || 0}</div>
-        <div style="font-size: 1em; opacity: 0.9;">بازی‌های انجام شده</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">⭐</div>
-        <div class="stat-value">${userData.totalStars || 0}</div>
-        <div style="font-size: 1em; opacity: 0.9;">ستاره‌های کسب شده</div>
-      </div>
-    </div>
+    <div class="info-grid">${stats}</div>
 
     <div class="info-card">
-      <h2 style="margin-bottom: 20px; font-size: 1.8em;">📊 اطلاعات حساب</h2>
-      <div class="info-row">
-        <span style="font-weight: bold; opacity: 0.8;">شناسه کاربری:</span>
-        <span style="font-weight: bold;">${sanitizeInput(userData.username)}</span>
-      </div>
-      <div class="info-row">
-        <span style="font-weight: bold; opacity: 0.8;">آخرین ورود:</span>
-        <span style="font-weight: bold;">${new Date(userData.lastLogin || Date.now()).toLocaleString('fa-IR')}</span>
-      </div>
-      <div class="info-row">
-        <span style="font-weight: bold; opacity: 0.8;">تاریخ ثبت‌نام:</span>
-        <span style="font-weight: bold;">${new Date(userData.createdAt || Date.now()).toLocaleString('fa-IR')}</span>
-      </div>
-      <div class="info-row">
-        <span style="font-weight: bold; opacity: 0.8;">سطح:</span>
-        <span style="font-weight: bold;">سطح ${userData.level || 1}</span>
-      </div>
+      <h2 style="margin-block:0 14px;">${escapeHtml(authText(lang, 'accountInfo'))}</h2>
+      ${rows}
     </div>
 
-    <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; margin-top: 30px;">
-      <a href="/" class="btn btn-primary">🏠 بازگشت به خانه</a>
-      <a href="/oauth/auth?game=${gameId}" class="btn">🎮 ورود به بازی</a>
-    </div>
-  </div>
-</body>
-</html>`
+    <div class="btn-container">
+      <a class="btn" href="/?lang=${code}">${escapeHtml(authText(lang, 'backHome'))}</a>
+      <a class="btn btn-secondary" href="/oauth/auth?game=${escapeHtml(gameId)}">${escapeHtml(authText(lang, 'enterGame'))}</a>
+    </div>`
+
+  return renderAuthShell({
+    title: `${authText(lang, 'profile')} - ${userData.displayName || userData.username}`,
+    lang, theme, brandColor: game.color, body
+  })
 }
