@@ -64,6 +64,7 @@ const DASH_I18N = {
     hlEdgeDesc: 'اجرا روی شبکه جهانی Cloudflare برای پاسخ‌دهی سریع و پایدار.',
     navMetrics: 'متریک‌ها',
     navTestPanel: 'پنل تست',
+    navReleaseNotes: 'یادداشت‌های انتشار',
     footerTagline: 'سامانه پروکسی OAuth برای بازی‌های AmirCollider.',
     footerPowered: 'اجرا شده روی Cloudflare Workers',
     // service test runtime
@@ -106,6 +107,7 @@ const DASH_I18N = {
     hlEdgeDesc: 'Served from Cloudflare’s global network for fast, reliable responses.',
     navMetrics: 'Metrics',
     navTestPanel: 'Test panel',
+    navReleaseNotes: 'Release notes',
     footerTagline: 'OAuth proxy for AmirCollider games.',
     footerPowered: 'Powered by Cloudflare Workers',
     rTesting: 'Checking…',
@@ -147,6 +149,7 @@ const DASH_I18N = {
     hlEdgeDesc: 'Cloudflare のグローバルネットワークで高速かつ安定して配信します。',
     navMetrics: 'メトリクス',
     navTestPanel: 'テストパネル',
+    navReleaseNotes: 'リリースノート',
     footerTagline: 'AmirCollider ゲーム向けの OAuth プロキシ。',
     footerPowered: 'Cloudflare Workers で稼働',
     rTesting: '確認中…',
@@ -267,7 +270,8 @@ const ICONS = {
   beaker: '<path d="M9 3h6"/><path d="M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4A2 2 0 0 0 19 18l-5-9V3"/><line x1="7.5" y1="15" x2="16.5" y2="15"/>',
   globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z"/>',
   contrast: '<circle cx="12" cy="12" r="9"/><path d="M12 3v18a9 9 0 0 0 0-18z" fill="currentColor" stroke="none"/>',
-  bolt: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>'
+  bolt: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
+  notes: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/>'
 }
 
 function icon(name, cls) {
@@ -350,6 +354,24 @@ function getDashboardCSS() {
         radial-gradient(900px 480px at 8% 6%, color-mix(in srgb, var(--brand-2) 16%, transparent), transparent 60%),
         linear-gradient(160deg, var(--bg-1), var(--bg-2));
       background-attachment: fixed;
+    }
+
+   /* ---------- smooth theme transition (light <-> dark) ---------- */
+    @media (prefers-reduced-motion: no-preference) {
+      body,
+      .seg, .icon-btn, .stat, .section-title, .pill,
+      .result-box, .syslink, footer {
+        transition:
+          background-color 0.35s ease,
+          color 0.35s ease,
+          border-color 0.35s ease,
+          box-shadow 0.35s ease;
+      }
+      ::view-transition-old(root),
+      ::view-transition-new(root) {
+        animation-duration: 0.4s;
+        animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+      }
     }
 
     .wrap { max-width: var(--maxw); margin: 0 auto; }
@@ -652,7 +674,8 @@ function renderSystemLinks(lang) {
   const p = pack(lang)
   const links = [
     { href: '/metrics', ic: 'metrics', label: p.navMetrics },
-    { href: '/testsite', ic: 'beaker', label: p.navTestPanel }
+    { href: '/testsite', ic: 'beaker', label: p.navTestPanel },
+    { href: '/release-notes', ic: 'notes', label: p.navReleaseNotes }
   ]
   return '<div class="syslinks">' + links.map(l =>
     '<a class="syslink" href="' + escapeHtml(l.href) + '">' + icon(l.ic) + '<span>' + escapeHtml(l.label) + '</span></a>'
@@ -699,10 +722,18 @@ function getClientScript(baseUrl, lang) {
       var cur = document.documentElement.getAttribute('data-theme');
       var dark = getComputedStyle(document.documentElement).colorScheme.indexOf('dark') !== -1;
       var next = dark ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', next);
+      var commit = function () {
+        document.documentElement.setAttribute('data-theme', next);
+        acApplyThemeLabel();
+      };
+      var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (document.startViewTransition && !reduce) {
+        document.startViewTransition(commit);
+      } else {
+        commit();
+      }
       try { localStorage.setItem('ac_theme', next); } catch (e) {}
       document.cookie = 'theme=' + next + ';path=/;max-age=31536000;samesite=lax';
-      acApplyThemeLabel();
     }
     window.acToggleTheme = acToggleTheme;
 
@@ -864,8 +895,7 @@ function createDashboardPage(GAMES, baseUrl, routesCount, lang, theme) {
     <div class="section-title">${escapeHtml(pack(resolved).sectionGames)}</div>
     ${createGamesCardsHTML(GAMES, baseUrl, { lang: resolved })}
 
-    ${renderHighlights(resolved)}
-    ${renderSystemLinks(resolved)}
+   ${renderSystemLinks(resolved)}
     ${renderFooter(resolved, CONFIG.VERSION)}
   </div>
 
