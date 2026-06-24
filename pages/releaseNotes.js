@@ -5,8 +5,8 @@
 // ==========================================
 //
 // Responsibilities
-//   - Render the public Release Notes page: topbar, hero and a
-//     version timeline. Theme-aware (light/dark/auto) and tri-lingual
+//   - Render the public Release Notes page: topbar, hero and a grouped
+//     version changelog. Theme-aware (light/dark/auto) and tri-lingual
 //     (fa/en/ja) with correct RTL/LTR, matching the dashboard chrome.
 //
 // Integration contract (do not break without updating callers)
@@ -15,8 +15,9 @@
 //   - Route: GET /release-notes  (registered in worker.js ROUTES)
 //
 // Extending
-//   - Add a release: prepend one entry to RELEASES below.
-//   - Add a UI language: add one entry to RN_I18N below.
+//   - Add a release:  prepend one entry to RELEASES below.
+//   - Add a group:    push one object into release.groups.
+//   - Add a language:  add one entry to RN_I18N and fill every group.
 // ==========================================
 
 import { CONFIG } from '../config.js'
@@ -70,6 +71,7 @@ const RN_I18N = {
 
 // ==========================================
 // Release timeline (newest first)
+// Each release has a localized summary and grouped change items.
 // tag: 'latest' highlights the current version.
 // ==========================================
 const RELEASES = [
@@ -77,23 +79,185 @@ const RELEASES = [
     version: '6.7',
     date: '2026-06-24',
     tag: 'latest',
-    notes: {
-      fa: [
-        'انیمیشن نرم هنگام تغییر بین تم روشن و تاریک.',
-        'حذف بخش «ویژگی‌های کلیدی» برای ظاهری حرفه‌ای‌تر.',
-        'افزودن صفحه‌ی یادداشت‌های انتشار.'
-      ],
-      en: [
-        'Smooth animated transition between light and dark themes.',
-        'Removed the “Key features” section for a cleaner, more professional look.',
-        'Added this Release notes page.'
-      ],
-      ja: [
-        'ライト/ダークテーマ切り替え時のスムーズなアニメーション。',
-        '「主な特徴」セクションを削除し、より洗練された見た目に。',
-        'リリースノートページを追加。'
-      ]
-    }
+    summary: {
+      fa: 'بازسازی کامل سایت: سیستم طراحی جدید، پشتیبانی سه‌زبانه، تم روشن/تاریک/خودکار، میزبانی فایل‌ها روی R2 و انتقال دامنه.',
+      en: 'A full site rebuild: a new design system, trilingual support, light/dark/auto theming, R2-hosted assets and a domain migration.',
+      ja: 'サイトの全面刷新：新しいデザインシステム、3言語対応、ライト/ダーク/自動テーマ、R2 によるアセット配信、ドメイン移行。'
+    },
+    groups: [
+      {
+        title: { fa: 'طراحی و رابط کاربری', en: 'Design & UI', ja: 'デザイン & UI' },
+        items: {
+          fa: [
+            'بازطراحی کامل تمام صفحات (داشبورد، سلامت، پینگ، متریک‌ها، جدول امتیازات، حریم خصوصی، شرایط استفاده و پنل تست) با یک سیستم طراحی یکپارچه.',
+            'جایگزینی ظاهر قدیمی شیشه‌ای/گرادیانی با سیستم مبتنی بر توکن‌های رنگ و فاصله.',
+            'افزودن فونت Vazirmatn و مجموعه آیکون‌های SVG به‌جای ایموجی‌ها.',
+            'ساختار CSS ماژولار (توکن‌ها، پایه، چیدمان، تایپوگرافی، کامپوننت‌ها، انیمیشن‌ها، واکنش‌گرایی).',
+            'حذف بخش «ویژگی‌های کلیدی» از داشبورد برای ظاهری تمیزتر و حرفه‌ای‌تر.'
+          ],
+          en: [
+            'Complete redesign of every page (dashboard, health, ping, metrics, leaderboard, privacy, terms and the test panel) under one unified design system.',
+            'Replaced the old glass/gradient look with a color- and spacing-token based system.',
+            'Added the Vazirmatn font and an SVG icon set in place of emojis.',
+            'Modular CSS structure (tokens, base, layout, typography, components, animations, responsive).',
+            'Removed the “Key features” section from the dashboard for a cleaner, more professional look.'
+          ],
+          ja: [
+            '全ページ（ダッシュボード、ヘルス、Ping、メトリクス、リーダーボード、プライバシー、利用規約、テストパネル）を統一デザインシステムで再設計。',
+            '旧来のガラス/グラデーション表現を、カラー・スペーシングのトークン方式に置き換え。',
+            'Vazirmatn フォントと SVG アイコンセットを採用し、絵文字を廃止。',
+            'モジュール化された CSS 構成（トークン、ベース、レイアウト、タイポグラフィ、コンポーネント、アニメーション、レスポンシブ）。',
+            'ダッシュボードから「主な特徴」セクションを削除し、より洗練された見た目に。'
+          ]
+        }
+      },
+      {
+        title: { fa: 'پشتیبانی چندزبانه', en: 'Multilingual support', ja: '多言語対応' },
+        items: {
+          fa: [
+            'افزودن زبان‌های انگلیسی و ژاپنی در کنار فارسی در همه‌ی صفحات.',
+            'چیدمان درست راست‌چین/چپ‌چین (RTL/LTR) بر اساس زبان انتخابی.',
+            'سوییچ زبان با ماندگاری انتخاب از طریق کوکی و localStorage.',
+            'تشخیص خودکار زبان: پارامتر آدرس ← کوکی ← هدر مرورگر ← پیش‌فرض.',
+            'محلی‌سازی اعداد و تاریخ‌ها با Intl.'
+          ],
+          en: [
+            'Added English and Japanese alongside Persian across every page.',
+            'Correct RTL/LTR layout driven by the selected language.',
+            'Language switcher whose choice persists via cookie and localStorage.',
+            'Automatic language resolution: URL query → cookie → browser header → default.',
+            'Localized numbers and dates via Intl.'
+          ],
+          ja: [
+            '全ページでペルシャ語に加え英語・日本語を追加。',
+            '選択言語に応じた正しい RTL/LTR レイアウト。',
+            'Cookie と localStorage に選択を保存する言語スイッチャー。',
+            '言語の自動判定：URL クエリ → Cookie → ブラウザヘッダー → 既定値。',
+            'Intl による数値・日付のローカライズ。'
+          ]
+        }
+      },
+      {
+        title: { fa: 'تم و حالت نمایش', en: 'Theming', ja: 'テーマ' },
+        items: {
+          fa: [
+            'افزودن حالت‌های روشن، تاریک و خودکار (پیروی از سیستم‌عامل).',
+            'دکمه‌ی تغییر دستی تم با ماندگاری انتخاب (localStorage + کوکی).',
+            'اعمال تم پیش از اولین رنگ‌آمیزی صفحه برای جلوگیری از پرش لحظه‌ای.',
+            'انیمیشن نرم هنگام جابه‌جایی بین روشن و تاریک با View Transitions API و احترام به prefers-reduced-motion.'
+          ],
+          en: [
+            'Added light, dark and auto modes (auto follows the OS).',
+            'A manual theme toggle that remembers your choice (localStorage + cookie).',
+            'Theme applied before first paint to avoid a flash on load.',
+            'Smooth animated light↔dark switch via the View Transitions API, honoring prefers-reduced-motion.'
+          ],
+          ja: [
+            'ライト・ダーク・自動モードを追加（自動は OS に追従）。',
+            '選択を記憶する手動テーマ切り替え（localStorage + Cookie）。',
+            '初回描画前にテーマを適用し、読み込み時のちらつきを防止。',
+            'View Transitions API によるスムーズなライト↔ダーク切り替え。prefers-reduced-motion を尊重。'
+          ]
+        }
+      },
+      {
+        title: { fa: 'زیرساخت', en: 'Infrastructure', ja: 'インフラ' },
+        items: {
+          fa: [
+            'میزبانی فایل‌های استاتیک (لوگوها و دارایی‌ها) روی فضای ذخیره‌سازی داخلی Cloudflare R2 از مسیر /assets به‌جای لینک‌های خارجی Google Drive؛ سریع‌تر، پایدارتر و بدون وابستگی به سرویس ثالث.',
+            'انتقال دامنه از https://firebase-proxy.n95pluss.workers.dev/ به https://amircollider.n95pluss.workers.dev/.'
+          ],
+          en: [
+            'Static files (logos and assets) are now served from internal Cloudflare R2 storage under /assets instead of external Google Drive links — faster, more reliable and free of third-party dependencies.',
+            'Domain migrated from https://firebase-proxy.n95pluss.workers.dev/ to https://amircollider.n95pluss.workers.dev/.'
+          ],
+          ja: [
+            '静的ファイル（ロゴ・アセット）を、外部の Google Drive リンクではなく Cloudflare R2 の内部ストレージから /assets 経由で配信。高速・安定し、サードパーティ依存を排除。',
+            'ドメインを https://firebase-proxy.n95pluss.workers.dev/ から https://amircollider.n95pluss.workers.dev/ へ移行。'
+          ]
+        }
+      },
+      {
+        title: { fa: 'امنیت و پایداری', en: 'Security & reliability', ja: 'セキュリティ & 信頼性' },
+        items: {
+          fa: [
+            'پاسخ‌های خطا دیگر پیام داخلی یا stack trace را لو نمی‌دهند؛ تنها یک کد خطای پایدار و عمومی بازگردانده می‌شود.',
+            'صفحه‌ی خطای محلی‌شده و تم‌آگاه (fa/en/ja) جایگزین صفحه‌ی تنها-فارسی شد.',
+            'فریز عمیق (deep-freeze) درخت پیکربندی برای جلوگیری از تغییر در زمان اجرا.',
+            'حذف هدر منسوخ X-XSS-Protection.'
+          ],
+          en: [
+            'Error responses no longer leak internal messages or stack traces; only a stable, generic error code is returned.',
+            'A localized, theme-aware error page (fa/en/ja) replaces the Persian-only one.',
+            'The configuration tree is deep-frozen to prevent runtime mutation.',
+            'Removed the deprecated X-XSS-Protection header.'
+          ],
+          ja: [
+            'エラー応答が内部メッセージやスタックトレースを漏らさないよう変更。安定した汎用エラーコードのみを返却。',
+            'ペルシャ語のみのエラーページを、ローカライズ済みでテーマ対応（fa/en/ja）のページに置換。',
+            '設定ツリーをディープフリーズし、実行時の変更を防止。',
+            '非推奨の X-XSS-Protection ヘッダーを削除。'
+          ]
+        }
+      },
+      {
+        title: { fa: 'پاک‌سازی و ساده‌سازی', en: 'Cleanup & simplification', ja: 'クリーンアップ & 簡素化' },
+        items: {
+          fa: [
+            'حذف محدودیت نرخ درخواست درون‌حافظه‌ای per-IP (ثابت‌های rate limit و تابع isRateLimited).',
+            'حذف ثابت‌های بلااستفاده‌ی retry و حجم درخواست (MAX_RETRIES، RETRY_DELAY_MS، MAX_REQUEST_SIZE).',
+            'تبدیل validateGameId به تابع خالص بدون خروجی لاگ.',
+            'حذف وابستگی آواتارهای جدول امتیازات به via.placeholder.com.'
+          ],
+          en: [
+            'Removed in-memory per-IP rate limiting (the rate-limit constants and the isRateLimited function).',
+            'Removed unused retry and request-size constants (MAX_RETRIES, RETRY_DELAY_MS, MAX_REQUEST_SIZE).',
+            'validateGameId is now a pure function with no console output.',
+            'Leaderboard avatars no longer depend on via.placeholder.com.'
+          ],
+          ja: [
+            'メモリ内の IP 単位レート制限（rate-limit 定数と isRateLimited 関数）を削除。',
+            '未使用のリトライ・リクエストサイズ定数（MAX_RETRIES、RETRY_DELAY_MS、MAX_REQUEST_SIZE）を削除。',
+            'validateGameId をログ出力のない純粋関数に変更。',
+            'リーダーボードのアバターが via.placeholder.com に依存しないよう変更。'
+          ]
+        }
+      },
+      {
+        title: { fa: 'دسترس‌پذیری', en: 'Accessibility', ja: 'アクセシビリティ' },
+        items: {
+          fa: [
+            'رعایت prefers-reduced-motion در همه‌ی صفحات.',
+            'افزودن خطوط فوکوس (focus-visible) و برچسب‌ها و نقش‌های ARIA به کنترل‌ها.'
+          ],
+          en: [
+            'prefers-reduced-motion is honored across all pages.',
+            'Added focus-visible outlines and ARIA labels/roles to controls.'
+          ],
+          ja: [
+            '全ページで prefers-reduced-motion を尊重。',
+            'コントロールに focus-visible のアウトラインと ARIA ラベル/ロールを追加。'
+          ]
+        }
+      },
+      {
+        title: { fa: 'صفحه‌ها و نسخه‌گذاری', en: 'Pages & versioning', ja: 'ページ & バージョン' },
+        items: {
+          fa: [
+            'افزودن همین صفحه‌ی «یادداشت‌های انتشار» به همراه لینک در داشبورد.',
+            'تغییر شماره‌ی نسخه از 6.7.3 به 6.7 برای نشان‌دادن بازسازی کامل.'
+          ],
+          en: [
+            'Added this Release notes page, plus a link to it on the dashboard.',
+            'Version number changed from 6.7.3 to 6.7 to mark the full rebuild.'
+          ],
+          ja: [
+            'このリリースノートページを追加し、ダッシュボードにリンクを設置。',
+            '全面刷新を示すため、バージョン番号を 6.7.3 から 6.7 に変更。'
+          ]
+        }
+      }
+    ]
   }
 ]
 
@@ -110,6 +274,11 @@ function pack(lang) {
 
 function dirFor(lang) {
   return resolveLang(lang) === 'fa' ? 'rtl' : 'ltr'
+}
+
+function pick(map, lang) {
+  if (!map) return ''
+  return map[resolveLang(lang)] != null ? map[resolveLang(lang)] : (map[DEFAULT_LANG] || '')
 }
 
 // ==========================================
@@ -188,7 +357,7 @@ function getReleaseNotesCSS() {
       --brand-2: #a78bfa;
       --ok: #4caf50;
       --radius: 18px;
-      --maxw: 900px;
+      --maxw: 920px;
 
       --bg-1: #0b0e16;
       --bg-2: #141a2e;
@@ -304,17 +473,17 @@ function getReleaseNotesCSS() {
     .hero p { margin-block-start: 8px; color: var(--text-dim); font-size: 1.02em; }
 
     /* ---------- releases ---------- */
-    .releases { display: flex; flex-direction: column; gap: 18px; margin-block-end: 40px; }
+    .releases { display: flex; flex-direction: column; gap: 20px; margin-block-end: 40px; }
     .release {
-      padding: 22px 24px; border-radius: var(--radius);
+      padding: 24px 26px; border-radius: var(--radius);
       background: var(--surface); border: 1px solid var(--border);
     }
     .release-head {
       display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
-      margin-block-end: 14px;
+      margin-block-end: 12px;
     }
     .release-ver {
-      font-weight: 800; font-size: 1.25em;
+      font-weight: 800; font-size: 1.3em;
       color: color-mix(in srgb, var(--brand) 45%, var(--text));
     }
     .release-date { color: var(--text-dim); font-size: 0.86em; }
@@ -323,14 +492,32 @@ function getReleaseNotesCSS() {
       font-size: 0.74em; font-weight: 700; color: #fff;
       background: linear-gradient(135deg, var(--brand), var(--brand-2));
     }
-    .release ul { list-style: none; display: flex; flex-direction: column; gap: 9px; }
-    .release li {
-      position: relative; padding-inline-start: 20px;
-      color: var(--text); font-size: 0.95em; line-height: 1.6;
+    .release-summary {
+      color: var(--text-dim); font-size: 0.96em; line-height: 1.7;
+      margin-block-end: 18px;
+      padding-block-end: 16px; border-block-end: 1px solid var(--border);
     }
-    .release li::before {
-      content: ''; position: absolute; inset-inline-start: 2px; top: 0.62em;
-      width: 7px; height: 7px; border-radius: 50%; background: var(--brand);
+
+    .group { margin-block-start: 18px; }
+    .group:first-of-type { margin-block-start: 0; }
+    .group-title {
+      display: flex; align-items: center; gap: 10px;
+      font-weight: 700; font-size: 1.02em; margin-block-end: 10px;
+      color: var(--text);
+    }
+    .group-title::before {
+      content: ''; width: 8px; height: 8px; border-radius: 3px; flex-shrink: 0;
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+    }
+    .group ul { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+    .group li {
+      position: relative; padding-inline-start: 20px;
+      color: var(--text); font-size: 0.93em; line-height: 1.65;
+    }
+    .group li::before {
+      content: ''; position: absolute; inset-inline-start: 3px; top: 0.62em;
+      width: 6px; height: 6px; border-radius: 50%;
+      background: color-mix(in srgb, var(--brand) 60%, var(--text-dim));
     }
 
     /* ---------- back link ---------- */
@@ -377,6 +564,7 @@ function getReleaseNotesCSS() {
     @media (max-width: 480px) {
       .seg button { padding: 6px 9px; }
       .release-tag { margin-inline-start: 0; }
+      .release { padding: 20px 18px; }
     }
   `
 }
@@ -441,17 +629,29 @@ function renderHero(lang) {
 }
 
 // ==========================================
-// Partial: Release timeline
+// Partial: Release timeline (grouped changelog)
 // ==========================================
 function renderReleases(lang) {
   const p = pack(lang)
-  const code = resolveLang(lang)
   const cards = RELEASES.map(rel => {
-    const notes = (rel.notes[code] || rel.notes[DEFAULT_LANG] || [])
-      .map(n => '<li>' + escapeHtml(n) + '</li>').join('')
     const tag = rel.tag === 'latest'
       ? '<span class="release-tag">' + escapeHtml(p.latest) + '</span>'
       : ''
+
+    const summary = rel.summary
+      ? '<p class="release-summary">' + escapeHtml(pick(rel.summary, lang)) + '</p>'
+      : ''
+
+    const groups = (rel.groups || []).map(group => {
+      const items = (pick(group.items, lang) || [])
+        .map(n => '<li>' + escapeHtml(n) + '</li>').join('')
+      return `
+        <div class="group">
+          <div class="group-title">${escapeHtml(pick(group.title, lang))}</div>
+          <ul>${items}</ul>
+        </div>`
+    }).join('')
+
     return `
       <article class="release">
         <div class="release-head">
@@ -459,9 +659,11 @@ function renderReleases(lang) {
           <span class="release-date">${escapeHtml(rel.date)}</span>
           ${tag}
         </div>
-        <ul>${notes}</ul>
+        ${summary}
+        ${groups}
       </article>`
   }).join('')
+
   return `<div class="releases">${cards}</div>`
 }
 
