@@ -1,5 +1,5 @@
 // ==========================================
-// OAuth Proxy v6.7.3 - Secure Version
+// OAuth Proxy v6.7 - Secure Version
 // AmirCollider Games - Worker Core (routing, auth, data API)
 // ==========================================
 //
@@ -47,6 +47,7 @@ import { handleTermsWithGame } from './pages/terms.js'
 import { handleLeaderboardUnified } from './pages/leaderboard.js'
 import { handleMetrics } from './pages/metrics.js'
 import { handleDashboard } from './pages/dashboard.js'
+import { handleReleaseNotes } from './pages/releaseNotes.js'
 import {
   handleTestSite,
   handleTestSiteLogin,
@@ -370,6 +371,7 @@ const ROUTES = [
   { path: '/testsite/login', method: 'POST', handler: handleTestSiteLoginPost },
   { path: '/testsite/logout', method: 'POST', handler: handleTestSiteLogout },
   { path: '/metrics', method: 'GET', handler: handleMetrics },
+  { path: '/release-notes', method: 'GET', handler: handleReleaseNotes },
   { path: '/assets/', method: 'GET', handler: handleAsset, prefix: true },
   { path: '/:gameId/health', method: 'GET', handler: handleHealthWithUI, dynamic: true },
   { path: '/:gameId/ping', method: 'GET', handler: handlePingWithUI, dynamic: true },
