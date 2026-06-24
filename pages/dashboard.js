@@ -54,6 +54,8 @@ const DASH_I18N = {
     statGames: 'بازی فعال',
     statEndpoints: 'سرویس API',
     statLanguages: 'زبان',
+    statEdge: 'شبکه جهانی',
+    statEdgeValue: 'جهانی',
     sectionGames: 'بازی‌های فعال',
     sectionHighlights: 'ویژگی‌های کلیدی',
     hlMultilang: 'سه‌زبانه',
@@ -97,6 +99,8 @@ const DASH_I18N = {
     statGames: 'Active games',
     statEndpoints: 'API services',
     statLanguages: 'Languages',
+    statEdge: 'Edge network',
+    statEdgeValue: 'Global',
     sectionGames: 'Active games',
     sectionHighlights: 'Key features',
     hlMultilang: 'Trilingual',
@@ -139,6 +143,8 @@ const DASH_I18N = {
     statGames: '稼働中ゲーム',
     statEndpoints: 'API サービス',
     statLanguages: '言語',
+    statEdge: 'エッジ配信',
+    statEdgeValue: 'グローバル',
     sectionGames: '稼働中のゲーム',
     sectionHighlights: '主な特徴',
     hlMultilang: '3 言語対応',
@@ -271,7 +277,11 @@ const ICONS = {
   globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z"/>',
   contrast: '<circle cx="12" cy="12" r="9"/><path d="M12 3v18a9 9 0 0 0 0-18z" fill="currentColor" stroke="none"/>',
   bolt: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
-  notes: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/>'
+  notes: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/>',
+  tag: '<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>',
+  gamepad: '<line x1="6" y1="11" x2="10" y2="11"/><line x1="8" y1="9" x2="8" y2="13"/><line x1="15" y1="12" x2="15.01" y2="12"/><line x1="18" y1="10" x2="18.01" y2="10"/><rect x="2" y="6" width="20" height="12" rx="2"/>',
+  route: '<circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/>'
+}
 }
 
 function icon(name, cls) {
@@ -450,8 +460,11 @@ function getDashboardCSS() {
     .stat {
       padding: 22px 18px; border-radius: var(--radius); text-align: center;
       background: var(--surface); border: 1px solid var(--border);
+      display: flex; flex-direction: column; align-items: center; gap: 9px;
       transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
     }
+    .stat-ic { display: inline-flex; color: color-mix(in srgb, var(--brand) 55%, var(--text)); }
+    .stat-ic svg { width: 22px; height: 22px; }
     .stat:hover {
       transform: translateY(-4px);
       border-color: color-mix(in srgb, var(--brand) 45%, var(--border));
@@ -461,7 +474,7 @@ function getDashboardCSS() {
       font-size: 2.3em; font-weight: 800; line-height: 1;
       color: color-mix(in srgb, var(--brand) 40%, var(--text));
     }
-    .stat-label { margin-block-start: 8px; font-size: 0.86em; color: var(--text-dim); }
+    .stat-label { font-size: 0.86em; color: var(--text-dim); }
 
     /* ---------- section titles ---------- */
     .section-title {
@@ -505,7 +518,7 @@ function getDashboardCSS() {
     .hl p  { font-size: 0.9em; line-height: 1.6; color: var(--text-dim); }
 
     /* ---------- system links ---------- */
-    .syslinks { display: flex; flex-wrap: wrap; gap: 12px; margin-block-end: 44px; }
+    .syslinks { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-block-end: 44px; }
     .syslink {
       display: inline-flex; align-items: center; gap: 9px;
       padding: 11px 18px; border-radius: 13px; text-decoration: none;
@@ -642,14 +655,16 @@ function renderStats(lang, gamesCount, routesCount) {
   const p = pack(lang)
   const major = String(CONFIG.VERSION.split('.').slice(0, 2).join('.'))
   const stats = [
-    { value: major, label: p.statVersion },
-    { value: String(gamesCount), label: p.statGames },
-    { value: String(routesCount), label: p.statEndpoints },
-    { value: '3', label: p.statLanguages }
+    { ic: 'tag', value: major, label: p.statVersion },
+    { ic: 'gamepad', value: String(gamesCount), label: p.statGames },
+    { ic: 'route', value: String(routesCount), label: p.statEndpoints },
+    { ic: 'globe', value: p.statEdgeValue, label: p.statEdge }
   ]
   const cells = stats.map(s =>
-    '<div class="stat"><div class="stat-num" data-count="' + escapeHtml(s.value) + '">'
-    + escapeHtml(s.value) + '</div><div class="stat-label">' + escapeHtml(s.label) + '</div></div>'
+    '<div class="stat"><span class="stat-ic">' + icon(s.ic) + '</span>'
+    + '<span class="stat-num" data-count="' + escapeHtml(s.value) + '">'
+    + escapeHtml(s.value) + '</span>'
+    + '<span class="stat-label">' + escapeHtml(s.label) + '</span></div>'
   ).join('')
   return '<div class="stats">' + cells + '</div>'
 }
@@ -674,7 +689,6 @@ function renderSystemLinks(lang) {
   const p = pack(lang)
   const links = [
     { href: '/metrics', ic: 'metrics', label: p.navMetrics },
-    { href: '/testsite', ic: 'beaker', label: p.navTestPanel },
     { href: '/release-notes', ic: 'notes', label: p.navReleaseNotes }
   ]
   return '<div class="syslinks">' + links.map(l =>
