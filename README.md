@@ -1,175 +1,177 @@
 <!-- ==========================================
-     AmirCollider - GitHub Profile README
-     Special repo: AmirCollider/AmirCollider
-     Theme: neon / edge dark  •  Accent: #FF5722
-     Sections are marked with HTML comments for easy editing.
+     AmirCollider — GitHub Profile README
+     Trilingual: English / فارسی / 日本語
+     Images are served from this repo's /assets folder
+     (raw.githubusercontent.com) so they never break.
      ========================================== -->
 
-<!-- ==========================================
-     Header Banner
-     ========================================== -->
-<a href="https://github.com/AmirCollider">
-  <img width="100%" src="https://capsule-render.vercel.app/api?type=waving&height=220&color=0:0b0e16,50:7b1e0a,100:FF5722&text=AmirCollider&fontColor=ffffff&fontSize=64&fontAlignY=38&desc=Game%20Developer%20%C2%B7%20Edge%20%26%20Backend%20Engineer&descSize=18&descAlignY=60&animation=fadeIn" alt="AmirCollider" />
-</a>
-
-<!-- ==========================================
-     Tagline (typing animation + trilingual line)
-     ========================================== -->
-<div align="center">
-
-[![Typing SVG](https://readme-typing-svg.demolab.com?font=JetBrains+Mono&weight=600&size=22&pause=1000&color=FF5722&center=true&vCenter=true&width=560&lines=I+build+games+and+the+systems+behind+them;Cloudflare+Workers+%E2%80%A2+D1+%E2%80%A2+R2;Unity+%E2%80%A2+C%23+%E2%80%A2+OAuth+2.0;Trilingual+UX%3A+fa+%E2%80%A2+en+%E2%80%A2+ja)](https://git.io/typing-svg)
-
-**سازنده‌ی بازی و سیستم‌های پشت آن** &nbsp;·&nbsp; **Games & the infrastructure behind them** &nbsp;·&nbsp; **ゲームとその裏側のシステム**
-
-<img src="https://komarev.com/ghpvc/?username=AmirCollider&label=Profile%20views&color=FF5722&style=flat" alt="profile views" />
-
-</div>
-
-<!-- ==========================================
-     Social / Contact badges
-     TODO(amir): replace placeholders with your real links.
-     ========================================== -->
-<div align="center">
-
-[![Myket](https://img.shields.io/badge/Myket-Neon%20Katana-FF5722?style=for-the-badge&logo=android&logoColor=white)](https://myket.ir/app/com.AmirColliderGames.NeonKatana)
-[![Email](https://img.shields.io/badge/Email-amircollider%40yahoo.com-7b1e0a?style=for-the-badge&logo=maildotru&logoColor=white)](mailto:amircollider@yahoo.com)
-<!-- [![Website](https://img.shields.io/badge/Website-amircollider.dev-0b0e16?style=for-the-badge&logo=cloudflare&logoColor=white)](https://YOUR-DOMAIN) -->
-<!-- [![X](https://img.shields.io/badge/X-@handle-0b0e16?style=for-the-badge&logo=x&logoColor=white)](https://x.com/YOUR-HANDLE) -->
-
-</div>
-
----
-
-<!-- ==========================================
-     About
-     ========================================== -->
-## ⚡ About
-
-I'm **Amir**, the developer behind **AmirCollider Games** — I design and ship complete products end to end, from the gameplay in **Unity** to the **edge backend** that powers sign-in, leaderboards and player profiles.
-
-- 🎮 I build **Android games** with Unity / C# and publish them.
-- ☁️ I run my own **serverless auth platform** on **Cloudflare Workers + D1 + R2** — a hardened OAuth 2.0 gateway every game client talks to.
-- 🔐 I care about **security by default**: HMAC-signed state, strict security headers, redacted logging and input sanitization.
-- 🌍 Everything I ship is **trilingual (Persian · English · Japanese)** with correct **RTL/LTR**, light/dark/auto theming, and a custom token-based design system.
-- 🧩 I like clean, modular architectures where adding a feature means editing one registry, not ten files.
-
----
-
-<!-- ==========================================
-     Tech Stack
-     ========================================== -->
-## 🛠️ Tech Stack
-
-**Games**
-<p>
-  <img src="https://img.shields.io/badge/Unity-000000?style=for-the-badge&logo=unity&logoColor=white" />
-  <img src="https://img.shields.io/badge/C%23-512BD4?style=for-the-badge&logo=csharp&logoColor=white" />
-  <img src="https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white" />
-</p>
-
-**Edge & Backend**
-<p>
-  <img src="https://img.shields.io/badge/Cloudflare%20Workers-F38020?style=for-the-badge&logo=cloudflareworkers&logoColor=white" />
-  <img src="https://img.shields.io/badge/Cloudflare%20D1-F38020?style=for-the-badge&logo=cloudflare&logoColor=white" />
-  <img src="https://img.shields.io/badge/Cloudflare%20R2-F38020?style=for-the-badge&logo=cloudflare&logoColor=white" />
-  <img src="https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white" />
-</p>
-
-**Auth & Security**
-<p>
-  <img src="https://img.shields.io/badge/OAuth%202.0-EB5424?style=for-the-badge&logo=auth0&logoColor=white" />
-  <img src="https://img.shields.io/badge/Google%20Identity-4285F4?style=for-the-badge&logo=google&logoColor=white" />
-  <img src="https://img.shields.io/badge/HMAC%20%2F%20TLS-2C3E50?style=for-the-badge&logo=letsencrypt&logoColor=white" />
-</p>
-
-**Web & Languages**
-<p>
-  <img src="https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black" />
-  <img src="https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white" />
-  <img src="https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white" />
-  <img src="https://img.shields.io/badge/SQL-003B57?style=for-the-badge&logo=sqlite&logoColor=white" />
-  <img src="https://img.shields.io/badge/Git-F05032?style=for-the-badge&logo=git&logoColor=white" />
-</p>
-
----
-
-<!-- ==========================================
-     Featured Projects
-     ========================================== -->
-## 🚀 Featured Projects
-
-<!-- ---------- Project 1: OAuth Proxy ---------- -->
-### 🔐 AmirCollider OAuth Proxy &nbsp;·&nbsp; `v6.7`
-
-> A production **OAuth 2.0 authentication gateway** for game clients, running entirely at the edge on **Cloudflare Workers**. It's the single login surface that **Unity, Android, Web and Desktop (loopback)** clients all depend on.
-
-- **Auth surface** — Google sign-in with **HMAC-signed, expiry-checked state** that can't be forged in transit; token exchange, refresh, validate and existence checks.
-- **Data surface** — per-game **leaderboards** and player records backed by **Cloudflare D1**, token-guarded on every mutation.
-- **Server-rendered pages** — dashboard, health, ping, metrics, leaderboard, privacy, terms, release notes and a live self-test panel — all **trilingual (fa/en/ja)** with correct **RTL/LTR**.
-- **Design system** — color & spacing **tokens**, Vazirmatn + SVG icon set, **light/dark/auto** theming with persisted choice.
-- **Security & ops** — strict security headers, structured **redacted logging** (no secrets, no auth codes), input sanitization and a username policy.
-- **Architecture** — fully modular (`worker.js` · `config.js` · `utils.js` · `shared-styles.js` · `pages/*`). Adding a new game = one entry in `GAME_REGISTRY`.
-
-`Cloudflare Workers` `D1` `R2` `OAuth 2.0` `Google Identity` `i18n` `Design System`
-
-<!-- TODO(amir): point this at the real repo once it's public -->
-<!-- 🔗 https://github.com/AmirCollider/REPO-NAME -->
-
-<!-- ---------- Project 2: Neon Katana ---------- -->
-### ⚔️ Neon Katana &nbsp;·&nbsp; Android Game
-
-> A **neon action sword game** for Android, built in **Unity / C#** and published on Myket. Players sign in with Google and compete on cloud leaderboards — powered by the OAuth Proxy above.
-
-- Fast neon-styled action combat.
-- Google sign-in, cloud-saved progress and global high-score leaderboards.
-- Live on the **Myket** app store.
-
-`Unity` `C#` `Android` `Google Sign-In` `Leaderboards`
-
-[![Get it on Myket](https://img.shields.io/badge/▶%20Play%20on%20Myket-FF5722?style=for-the-badge&logo=android&logoColor=white)](https://myket.ir/app/com.AmirColliderGames.NeonKatana)
-
-<!-- TODO(amir): drop a logo / 2-3 screenshots / a short gameplay GIF here.
-     Suggested:  <p><img src="assets/neon-katana-1.png" width="32%"/> ...</p> -->
-
----
-
-<!-- ==========================================
-     GitHub Stats
-     ========================================== -->
-## 📊 GitHub Stats
+<a id="top"></a>
 
 <div align="center">
 
-<img height="165" src="https://github-readme-stats.vercel.app/api?username=AmirCollider&show_icons=true&hide_border=true&count_private=true&include_all_commits=true&theme=tokyonight&title_color=FF5722&icon_color=FF5722" alt="stats" />
-<img height="165" src="https://github-readme-stats.vercel.app/api/top-langs/?username=AmirCollider&layout=compact&hide_border=true&langs_count=8&theme=tokyonight&title_color=FF5722" alt="top languages" />
+<!-- HERO BANNER — replace assets/banner.png with your 1280x320 image -->
+<img src="https://raw.githubusercontent.com/AmirCollider/AmirCollider/main/assets/banner.png" alt="AmirCollider" width="100%" />
 
-<br/>
+<h1>AmirCollider</h1>
 
-<img height="165" src="https://streak-stats.demolab.com?user=AmirCollider&hide_border=true&theme=tokyonight&ring=FF5722&fire=FF5722&currStreakLabel=FF5722" alt="streak" />
+<b>Indie Game Developer · Edge & Backend Engineer · Full-Stack Web</b>
+
+<sub>Unity / Android games · Serverless infrastructure on Cloudflare · Trilingual, accessible web platforms</sub>
 
 <br/><br/>
 
-<img width="100%" src="https://github-profile-trophy.vercel.app/?username=AmirCollider&theme=tokyonight&no-frame=true&no-bg=true&column=7&margin-w=8" alt="trophies" />
+<!-- LANGUAGE SWITCHER -->
+<a href="#english"><img src="https://img.shields.io/badge/English-2563EB?style=for-the-badge" alt="English" /></a>
+<a href="#persian"><img src="https://img.shields.io/badge/فارسی-16A34A?style=for-the-badge" alt="فارسی" /></a>
+<a href="#japanese"><img src="https://img.shields.io/badge/日本語-DC2626?style=for-the-badge" alt="日本語" /></a>
 
-<br/>
+<br/><br/>
 
-<img width="95%" src="https://github-readme-activity-graph.vercel.app/graph?username=AmirCollider&bg_color=0b0e16&color=ffffff&line=FF5722&point=ffffff&area=true&hide_border=true" alt="activity graph" />
+<a href="https://amircollider.n95pluss.workers.dev/"><img src="https://img.shields.io/badge/Website-amircollider-667EEA?style=for-the-badge&logo=cloudflare&logoColor=white" alt="Website" /></a>
+<a href="https://www.instagram.com/amir.collider/"><img src="https://img.shields.io/badge/Instagram-@amir.collider-E4405F?style=for-the-badge&logo=instagram&logoColor=white" alt="Instagram" /></a>
 
 </div>
 
 ---
 
-<!-- ==========================================
-     Footer
-     ========================================== -->
+<a id="english"></a>
+
+## 🇬🇧 English
+
+<div align="center">
+<sub><a href="#top">↑ top</a> · <a href="#persian">فارسی ↓</a> · <a href="#japanese">日本語 ↓</a></sub>
+</div>
+
+### 👋 About me
+
+I'm **AmirCollider** — an indie developer building games and the infrastructure that runs behind them. My work spans the whole stack: from **Unity / Android** game clients, to **serverless edge backends** on Cloudflare Workers, to **trilingual, accessible web interfaces** with light/dark theming and correct RTL/LTR layout.
+
+I care about clean architecture, security by default, and polished details that most people never notice — until they're missing.
+
+### 🛠️ What I build
+
+- 🎮 **Games** — Unity-powered titles published for Android.
+- 🔐 **Authentication infrastructure** — production OAuth flows (Google sign-in for web, desktop and Android) running at the edge.
+- ⚡ **Serverless platforms** — Cloudflare Workers + D1 (SQLite) + R2 object storage, no origin server.
+- 🌐 **Multilingual web** — every page in Persian, English and Japanese, theme-aware and accessibility-conscious.
+
+### 🚀 Featured project — AmirCollider Platform
+
+A secure, edge-native backend powering my games: Google OAuth proxy, player profiles, leaderboards and a live status dashboard.
+
+- HMAC-signed, expiry-checked OAuth state — tamper-proof in transit
+- Trilingual (FA / EN / JA) server-rendered pages with light / dark / auto themes
+- Static assets served from Cloudflare R2; data on D1; structured, redacted logging
+- Built-in test panel, metrics and release notes
+
+🔗 **Explore my games & live demos on the website:** **[amircollider.n95pluss.workers.dev](https://amircollider.n95pluss.workers.dev/)**
+
+### 🧰 Tech stack
+
 <div align="center">
 
-### Let's build something. 🎮
+![Unity](https://img.shields.io/badge/Unity-000000?style=for-the-badge&logo=unity&logoColor=white)
+![C#](https://img.shields.io/badge/C%23-512BD4?style=for-the-badge&logo=csharp&logoColor=white)
+![Android](https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
+![Cloudflare Workers](https://img.shields.io/badge/Cloudflare%20Workers-F38020?style=for-the-badge&logo=cloudflare&logoColor=white)
+![SQLite](https://img.shields.io/badge/D1%20SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
+![Google OAuth](https://img.shields.io/badge/Google%20OAuth-4285F4?style=for-the-badge&logo=google&logoColor=white)
+![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)
+![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white)
+![Git](https://img.shields.io/badge/Git-F05032?style=for-the-badge&logo=git&logoColor=white)
 
-[![Email](https://img.shields.io/badge/amircollider@yahoo.com-FF5722?style=flat-square&logo=maildotru&logoColor=white)](mailto:amircollider@yahoo.com)
+</div>
 
-<sub>© AmirCollider Games · Built on the edge ☁️ · fa · en · ja</sub>
+### 📫 Connect
 
-<img width="100%" src="https://capsule-render.vercel.app/api?type=waving&height=120&section=footer&color=0:FF5722,100:0b0e16" alt="" />
+- 🌐 Website: **[amircollider.n95pluss.workers.dev](https://amircollider.n95pluss.workers.dev/)**
+- 📸 Instagram: **[@amir.collider](https://www.instagram.com/amir.collider/)**
 
+---
+
+<a id="persian"></a>
+
+## 🇮🇷 فارسی
+
+<div align="center">
+<sub><a href="#top">↑ بالا</a> · <a href="#english">English ↑</a> · <a href="#japanese">日本語 ↓</a></sub>
+</div>
+
+<div dir="rtl" align="right">
+
+### 👋 درباره‌ی من
+
+من **AmirCollider** هستم؛ یک توسعه‌دهنده‌ی مستقل که هم بازی می‌سازد و هم زیرساختی که پشت آن بازی‌ها اجرا می‌شود. کارم کل مسیر را در بر می‌گیرد: از کلاینت بازی روی **Unity / اندروید**، تا **بک‌اند سرورلس روی لبه‌ی شبکه** با Cloudflare Workers، تا **رابط‌های وب چندزبانه و دسترس‌پذیر** با تم روشن/تاریک و چیدمان درست راست‌چین/چپ‌چین.
+
+معماری تمیز، امنیت پیش‌فرض و جزئیاتی که تا وقتی نباشند کسی متوجه‌شان نمی‌شود، برایم مهم است.
+
+### 🛠️ چه چیزهایی می‌سازم
+
+- 🎮 **بازی‌ها** — عناوین ساخته‌شده با Unity و منتشرشده برای اندروید.
+- 🔐 **زیرساخت احراز هویت** — جریان‌های OAuth واقعی (ورود با گوگل برای وب، دسکتاپ و اندروید) اجراشده روی لبه‌ی شبکه.
+- ⚡ **پلتفرم‌های سرورلس** — Cloudflare Workers به‌همراه D1 (SQLite) و فضای ذخیره‌سازی R2، بدون سرور مبدأ.
+- 🌐 **وب چندزبانه** — هر صفحه به فارسی، انگلیسی و ژاپنی، تم‌آگاه و با توجه به دسترس‌پذیری.
+
+### 🚀 پروژه‌ی شاخص — پلتفرم AmirCollider
+
+یک بک‌اند امن و لبه‌محور که بازی‌هایم را اجرا می‌کند: پروکسی OAuth گوگل، پروفایل بازیکنان، جدول امتیازات و داشبورد وضعیت زنده.
+
+- وضعیت OAuth با امضای HMAC و بررسی انقضا — غیرقابل دستکاری در مسیر انتقال
+- صفحات سه‌زبانه (فارسی/انگلیسی/ژاپنی) با رندر سمت سرور و تم روشن/تاریک/خودکار
+- میزبانی فایل‌های استاتیک روی Cloudflare R2؛ داده‌ها روی D1؛ لاگ‌گیری ساختاریافته و پاک‌سازی‌شده
+- پنل تست، متریک‌ها و یادداشت‌های انتشار به‌صورت داخلی
+
+🔗 **بازی‌ها و دموهای زنده را در وب‌سایت ببینید:** **[amircollider.n95pluss.workers.dev](https://amircollider.n95pluss.workers.dev/)**
+
+### 📫 ارتباط
+
+- 🌐 وب‌سایت: **[amircollider.n95pluss.workers.dev](https://amircollider.n95pluss.workers.dev/)**
+- 📸 اینستاگرام: **[@amir.collider](https://www.instagram.com/amir.collider/)**
+
+</div>
+
+---
+
+<a id="japanese"></a>
+
+## 🇯🇵 日本語
+
+<div align="center">
+<sub><a href="#top">↑ トップ</a> · <a href="#english">English ↑</a> · <a href="#persian">فارسی ↑</a></sub>
+</div>
+
+### 👋 自己紹介
+
+**AmirCollider** です。ゲームと、その裏側で動くインフラの両方を作るインディー開発者です。**Unity / Android** のゲームクライアントから、Cloudflare Workers 上の**サーバーレス・エッジバックエンド**、ライト/ダークテーマと正しい RTL/LTR レイアウトを備えた**多言語・アクセシブルな Web インターフェース**まで、スタック全体を手がけています。
+
+クリーンなアーキテクチャ、デフォルトでのセキュリティ、そして無くなって初めて気づくような細部を大切にしています。
+
+### 🛠️ 作っているもの
+
+- 🎮 **ゲーム** — Unity で開発し、Android 向けに公開したタイトル。
+- 🔐 **認証インフラ** — エッジで動作する実運用の OAuth フロー（Web・デスクトップ・Android 向け Google サインイン）。
+- ⚡ **サーバーレス基盤** — Cloudflare Workers + D1 (SQLite) + R2 ストレージ、オリジンサーバー不要。
+- 🌐 **多言語 Web** — すべてのページをペルシャ語・英語・日本語で、テーマ対応かつアクセシビリティに配慮。
+
+### 🚀 注目プロジェクト — AmirCollider Platform
+
+私のゲームを支える、安全でエッジネイティブなバックエンド。Google OAuth プロキシ、プレイヤープロフィール、リーダーボード、ライブステータスダッシュボードを提供します。
+
+- HMAC 署名・有効期限チェック付きの OAuth state — 転送中の改ざんを防止
+- 三言語（FA / EN / JA）のサーバーレンダリングページ、ライト/ダーク/自動テーマ
+- 静的アセットは Cloudflare R2 から配信、データは D1、ログは構造化・秘匿化
+- テストパネル・メトリクス・リリースノートを内蔵
+
+🔗 **ゲームとライブデモは Web サイトでご覧ください：** **[amircollider.n95pluss.workers.dev](https://amircollider.n95pluss.workers.dev/)**
+
+### 📫 連絡先
+
+- 🌐 ウェブサイト：**[amircollider.n95pluss.workers.dev](https://amircollider.n95pluss.workers.dev/)**
+- 📸 Instagram：**[@amir.collider](https://www.instagram.com/amir.collider/)**
+
+---
+
+<div align="center">
+<sub>© AmirCollider · Built with Unity, Cloudflare Workers & a lot of attention to detail.</sub>
 </div>
