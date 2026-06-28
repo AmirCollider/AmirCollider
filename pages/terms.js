@@ -586,6 +586,12 @@ function getTermsCSS() {
   return `
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
+    /* ==========================================
+       Hide scrollbars (scrolling stays functional)
+       ========================================== */
+    html { scrollbar-width: none; -ms-overflow-style: none; }
+    html::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
     :root {
       --brand: #6c63ff;
       --brand-2: #a78bfa;
