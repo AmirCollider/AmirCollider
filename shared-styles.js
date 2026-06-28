@@ -136,10 +136,17 @@ function cssTokens(brand, brand2, accent, brandRgb, accentRgb) {
 // ==========================================
 function cssBase() {
   return `
-    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+   *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
-    html { -webkit-text-size-adjust: 100%; }
-
+    /* ==========================================
+       Hide scrollbars (scrolling stays functional)
+       ========================================== */
+    html {
+      -webkit-text-size-adjust: 100%;
+      scrollbar-width: none;        /* Firefox */
+      -ms-overflow-style: none;     /* IE / old Edge */
+    }
+    html::-webkit-scrollbar { width: 0; height: 0; display: none; } /* Chrome / Safari / Edge */
     body {
       font-family: 'Vazirmatn', 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP',
                    'Yu Gothic', Meiryo, Tahoma, Arial, sans-serif;
