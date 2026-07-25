@@ -48,6 +48,15 @@ import { handleLeaderboardUnified } from './pages/leaderboard.js'
 import { handleMetrics } from './pages/metrics.js'
 import { handleDashboard } from './pages/dashboard.js'
 import { handleReleaseNotes } from './pages/releaseNotes.js'
+import { handleUnityDocSnap } from './pages/unityDocSnap.js'
+import {
+  handleLicensePage,
+  handleLicenseActivate,
+  handleLicenseValidate,
+  handleLicenseDeactivate,
+  handleLicenseDevices,
+  handleLicenseAdmin
+} from './pages/license.js'
 import {
   handleTestSite,
   handleTestSiteLogin,
@@ -372,6 +381,24 @@ const ROUTES = [
   { path: '/testsite/logout', method: 'POST', handler: handleTestSiteLogout },
   { path: '/metrics', method: 'GET', handler: handleMetrics },
   { path: '/release-notes', method: 'GET', handler: handleReleaseNotes },
+
+  // ---- Unity DocSnap: product page + licensing ----
+  //
+  // The licence endpoints are POST-only and take their key in
+  // the body rather than the query string. A key in a URL ends
+  // up in access logs, in browser history, and in the Referer
+  // header of anything the page later links to - which for a
+  // credential that unlocks a paid product is three places too
+  // many.
+  { path: '/unity-docsnap', method: 'GET', handler: handleUnityDocSnap },
+  { path: '/docsnap', method: 'GET', handler: handleUnityDocSnap },
+  { path: '/license', method: 'GET', handler: handleLicensePage },
+  { path: '/license/activate', method: 'POST', handler: handleLicenseActivate },
+  { path: '/license/validate', method: 'POST', handler: handleLicenseValidate },
+  { path: '/license/deactivate', method: 'POST', handler: handleLicenseDeactivate },
+  { path: '/license/devices', method: 'POST', handler: handleLicenseDevices },
+  { path: '/license/admin', method: 'POST', handler: handleLicenseAdmin },
+
   { path: '/assets/', method: 'GET', handler: handleAsset, prefix: true },
   { path: '/:gameId/health', method: 'GET', handler: handleHealthWithUI, dynamic: true },
   { path: '/:gameId/ping', method: 'GET', handler: handlePingWithUI, dynamic: true },

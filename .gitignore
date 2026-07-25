@@ -1,0 +1,34 @@
+# ==========================================
+# AmirCollider Worker
+# ==========================================
+
+# ---- Secrets ----
+# The licence signing key. Anybody holding it can mint
+# licences for Unity DocSnap Pro, so it must never reach a
+# commit. scripts/generate-license-keypair.sh writes it here
+# by default; it belongs in `wrangler secret put` and nowhere
+# else.
+license-private.pem
+*.pem
+*.key
+.dev.vars
+.env
+.env.*
+
+# ---- Generated licence batches ----
+# The plaintext keys from a generate call exist in exactly
+# one place before they go into Sell.app, and that place is
+# a file on your machine for about a minute. It must not be
+# the one place it also gets committed.
+serials.txt
+serials*.txt
+
+# ---- Wrangler / node ----
+.wrangler/
+node_modules/
+dist/
+*.log
+
+# ---- OS noise ----
+.DS_Store
+Thumbs.db

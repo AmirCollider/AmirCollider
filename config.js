@@ -64,6 +64,33 @@ export const CORS_HEADERS = deepFreeze({
 // ==========================================
 export const CONFIG = deepFreeze({
   VERSION: '6.7',
+
+  // The site's own public origin.
+  //
+  // Needed because a handful of places have to produce an
+  // ABSOLUTE url rather than a path: a licence refusal that
+  // tells somebody where to release a seat, and the product
+  // page's canonical/OpenGraph tags. Everything else uses
+  // paths and should keep doing so.
+  //
+  // A constant rather than url.origin, deliberately: the
+  // request origin is whatever host the caller used, so a
+  // preview deployment or a proxied hostname would bake the
+  // wrong address into a customer-facing message.
+  SITE_URL: 'https://amircollider.n95pluss.workers.dev',
+
+  // Unity DocSnap — the paid Unity editor extension. The
+  // checkout is Sell.app, which delivers a pre-generated key
+  // from its serial pool the moment a payment clears, so
+  // neither this Worker nor a webhook sits in the payment
+  // path.
+  DOCSNAP: {
+    PRICE_USD: '49.99',
+    BUY_URL: 'https://amircollider.sell.app',
+    REPO_URL: 'https://github.com/AmirCollider/UnityDocSnap',
+    VERSION: '1.0.0'
+  },
+
   STATE_EXPIRY_MS: 30 * 60 * 1000,
   REDIRECT_TIMEOUT_MS: 1000,
   PING_TIMEOUT_MS: 5000,

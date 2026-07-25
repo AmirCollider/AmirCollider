@@ -64,6 +64,12 @@ const DASH_I18N = {
     hlThemeDesc: 'تم خودکار بر پایه سیستم، با امکان تغییر دستی و ماندگاری انتخاب.',
     hlEdge: 'اجرا روی لبه شبکه',
     hlEdgeDesc: 'اجرا روی شبکه جهانی Cloudflare برای پاسخ‌دهی سریع و پایدار.',
+    sectionTools: 'ابزارها',
+    toolDocSnapName: 'Unity DocSnap',
+    toolDocSnapDesc: 'کل پروژه‌ی یونیتی را می‌کند یک وب‌سایت آفلاین — برای آدم‌ها و برای هوش مصنوعی. نسخه‌ی رایگان بدون کد، نسخه‌ی Pro یک‌بار خرید.',
+    toolDocSnapCta: 'ببین و بخر',
+    toolFree: 'رایگان',
+    toolPro: 'Pro $49.99',
     navMetrics: 'متریک‌ها',
     navTestPanel: 'پنل تست',
     navReleaseNotes: 'یادداشت‌های انتشار',
@@ -109,6 +115,12 @@ const DASH_I18N = {
     hlThemeDesc: 'Theme follows your system by default, with a manual toggle that remembers your choice.',
     hlEdge: 'Runs at the edge',
     hlEdgeDesc: 'Served from Cloudflare’s global network for fast, reliable responses.',
+    sectionTools: 'Tools',
+    toolDocSnapName: 'Unity DocSnap',
+    toolDocSnapDesc: 'Snaps a whole Unity project into an offline website — for humans and AI alike. Free needs no key; Pro is a one-off purchase.',
+    toolDocSnapCta: 'See it',
+    toolFree: 'Free',
+    toolPro: 'Pro $49.99',
     navMetrics: 'Metrics',
     navTestPanel: 'Test panel',
     navReleaseNotes: 'Release notes',
@@ -153,6 +165,12 @@ const DASH_I18N = {
     hlThemeDesc: '既定では OS に追従し、手動切り替えと設定の保存にも対応します。',
     hlEdge: 'エッジで実行',
     hlEdgeDesc: 'Cloudflare のグローバルネットワークで高速かつ安定して配信します。',
+    sectionTools: 'ツール',
+    toolDocSnapName: 'Unity DocSnap',
+    toolDocSnapDesc: 'Unity プロジェクト全体をオフラインの Web サイトに。人にも AI にも読める形で。無料版はキー不要、Pro は買い切りです。',
+    toolDocSnapCta: '詳しく見る',
+    toolFree: '無料版',
+    toolPro: 'Pro $49.99',
     navMetrics: 'メトリクス',
     navTestPanel: 'テストパネル',
     navReleaseNotes: 'リリースノート',
@@ -522,6 +540,34 @@ function getDashboardCSS() {
     .hl h3 { font-size: 1.05em; font-weight: 700; margin-block-end: 6px; }
     .hl p  { font-size: 0.9em; line-height: 1.6; color: var(--text-dim); }
 
+    /* ---------- tools (the paid extension) ---------- */
+    .tool-card {
+      display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+      padding: 22px; margin-block-end: 44px; text-decoration: none; color: var(--text);
+      border-radius: var(--radius); background: var(--surface);
+      border: 1px solid color-mix(in srgb, var(--brand) 30%, var(--border));
+      transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+    }
+    .tool-card:hover {
+      transform: translateY(-4px); background: var(--surface-2);
+      border-color: color-mix(in srgb, var(--brand) 55%, var(--border));
+    }
+    .tool-ic { font-size: 2.2em; line-height: 1; }
+    .tool-body { flex: 1 1 260px; min-width: 0; }
+    .tool-name { display: block; font-weight: 800; font-size: 1.05em; }
+    .tool-desc { display: block; font-size: 0.9em; color: var(--text-dim); margin-block: 4px 10px; }
+    .tool-tags { display: flex; gap: 8px; flex-wrap: wrap; }
+    .tool-tag {
+      font-size: 0.78em; font-weight: 700; padding: 3px 10px; border-radius: 999px;
+      color: var(--text-dim); background: var(--surface-2); border: 1px solid var(--border);
+    }
+    .tool-tag.is-pro {
+      color: color-mix(in srgb, var(--brand) 50%, var(--text));
+      background: color-mix(in srgb, var(--brand) 14%, transparent);
+      border-color: color-mix(in srgb, var(--brand) 38%, transparent);
+    }
+    .tool-cta { font-weight: 700; font-size: 0.9em; color: color-mix(in srgb, var(--brand) 55%, var(--text)); }
+
     /* ---------- system links ---------- */
     .syslinks { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-block-end: 44px; }
     .syslink {
@@ -589,6 +635,7 @@ function getDashboardCSS() {
       .stats     { animation-delay: 0.10s; }
       .section-title, .games-grid { animation: dRise 0.5s cubic-bezier(0.16,1,0.3,1) both; animation-delay: 0.14s; }
       .highlights{ animation-delay: 0.18s; }
+      .tool-card { animation: dRise 0.5s cubic-bezier(0.16,1,0.3,1) both; animation-delay: 0.20s; }
       .syslinks  { animation-delay: 0.22s; }
       .pill .dot { animation: dPulse 1.9s ease-in-out infinite; }
       .spinner   { animation: dSpin 0.7s linear infinite; }
@@ -688,6 +735,37 @@ function renderHighlights(lang) {
   return `
     <div class="section-title">${escapeHtml(p.sectionHighlights)}</div>
     <div class="highlights">${cards}</div>`
+}
+
+// ==========================================
+// renderTools
+// The paid Unity editor extension, on the landing page.
+//
+// It sits below the games and above the system links,
+// which is where it belongs: this dashboard is a
+// developer's shop window, and the one thing on it that
+// somebody can actually buy should not be buried under
+// the health-check endpoints. One card rather than a
+// section of them, because there is one product - a grid
+// built for a catalogue that holds a single item looks
+// like a page waiting for content.
+// ==========================================
+function renderTools(lang) {
+  const p = pack(lang)
+  return `
+    <div class="section-title">${escapeHtml(p.sectionTools)}</div>
+    <a class="tool-card" href="/unity-docsnap">
+      <span class="tool-ic">🧋</span>
+      <span class="tool-body">
+        <span class="tool-name">${escapeHtml(p.toolDocSnapName)}</span>
+        <span class="tool-desc">${escapeHtml(p.toolDocSnapDesc)}</span>
+        <span class="tool-tags">
+          <span class="tool-tag">${escapeHtml(p.toolFree)}</span>
+          <span class="tool-tag is-pro">${escapeHtml(p.toolPro)}</span>
+        </span>
+      </span>
+      <span class="tool-cta">${escapeHtml(p.toolDocSnapCta)} &rarr;</span>
+    </a>`
 }
 
 function renderSystemLinks(lang) {
@@ -913,6 +991,8 @@ function createDashboardPage(GAMES, baseUrl, routesCount, lang, theme) {
 
     <div class="section-title">${escapeHtml(pack(resolved).sectionGames)}</div>
     ${createGamesCardsHTML(GAMES, baseUrl, { lang: resolved })}
+
+    ${renderTools(resolved)}
 
    ${renderSystemLinks(resolved)}
     ${renderFooter(resolved, CONFIG.VERSION)}
