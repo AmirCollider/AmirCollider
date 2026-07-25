@@ -64,6 +64,45 @@ export const CORS_HEADERS = deepFreeze({
 // ==========================================
 export const CONFIG = deepFreeze({
   VERSION: '6.7',
+
+  // The site's own public origin.
+  //
+  // Needed because a handful of places have to produce an
+  // ABSOLUTE url rather than a path: a licence refusal that
+  // tells somebody where to release a seat, and the product
+  // page's canonical/OpenGraph tags. Everything else uses
+  // paths and should keep doing so.
+  //
+  // A constant rather than url.origin, deliberately: the
+  // request origin is whatever host the caller used, so a
+  // preview deployment or a proxied hostname would bake the
+  // wrong address into a customer-facing message.
+  SITE_URL: 'https://amircollider.n95pluss.workers.dev',
+
+  // Unity DocSnap — the paid Unity editor extension.
+  //
+  // Three tiers. Free needs no key at all. Plus is the two
+  // outputs people ask for by name (the AI-ready summaries
+  // and the Changes page) and exists because somebody who
+  // wants exactly those would look at a single $49.99 price
+  // and buy nothing. Pro is everything.
+  //
+  // Both checkouts are Sell.app products with their own
+  // pre-generated serial pools, so a purchase delivers a key
+  // of the right tier the moment a payment clears - neither
+  // this Worker nor a webhook sits in the payment path.
+  //
+  // The tier names here must match DocSnapEditionMatrix in
+  // the Unity package, which is what a licence token carries.
+  DOCSNAP: {
+    REPO_URL: 'https://github.com/AmirCollider/UnityDocSnap',
+    VERSION: '1.0.0',
+    TIERS: {
+      plus: { name: 'Plus', price: '19.99', buyUrl: 'https://amircollider.sell.app' },
+      pro: { name: 'Pro', price: '49.99', buyUrl: 'https://amircollider.sell.app' }
+    }
+  },
+
   STATE_EXPIRY_MS: 30 * 60 * 1000,
   REDIRECT_TIMEOUT_MS: 1000,
   PING_TIMEOUT_MS: 5000,

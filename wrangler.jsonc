@@ -11,6 +11,30 @@
       "binding": "NEON_KATANA_DB",
       "database_name": "neon-katana-db",
       "database_id": "790fc372-1b4d-4e5a-996f-bf92cde2d19c"
+    },
+    // ==========================================
+    // Unity DocSnap licence keys and activations.
+    //
+    // Its own database rather than a few extra tables in the
+    // game one. The game database is written by every player
+    // on every score submission; this is written a few times
+    // per sale, and a bug in the busy half must not be able
+    // to reach the half that decides who paid for what.
+    //
+    // Create it once, then paste the printed id here:
+    //   npx wrangler d1 create amircollider-licenses
+    //   npx wrangler d1 execute amircollider-licenses --remote \
+    //       --file=./migrations/0001_licenses.sql
+    //
+    // Until database_id is filled in, every /license endpoint
+    // answers 503 "licensing is not configured on this
+    // deployment" - which is the honest state, and does not
+    // affect any other route.
+    // ==========================================
+    {
+      "binding": "LICENSE_DB",
+      "database_name": "amircollider-licenses",
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID"
     }
   ],
   "r2_buckets": [
