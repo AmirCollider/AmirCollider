@@ -342,7 +342,7 @@ const ROWS = [
   },
   {
     free: { fa: '۳ اسنپ‌شات', en: '3 snapshots', ja: '3 件まで' },
-    plus: { fa: '۳ اسنپ‌شات', en: '3 snapshots', ja: '3 件まで' },
+    plus: { fa: '۵ اسنپ‌شات', en: '5 snapshots', ja: '5 件まで' },
     pro: true,
     label: {
       fa: '📚 تاریخچه‌ی نسخه‌ها',

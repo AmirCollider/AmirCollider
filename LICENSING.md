@@ -45,21 +45,50 @@ record; D1 holds who activated what, where.
 
 ### 1. Create the database
 
-```bash
-npx wrangler d1 create amircollider-licenses
+The `LICENSE_DB` binding ships **commented out** in `wrangler.jsonc`,
+so the Worker deploys and runs normally before any of this is done —
+every `/license` endpoint simply answers `503 not_configured` and no
+other route is affected. Do not uncomment it before the database
+exists: Cloudflare validates every binding at deploy time and rejects
+an invalid id with
+
+```
+binding LICENSE_DB of type d1 must have a valid `database_id`
+specified [code: 10021]
 ```
 
-Copy the printed `database_id` into `wrangler.jsonc`, replacing
-`REPLACE_WITH_D1_DATABASE_ID`. Then create the tables:
+which, on a Git-connected build, fails the deploy for the *whole*
+Worker.
+
+**With the CLI:**
 
 ```bash
+npx wrangler d1 create amircollider-licenses
 npx wrangler d1 execute amircollider-licenses --remote \
     --file=./migrations/0001_licenses.sql
 ```
 
-Until that id is filled in, every `/license` endpoint answers
-`503 not_configured`. No other route is affected, so deploying before
-this is finished is safe.
+**From the dashboard**, if you deploy by pushing to GitHub and never
+run wrangler locally:
+
+1. Cloudflare dashboard ▸ **Storage & Databases ▸ D1 ▸ Create**
+2. Name it `amircollider-licenses`
+3. Open it ▸ **Console** tab ▸ paste the whole of
+   `migrations/0001_licenses.sql` ▸ run
+4. Copy the **Database ID** from the database's overview page
+
+Either way, finish by uncommenting the `LICENSE_DB` block at the
+bottom of `d1_databases` in `wrangler.jsonc` and pasting the real
+UUID in. Note the leading comma — it separates the new entry from
+`NEON_KATANA_DB`:
+
+```jsonc
+    ,{
+      "binding": "LICENSE_DB",
+      "database_name": "amircollider-licenses",
+      "database_id": "the-uuid-you-just-copied"
+    }
+```
 
 ### 2. Set the two secrets
 
