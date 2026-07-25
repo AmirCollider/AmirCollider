@@ -11,57 +11,12 @@
       "binding": "NEON_KATANA_DB",
       "database_name": "neon-katana-db",
       "database_id": "790fc372-1b4d-4e5a-996f-bf92cde2d19c"
+    },
+    {
+      "binding": "LICENSE_DB",
+      "database_name": "amircollider-licenses",
+      "database_id": "7ddcf78a-8de1-47d4-899d-9ca72b903b68"
     }
-
-    // ==========================================
-    // Unity DocSnap licence keys and activations —
-    // COMMENTED OUT UNTIL THE DATABASE EXISTS.
-    //
-    // Uncomment the block below and paste the real id once
-    // the database is created. Leaving it commented is not a
-    // half-finished state: `db(env)` in licensing/store.js
-    // returns null when the binding is absent, so every
-    // /license endpoint answers a clean 503 "licensing is not
-    // configured on this deployment" and no other route is
-    // affected at all.
-    //
-    // It is commented rather than left with a placeholder id
-    // because Cloudflare validates every binding at deploy
-    // time and rejects an unparseable one:
-    //
-    //   binding LICENSE_DB of type d1 must have a valid
-    //   `database_id` specified [code: 10021]
-    //
-    // With Git-connected builds that failure lands on the
-    // whole Worker - the OAuth proxy, the leaderboards, the
-    // game pages, all of it - for the sake of a feature
-    // nobody has set up yet. A config that breaks working
-    // routes to reserve a name for a future one has its
-    // priorities backwards.
-    //
-    // Its own database rather than a few extra tables in the
-    // game one. The game database is written by every player
-    // on every score submission; this is written a few times
-    // per sale, and a bug in the busy half must not be able to
-    // reach the half that decides who paid for what.
-    //
-    // Setup:
-    //   npx wrangler d1 create amircollider-licenses
-    //   npx wrangler d1 execute amircollider-licenses --remote \
-    //       --file=./migrations/0001_licenses.sql
-    //
-    // Or from the dashboard: Storage & Databases ▸ D1 ▸ Create,
-    // name it amircollider-licenses, then paste the SQL from
-    // migrations/0001_licenses.sql into its Console tab.
-    //
-    // Then uncomment:
-    //
-    // ,{
-    //   "binding": "LICENSE_DB",
-    //   "database_name": "amircollider-licenses",
-    //   "database_id": "PASTE_THE_REAL_UUID_HERE"
-    // }
-    // ==========================================
   ],
   "r2_buckets": [
     {
