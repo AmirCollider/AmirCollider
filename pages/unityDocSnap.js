@@ -71,8 +71,7 @@ const I18N = {
     ctaPrices: 'قیمت‌ها را ببین',
     priceNote: 'خرید یک‌باره · یک سیستم · بدون اشتراک ماهانه',
 
-   sectionWhat: 'چه‌کار می‌کند',
-    sectionVideos: 'در عمل ببینید',
+    sectionWhat: 'چه‌کار می‌کند',
     sectionCompare: 'مقایسه‌ی نسخه‌ها',
     sectionSpotlight: 'چیزی که بیشترین آدم برایش پول می‌دهد',
     sectionPricing: 'قیمت',
@@ -142,7 +141,6 @@ const I18N = {
     priceNote: 'One-off purchase · one machine · no subscription',
 
     sectionWhat: 'What it does',
-    sectionVideos: 'See it in action',
     sectionCompare: 'Compare the editions',
     sectionSpotlight: 'What most people pay for',
     sectionPricing: 'Pricing',
@@ -212,7 +210,6 @@ const I18N = {
     priceNote: '買い切り · 1 台まで · サブスクリプションなし',
 
     sectionWhat: 'できること',
-    sectionVideos: '実際の動作を見る',
     sectionCompare: 'エディション比較',
     sectionSpotlight: '最も選ばれている理由',
     sectionPricing: '価格',
@@ -443,133 +440,6 @@ const WHAT = [
 
 
 // ==========================================
-// Promo video manifest
-// Each entry maps one clip to its R2 object key per language, plus
-// a localized title/caption. Keys are bucket-relative (no leading
-// slash) and are joined onto "/assets/" by videoSrcFor() below.
-//
-// FLAGS - confirm and fix in R2 before relying on this list:
-//   - EN keys sit under "EN/EN/" (double-nested) per the bucket
-//     listing supplied 2026-07-26 - kept as-is so this matches what
-//     is actually uploaded. If that gets flattened to EN/ in R2,
-//     drop the duplicated "EN/" segment below.
-//   - FA keys are UNCONFIRMED. The FA listing supplied was
-//     byte-identical to the EN one (same links, sizes, timestamps),
-//     which reads as a pasted duplicate rather than real FA content.
-//     This table guesses "FA/<file>.mp4" (flat, matching JP) -
-//     replace with the real FA object keys.
-//   - "10 Dark and Languages -JA-.mp4" is missing from JP/, so ja
-//     falls back to the English clip for that one entry until it is
-//     uploaded and the key below is filled in.
-// ==========================================
-const PROMO_VIDEOS = [
-  {
-    key: { en: 'EN/EN/01 Explain to AI.mp4', fa: 'FA/01 Explain to AI.mp4', ja: 'JP/01 Explain to AI -JA-.mp4' },
-    title: { fa: 'توضیح برای هوش مصنوعی', en: 'Explain to AI', ja: 'AI に説明する' },
-    caption: {
-      fa: 'کل پروژه را یک‌جا برای دستیار هوش مصنوعی پیست کن.',
-      en: 'Paste the whole project into an AI assistant in one go.',
-      ja: 'プロジェクト全体を一度に AI アシスタントへ貼り付け。'
-    }
-  },
-  {
-    key: { en: 'EN/EN/02 What Changed.mp4', fa: 'FA/02 What Changed.mp4', ja: 'JP/02 What Changed -JA-.mp4' },
-    title: { fa: 'چه چیزی تغییر کرد', en: 'What Changed', ja: '何が変わったか' },
-    caption: {
-      fa: 'صفحه‌ی تغییرات: دیف تمیز بین دو خروجی.',
-      en: 'The Changes page: a clean diff between two exports.',
-      ja: '変更ページ：2 つのエクスポートのきれいな差分。'
-    }
-  },
-  {
-    key: { en: 'EN/EN/03 Find a File.mp4', fa: 'FA/03 Find a File.mp4', ja: 'JP/03 Find a File -JA-.mp4' },
-    title: { fa: 'پیدا کردن یک فایل', en: 'Find a File', ja: 'ファイルを見つける' },
-    caption: {
-      fa: 'جست‌وجوی آنی در همه‌ی سین‌ها، اسکریپت‌ها و اسِت‌ها.',
-      en: 'Search across every Scene, script and asset instantly.',
-      ja: 'すべてのシーン・スクリプト・アセットを即座に検索。'
-    }
-  },
-  {
-    key: { en: 'EN/EN/04 Complete Archive.mp4', fa: 'FA/04 Complete Archive.mp4', ja: 'JP/04 Complete Archive -JA-.mp4' },
-    title: { fa: 'آرشیو کامل', en: 'Complete Archive', ja: '完全なアーカイブ' },
-    caption: {
-      fa: 'یک سایت HTML، کل پروژه — آماده‌ی مرور.',
-      en: 'One HTML site holds the entire project, ready to browse.',
-      ja: 'プロジェクト全体を 1 つの HTML サイトに。'
-    }
-  },
-  {
-    key: { en: 'EN/EN/05 Offline No Unity.mp4', fa: 'FA/05 Offline No Unity.mp4', ja: 'JP/05 Offline No Unity -JA-.mp4' },
-    title: { fa: 'آفلاین، بدون یونیتی', en: 'Offline, No Unity', ja: 'オフライン、Unity 不要' },
-    caption: {
-      fa: 'با دو کلیک باز می‌شود — بدون یونیتی، بدون سرور.',
-      en: 'Opens with a double-click — no Unity, no server.',
-      ja: 'ダブルクリックで開く — Unity もサーバーも不要。'
-    }
-  },
-  {
-    key: { en: 'EN/EN/06 Share With Team.mp4', fa: 'FA/06 Share With Team.mp4', ja: 'JP/06 Share With Team -JA-.mp4' },
-    title: { fa: 'اشتراک‌گذاری با تیم', en: 'Share With Team', ja: 'チームと共有' },
-    caption: {
-      fa: 'سایت خروجی را برای هرکسی بفرست — بدون نیاز به نصب یونیتی.',
-      en: 'Send the exported site to anyone — no Unity install needed.',
-      ja: 'エクスポートしたサイトを誰にでも共有 — Unity 不要。'
-    }
-  },
-  {
-    key: { en: 'EN/EN/07 Browse in Browser.mp4', fa: 'FA/07 Browse in Browser.mp4', ja: 'JP/07 Browse in Browser -JA-.mp4' },
-    title: { fa: 'مرور در مرورگر', en: 'Browse in Browser', ja: 'ブラウザで閲覧' },
-    caption: {
-      fa: 'کل Hierarchy و Inspector، همان‌جا توی مرورگر.',
-      en: 'The whole Hierarchy and Inspector, right in your browser.',
-      ja: 'Hierarchy と Inspector をそのままブラウザで。'
-    }
-  },
-  {
-    key: { en: 'EN/EN/08 Asset Settings.mp4', fa: 'FA/08 Asset Settings.mp4', ja: 'JP/08 Asset Settings -JA-.mp4' },
-    title: { fa: 'تنظیمات اسِت', en: 'Asset Settings', ja: 'アセット設定' },
-    caption: {
-      fa: 'تنظیمات ایمپورت هر اسِت، تمیز و مرتب.',
-      en: "Every asset's import settings, laid out clearly.",
-      ja: '各アセットのインポート設定を分かりやすく表示。'
-    }
-  },
-  {
-    key: { en: 'EN/EN/09 Versions Compare.mp4', fa: 'FA/09 Versions Compare.mp4', ja: 'JP/09 Versions Compare -JA-.mp4' },
-    title: { fa: 'مقایسه‌ی نسخه‌ها', en: 'Compare Versions', ja: 'バージョンを比較' },
-    caption: {
-      fa: 'دو اسنپ‌شات را کنار هم بگذار و ببین دقیقاً چه چیزی تغییر کرد.',
-      en: 'Line up two snapshots and see exactly what moved.',
-      ja: '2 つのスナップショットを並べて変化を確認。'
-    }
-  },
-  {
-    // ja: 'JP/10 Dark and Languages -JA-.mp4' not uploaded yet - falls back to en.
-    key: { en: 'EN/EN/10 Dark and Languages.mp4', fa: 'FA/10 Dark and Languages.mp4', ja: null },
-    title: { fa: 'حالت تاریک و زبان‌ها', en: 'Dark Mode & Languages', ja: 'ダークモードと多言語' },
-    caption: {
-      fa: 'روشن یا تاریک، به فارسی، انگلیسی یا ژاپنی.',
-      en: 'Light or dark, in Persian, English or Japanese.',
-      ja: 'ライトまたはダーク、日本語・英語・ペルシャ語に対応。'
-    }
-  }
-]
-
-
-// ==========================================
-// videoSrcFor
-// Resolves a manifest entry's R2 key for the active language into
-// an /assets/ URL, falling back to the English clip when that
-// language's key is null (see PROMO_VIDEOS flags above).
-// ==========================================
-function videoSrcFor(entry, lang) {
-  const key = entry.key[lang] || entry.key.en
-  return '/assets/' + key.split('/').map(encodeURIComponent).join('/')
-}
-
-
-// ==========================================
 // Request helpers
 // Same resolution order as the dashboard, so a language
 // chosen there is still in force here.
@@ -678,27 +548,6 @@ function renderWhat(p, lang) {
   return `
     <h2 class="section">${escapeHtml(p.sectionWhat)}</h2>
     <div class="grid">${cards}</div>`
-}
-
-// ==========================================
-// renderVideos
-// A grid of short (10-20s) muted, looping demo clips, one per
-// feature. Autoplay-in-view is wired client-side (see script()) and
-// is skipped under prefers-reduced-motion; native controls stay
-// available either way so sound and seeking always work.
-// ==========================================
-function renderVideos(p, lang) {
-  const cards = PROMO_VIDEOS.map(entry => `
-    <div class="vcard">
-      <video class="vclip" muted loop playsinline preload="metadata" controls
-             src="${escapeHtml(videoSrcFor(entry, lang))}"></video>
-      <h3>${escapeHtml(entry.title[lang])}</h3>
-      <p>${escapeHtml(entry.caption[lang])}</p>
-    </div>`).join('')
-
-  return `
-    <h2 class="section">${escapeHtml(p.sectionVideos)}</h2>
-    <div class="video-grid">${cards}</div>`
 }
 
 // ==========================================
@@ -891,8 +740,7 @@ function renderPage(lang, theme) {
   <div class="wrap">
     ${renderTopbar(lang)}
     ${renderHero(p)}
-   ${renderWhat(p, lang)}
-    ${renderVideos(p, lang)}
+    ${renderWhat(p, lang)}
     ${renderSpotlight(p)}
     ${renderCompare(p, lang)}
     ${renderPricing(p, lang)}
@@ -1026,19 +874,6 @@ function css() {
     .card h3 { font-size: 1.05em; font-weight: 700; margin-block-end: 6px; }
     .card p { font-size: 0.93em; color: var(--text-dim); }
 
-    /* ---------- promo video grid ---------- */
-    .video-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
-    .vcard {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 14px;
-    }
-    .vclip {
-      width: 100%; aspect-ratio: 16 / 9; border-radius: 12px;
-      background: #000; display: block; object-fit: cover;
-    }
-    .vcard h3 { font-size: 1em; font-weight: 700; margin-block: 12px 4px; }
-    .vcard p { font-size: 0.88em; color: var(--text-dim); }
-
     /* ---------- comparison ---------- */
     /* The table scrolls inside its own box so a long feature
        label can never make the page itself scroll sideways. */
@@ -1159,21 +994,6 @@ function script() {
       try { localStorage.setItem('ac_theme', next); } catch (e) {}
       document.cookie = 'theme=' + next + ';path=/;max-age=31536000;samesite=lax';
     }
-    function dsInitVideos() {
-      var clips = document.querySelectorAll('.vclip');
-      if (!clips.length || !('IntersectionObserver' in window)) return;
-      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-
-      var io = new IntersectionObserver(function (entries) {
-        entries.forEach(function (entry) {
-          if (entry.isIntersecting) entry.target.play().catch(function () {});
-          else entry.target.pause();
-        });
-      }, { threshold: 0.5 });
-
-      clips.forEach(function (v) { io.observe(v); });
-    }
-    dsInitVideos();
   `
 }
 

@@ -1259,45 +1259,12 @@ function buildProfileUpdate(data, includeGamesPlayed = false) {
 
 
 // ==========================================
-// Range Header Parser
-// Turns a single "bytes=start-end" Range request header into the
-// R2 `range` option shape ({offset,length} | {offset} | {suffix}).
-// Returns null for an absent, multi-range, or unparseable header so
-// the caller falls back to a full (non-partial) response.
-// ==========================================
-function parseRangeHeader(header) {
-  if (!header) return null
-  const match = /^bytes=(\d*)-(\d*)$/.exec(header.trim())
-  if (!match) return null
-
-  const [, startStr, endStr] = match
-  if (startStr === '' && endStr === '') return null
-
-  if (startStr === '') {
-    const suffix = parseInt(endStr, 10)
-    return Number.isNaN(suffix) || suffix <= 0 ? null : { suffix }
-  }
-
-  const offset = parseInt(startStr, 10)
-  if (Number.isNaN(offset) || offset < 0) return null
-  if (endStr === '') return { offset }
-
-  const end = parseInt(endStr, 10)
-  if (Number.isNaN(end) || end < offset) return null
-  return { offset, length: end - offset + 1 }
-}
-
-
-// ==========================================
 // Static Asset Handler (R2)
-// Serves assets - including nested keys such as EN/clip.mp4 - from
-// the bound R2 bucket with path-traversal guards. Honors HTTP Range
-// requests (206 + Content-Range) so <video> playback and scrubbing
-// work correctly in every browser, Safari included.
+// Serves immutable assets from the bound R2 bucket with path-traversal guards.
 // ==========================================
 async function handleAsset(url, request, gameId, requestId, GAMES, env) {
   const key = decodeURIComponent(url.pathname.replace('/assets/', ''))
-  if (!key || key.includes('..') || key.startsWith('/') || key.includes('//')) {
+  if (!key || key.includes('..') || key.includes('/')) {
     return createJsonResponse({ error: 'invalid_asset', message: 'Invalid asset path', requestId }, 400)
   }
 
@@ -1306,37 +1273,26 @@ async function handleAsset(url, request, gameId, requestId, GAMES, env) {
     return createJsonResponse({ error: 'r2_not_bound', message: 'R2 binding "ASSETS" not found', requestId }, 500)
   }
 
-  const range = parseRangeHeader(request.headers.get('Range'))
-  const object = await bucket.get(key, range ? { range } : undefined)
+  const object = await bucket.get(key)
   if (!object) {
     return createJsonResponse({ error: 'asset_not_found', message: `Asset "${key}" not found`, requestId }, 404)
   }
 
   const extMap = {
     png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
-    gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml', ico: 'image/x-icon',
-    mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime', m4v: 'video/x-m4v'
+    gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml', ico: 'image/x-icon'
   }
   const ext = key.split('.').pop().toLowerCase()
   const contentType = object.httpMetadata?.contentType || extMap[ext] || 'application/octet-stream'
 
-  const headers = {
-    'Content-Type': contentType,
-    'Cache-Control': 'public, max-age=31536000, immutable',
-    'ETag': object.httpEtag,
-    'Accept-Ranges': 'bytes'
-  }
-
-  if (object.range) {
-    const start = object.range.offset || 0
-    const length = object.range.length != null ? object.range.length : object.size - start
-    headers['Content-Range'] = `bytes ${start}-${start + length - 1}/${object.size}`
-    headers['Content-Length'] = String(length)
-    return new Response(object.body, { status: 206, headers })
-  }
-
-  headers['Content-Length'] = String(object.size)
-  return new Response(object.body, { status: 200, headers })
+  return new Response(object.body, {
+    status: 200,
+    headers: {
+      'Content-Type': contentType,
+      'Cache-Control': 'public, max-age=31536000, immutable',
+      'ETag': object.httpEtag
+    }
+  })
 }
 
 
