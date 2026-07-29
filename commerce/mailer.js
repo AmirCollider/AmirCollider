@@ -106,7 +106,16 @@ async function sendViaResend(env, message) {
     signal
   }))
 
-  if (response.ok) return { ok: true, via: 'resend' }
+  if (response.ok) {
+    // Keep the provider's own id for the message. It is the only
+    // handle that can answer the question this system genuinely
+    // cannot: not "did we hand it over" - which is all `ok` means -
+    // but "did it reach the inbox, bounce, or get filed as spam".
+    // That answer lives in the Resend dashboard, and without this id
+    // there is nothing to look up.
+    const id = await response.json().then(body => body && body.id).catch(() => null)
+    return { ok: true, via: id ? 'resend:' + id : 'resend' }
+  }
 
   const detail = await response.text().catch(() => '')
   return { ok: false, via: 'resend', status: response.status, detail: detail.slice(0, 300) }
@@ -119,6 +128,8 @@ async function sendViaResend(env, message) {
 async function sendViaBrevo(env, message) {
   const sender = senderFor(env)
 
+  // Same treatment as Resend: keep the provider's message id, since
+  // it is what a deliverability question is answered with.
   const response = await withTimeout(signal => fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
     headers: {
@@ -137,7 +148,10 @@ async function sendViaBrevo(env, message) {
     signal
   }))
 
-  if (response.ok) return { ok: true, via: 'brevo' }
+  if (response.ok) {
+    const id = await response.json().then(body => body && body.messageId).catch(() => null)
+    return { ok: true, via: id ? 'brevo:' + id : 'brevo' }
+  }
 
   const detail = await response.text().catch(() => '')
   return { ok: false, via: 'brevo', status: response.status, detail: detail.slice(0, 300) }

@@ -424,7 +424,7 @@ export async function handleCheckoutTest(url, request, gameId, requestId, GAMES,
       // Said plainly, because "delivered" is the only outcome that
       // means the whole chain worked, and every other status has a
       // different next step.
-      verdict: verdictFor(after)
+      verdict: verdictFor(after, await listOutbox(database, order.id))
     })
   }
 
@@ -440,7 +440,7 @@ export async function handleCheckoutTest(url, request, gameId, requestId, GAMES,
       order: summarise(order),
       events: await listEvents(database, order.id),
       mail: await listOutbox(database, order.id),
-      verdict: verdictFor(order),
+      verdict: verdictFor(order, await listOutbox(database, order.id)),
       // Only ever for a rehearsal order, and only to prove the
       // sealed copy can be opened - which is what a resend depends
       // on. A real order's key is never returned by anything.
@@ -548,13 +548,35 @@ export async function handleCheckoutTest(url, request, gameId, requestId, GAMES,
 // look at". Answering the second one here means the panel
 // and a curl session say the same thing.
 // ==========================================
-function verdictFor(order) {
+function verdictFor(order, mail = []) {
   switch (order.status) {
-    case ORDER_STATE.DELIVERED:
+    case ORDER_STATE.DELIVERED: {
+      // Names the exact message to go and look for, because "check
+      // the inbox" is not an instruction somebody can follow when
+      // their inbox also contains mail from the payment provider,
+      // and mistaking one for the other reads as "your system sent
+      // me an empty email with a broken key in it".
+      //
+      // And it says accepted, not arrived. Everything this system
+      // can observe stops at the mail provider's API returning 200.
+      // Whether Gmail then filed it, binned it or spam-foldered it
+      // is a question only the provider's dashboard answers - which
+      // is what the message id is for.
+      const sent = mail.find(row => row.kind === 'license' && row.sent_at) || mail[0] || {}
       return {
         pass: true,
-        message: 'The whole chain worked: payment accepted, key minted, email accepted by the provider. Check the inbox.'
+        message: 'The whole chain worked: payment accepted, key minted, email handed to the mail provider and accepted by it.',
+        lookFor: {
+          to: sent.to_email || order.email,
+          subject: sent.subject || '',
+          searchYourMailboxFor: 'DSNAP-',
+          providerMessageId: sent.sent_via || '',
+          note: 'Accepted by the provider is not the same as landed in the inbox. If it is not there, look in spam, '
+              + 'then look this message id up in your mail provider\'s dashboard to see whether it was delivered or bounced. '
+              + 'Do not confuse it with mail from NOWPayments — that is the payment provider writing to you, not this system.'
+        }
       }
+    }
     case ORDER_STATE.ISSUED:
       return {
         pass: false,
