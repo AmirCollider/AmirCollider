@@ -274,6 +274,189 @@ export async function issueLicenseForOrder(database, plaintextKey, { product, ti
 
 
 // ==========================================
+// listLicenses
+// The licences that exist, newest first.
+//
+// This function is the answer to a gap the rest of this file
+// created. Everything else here is keyed by the plaintext
+// key, because that is what a customer sends when they need
+// help - and the table stores only hashes, so a key is the
+// ONLY way in. That is exactly right for the customer-facing
+// path and useless for the operator, who has to be able to
+// ask "what have I sold?" and "revoke that one" about a
+// licence nobody has emailed them about.
+//
+// Without this, the only way to see a licence was to open
+// the D1 console and write SQL, and the only way to revoke
+// one was to already possess the key you wanted to revoke -
+// which, for a key being used illegitimately, is the one
+// thing you do not have.
+//
+// Filters are all optional and all parameterised. `q` is the
+// free-text one, matched against the masked label, the email
+// and the note (which carries the order id), because those
+// are the three things an operator actually has in front of
+// them when they come looking.
+// ==========================================
+export async function listLicenses(database, {
+  status = '', tier = '', batch = '', product = '', q = '', limit = 50, offset = 0
+} = {}) {
+  const where = []
+  const args = []
+
+  if (status) { where.push('l.status = ?'); args.push(String(status)) }
+  if (tier) { where.push('l.tier = ?'); args.push(String(tier)) }
+  if (batch) { where.push('l.batch = ?'); args.push(String(batch)) }
+  if (product) { where.push('l.product = ?'); args.push(String(product)) }
+
+  if (q) {
+    // Matched case-insensitively against all three, because an
+    // operator pasting "DSNAP-Q3MDQ" from an email, or an order id
+    // from the checkout panel, or a customer's address, all mean
+    // "find me this licence".
+    where.push('(UPPER(l.key_public) LIKE UPPER(?) OR UPPER(l.email) LIKE UPPER(?) OR UPPER(l.note) LIKE UPPER(?))')
+    const like = '%' + String(q).trim() + '%'
+    args.push(like, like, like)
+  }
+
+  const clause = where.length ? 'WHERE ' + where.join(' AND ') : ''
+  const size = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200)
+  const skip = Math.max(parseInt(offset, 10) || 0, 0)
+
+  const { results } = await database.prepare(
+    `SELECT l.*,
+            (SELECT COUNT(*) FROM license_activations a WHERE a.key_hash = l.key_hash) AS seats_used
+     FROM licenses l
+     ${clause}
+     ORDER BY l.created_at DESC
+     LIMIT ? OFFSET ?`
+  ).bind(...args, size, skip).all()
+
+  const total = await database.prepare(
+    `SELECT COUNT(*) AS n FROM licenses l ${clause}`
+  ).bind(...args).first()
+
+  return { rows: results || [], total: (total && total.n) || 0, limit: size, offset: skip }
+}
+
+
+// ==========================================
+// findLicenseByLabel
+// One licence by its masked public label.
+//
+// The label is what appears in an email, in the order record
+// and on the management page - "DSNAP-Q3MDQ-…-C3R7T" - and it
+// is deliberately five characters short of usable as a key.
+// That makes it the safe identifier to pass around an admin
+// interface: enough to name a row, not enough to activate
+// anything.
+//
+// Matched with a LIKE on the two ends rather than on the
+// literal string, because the ellipsis in the middle is a
+// display character that does not survive every copy-paste.
+// ==========================================
+export async function findLicenseByLabel(database, label) {
+  const text = String(label || '').trim()
+  if (!text) return null
+
+  const exact = await database
+    .prepare('SELECT * FROM licenses WHERE key_public = ? LIMIT 1')
+    .bind(text)
+    .first()
+  if (exact) return exact
+
+  // Fall back to first-group + last-group matching, which survives
+  // an ellipsis that got mangled into "..." or dropped entirely.
+  const parts = text.replace(/[…]/g, '-').split('-').filter(Boolean)
+  if (parts.length < 3) return null
+
+  const head = parts[0] + '-' + parts[1] + '%'
+  const tail = '%' + parts[parts.length - 1]
+
+  const { results } = await database
+    .prepare('SELECT * FROM licenses WHERE key_public LIKE ? AND key_public LIKE ? LIMIT 2')
+    .bind(head, tail)
+    .all()
+
+  // Exactly one match, or nothing. Two rows sharing both ends is
+  // vanishingly unlikely and, if it ever happened, acting on a
+  // guess would be revoking the wrong customer's licence.
+  return (results && results.length === 1) ? results[0] : null
+}
+
+
+// ==========================================
+// findLicenseByOrder
+// The licence a checkout order produced.
+//
+// Joins through the note column, which issueLicenseForOrder
+// fills with "order:<id>". That is the link between a payment
+// and a key, and it is the identifier an operator has when
+// the complaint arrives via the order rather than the key.
+// ==========================================
+export async function findLicenseByOrder(database, orderId) {
+  const id = String(orderId || '').trim()
+  if (!id) return null
+
+  return database
+    .prepare('SELECT * FROM licenses WHERE note = ? LIMIT 1')
+    .bind('order:' + id)
+    .first()
+}
+
+
+// ==========================================
+// deleteLicense
+// Removes a licence row and its activations outright.
+//
+// Deliberately separate from setStatus, and deliberately not
+// the thing the interface offers first. Revoking keeps the
+// row, which is what makes "was this key ever real?" a
+// question with an answer six months later - and a deleted
+// key is one nobody can explain, to a customer or to
+// themselves.
+//
+// It exists for the two cases revoking does not cover: a
+// batch generated by mistake that was never sold, and a
+// genuine erasure request. Both are rare and both are
+// deliberate, which is why the caller has to ask for it
+// explicitly.
+// ==========================================
+export async function deleteLicense(database, keyHash) {
+  await database.prepare('DELETE FROM license_activations WHERE key_hash = ?').bind(keyHash).run()
+  const result = await database.prepare('DELETE FROM licenses WHERE key_hash = ?').bind(keyHash).run()
+  return Boolean(result && result.meta && result.meta.changes > 0)
+}
+
+
+// ==========================================
+// licenseStats
+// The shape of the whole table at a glance.
+//
+// What an operator wants on opening the page: how many keys
+// exist, how many are live, how many were ever activated,
+// and how many have been revoked - per tier, because the two
+// tiers are two products with two prices.
+// ==========================================
+export async function licenseStats(database) {
+  const { results } = await database.prepare(
+    `SELECT tier,
+            status,
+            COUNT(*) AS n,
+            SUM(CASE WHEN first_activated_at IS NOT NULL THEN 1 ELSE 0 END) AS activated
+     FROM licenses
+     GROUP BY tier, status`
+  ).all()
+
+  const seats = await database.prepare(
+    'SELECT COUNT(*) AS n FROM license_activations'
+  ).first()
+
+  return { byTierAndStatus: results || [], machinesActivated: (seats && seats.n) || 0 }
+}
+
+
+// ==========================================
 // setStatus
 // Revokes or restores a key.
 //

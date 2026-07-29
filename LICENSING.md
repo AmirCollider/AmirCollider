@@ -181,6 +181,130 @@ find its rows.
 
 ---
 
+## Seeing and controlling what exists
+
+The commands in the next section are all keyed by the **plaintext
+key**, because they were built for the case where a customer emails
+you theirs. The table stores only hashes, so a key is the only way in
+— which is right for support, and useless when the question is
+"what have I sold?" or "kill that one" about a licence nobody emailed
+you about.
+
+A key being used illegitimately is precisely the key you do not have.
+
+So there is a second surface for the operator:
+
+    POST /testsite/licenses
+
+with a **licence manager** in the `/testsite` panel driving it. Sign in
+with `TestSitePassword` and it is the section above the checkout
+simulator: search, filter, and per-row buttons.
+
+### Identifiers
+
+Every action that names a licence takes any one of these — you never
+need the plaintext key:
+
+| Field | What it is | Where you get it |
+|---|---|---|
+| `label` | The masked label, `DSNAP-Q3MDQ-…-C3R7T` | A listing, an order, our delivery email |
+| `order` | A checkout order id, `ord_…` | The order panel, the customer's receipt |
+| `key`   | The full plaintext key | The customer's email to you |
+
+The panel uses `label` throughout, deliberately: it is five characters
+short of usable, so a screenshot of that screen — or a support thread
+quoting a row from it — hands nobody a working licence.
+
+### From a terminal
+
+```bash
+BASE=https://amircollider.n95pluss.workers.dev
+AUTH="Authorization: Bearer $DOCSNAP_ADMIN_TOKEN"
+J='Content-Type: application/json'
+
+# Everything, newest first
+curl -s $BASE/testsite/licenses -H "$AUTH" -H "$J" -d '{"action":"list"}'
+
+# Narrow it down — status, tier, batch, or free text against
+# the label, the email and the order id
+curl -s $BASE/testsite/licenses -H "$AUTH" -H "$J" \
+  -d '{"action":"list","status":"active","tier":"pro","q":"buyer@example.com"}'
+
+# One licence, with the machines currently holding seats
+curl -s $BASE/testsite/licenses -H "$AUTH" -H "$J" \
+  -d '{"action":"get","label":"DSNAP-Q3MDQ-…-C3R7T"}'
+
+# Kill it
+curl -s $BASE/testsite/licenses -H "$AUTH" -H "$J" \
+  -d '{"action":"revoke","label":"DSNAP-Q3MDQ-…-C3R7T"}'
+
+# Undo that
+curl -s $BASE/testsite/licenses -H "$AUTH" -H "$J" \
+  -d '{"action":"restore","label":"DSNAP-Q3MDQ-…-C3R7T"}'
+
+# Free one machine's seat without touching the key
+curl -s $BASE/testsite/licenses -H "$AUTH" -H "$J" \
+  -d '{"action":"release","label":"DSNAP-…","machine":"<full machine id from get>"}'
+
+# Counts by tier and status
+curl -s $BASE/testsite/licenses -H "$AUTH" -H "$J" -d '{"action":"stats"}'
+```
+
+### Revoke, don't delete
+
+For a licence being used illegitimately, **revoke** is the right
+answer, and `delete` is almost never what you want:
+
+- **Revoke** stops the key and clears its activations, *and keeps the
+  row*. Six months later "what was this, and why did I kill it?" still
+  has an answer. It is reversible with `restore`.
+- **Delete** removes the record permanently. Nothing can explain that
+  key to a customer, or to you, afterwards.
+
+So `delete` is guarded twice. It refuses without `"confirm": true`,
+and if the licence has ever been activated on a real machine — meaning
+somebody probably paid for it — it refuses *again* unless you also send
+`"evenThoughActivated": true`. A generated key nobody ever touched
+needs only the first.
+
+It exists for the two cases revoking does not cover: a batch generated
+by mistake and never sold, and a genuine erasure request.
+
+### The one thing revoking cannot do
+
+Revoking clears activations and stops future ones. A machine that
+**already holds a signed token** keeps its edition until that token
+expires — up to 45 days. That is the price of offline verification,
+and it is bounded; there is no way to reach into an Editor that is not
+asking us anything. The API says so in its response rather than
+leaving you to find out from the customer.
+
+### Straight from the database
+
+The panel and the API cover everything, but the D1 console is always
+there:
+
+```sql
+-- what exists
+SELECT key_public, tier, status, email, note, batch,
+       datetime(created_at/1000,'unixepoch') AS created,
+       (SELECT COUNT(*) FROM license_activations a WHERE a.key_hash = l.key_hash) AS seats
+FROM licenses l ORDER BY created_at DESC LIMIT 50;
+
+-- who is actually using a key
+SELECT machine_label, app_version,
+       datetime(last_seen_at/1000,'unixepoch') AS last_seen
+FROM license_activations WHERE key_hash =
+  (SELECT key_hash FROM licenses WHERE key_public = 'DSNAP-…-…');
+
+-- kill one by hand
+UPDATE licenses SET status='revoked' WHERE key_public = 'DSNAP-…-…';
+DELETE FROM license_activations WHERE key_hash =
+  (SELECT key_hash FROM licenses WHERE key_public = 'DSNAP-…-…');
+```
+
+---
+
 ## Support
 
 Every command below is the same `curl` with a different `action`.
@@ -271,9 +395,16 @@ do nothing else with them. Raw hardware identifiers are never stored.
 | `POST` | `/license/validate` | Unity Editor (background renewal) |
 | `POST` | `/license/deactivate` | Editor and web page |
 | `POST` | `/license/devices` | web page |
-| `POST` | `/license/admin` | you, with the bearer token |
+| `POST` | `/license/admin` | you, with the bearer token (keyed by plaintext key) |
+| `POST` | `/testsite/licenses` | you — list, search, revoke, release, delete |
 | `GET` | `/license` | customers |
 | `GET` | `/unity-docsnap` | the product page |
+
+`/testsite/licenses` accepts the admin bearer token **or** a signed
+`/testsite` session, which is what lets the panel drive it without
+putting a key-minting credential in a web page. It lives under
+`/testsite/` because the panel's session cookie is scoped
+`Path=/testsite` and a browser will not send it anywhere else.
 
 All the licence endpoints are POST and take the key in the body. A key
 in a query string ends up in access logs, browser history, and the

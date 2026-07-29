@@ -429,6 +429,26 @@ const I18N = {
     tooSlow: 'بسیار کند',
     validHtml: 'HTML معتبر',
     // manual panel
+    licTitle: 'مدیریت لایسنس‌ها',
+    licLede: 'همه‌ی کلیدهای ساخته‌شده را ببین، جست‌وجو کن، و هر کدام را که لازم بود باطل کن. جست‌وجو با بخشی از برچسب کلید، شماره سفارش، یا ایمیل مشتری کار می‌کند.',
+    licSearch: 'جست‌وجو',
+    licStatus: 'وضعیت',
+    licTier: 'نسخه',
+    licAny: 'همه',
+    licLoad: 'نمایش لایسنس‌ها',
+    licStats: 'آمار کلی',
+    licNone: 'لایسنسی با این فیلترها پیدا نشد.',
+    licSeats: 'سیستم',
+    licRevoke: 'باطل کردن',
+    licRestore: 'برگرداندن',
+    licDevices: 'سیستم‌ها',
+    licDelete: 'حذف کامل',
+    licNever: 'هیچ‌وقت فعال نشده',
+    licRevokeAsk: 'این کلید باطل شود؟ روی سیستم‌های جدید دیگر کار نمی‌کند.',
+    licDeleteAsk: 'رکورد کامل حذف شود؟ برگشت‌پذیر نیست. برای کلیدی که سوءاستفاده شده، «باطل کردن» گزینه‌ی درست‌تری است چون تاریخچه را نگه می‌دارد.',
+    licDeleteActivated: 'این کلید روی یک سیستم واقعی فعال شده — یعنی احتمالاً کسی بابتش پول داده. مطمئنی که می‌خواهی رکوردش را کامل پاک کنی؟',
+    licReleaseAsk: 'این سیستم آزاد شود؟',
+    licTotal: 'مجموع',
     simTitle: 'شبیه‌ساز خرید',
     simLede: 'کل مسیر بعد از پرداخت را بدون خرج کردن پول اجرا می‌کند: کلید واقعی ساخته می‌شود و ایمیل واقعی فرستاده می‌شود. فقط پیام درگاه پرداخت شبیه‌سازی می‌شود — همان بدنه‌ی JSON با همان امضای واقعی به همان وبهوک واقعی می‌رود.',
     simTier: 'نسخه',
@@ -572,6 +592,26 @@ const I18N = {
     slow: 'Slow',
     tooSlow: 'Too slow',
     validHtml: 'Valid HTML',
+    licTitle: 'Licence manager',
+    licLede: 'See every key that exists, search it, and revoke any of them. Search matches part of a key label, an order id, or a customer email.',
+    licSearch: 'Search',
+    licStatus: 'Status',
+    licTier: 'Edition',
+    licAny: 'Any',
+    licLoad: 'Show licences',
+    licStats: 'Overview',
+    licNone: 'No licence matched those filters.',
+    licSeats: 'machines',
+    licRevoke: 'Revoke',
+    licRestore: 'Restore',
+    licDevices: 'Machines',
+    licDelete: 'Delete',
+    licNever: 'never activated',
+    licRevokeAsk: 'Revoke this key? It will stop working on new machines.',
+    licDeleteAsk: 'Delete the whole record? This cannot be undone. For a key being misused, revoking is the better answer — it stops the key and keeps the history.',
+    licDeleteActivated: 'This key has been activated on a real machine, so somebody probably paid for it. Delete the record anyway?',
+    licReleaseAsk: 'Release this machine?',
+    licTotal: 'total',
     simTitle: 'Checkout simulator',
     simLede: 'Runs the whole post-payment chain without spending anything: a real key is minted and a real email is sent. Only the provider\u2019s message is synthesized — the same JSON body, with a genuine signature, goes to the real webhook.',
     simTier: 'Edition',
@@ -714,6 +754,26 @@ const I18N = {
     slow: '遅い',
     tooSlow: '非常に遅い',
     validHtml: '有効なHTML',
+    licTitle: 'ライセンス管理',
+    licLede: '発行済みのキーを一覧・検索し、必要なものを失効させられます。検索はキーのラベルの一部、注文番号、顧客のメールアドレスに一致します。',
+    licSearch: '検索',
+    licStatus: '状態',
+    licTier: 'エディション',
+    licAny: 'すべて',
+    licLoad: 'ライセンスを表示',
+    licStats: '概要',
+    licNone: '条件に一致するライセンスはありません。',
+    licSeats: '台',
+    licRevoke: '失効',
+    licRestore: '復元',
+    licDevices: 'マシン',
+    licDelete: '削除',
+    licNever: '未有効化',
+    licRevokeAsk: 'このキーを失効させますか?新しいマシンでは使えなくなります。',
+    licDeleteAsk: 'レコードを完全に削除しますか?元に戻せません。不正利用への対処としては、履歴が残る「失効」の方が適切です。',
+    licDeleteActivated: 'このキーは実際のマシンで有効化されています。購入者がいる可能性が高いです。それでも削除しますか?',
+    licReleaseAsk: 'このマシンを解放しますか?',
+    licTotal: '合計',
     simTitle: 'チェックアウト・シミュレーター',
     simLede: '支払い後の処理全体を、実際に支払うことなく実行します。ライセンスキーは本物が発行され、メールも実際に送信されます。作り物は決済事業者からの通知だけで、同じ JSON を本物の署名付きで本物の Webhook に送ります。',
     simTier: 'エディション',
@@ -1178,6 +1238,43 @@ function renderDashboard(GAMES, baseUrl, lang, theme) {
       ${sectionsHtml}
     </section>
 
+    <section class="ts-manual ts-lic">
+      <h2><span class="ts-ic">${ICONS.lock}</span><span data-i18n="licTitle">${esc(dict.licTitle)}</span></h2>
+      <p class="ts-sim-lede" data-i18n="licLede">${esc(dict.licLede)}</p>
+
+      <div class="ts-manual-grid">
+        <label class="ts-m-field ts-m-endpoint">
+          <span data-i18n="licSearch">${esc(dict.licSearch)}</span>
+          <input type="text" id="ts-lic-q" dir="ltr" spellcheck="false" placeholder="DSNAP-…  /  ord_…  /  email">
+        </label>
+        <label class="ts-m-field">
+          <span data-i18n="licStatus">${esc(dict.licStatus)}</span>
+          <select id="ts-lic-status">
+            <option value="" data-i18n="licAny">${esc(dict.licAny)}</option>
+            <option value="active">active</option>
+            <option value="revoked">revoked</option>
+          </select>
+        </label>
+        <label class="ts-m-field">
+          <span data-i18n="licTier">${esc(dict.licTier)}</span>
+          <select id="ts-lic-tier">
+            <option value="" data-i18n="licAny">${esc(dict.licAny)}</option>
+            <option value="plus">plus</option>
+            <option value="pro">pro</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="ts-sim-actions">
+        <button class="ts-btn ts-btn-run" id="ts-lic-load"><span class="ts-ic">${ICONS.eye}</span><span data-i18n="licLoad">${esc(dict.licLoad)}</span></button>
+        <button class="ts-btn" id="ts-lic-stats"><span data-i18n="licStats">${esc(dict.licStats)}</span></button>
+      </div>
+
+      <div class="ts-lic-summary" id="ts-lic-summary"></div>
+      <div class="ts-lic-list" id="ts-lic-list"></div>
+      <pre class="ts-m-out" id="ts-lic-out" dir="ltr"></pre>
+    </section>
+
     <section class="ts-manual ts-sim">
       <h2><span class="ts-ic">${ICONS.cart}</span><span data-i18n="simTitle">${esc(dict.simTitle)}</span></h2>
       <p class="ts-sim-lede" data-i18n="simLede">${esc(dict.simLede)}</p>
@@ -1487,6 +1584,34 @@ function dashStyles(accent, accentRgb) {
     color: var(--text); max-height: 340px; overflow: auto; white-space: pre-wrap;
     direction: ltr; text-align: start; unicode-bidi: plaintext; line-height: 1.65; }
   .ts-m-out.is-shown { display: block; }
+
+  /* licence manager */
+  .ts-lic { border-inline-start: 3px solid var(--warn); }
+  .ts-lic-summary { font-size: .8rem; color: var(--text-dim); margin-top: 14px; }
+  .ts-lic-summary:empty { display: none; }
+  .ts-lic-list { margin-top: 10px; max-height: 460px; overflow-y: auto; }
+  .ts-lic-list:empty { display: none; }
+  .ts-lic-empty { color: var(--text-dim); font-size: .85rem; padding: 14px 2px; }
+
+  .ts-lic-row { padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--surface-2); margin-bottom: 8px; }
+  /* A revoked row stays legible rather than being greyed into
+     nothing: the whole point of keeping it is that somebody reads
+     it later. */
+  .ts-lic-row.is-dead { opacity: .72; border-inline-start: 3px solid var(--err); }
+  .ts-lic-main { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .ts-lic-label { font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: .84rem;
+    font-weight: 700; direction: ltr; unicode-bidi: plaintext; }
+  .ts-lic-badge { font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em;
+    padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-dim); }
+  .ts-lic-badge.ts-lic-pro { color: var(--accent); border-color: var(--accent); }
+  .ts-lic-badge.ts-lic-plus { color: var(--info); border-color: var(--info); }
+  .ts-lic-badge.ts-lic-active { color: var(--ok); border-color: var(--ok); }
+  .ts-lic-badge.ts-lic-revoked { color: var(--err); border-color: var(--err); }
+  .ts-lic-meta { font-size: .76rem; color: var(--text-dim); margin-top: 5px;
+    direction: ltr; text-align: start; unicode-bidi: plaintext; }
+  .ts-lic-acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .ts-lic-acts .ts-btn { font-size: .74rem; padding: 6px 12px; }
 
   /* toast */
   .ts-toast { position: fixed; inset-block-end: 26px; inset-inline-start: 50%;
@@ -2202,6 +2327,139 @@ function dashClientScript() {
         out.textContent = dict.net + ': ' + e.message;
       });
     }
+
+    /* ---------- licence manager ---------- */
+    /* Rows are addressed by their masked label, never by a key.
+       The label is five characters short of usable, so a screenshot
+       of this panel, or a support thread quoting a row from it,
+       hands nobody a working licence. */
+    var licList = document.getElementById('ts-lic-list');
+    var licSummary = document.getElementById('ts-lic-summary');
+    var licOut = document.getElementById('ts-lic-out');
+
+    function licCall(payload) {
+      return fetch(BASE + '/testsite/licenses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(function (res) { return res.json().then(function (d) { return { status: res.status, data: d }; }); });
+    }
+
+    function licWhen(ms) {
+      if (!ms) return '—';
+      try { return new Date(ms).toLocaleDateString(); } catch (e) { return '—'; }
+    }
+
+    function licShowRaw(data) {
+      licOut.classList.add('is-shown');
+      licOut.textContent = JSON.stringify(data, null, 2);
+    }
+
+    function licRender(rows, total) {
+      var dict = dictNow();
+      if (!rows.length) {
+        licList.innerHTML = '<div class="ts-lic-empty">' + acEscT(dict.licNone) + '</div>';
+        return;
+      }
+
+      licList.innerHTML = rows.map(function (l) {
+        var dead = l.status === 'revoked';
+        return '<div class="ts-lic-row' + (dead ? ' is-dead' : '') + '">'
+          + '<div class="ts-lic-main">'
+          +   '<code class="ts-lic-label">' + acEscT(l.label) + '</code>'
+          +   '<span class="ts-lic-badge ts-lic-' + acEscT(l.tier) + '">' + acEscT(l.tier) + '</span>'
+          +   '<span class="ts-lic-badge ts-lic-' + acEscT(l.status) + '">' + acEscT(l.status) + '</span>'
+          + '</div>'
+          + '<div class="ts-lic-meta">'
+          +   (l.email ? acEscT(l.email) + ' · ' : '')
+          +   l.seatsUsed + '/' + l.seatsTotal + ' ' + acEscT(dict.licSeats) + ' · '
+          +   licWhen(l.createdAt)
+          +   (l.everActivated ? '' : ' · ' + acEscT(dict.licNever))
+          +   (l.orderId ? ' · ' + acEscT(l.orderId) : '')
+          + '</div>'
+          + '<div class="ts-lic-acts">'
+          +   '<button type="button" class="ts-btn" data-lic-devices="' + acEscT(l.label) + '">' + acEscT(dict.licDevices) + '</button>'
+          +   (dead
+                ? '<button type="button" class="ts-btn" data-lic-restore="' + acEscT(l.label) + '">' + acEscT(dict.licRestore) + '</button>'
+                : '<button type="button" class="ts-btn ts-btn-danger" data-lic-revoke="' + acEscT(l.label) + '">' + acEscT(dict.licRevoke) + '</button>')
+          +   '<button type="button" class="ts-btn ts-btn-danger" data-lic-delete="' + acEscT(l.label) + '">' + acEscT(dict.licDelete) + '</button>'
+          + '</div>'
+          + '</div>';
+      }).join('');
+
+      licSummary.textContent = rows.length + ' / ' + total + ' ' + dict.licTotal;
+      licBind();
+    }
+
+    function licLoad() {
+      var payload = {
+        action: 'list',
+        q: document.getElementById('ts-lic-q').value.trim(),
+        status: document.getElementById('ts-lic-status').value,
+        tier: document.getElementById('ts-lic-tier').value,
+        limit: 100
+      };
+      licList.innerHTML = '<div class="ts-lic-empty">…</div>';
+      licCall(payload).then(function (r) {
+        if (!r.data.ok) { licShowRaw(r.data); return; }
+        licOut.classList.remove('is-shown');
+        licRender(r.data.licenses, r.data.total);
+      }).catch(function (e) { licShowRaw({ error: e.message }); });
+    }
+
+    function licAct(action, label, extra) {
+      var payload = Object.assign({ action: action, label: label }, extra || {});
+      licCall(payload).then(function (r) {
+        licShowRaw(r.data);
+        /* A refusal that asks for confirmation is not an error - it is
+           the server insisting the operator mean it. Surfaced as its
+           own prompt rather than as a red JSON blob. */
+        if (r.data.error === 'confirm_required') {
+          if (window.confirm(dictNow().licDeleteAsk)) licAct(action, label, { confirm: true });
+          return;
+        }
+        if (r.data.error === 'activated_license') {
+          if (window.confirm(dictNow().licDeleteActivated)) {
+            licAct(action, label, { confirm: true, evenThoughActivated: true });
+          }
+          return;
+        }
+        if (r.data.ok) licLoad();
+      }).catch(function (e) { licShowRaw({ error: e.message }); });
+    }
+
+    function licBind() {
+      Array.prototype.forEach.call(licList.querySelectorAll('[data-lic-revoke]'), function (b) {
+        b.addEventListener('click', function () {
+          if (window.confirm(dictNow().licRevokeAsk)) licAct('revoke', b.getAttribute('data-lic-revoke'));
+        });
+      });
+      Array.prototype.forEach.call(licList.querySelectorAll('[data-lic-restore]'), function (b) {
+        b.addEventListener('click', function () { licAct('restore', b.getAttribute('data-lic-restore')); });
+      });
+      Array.prototype.forEach.call(licList.querySelectorAll('[data-lic-delete]'), function (b) {
+        b.addEventListener('click', function () { licAct('delete', b.getAttribute('data-lic-delete')); });
+      });
+      Array.prototype.forEach.call(licList.querySelectorAll('[data-lic-devices]'), function (b) {
+        b.addEventListener('click', function () {
+          licCall({ action: 'get', label: b.getAttribute('data-lic-devices') }).then(function (r) {
+            licShowRaw(r.data);
+          });
+        });
+      });
+    }
+
+    function acEscT(v) {
+      return String(v == null ? '' : v)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    document.getElementById('ts-lic-load').addEventListener('click', licLoad);
+    document.getElementById('ts-lic-q').addEventListener('keydown', function (e) { if (e.key === 'Enter') licLoad(); });
+    document.getElementById('ts-lic-stats').addEventListener('click', function () {
+      licCall({ action: 'stats' }).then(function (r) { licShowRaw(r.data); });
+    });
 
     /* ---------- checkout simulator ---------- */
     /* Every button here is one POST to /testsite/checkout, which is

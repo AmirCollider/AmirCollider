@@ -60,6 +60,7 @@ import {
 } from './pages/checkout.js'
 import { handleOrderHelp, handleOrderLookup } from './pages/orderHelp.js'
 import { handleCheckoutTest } from './pages/checkoutTest.js'
+import { handleLicenseAdminPanel } from './pages/licenseAdmin.js'
 import { db as commerceDb } from './commerce/orders.js'
 import { reconcile } from './commerce/fulfilment.js'
 import {
@@ -486,6 +487,12 @@ const ROUTES = [
   // dev credential on every request to every public page, which
   // is a worse trade than a longer URL.
   { path: '/testsite/checkout', method: 'POST', handler: handleCheckoutTest },
+
+  // Seeing and controlling the licences that exist. Separate
+  // from /license/admin because that one can only be reached
+  // with a plaintext key, which is exactly what you do not
+  // have for a licence you want to revoke.
+  { path: '/testsite/licenses', method: 'POST', handler: handleLicenseAdminPanel },
 
   // ---- Unity DocSnap: demo clips ----
   //
