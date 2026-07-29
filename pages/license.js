@@ -404,11 +404,18 @@ export async function handleLicenseDevices(url, request, gameId, requestId, GAME
 // gates minting sellable licence keys is not a risk
 // worth taking to save four lines.
 //
-// The generate action is the only place plaintext keys
-// ever exist server-side: they are returned once, in the
-// response, to be pasted into Sell.app's serial pool.
-// After that only their hashes remain, here and nowhere
-// else.
+// The generate action returns plaintext keys once, in the
+// response, to be sent to a customer by hand or loaded into
+// a storefront's serial pool. After that only their hashes
+// remain here.
+//
+// It is no longer the ONLY place plaintext exists
+// server-side: the crypto checkout mints a key per sale and
+// keeps an AES-GCM sealed copy on the order row for thirty
+// days so a lost email can be answered with the same key.
+// See CHECKOUT.md. Nothing has changed here - this table
+// still holds hashes and nothing else - but a reader
+// auditing where plaintext can live needs both halves.
 // ==========================================
 export async function handleLicenseAdmin(url, request, gameId, requestId, GAMES, env) {
   const database = db(env)

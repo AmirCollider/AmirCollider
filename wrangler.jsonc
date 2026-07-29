@@ -23,5 +23,24 @@
       "binding": "ASSETS",
       "bucket_name": "amircolliderr2"
     }
-  ]
+  ],
+
+  // ==========================================
+  // Cron - the checkout's safety net
+  //
+  // Every five minutes, the Worker's scheduled handler
+  // retries any licence email that has not gone out, resumes
+  // any order that was paid for and not delivered, and asks
+  // the payment provider about invoices whose callback never
+  // arrived.
+  //
+  // Five minutes because that is the delivery promise made
+  // on the pay page and quoted in the "it never arrived"
+  // email template. A longer interval would make the page
+  // lie; a shorter one buys nothing, because the happy path
+  // delivers in seconds and never waits for this at all.
+  // ==========================================
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  }
 }

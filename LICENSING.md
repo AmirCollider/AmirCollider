@@ -7,37 +7,39 @@ Read once, then come back for the commands.
 ## How it fits together
 
 ```
-you  ──generate N keys, tier=plus──▶  D1 (hashes only)
-      │                                  │
-      └──paste plaintext──▶ Sell.app "Unity DocSnap Plus" serials
-                                         │
-      ──generate N keys, tier=pro───▶  D1
-      │                                  │
-      └──paste plaintext──▶ Sell.app "Unity DocSnap Pro" serials
-                                         │
-                          customer buys, gets one key
-                                         │
-                       Unity ──activate──▶ Worker ──▶ D1
-                             ◀──signed token (carries the tier)──┘
-                                         │
-                       Editor verifies offline for 45 days
+customer buys at /checkout, pays in any coin
+                     │
+        payment confirms ──▶ Worker mints ONE key at the right tier
+                     │              │
+                     │         D1 (hash only) ──▶ licenses
+                     │
+        key emailed automatically, in the buyer's language
+                     │
+   Unity ──activate──▶ Worker ──▶ D1
+         ◀──signed token (carries the tier)──┘
+                     │
+   Editor verifies offline for 45 days
 ```
 
-**Two products, two pools.** Plus and Pro are separate Sell.app
-products with separate serial lists. The tier is fixed when a key is
-generated and travels in the signed token, so the Editor unlocks
-exactly what was bought — there is no upgrade path inside a key, and
-a Plus customer moving to Pro simply buys a Pro key.
+**The tier is fixed when a key is minted** and travels in the signed
+token, so the Editor unlocks exactly what was bought. There is no
+upgrade path inside a key — a Plus customer moving to Pro buys a Pro
+key.
 
-The payment path contains no code of ours. Sell.app holds a pool of
-pre-generated keys and hands one out when a payment clears — no
-webhook, nothing to go down at the moment of a sale, and no work for
-you per order. The Worker's only job is turning a key into a
-machine-bound token.
+**Keys are minted per sale, not pre-generated into a pool.** The
+checkout in `CHECKOUT.md` generates one at the moment a payment
+confirms and emails the plaintext straight out; D1 keeps only the
+hash. That is what makes automatic delivery possible at all, because
+a pool of hashes cannot be emailed to anybody.
+
+The batch generator below still exists and is still the right tool for
+everything that is not an automated sale: a manual sale, a replacement
+key, a studio licence, a review copy, or loading a third-party
+storefront's serial pool.
 
 A key becomes a customer at **first activation**, which is the only
-moment this system can observe. Sell.app holds the actual order
-record; D1 holds who activated what, where.
+moment the licence tables can observe. The `orders` table holds the
+sale; `licenses` holds who activated what, where.
 
 ---
 
@@ -126,6 +128,11 @@ npx wrangler deploy
 
 ## Selling
 
+The automated path — crypto checkout, automatic minting, automatic
+delivery, and what to do when a step misbehaves — is documented
+separately in **[CHECKOUT.md](CHECKOUT.md)**. What follows is the
+manual path.
+
 ### Generate a batch
 
 `tier` is required — `"plus"` or `"pro"`. There is deliberately no
@@ -150,13 +157,13 @@ curl -s https://amircollider.n95pluss.workers.dev/license/admin \
   > serials-pro.txt
 ```
 
-Each file is one key per line — the format Sell.app's **Serials** box
-wants. Paste each into its own product, then delete both files.
+Each file is one key per line. Send one to a customer, or paste the
+list into a storefront's serials box — then delete the files.
 
-**Check the tier before you paste.** The response echoes it back, and
-the batch label defaults to include it. A Pro pool loaded into the
-Plus product hands $19.99 buyers the whole $49.99 feature set; the
-other way round, $49.99 buyers get two features and ask for a refund.
+**Check the tier before you send anything.** The response echoes it
+back, and the batch label defaults to include it. A Pro key sent for a
+$19.99 sale hands that buyer the whole $49.99 feature set; the other
+way round, a $49.99 buyer gets two features and asks for a refund.
 
 **The plaintext keys exist only in that one response.** D1 stores
 SHA-256 hashes, so a leak of the database hands over nothing usable,
@@ -205,15 +212,19 @@ the price of offline verification, and it is bounded.
 
 ### "I lost my key"
 
-Revoke the old one, generate a batch of 1 **at the same tier**, send
-them the new key.
+If they bought through `/checkout` within the last 30 days, they do not
+need you: `/order` looks their orders up by email and re-sends **the
+same key**. See CHECKOUT.md.
+
+Otherwise: revoke the old one, generate a batch of 1 **at the same
+tier**, and send them the new key.
 
 ### "I bought Plus and want to upgrade to Pro"
 
 They buy a Pro key and enter it in Unity — it replaces the stored
 activation. Their Plus key is untouched and can stay on another
-machine. There is no in-place upgrade, and no partial refund
-mechanism here; if you want to offer one, do it in Sell.app.
+machine. There is no in-place upgrade and no partial-refund mechanism
+here; refunds are issued from the payment provider's dashboard.
 
 ### "I can't activate — it says the key is on another machine"
 

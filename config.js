@@ -87,10 +87,11 @@ export const CONFIG = deepFreeze({
   // wants exactly those would look at a single $49.99 price
   // and buy nothing. Pro is everything.
   //
-  // Both checkouts are Sell.app products with their own
-  // pre-generated serial pools, so a purchase delivers a key
-  // of the right tier the moment a payment clears - neither
-  // this Worker nor a webhook sits in the payment path.
+  // Both tiers are sold through this Worker's own crypto
+  // checkout (/checkout), which mints a key of the right
+  // tier and emails it the moment a payment confirms. See
+  // CHECKOUT.md for the whole path and COMMERCE below for
+  // the knobs.
   //
   // The tier names here must match DocSnapEditionMatrix in
   // the Unity package, which is what a licence token carries.
@@ -98,9 +99,71 @@ export const CONFIG = deepFreeze({
     REPO_URL: 'https://github.com/AmirCollider/UnityDocSnap',
     VERSION: '1.0.0',
     TIERS: {
-      plus: { name: 'Plus', price: '19.99', buyUrl: 'https://amircollider.sell.app' },
-      pro: { name: 'Pro', price: '49.99', buyUrl: 'https://amircollider.sell.app' }
+      plus: { name: 'Plus', price: '19.99', buyUrl: '/checkout?tier=plus' },
+      pro: { name: 'Pro', price: '49.99', buyUrl: '/checkout?tier=pro' }
     }
+  },
+
+  // Crypto checkout.
+  //
+  // Every number here is a promise made to a customer on the
+  // pay page, so they live next to each other rather than
+  // scattered through the handlers that enforce them - a
+  // page that says "within 5 minutes" while a cron runs
+  // every 15 is a support ticket with our name on it.
+  COMMERCE: {
+    // The payment provider. NOWPayments is the one
+    // implemented in commerce/provider.js; the field exists
+    // so a second one can be added without the order code
+    // learning its name.
+    PROVIDER: 'nowpayments',
+    PROVIDER_API: 'https://api.nowpayments.io/v1',
+
+    // Prices are quoted in USD and converted by the provider
+    // at payment time. Quoting in a coin instead would mean
+    // re-pricing the product every time BTC moved.
+    PRICE_CURRENCY: 'usd',
+
+    // How long an unpaid invoice is kept warm before the
+    // reconciler marks it expired. Generous on purpose:
+    // somebody funding an exchange withdrawal to pay for
+    // this can easily be an hour, and an order marked dead
+    // while their transaction is in flight still delivers
+    // (a late payment is honoured) but panics the customer.
+    INVOICE_TTL_MS: 24 * 60 * 60 * 1000,
+
+    // The promise on the pay page, and the number the "it
+    // never arrived" email template quotes back. Delivery is
+    // normally seconds; five minutes is the number that
+    // covers a slow mail provider without inviting a ticket.
+    DELIVERY_PROMISE_MINUTES: 5,
+
+    // How long the issued key stays retrievable for a
+    // re-send after it was delivered. Sealed with AES-GCM
+    // under a Worker secret for the whole window and wiped
+    // by cron afterwards, so a customer who lost the email
+    // can get the same key back without us keeping plaintext
+    // licence keys around forever.
+    KEY_RETENTION_MS: 30 * 24 * 60 * 60 * 1000,
+
+    // Delivery email retry schedule, in minutes from the
+    // first failure. Front-loaded because the overwhelming
+    // majority of mail-provider failures are a blip that is
+    // over in a minute, and the long tail exists for the
+    // afternoon an API key gets rotated by mistake.
+    MAIL_RETRY_MINUTES: [1, 3, 10, 30, 120, 360, 720, 1440],
+
+    // An order that has been paid this long without a key in
+    // the customer's inbox is something a human needs to
+    // know about, so it raises an admin alert.
+    STUCK_ALERT_MS: 15 * 60 * 1000,
+
+    // Orders one IP may open per hour. High enough that a
+    // person retrying a failed invoice three times never
+    // notices, low enough that the provider's API is not a
+    // free amplifier.
+    ORDER_RATE_LIMIT: 12,
+    ORDER_RATE_WINDOW_MS: 60 * 60 * 1000
   },
 
   STATE_EXPIRY_MS: 30 * 60 * 1000,

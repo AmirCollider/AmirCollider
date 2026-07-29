@@ -49,6 +49,18 @@ import { handleMetrics } from './pages/metrics.js'
 import { handleDashboard } from './pages/dashboard.js'
 import { handleReleaseNotes } from './pages/releaseNotes.js'
 import { handleUnityDocSnap } from './pages/unityDocSnap.js'
+import { handleDocSnapVideo } from './pages/video.js'
+import {
+  handleCheckoutPage,
+  handleCheckoutCreate,
+  handleCheckoutPay,
+  handleCheckoutStatus,
+  handleCheckoutResend,
+  handleCheckoutWebhook
+} from './pages/checkout.js'
+import { handleOrderHelp, handleOrderLookup } from './pages/orderHelp.js'
+import { db as commerceDb } from './commerce/orders.js'
+import { reconcile } from './commerce/fulfilment.js'
 import {
   handleLicensePage,
   handleLicenseActivate,
@@ -67,6 +79,46 @@ import {
 export default {
   async fetch(request, env, ctx) {
     return handleRequest(request, env, ctx)
+  },
+
+  // ==========================================
+  // scheduled
+  // The checkout's safety net, on a cron trigger.
+  //
+  // Everything in the purchase path is meant to complete
+  // inside the request that started it: a payment callback
+  // arrives, a key is minted, an email goes out. This runs
+  // for the times it did not - a callback that was never
+  // delivered, a mail provider that was down for ninety
+  // seconds, an isolate that died between minting and
+  // sending.
+  //
+  // Without it, each of those is a customer who paid and
+  // received nothing, and who finds out before we do.
+  //
+  // ctx.waitUntil so the work is not cut off when this
+  // function returns, and a try/catch around all of it
+  // because a scheduled handler that throws is a scheduled
+  // handler whose failure nobody sees.
+  // ==========================================
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(runScheduled(env))
+  }
+}
+
+
+async function runScheduled(env) {
+  const database = commerceDb(env)
+  if (!database) {
+    logInfo('Cron skipped: LICENSE_DB is not bound')
+    return
+  }
+
+  try {
+    const summary = await reconcile(env, database)
+    logInfo('Cron finished', summary)
+  } catch (error) {
+    logError('Cron failed', { error: error.message })
   }
 }
 
@@ -398,6 +450,36 @@ const ROUTES = [
   { path: '/license/deactivate', method: 'POST', handler: handleLicenseDeactivate },
   { path: '/license/devices', method: 'POST', handler: handleLicenseDevices },
   { path: '/license/admin', method: 'POST', handler: handleLicenseAdmin },
+
+  // ---- Unity DocSnap: crypto checkout ----
+  //
+  // /checkout/webhook is the only unauthenticated POST here
+  // that changes anything, and it is guarded by an HMAC over
+  // the body rather than by a secret in the URL - a secret
+  // path would end up in the payment provider's dashboard,
+  // in their logs, and in ours.
+  //
+  // The status and resend endpoints take a signed order
+  // handle in the query string rather than a key or an email,
+  // so a shared link exposes the masked order and nothing
+  // that can be used anywhere else.
+  { path: '/checkout', method: 'GET', handler: handleCheckoutPage },
+  { path: '/checkout/create', method: 'POST', handler: handleCheckoutCreate },
+  { path: '/checkout/pay', method: 'GET', handler: handleCheckoutPay },
+  { path: '/checkout/status', method: 'GET', handler: handleCheckoutStatus },
+  { path: '/checkout/resend', method: 'POST', handler: handleCheckoutResend },
+  { path: '/checkout/webhook', method: 'POST', handler: handleCheckoutWebhook },
+  { path: '/order', method: 'GET', handler: handleOrderHelp },
+  { path: '/order/lookup', method: 'POST', handler: handleOrderLookup },
+
+  // ---- Unity DocSnap: demo clips ----
+  //
+  // Registered for HEAD as well as GET. A <video> element
+  // asks for the headers before it commits to a download, and
+  // a 405 to that question is a player that shows a black
+  // rectangle and reports nothing.
+  { path: '/video/', method: 'GET', handler: handleDocSnapVideo, prefix: true },
+  { path: '/video/', method: 'HEAD', handler: handleDocSnapVideo, prefix: true },
 
   { path: '/assets/', method: 'GET', handler: handleAsset, prefix: true },
   { path: '/:gameId/health', method: 'GET', handler: handleHealthWithUI, dynamic: true },

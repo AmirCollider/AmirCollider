@@ -224,6 +224,56 @@ export async function insertLicenses(database, keys, { batch, maxActivations, pr
 
 
 // ==========================================
+// issueLicenseForOrder
+// One key, minted for one paid order.
+//
+// The counterpart to insertLicenses, and deliberately not a
+// special case of it. A batch is written ahead of any sale
+// and has no owner; this row is created BECAUSE somebody
+// bought it, so it can record who and against what - which
+// is the difference between a support question that has an
+// answer and one that ends in "check the payment provider".
+//
+// A plain INSERT rather than INSERT OR IGNORE. A collision
+// here would mean the CSPRNG produced a key that already
+// exists, and quietly ignoring that would hand the customer
+// somebody else's licence. Better to throw: the caller
+// treats it as a delivery failure, the order stays
+// undelivered, and the retry generates a different key.
+//
+// The plaintext is passed in and never returned. It exists
+// in the caller's scope for as long as it takes to seal it
+// into the order row and put it in an email, and nothing
+// here extends that.
+// ==========================================
+export async function issueLicenseForOrder(database, plaintextKey, { product, tier, email, orderId, maxActivations = 1 }) {
+  const normalized = normalizeKey(plaintextKey)
+  const keyHash = await hashKey(normalized)
+  const keyPublic = publicLabel(normalized)
+  const now = Date.now()
+
+  await database
+    .prepare(`INSERT INTO licenses
+              (key_hash, key_public, product, tier, status, max_activations, email, note, batch, created_at)
+              VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)`)
+    .bind(
+      keyHash, keyPublic, product, tier, maxActivations,
+      email || null,
+      // The order id in `note` rather than a new column: it is
+      // exactly what the column is for, it needs no migration
+      // against a table that already holds live keys, and it is
+      // the first thing anyone looking at a row wants to know.
+      orderId ? `order:${orderId}` : null,
+      `auto-${new Date(now).toISOString().slice(0, 10)}-${tier}`,
+      now
+    )
+    .run()
+
+  return { keyHash, keyPublic }
+}
+
+
+// ==========================================
 // setStatus
 // Revokes or restores a key.
 //

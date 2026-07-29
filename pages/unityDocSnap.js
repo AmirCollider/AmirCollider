@@ -43,6 +43,9 @@
 import { CONFIG } from '../config.js'
 import { getPageHead } from '../shared-styles.js'
 import { createHtmlResponse } from '../utils.js'
+import {
+  VIDEOS as VIDEOS_ALL, VIDEO_LANGS, videosFor, totalSecondsFor, formatDuration
+} from '../content/docsnapVideos.js'
 
 const DEFAULT_LANG = 'fa'
 const LANG_COOKIE_MAX_AGE = 60 * 60 * 24 * 365
@@ -72,10 +75,19 @@ const I18N = {
     priceNote: 'خرید یک‌باره · یک سیستم · بدون اشتراک ماهانه',
 
     sectionWhat: 'چه‌کار می‌کند',
+    sectionVideos: 'ببین چطور کار می‌کند',
     sectionCompare: 'مقایسه‌ی نسخه‌ها',
     sectionSpotlight: 'چیزی که بیشترین آدم برایش پول می‌دهد',
     sectionPricing: 'قیمت',
     sectionFaq: 'سؤال‌های پرتکرار',
+
+    videoLede: (count, total) =>
+      `${count} کلیپ کوتاه، در مجموع ${total} — هر کدام یک کار را نشان می‌دهد، بدون مقدمه.`,
+    videoLangLabel: 'زبان ویدیو',
+    videoOnlyEn: 'این کلیپ فقط به انگلیسی ضبط شده است.',
+    videoNoSupport: 'مرورگرت این ویدیو را پخش نمی‌کند.',
+    videoDownload: 'دانلود فایل ویدیو',
+    videoOf: (index, count) => `کلیپ ${index} از ${count}`,
 
     colFeature: 'قابلیت',
     colFree: 'رایگان',
@@ -104,6 +116,7 @@ const I18N = {
     everythingInPlus: 'هرچه در Plus هست، به‌علاوه:',
     buyFine: 'کد فوراً بعد از پرداخت تحویل داده می‌شود. روی یک سیستم فعال می‌شود و هر وقت خواستی خودت می‌توانی آزادش کنی و ببری روی سیستم دیگر.',
     haveKey: 'کد دارم',
+    orderHelp: 'سفارشم نرسیده',
     popular: 'محبوب‌ترین',
 
     faq: [
@@ -141,10 +154,19 @@ const I18N = {
     priceNote: 'One-off purchase · one machine · no subscription',
 
     sectionWhat: 'What it does',
+    sectionVideos: 'See it work',
     sectionCompare: 'Compare the editions',
     sectionSpotlight: 'What most people pay for',
     sectionPricing: 'Pricing',
     sectionFaq: 'Common questions',
+
+    videoLede: (count, total) =>
+      `${count} short clips, ${total} in total — each one shows a single thing, with no preamble.`,
+    videoLangLabel: 'Video language',
+    videoOnlyEn: 'This clip was only recorded in English.',
+    videoNoSupport: 'Your browser cannot play this video.',
+    videoDownload: 'Download the video file',
+    videoOf: (index, count) => `Clip ${index} of ${count}`,
 
     colFeature: 'Feature',
     colFree: 'Free',
@@ -173,6 +195,7 @@ const I18N = {
     everythingInPlus: 'Everything in Plus, plus:',
     buyFine: 'Your key is delivered the moment payment clears. It activates on one machine, and you can release it yourself any time to move to another.',
     haveKey: 'I have a key',
+    orderHelp: 'My order has not arrived',
     popular: 'Most popular',
 
     faq: [
@@ -210,10 +233,19 @@ const I18N = {
     priceNote: '買い切り · 1 台まで · サブスクリプションなし',
 
     sectionWhat: 'できること',
+    sectionVideos: '動作を見る',
     sectionCompare: 'エディション比較',
     sectionSpotlight: '最も選ばれている理由',
     sectionPricing: '価格',
     sectionFaq: 'よくある質問',
+
+    videoLede: (count, total) =>
+      `短いクリップ ${count} 本、合計 ${total}。前置きなしで 1 本につき 1 つの機能を紹介します。`,
+    videoLangLabel: '動画の言語',
+    videoOnlyEn: 'このクリップは英語版のみです。',
+    videoNoSupport: 'お使いのブラウザではこの動画を再生できません。',
+    videoDownload: '動画ファイルをダウンロード',
+    videoOf: (index, count) => `${count} 本中 ${index} 本目`,
 
     colFeature: '機能',
     colFree: '無料版',
@@ -242,6 +274,7 @@ const I18N = {
     everythingInPlus: 'Plus のすべてに加えて:',
     buyFine: '決済完了と同時にキーが届きます。1 台で有効化でき、別のマシンへはいつでも自分で移せます。',
     haveKey: 'キーを持っています',
+    orderHelp: '注文が届かない',
     popular: '人気',
 
     faq: [
@@ -551,6 +584,120 @@ function renderWhat(p, lang) {
 }
 
 // ==========================================
+// renderVideos
+// The demo clips, as a player with a playlist beside it.
+//
+// Placed straight after "what it does" and before any
+// price, for the same reason the buy buttons are two clicks
+// down: this is a tool nobody has seen, and two and a half
+// minutes of watching it work is worth more than any
+// paragraph on this page.
+//
+// A playlist rather than a grid of ten embedded players.
+// Ten <video> elements each fetch their own metadata on
+// load, which is ten range requests before the visitor has
+// asked for anything - and on a phone that is the whole
+// section costing megabytes to sit still. One player with
+// preload="none" costs nothing until something is clicked.
+//
+// The clip language is its own control, seeded from the
+// page language but free to differ. Somebody reading in
+// Persian may well want the English recordings, and the
+// tenth clip only exists there - so the two are not tied
+// together.
+// ==========================================
+function renderVideos(p, lang) {
+  // The clip language starts as the page language when
+  // recordings exist in it, and falls back to English rather
+  // than to an empty section.
+  const startLang = VIDEO_LANGS.indexOf(lang) !== -1 ? lang : 'en'
+  const clips = videosFor(startLang)
+
+  const langButtons = VIDEO_LANGS.map(code => `
+    <button type="button" data-vlang="${code}" lang="${code}"
+            aria-pressed="${code === startLang ? 'true' : 'false'}">
+      ${escapeHtml(I18N[code].langName)}
+    </button>`).join('')
+
+  const items = clips.map((clip, index) => `
+    <li>
+      <button type="button" class="vitem${index === 0 ? ' is-on' : ''}" data-id="${clip.id}"
+              aria-current="${index === 0 ? 'true' : 'false'}">
+        <span class="vnum">${String(clip.id).padStart(2, '0')}</span>
+        <span class="vtext">
+          <b>${escapeHtml(clip.title[lang])}</b>
+          <small>${escapeHtml(clip.blurb[lang])}</small>
+        </span>
+        <span class="vdur" dir="ltr">${formatDuration(clip.seconds)}</span>
+      </button>
+    </li>`).join('')
+
+  const first = clips[0]
+
+  return `
+    <h2 class="section" id="videos">${escapeHtml(p.sectionVideos)}</h2>
+
+    <div class="vhead">
+      <p class="vlede" id="vLede">${escapeHtml(p.videoLede(clips.length, formatDuration(totalSecondsFor(startLang))))}</p>
+      <div class="vlang">
+        <span class="vlang-label">${escapeHtml(p.videoLangLabel)}</span>
+        <div class="seg" role="group" aria-label="${escapeHtml(p.videoLangLabel)}">${langButtons}</div>
+      </div>
+    </div>
+
+    <div class="vplayer">
+      <div class="vstage">
+        <video id="vEl" controls preload="none" playsinline
+               src="/video/${startLang}/${first.id}"
+               aria-describedby="vTitle">
+          <p>${escapeHtml(p.videoNoSupport)}
+             <a id="vDl" href="/video/${startLang}/${first.id}">${escapeHtml(p.videoDownload)}</a></p>
+        </video>
+        <div class="vnow">
+          <b id="vTitle">${escapeHtml(first.title[lang])}</b>
+          <small id="vBlurb">${escapeHtml(first.blurb[lang])}</small>
+          <span class="vcount" id="vCount">${escapeHtml(p.videoOf(1, clips.length))}</span>
+        </div>
+      </div>
+      <ol class="vlist" id="vList">${items}</ol>
+    </div>`
+}
+
+
+// ==========================================
+// videoData
+// The catalogue the player needs, as one script tag.
+//
+// Split into two shapes on purpose. `byLang` is which clips
+// EXIST in each recording language, and `meta` is what each
+// clip is CALLED in the language the reader is reading -
+// two independent axes that a single nested object would
+// have made three times the size by repeating every title
+// once per language.
+// ==========================================
+function videoData(lang) {
+  const byLang = {}
+  for (const code of VIDEO_LANGS) {
+    byLang[code] = {
+      ids: videosFor(code).map(clip => clip.id),
+      total: formatDuration(totalSecondsFor(code))
+    }
+  }
+
+  const meta = {}
+  for (const clip of VIDEOS_ALL) {
+    meta[clip.id] = {
+      t: clip.title[lang],
+      b: clip.blurb[lang],
+      d: formatDuration(clip.seconds)
+    }
+  }
+
+  return { byLang, meta }
+}
+
+
+// ==========================================
 // renderCompare
 // The table, plus the paragraph under it that says what
 // Free keeps.
@@ -741,6 +888,7 @@ function renderPage(lang, theme) {
     ${renderTopbar(lang)}
     ${renderHero(p)}
     ${renderWhat(p, lang)}
+    ${renderVideos(p, lang)}
     ${renderSpotlight(p)}
     ${renderCompare(p, lang)}
     ${renderPricing(p, lang)}
@@ -751,9 +899,11 @@ function renderPage(lang, theme) {
       <a href="${escapeHtml(REPO_URL)}" rel="noopener">GitHub</a>
       <span>·</span>
       <a href="/license">${escapeHtml(p.haveKey)}</a>
+      <span>·</span>
+      <a href="/order">${escapeHtml(p.orderHelp)}</a>
     </footer>
   </div>
-  <script>${script()}</script>
+  <script>${script(lang, p)}</script>
 </body>
 </html>`
 }
@@ -874,6 +1024,73 @@ function css() {
     .card h3 { font-size: 1.05em; font-weight: 700; margin-block-end: 6px; }
     .card p { font-size: 0.93em; color: var(--text-dim); }
 
+    /* ---------- videos ---------- */
+    .vhead {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 14px; flex-wrap: wrap; margin-block-end: 16px;
+    }
+    .vlede { color: var(--text-dim); font-size: 0.94em; }
+    .vlang { display: flex; align-items: center; gap: 10px; }
+    .vlang-label { font-size: 0.8em; color: var(--text-dim); font-weight: 600; }
+
+    /* Player left, playlist right on a desktop; stacked on a
+       phone, where a side-by-side split would leave the video
+       too small to read a Unity Inspector in. */
+    .vplayer { display: grid; grid-template-columns: 1.55fr 1fr; gap: 16px; align-items: start; }
+    @media (max-width: 820px) { .vplayer { grid-template-columns: 1fr; } }
+
+    .vstage {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden;
+    }
+    .vstage video {
+      display: block; width: 100%; aspect-ratio: 16 / 9; background: #05070d;
+    }
+    .vstage video p { color: var(--text-dim); padding: 20px; font-size: 0.9em; }
+    .vnow { padding: 14px 16px; }
+    .vnow b { display: block; font-size: 1em; font-weight: 700; }
+    .vnow small { display: block; color: var(--text-dim); font-size: 0.87em; margin-block-start: 3px; }
+    .vcount { display: block; font-size: 0.76em; color: var(--text-dim); margin-block-start: 8px; }
+
+    /* The playlist scrolls inside itself so ten clips cannot
+       make the section taller than the player beside it. */
+    .vlist {
+      list-style: none; max-height: 420px; overflow-y: auto;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      background: var(--surface); padding: 6px;
+      scrollbar-width: thin;
+    }
+    @media (max-width: 820px) { .vlist { max-height: 320px; } }
+
+    .vitem {
+      display: flex; align-items: center; gap: 11px; width: 100%; text-align: start;
+      padding: 9px 10px; border: 0; border-radius: 12px; cursor: pointer;
+      font: inherit; color: var(--text); background: transparent;
+      transition: background 0.15s ease;
+    }
+    .vitem:hover { background: var(--surface-2); }
+    .vitem.is-on { background: color-mix(in srgb, var(--brand) 16%, transparent); }
+
+    .vnum {
+      flex: 0 0 26px; width: 26px; height: 26px; border-radius: 8px;
+      display: grid; place-items: center; font-size: 0.72em; font-weight: 800;
+      color: var(--text-dim); background: var(--surface-2); border: 1px solid var(--border);
+    }
+    .vitem.is-on .vnum {
+      color: #fff; border-color: transparent;
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+    }
+    .vtext { flex: 1 1 auto; min-width: 0; }
+    .vtext b { display: block; font-size: 0.88em; font-weight: 700; line-height: 1.45; }
+    .vtext small {
+      display: block; color: var(--text-dim); font-size: 0.78em; line-height: 1.5;
+      /* Two lines, then an ellipsis. A blurb that wraps to four
+         turns the playlist into a wall and hides the clips
+         below it. */
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .vdur { flex: 0 0 auto; font-size: 0.76em; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+
     /* ---------- comparison ---------- */
     /* The table scrolls inside its own box so a long feature
        label can never make the page itself scroll sideways. */
@@ -980,7 +1197,19 @@ function css() {
   `
 }
 
-function script() {
+// ==========================================
+// script
+// Language and theme switching, plus the video player.
+//
+// The player is the only stateful thing on this page, and
+// it is deliberately about forty lines of plain DOM work
+// rather than anything cleverer. It has to run before any
+// framework would have finished loading, on a page whose
+// whole argument is that it renders instantly.
+// ==========================================
+function script(lang, p) {
+  const data = videoData(lang)
+
   return `
     function dsLang(code) {
       try { localStorage.setItem('ac_lang', code); } catch (e) {}
@@ -994,6 +1223,132 @@ function script() {
       try { localStorage.setItem('ac_theme', next); } catch (e) {}
       document.cookie = 'theme=' + next + ';path=/;max-age=31536000;samesite=lax';
     }
+
+    (function () {
+      var BY_LANG = ${JSON.stringify(data.byLang)};
+      var META = ${JSON.stringify(data.meta)};
+      var TXT = {
+        lede: ${JSON.stringify(p.videoLede('__N__', '__T__'))},
+        of: ${JSON.stringify(p.videoOf('__I__', '__N__'))}
+      };
+
+      var video = document.getElementById('vEl');
+      if (!video) return;
+
+      var list = document.getElementById('vList');
+      var titleEl = document.getElementById('vTitle');
+      var blurbEl = document.getElementById('vBlurb');
+      var countEl = document.getElementById('vCount');
+      var ledeEl = document.getElementById('vLede');
+      var downloadEl = document.getElementById('vDl');
+
+      var vlang = ${JSON.stringify(VIDEO_LANGS.indexOf(lang) !== -1 ? lang : 'en')};
+      var current = BY_LANG[vlang].ids[0];
+
+      function esc(v) {
+        return String(v == null ? '' : v)
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+      }
+
+      function pad(n) { return n < 10 ? '0' + n : String(n); }
+
+      // Loading a clip is a src swap plus load(), not a new
+      // <video>. Replacing the element would lose the user's
+      // volume and fullscreen state between clips, which on a
+      // ten-item playlist means re-muting nine times.
+      function select(id, autoplay) {
+        current = id;
+        var meta = META[id];
+
+        video.src = '/video/' + vlang + '/' + id;
+        video.load();
+        if (autoplay) {
+          var playing = video.play();
+          // Autoplay with sound is refused by every browser unless
+          // the page has been interacted with. It HAS been - the
+          // user clicked a playlist item - but the promise is still
+          // rejected in some configurations, and an unhandled
+          // rejection in the console is noise nobody needs.
+          if (playing && playing.catch) playing.catch(function () {});
+        }
+
+        titleEl.textContent = meta.t;
+        blurbEl.textContent = meta.b;
+        if (downloadEl) downloadEl.href = '/video/' + vlang + '/' + id;
+
+        var ids = BY_LANG[vlang].ids;
+        countEl.textContent = TXT.of
+          .replace('__I__', String(ids.indexOf(id) + 1))
+          .replace('__N__', String(ids.length));
+
+        Array.prototype.forEach.call(list.querySelectorAll('.vitem'), function (button) {
+          var on = Number(button.getAttribute('data-id')) === id;
+          button.classList.toggle('is-on', on);
+          button.setAttribute('aria-current', on ? 'true' : 'false');
+        });
+      }
+
+      function paintList() {
+        var ids = BY_LANG[vlang].ids;
+
+        list.innerHTML = ids.map(function (id) {
+          var meta = META[id];
+          return '<li><button type="button" class="vitem" data-id="' + id + '" aria-current="false">'
+            + '<span class="vnum">' + pad(id) + '</span>'
+            + '<span class="vtext"><b>' + esc(meta.t) + '</b><small>' + esc(meta.b) + '</small></span>'
+            + '<span class="vdur" dir="ltr">' + meta.d + '</span>'
+            + '</button></li>';
+        }).join('');
+
+        ledeEl.textContent = TXT.lede
+          .replace('__N__', String(ids.length))
+          .replace('__T__', BY_LANG[vlang].total);
+
+        bind();
+      }
+
+      function bind() {
+        Array.prototype.forEach.call(list.querySelectorAll('.vitem'), function (button) {
+          button.addEventListener('click', function () {
+            select(Number(button.getAttribute('data-id')), true);
+          });
+        });
+      }
+
+      // Switching the clip language keeps the clip you were on
+      // when that clip exists in the new language, and falls back
+      // to the first one when it does not - which is only the
+      // tenth, the English-only tour. Jumping back to clip one on
+      // every language change would punish exactly the person
+      // who is comparing the same clip in two languages.
+      Array.prototype.forEach.call(document.querySelectorAll('[data-vlang]'), function (button) {
+        button.addEventListener('click', function () {
+          var next = button.getAttribute('data-vlang');
+          if (next === vlang) return;
+
+          vlang = next;
+          Array.prototype.forEach.call(document.querySelectorAll('[data-vlang]'), function (other) {
+            other.setAttribute('aria-pressed', other === button ? 'true' : 'false');
+          });
+
+          paintList();
+          var ids = BY_LANG[vlang].ids;
+          select(ids.indexOf(current) !== -1 ? current : ids[0], false);
+        });
+      });
+
+      // Autoplay the next clip when one finishes. Fourteen
+      // seconds is short enough that stopping after each one
+      // turns a two-minute tour into ten decisions.
+      video.addEventListener('ended', function () {
+        var ids = BY_LANG[vlang].ids;
+        var at = ids.indexOf(current);
+        if (at !== -1 && at + 1 < ids.length) select(ids[at + 1], true);
+      });
+
+      bind();
+    })();
   `
 }
 
