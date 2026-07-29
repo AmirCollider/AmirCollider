@@ -1698,7 +1698,7 @@ function dashClientScript() {
     var RUNNERS = {
       /* ---------- checkout ---------- */
       coConfig: function () {
-        return postJson('/checkout/test', { action: 'config' }).then(function (r) {
+        return postJson('/testsite/checkout', { action: 'config' }).then(function (r) {
           if (!r.ok) return netFail();
           if (r.status === 401) return { status: 'fail', code: 401, ping: r.ping, noteKey: 'coNoAuth' };
           if (r.status === 503) return { status: 'warn', code: 503, ping: r.ping, noteKey: 'coOff' };
@@ -2204,11 +2204,16 @@ function dashClientScript() {
     }
 
     /* ---------- checkout simulator ---------- */
-    /* Every button here is one POST to /checkout/test, which is
+    /* Every button here is one POST to /testsite/checkout, which is
        gated by this panel's own session cookie. The admin bearer
        token is deliberately NOT in this page - putting it in the
        markup would hand a key-minting credential to anyone who
-       opens dev tools. */
+       opens dev tools.
+
+       The path has to stay under /testsite/: the session cookie is
+       set with Path=/testsite, so the browser sends it here and
+       nowhere else. Move this endpoint and every button on this
+       panel answers 401. */
     var simOut = document.getElementById('ts-sim-out');
     var simVerdict = document.getElementById('ts-sim-verdict');
 
@@ -2228,7 +2233,7 @@ function dashClientScript() {
     }
 
     function simCall(payload) {
-      return fetch(BASE + '/checkout/test', {
+      return fetch(BASE + '/testsite/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

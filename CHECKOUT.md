@@ -194,7 +194,7 @@ without it. See `LICENSING.md`.
 | `DOCSNAP_KEY_WRAP_SECRET` | yes | Delivery throws; no order completes |
 | `DOCSNAP_ORDER_SECRET` | yes | Same |
 | `DOCSNAP_LICENSE_PRIVATE_KEY` | yes | Keys are delivered but cannot be activated |
-| `DOCSNAP_ADMIN_TOKEN` | for tooling | `/license/admin` and `/checkout/test` from a terminal |
+| `DOCSNAP_ADMIN_TOKEN` | for tooling | `/license/admin` and `/testsite/checkout` from a terminal |
 | `TestSitePassword` | for tooling | The `/testsite` panel and its checkout simulator |
 | `NOWPAYMENTS_API_BASE` | no | Set only to point at the sandbox; delete to go back to live |
 
@@ -264,19 +264,19 @@ BASE=https://amircollider.n95pluss.workers.dev
 AUTH="Authorization: Bearer $DOCSNAP_ADMIN_TOKEN"
 
 # What is wired up? (booleans only — never prints a secret)
-curl -s $BASE/checkout/test -H "$AUTH" -H 'Content-Type: application/json' \
+curl -s $BASE/testsite/checkout -H "$AUTH" -H 'Content-Type: application/json' \
   -d '{"action":"config"}'
 
 # Create a rehearsal order
-curl -s $BASE/checkout/test -H "$AUTH" -H 'Content-Type: application/json' \
+curl -s $BASE/testsite/checkout -H "$AUTH" -H 'Content-Type: application/json' \
   -d '{"action":"order","tier":"pro","email":"you@yourdomain.com","lang":"fa"}'
 
 # Pay it (use the id from the previous response)
-curl -s $BASE/checkout/test -H "$AUTH" -H 'Content-Type: application/json' \
+curl -s $BASE/testsite/checkout -H "$AUTH" -H 'Content-Type: application/json' \
   -d '{"action":"pay","order":"ord_…","status":"finished"}'
 
 # Clean up
-curl -s $BASE/checkout/test -H "$AUTH" -H 'Content-Type: application/json' \
+curl -s $BASE/testsite/checkout -H "$AUTH" -H 'Content-Type: application/json' \
   -d '{"action":"purge"}'
 ```
 

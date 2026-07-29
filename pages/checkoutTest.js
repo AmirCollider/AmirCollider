@@ -3,7 +3,19 @@
 // Rehearsing the checkout without spending money.
 //
 // Public entry point (wired in worker.js ROUTES):
-//   POST /checkout/test    { action: … }
+//   POST /testsite/checkout    { action: … }
+//
+// The path sits under /testsite/ and not under /checkout/,
+// which looks like a filing mistake and is not. The test
+// panel's session cookie is set with Path=/testsite, so a
+// browser will not send it to any other prefix - an endpoint
+// at /checkout/test can therefore never see the credential it
+// is meant to accept, and answers 401 to a signed-in operator.
+//
+// The alternative fix was widening that cookie to Path=/,
+// which would attach a dev credential to every request for
+// every public page on the site. A longer URL is the cheaper
+// of the two.
 //
 // The problem this solves: everything up to the payment can
 // be checked by looking at it - the form renders, the

@@ -478,7 +478,14 @@ const ROUTES = [
   // /testsite session, and it refuses to simulate a payment
   // against any order it did not create itself - so it can
   // never deliver a key for an invoice somebody has not paid.
-  { path: '/checkout/test', method: 'POST', handler: handleCheckoutTest },
+  //
+  // Under /testsite/ rather than /checkout/ for one concrete
+  // reason: the panel's session cookie is scoped Path=/testsite,
+  // so a browser simply does not send it anywhere else. The
+  // alternative was widening that cookie to Path=/ and posting a
+  // dev credential on every request to every public page, which
+  // is a worse trade than a longer URL.
+  { path: '/testsite/checkout', method: 'POST', handler: handleCheckoutTest },
 
   // ---- Unity DocSnap: demo clips ----
   //
