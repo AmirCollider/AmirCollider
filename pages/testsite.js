@@ -78,6 +78,13 @@ function safeEqual(a, b) {
 // Auth Check
 // Validates the signed session cookie against the panel password.
 // ==========================================
+// Exported because the checkout simulator is a second surface
+// behind the same gate. It cannot ask the browser for the admin
+// bearer token - putting that in a page would be handing it to
+// anyone who opens dev tools - so it accepts this panel's own
+// session instead, which is already proof of the same password.
+export { isAuthenticated as isTestSiteSession }
+
 async function isAuthenticated(request, env) {
   if (!env.TestSitePassword) return false
   const cookies = request.headers.get('Cookie') || ''
@@ -247,6 +254,8 @@ const ICONS = {
   globe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z"/></svg>',
   database: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>',
   layers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>',
+  cart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.6 12.4a1.5 1.5 0 0 0 1.5 1.2h8.3a1.5 1.5 0 0 0 1.5-1.2L21 7H6"/></svg>',
+  video: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="14" height="14" rx="2.5"/><path d="M16.5 10.5 22 7.5v9l-5.5-3z"/></svg>',
   terminal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>',
   chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>',
   lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
@@ -262,7 +271,9 @@ const GROUP_ICONS = {
   auth: ICONS.shield,
   oauth: ICONS.globe,
   db: ICONS.database,
-  d1: ICONS.layers
+  d1: ICONS.layers,
+  checkout: ICONS.cart,
+  video: ICONS.video
 }
 
 
@@ -311,6 +322,29 @@ const TEST_GROUPS = [
       { kind: 'd1Connection' }, { kind: 'd1Schema' }, { kind: 'd1Limit' },
       { kind: 'd1EmptyUser' }, { kind: 'd1GetUnauth' }, { kind: 'd1SetUnauth' },
       { kind: 'd1PatchUnauth' }, { kind: 'd1ScoreInvalid' }, { kind: 'd1UnknownPath' }
+    ]
+  },
+  {
+    // Read-only checks over the crypto checkout. Every one of
+    // these asserts a REFUSAL - a malformed order rejected, an
+    // unsigned callback turned away - because those are the
+    // assertions that can be made without creating anything.
+    // Rehearsing an actual sale is the simulator below, which is
+    // a deliberate act rather than part of a sweep.
+    key: 'checkout',
+    titleKey: 'gCheckout',
+    tests: [
+      { kind: 'coConfig' }, { kind: 'coPage' }, { kind: 'coOrderPage' },
+      { kind: 'coBadEmail' }, { kind: 'coBadTier' }, { kind: 'coWebhookUnsigned' },
+      { kind: 'coStatusUnknown' }, { kind: 'coLookupBad' }
+    ]
+  },
+  {
+    key: 'video',
+    titleKey: 'gVideo',
+    tests: [
+      { kind: 'vidPlay' }, { kind: 'vidRange' }, { kind: 'vidHead' },
+      { kind: 'vidJa' }, { kind: 'vidFa' }, { kind: 'vidMissing' }
     ]
   }
 ]
@@ -373,8 +407,15 @@ const I18N = {
     gOauth: 'جریان OAuth',
     gDb: 'پایگاه‌داده',
     gD1: 'پایگاه‌داده D1',
+    gCheckout: 'خرید با ارز دیجیتال',
+    gVideo: 'ویدیوهای معرفی',
     // detail fragments
     net: 'خطای شبکه',
+    coOff: 'هنوز پیکربندی نشده (۵۰۳)',
+    coNoAuth: 'اول در /testsite وارد شو',
+    coMissing: 'ناقص',
+    coForged: '⚠ وبهوک بدون امضا پذیرفته شد — فوراً NOWPAYMENTS_IPN_SECRET را بررسی کن',
+    vidNotInR2: 'فایل در R2 پیدا نشد',
     expected: 'انتظار',
     missingField: 'فیلد غایب',
     badStruct: 'ساختار نامعتبر',
@@ -388,6 +429,23 @@ const I18N = {
     tooSlow: 'بسیار کند',
     validHtml: 'HTML معتبر',
     // manual panel
+    simTitle: 'شبیه‌ساز خرید',
+    simLede: 'کل مسیر بعد از پرداخت را بدون خرج کردن پول اجرا می‌کند: کلید واقعی ساخته می‌شود و ایمیل واقعی فرستاده می‌شود. فقط پیام درگاه پرداخت شبیه‌سازی می‌شود — همان بدنه‌ی JSON با همان امضای واقعی به همان وبهوک واقعی می‌رود.',
+    simTier: 'نسخه',
+    simLang: 'زبان ایمیل',
+    simEmail: 'ایمیل (واقعی باشد — ایمیل واقعاً فرستاده می‌شود)',
+    simStatus: 'وضعیت پرداخت',
+    simOrder: 'شماره سفارش (خودکار پر می‌شود)',
+    simFull: 'اجرای کامل: سفارش ← پرداخت ← کلید ← ایمیل',
+    simCreate: 'فقط ساخت سفارش',
+    simPay: 'فقط شبیه‌سازی پرداخت',
+    simInspect: 'بررسی سفارش',
+    simMail: 'ارسال ایمیل آزمایشی',
+    simCron: 'اجرای دستی cron',
+    simPurge: 'پاک کردن داده‌های آزمایشی',
+    simNeedEmail: 'اول یک ایمیل واقعی بنویس.',
+    simNeedOrder: 'اول یک شماره سفارش بنویس یا سفارش بساز.',
+    simWorking: 'در حال اجرا…',
     manualTitle: 'درخواست دستی',
     mMethod: 'متد',
     mEndpoint: 'مسیر',
@@ -433,7 +491,23 @@ const I18N = {
     t_d1SetUnauth: 'SET بدون توکن', d_d1SetUnauth: 'نوشتن کاربر باید 401 بدهد',
     t_d1PatchUnauth: 'PATCH بدون توکن', d_d1PatchUnauth: 'به‌روزرسانی کاربر باید 401 بدهد',
     t_d1ScoreInvalid: 'امتیاز نامعتبر', d_d1ScoreInvalid: 'امتیاز منفی باید رد شود',
-    t_d1UnknownPath: 'مسیر ناشناخته', d_d1UnknownPath: 'نباید با 500 خطا بدهد'
+    t_d1UnknownPath: 'مسیر ناشناخته', d_d1UnknownPath: 'نباید با 500 خطا بدهد',
+
+    t_coConfig: 'پیکربندی', d_coConfig: 'همه‌ی Secretها و جدول‌های لازم موجودند؟',
+    t_coPage: 'صفحه‌ی خرید', d_coPage: '/checkout بالا می‌آید و دکمه فعال است',
+    t_coOrderPage: 'صفحه‌ی سفارش', d_coOrderPage: '/order با متن آماده‌ی پشتیبانی',
+    t_coBadEmail: 'ایمیل نامعتبر', d_coBadEmail: 'سفارش با ایمیل غلط باید رد شود',
+    t_coBadTier: 'نسخه‌ی نامعتبر', d_coBadTier: 'نسخه‌ی ناشناخته باید رد شود',
+    t_coWebhookUnsigned: 'وبهوک بدون امضا', d_coWebhookUnsigned: 'باید ۴۰۱ بدهد — مهم‌ترین تست امنیتی',
+    t_coStatusUnknown: 'سفارش ناموجود', d_coStatusUnknown: 'شناسه‌ی ناشناخته باید ۴۰۴ بدهد',
+    t_coLookupBad: 'جست‌وجوی نامعتبر', d_coLookupBad: 'ایمیل غلط در بازیابی سفارش',
+
+    t_vidPlay: 'پخش ویدیو', d_vidPlay: '/video/en/1 با هدر Accept-Ranges',
+    t_vidRange: 'جلو/عقب بردن', d_vidRange: 'درخواست Range باید ۲۰۶ بدهد',
+    t_vidHead: 'اطلاعات فایل', d_vidHead: 'HEAD باید حجم را برگرداند',
+    t_vidJa: 'ویدیوی ژاپنی', d_vidJa: '/video/ja/1 در R2 موجود است',
+    t_vidFa: 'ویدیوی فارسی', d_vidFa: '/video/fa/1 در R2 موجود است',
+    t_vidMissing: 'کلیپ ۱۰ فارسی', d_vidMissing: 'فقط انگلیسی ضبط شده — باید ۴۰۴ بدهد'
   },
   en: {
     loginTitle: 'Test panel login',
@@ -478,7 +552,14 @@ const I18N = {
     gOauth: 'OAuth flow',
     gDb: 'Database',
     gD1: 'D1 database',
+    gCheckout: 'Crypto checkout',
+    gVideo: 'Demo videos',
     net: 'Network error',
+    coOff: 'Not configured yet (503)',
+    coNoAuth: 'Sign in at /testsite first',
+    coMissing: 'Missing',
+    coForged: '⚠ An unsigned webhook was ACCEPTED — check NOWPAYMENTS_IPN_SECRET now',
+    vidNotInR2: 'File not found in R2',
     expected: 'Expected',
     missingField: 'Missing field',
     badStruct: 'Invalid structure',
@@ -491,6 +572,23 @@ const I18N = {
     slow: 'Slow',
     tooSlow: 'Too slow',
     validHtml: 'Valid HTML',
+    simTitle: 'Checkout simulator',
+    simLede: 'Runs the whole post-payment chain without spending anything: a real key is minted and a real email is sent. Only the provider\u2019s message is synthesized — the same JSON body, with a genuine signature, goes to the real webhook.',
+    simTier: 'Edition',
+    simLang: 'Email language',
+    simEmail: 'Email (use a real one — a real message is sent)',
+    simStatus: 'Payment status',
+    simOrder: 'Order id (filled in for you)',
+    simFull: 'Run it all: order → payment → key → email',
+    simCreate: 'Create order only',
+    simPay: 'Simulate payment only',
+    simInspect: 'Inspect order',
+    simMail: 'Send a test email',
+    simCron: 'Run cron now',
+    simPurge: 'Purge test data',
+    simNeedEmail: 'Enter a real email address first.',
+    simNeedOrder: 'Enter an order id, or create one first.',
+    simWorking: 'Working…',
     manualTitle: 'Manual request',
     mMethod: 'Method',
     mEndpoint: 'Endpoint',
@@ -535,7 +633,23 @@ const I18N = {
     t_d1SetUnauth: 'SET (no token)', d_d1SetUnauth: 'User write should return 401',
     t_d1PatchUnauth: 'PATCH (no token)', d_d1PatchUnauth: 'User update should return 401',
     t_d1ScoreInvalid: 'Invalid score', d_d1ScoreInvalid: 'Negative score should be rejected',
-    t_d1UnknownPath: 'Unknown path', d_d1UnknownPath: 'Must not error with 500'
+    t_d1UnknownPath: 'Unknown path', d_d1UnknownPath: 'Must not error with 500',
+
+    t_coConfig: 'Configuration', d_coConfig: 'Every secret and table the checkout needs',
+    t_coPage: 'Checkout page', d_coPage: '/checkout renders with the button enabled',
+    t_coOrderPage: 'Order help page', d_coOrderPage: '/order with the support template',
+    t_coBadEmail: 'Invalid email', d_coBadEmail: 'An order with a bad address is refused',
+    t_coBadTier: 'Invalid tier', d_coBadTier: 'An unknown edition is refused',
+    t_coWebhookUnsigned: 'Unsigned webhook', d_coWebhookUnsigned: 'Must be 401 — the critical security check',
+    t_coStatusUnknown: 'Unknown order', d_coStatusUnknown: 'An unknown id must be 404',
+    t_coLookupBad: 'Invalid lookup', d_coLookupBad: 'A bad address in order recovery',
+
+    t_vidPlay: 'Video playback', d_vidPlay: '/video/en/1 with Accept-Ranges',
+    t_vidRange: 'Seeking', d_vidRange: 'A Range request must return 206',
+    t_vidHead: 'File metadata', d_vidHead: 'HEAD returns the size',
+    t_vidJa: 'Japanese clip', d_vidJa: '/video/ja/1 exists in R2',
+    t_vidFa: 'Persian clip', d_vidFa: '/video/fa/1 exists in R2',
+    t_vidMissing: 'Persian clip 10', d_vidMissing: 'English-only — must be a clean 404'
   },
   ja: {
     loginTitle: 'テストパネル ログイン',
@@ -580,7 +694,14 @@ const I18N = {
     gOauth: 'OAuth フロー',
     gDb: 'データベース',
     gD1: 'D1 データベース',
+    gCheckout: '暗号資産チェックアウト',
+    gVideo: 'デモ動画',
     net: 'ネットワークエラー',
+    coOff: '未設定です (503)',
+    coNoAuth: 'まず /testsite にサインインしてください',
+    coMissing: '不足',
+    coForged: '⚠ 署名なしの Webhook が受理されました — NOWPAYMENTS_IPN_SECRET を確認してください',
+    vidNotInR2: 'R2 にファイルが見つかりません',
     expected: '期待',
     missingField: '欠落フィールド',
     badStruct: '不正な構造',
@@ -593,6 +714,23 @@ const I18N = {
     slow: '遅い',
     tooSlow: '非常に遅い',
     validHtml: '有効なHTML',
+    simTitle: 'チェックアウト・シミュレーター',
+    simLede: '支払い後の処理全体を、実際に支払うことなく実行します。ライセンスキーは本物が発行され、メールも実際に送信されます。作り物は決済事業者からの通知だけで、同じ JSON を本物の署名付きで本物の Webhook に送ります。',
+    simTier: 'エディション',
+    simLang: 'メールの言語',
+    simEmail: 'メールアドレス(実際に送信されます)',
+    simStatus: '支払いステータス',
+    simOrder: '注文番号(自動入力)',
+    simFull: '一括実行: 注文 → 支払い → キー → メール',
+    simCreate: '注文の作成のみ',
+    simPay: '支払いのシミュレートのみ',
+    simInspect: '注文を確認',
+    simMail: 'テストメールを送信',
+    simCron: 'cron を今すぐ実行',
+    simPurge: 'テストデータを削除',
+    simNeedEmail: 'まず実在するメールアドレスを入力してください。',
+    simNeedOrder: '注文番号を入力するか、先に注文を作成してください。',
+    simWorking: '実行中…',
     manualTitle: '手動リクエスト',
     mMethod: 'メソッド',
     mEndpoint: 'エンドポイント',
@@ -637,7 +775,23 @@ const I18N = {
     t_d1SetUnauth: 'SET (トークンなし)', d_d1SetUnauth: 'ユーザー書込は 401 を返すべき',
     t_d1PatchUnauth: 'PATCH (トークンなし)', d_d1PatchUnauth: 'ユーザー更新は 401 を返すべき',
     t_d1ScoreInvalid: '不正なスコア', d_d1ScoreInvalid: 'マイナススコアは拒否されるべき',
-    t_d1UnknownPath: '不明なパス', d_d1UnknownPath: '500 でエラーになってはいけない'
+    t_d1UnknownPath: '不明なパス', d_d1UnknownPath: '500 でエラーになってはいけない',
+
+    t_coConfig: '設定', d_coConfig: '必要なシークレットとテーブルの有無',
+    t_coPage: '購入ページ', d_coPage: '/checkout が表示されボタンが有効',
+    t_coOrderPage: '注文ページ', d_coOrderPage: '/order とサポート文面',
+    t_coBadEmail: '無効なメール', d_coBadEmail: '不正なアドレスの注文は拒否される',
+    t_coBadTier: '無効なエディション', d_coBadTier: '未知のエディションは拒否される',
+    t_coWebhookUnsigned: '署名なし Webhook', d_coWebhookUnsigned: '401 必須 — 最重要のセキュリティ確認',
+    t_coStatusUnknown: '存在しない注文', d_coStatusUnknown: '未知の ID は 404',
+    t_coLookupBad: '無効な検索', d_coLookupBad: '注文復旧での不正なアドレス',
+
+    t_vidPlay: '動画の再生', d_vidPlay: '/video/en/1 と Accept-Ranges',
+    t_vidRange: 'シーク', d_vidRange: 'Range リクエストは 206 を返す',
+    t_vidHead: 'ファイル情報', d_vidHead: 'HEAD がサイズを返す',
+    t_vidJa: '日本語クリップ', d_vidJa: '/video/ja/1 が R2 に存在',
+    t_vidFa: 'ペルシア語クリップ', d_vidFa: '/video/fa/1 が R2 に存在',
+    t_vidMissing: 'ペルシア語クリップ 10', d_vidMissing: '英語のみ — 404 が正しい'
   }
 }
 
@@ -1024,6 +1178,58 @@ function renderDashboard(GAMES, baseUrl, lang, theme) {
       ${sectionsHtml}
     </section>
 
+    <section class="ts-manual ts-sim">
+      <h2><span class="ts-ic">${ICONS.cart}</span><span data-i18n="simTitle">${esc(dict.simTitle)}</span></h2>
+      <p class="ts-sim-lede" data-i18n="simLede">${esc(dict.simLede)}</p>
+
+      <div class="ts-manual-grid">
+        <label class="ts-m-field">
+          <span data-i18n="simTier">${esc(dict.simTier)}</span>
+          <select id="ts-sim-tier">
+            <option value="plus">Plus — $${esc(CONFIG.DOCSNAP.TIERS.plus.price)}</option>
+            <option value="pro">Pro — $${esc(CONFIG.DOCSNAP.TIERS.pro.price)}</option>
+          </select>
+        </label>
+        <label class="ts-m-field">
+          <span data-i18n="simLang">${esc(dict.simLang)}</span>
+          <select id="ts-sim-lang">
+            <option value="fa">فارسی</option><option value="en">English</option><option value="ja">日本語</option>
+          </select>
+        </label>
+        <label class="ts-m-field ts-m-endpoint">
+          <span data-i18n="simEmail">${esc(dict.simEmail)}</span>
+          <input type="email" id="ts-sim-email" placeholder="you@example.com" dir="ltr">
+        </label>
+        <label class="ts-m-field">
+          <span data-i18n="simStatus">${esc(dict.simStatus)}</span>
+          <select id="ts-sim-status">
+            <option value="finished">finished</option>
+            <option value="confirmed">confirmed</option>
+            <option value="partially_paid">partially_paid</option>
+            <option value="expired">expired</option>
+            <option value="failed">failed</option>
+          </select>
+        </label>
+        <label class="ts-m-field">
+          <span data-i18n="simOrder">${esc(dict.simOrder)}</span>
+          <input type="text" id="ts-sim-order" placeholder="ord_…" dir="ltr">
+        </label>
+      </div>
+
+      <div class="ts-sim-actions">
+        <button class="ts-btn ts-btn-run" id="ts-sim-full"><span class="ts-ic">${ICONS.play}</span><span data-i18n="simFull">${esc(dict.simFull)}</span></button>
+        <button class="ts-btn" id="ts-sim-order-btn"><span data-i18n="simCreate">${esc(dict.simCreate)}</span></button>
+        <button class="ts-btn" id="ts-sim-pay"><span data-i18n="simPay">${esc(dict.simPay)}</span></button>
+        <button class="ts-btn" id="ts-sim-inspect"><span data-i18n="simInspect">${esc(dict.simInspect)}</span></button>
+        <button class="ts-btn" id="ts-sim-mail"><span data-i18n="simMail">${esc(dict.simMail)}</span></button>
+        <button class="ts-btn" id="ts-sim-cron"><span data-i18n="simCron">${esc(dict.simCron)}</span></button>
+        <button class="ts-btn ts-btn-danger" id="ts-sim-purge"><span data-i18n="simPurge">${esc(dict.simPurge)}</span></button>
+      </div>
+
+      <div class="ts-sim-verdict" id="ts-sim-verdict"></div>
+      <pre class="ts-m-out" id="ts-sim-out" dir="ltr"></pre>
+    </section>
+
     <section class="ts-manual">
       <h2><span class="ts-ic">${ICONS.terminal}</span><span data-i18n="manualTitle">${esc(dict.manualTitle)}</span></h2>
       <div class="ts-manual-grid">
@@ -1262,6 +1468,26 @@ function dashStyles(accent, accentRgb) {
     direction: ltr; text-align: start; unicode-bidi: plaintext; line-height: 1.7; }
   .ts-m-output.is-shown { display: block; }
 
+  /* checkout simulator */
+  .ts-sim { border-inline-start: 3px solid var(--accent); }
+  .ts-sim-lede { color: var(--text-dim); font-size: .84rem; line-height: 1.8; margin: 6px 0 16px; }
+  .ts-sim-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  .ts-sim-actions .ts-btn { font-size: .82rem; padding: 9px 15px; }
+
+  /* The verdict line is the whole point of the panel: one sentence
+     saying whether the chain worked, above a JSON dump nobody
+     should have to read to find that out. */
+  .ts-sim-verdict { margin-top: 14px; font-weight: 600; font-size: .86rem; line-height: 1.7; }
+  .ts-sim-verdict:empty { display: none; }
+  .ts-sim-verdict.is-pass { color: var(--ok); }
+  .ts-sim-verdict.is-fail { color: var(--err); }
+  .ts-m-out { display: none; margin-top: 12px; padding: 14px; border-radius: 10px;
+    background: var(--surface-2); border: 1px solid var(--border);
+    font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: .76rem;
+    color: var(--text); max-height: 340px; overflow: auto; white-space: pre-wrap;
+    direction: ltr; text-align: start; unicode-bidi: plaintext; line-height: 1.65; }
+  .ts-m-out.is-shown { display: block; }
+
   /* toast */
   .ts-toast { position: fixed; inset-block-end: 26px; inset-inline-start: 50%;
     transform: translate(-50%, 12px); padding: 11px 22px; border-radius: 12px;
@@ -1450,7 +1676,174 @@ function dashClientScript() {
     function expectFail(r, codes) { return { status: 'fail', code: r.code != null ? r.code : r.status, ping: r.ping, noteKey: 'expected', noteVal: codes }; }
 
     /* ---------- runners (keyed by kind) ---------- */
+
+    /* A checkout endpoint answers 503 everywhere when its secrets
+       are not set. That is correct behaviour, not a failure, so it
+       is reported as a warning with a note rather than as red -
+       otherwise a deployment that has simply not been configured
+       yet looks broken. */
+    function offOrFail(r, want) {
+      if (r.status === 503) return { status: 'warn', code: 503, ping: r.ping, noteKey: 'coOff' };
+      return { status: 'fail', code: r.status, ping: r.ping, noteKey: 'expected', noteVal: want };
+    }
+
+    function postJson(path, payload) {
+      return fetchTest(path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    }
+
     var RUNNERS = {
+      /* ---------- checkout ---------- */
+      coConfig: function () {
+        return postJson('/checkout/test', { action: 'config' }).then(function (r) {
+          if (!r.ok) return netFail();
+          if (r.status === 401) return { status: 'fail', code: 401, ping: r.ping, noteKey: 'coNoAuth' };
+          if (r.status === 503) return { status: 'warn', code: 503, ping: r.ping, noteKey: 'coOff' };
+          return r.res.json().then(function (d) {
+            if (d.ready) {
+              return { status: 'pass', code: r.status, ping: r.ping,
+                       noteVal: d.sandbox ? 'SANDBOX' : 'live' };
+            }
+            /* The missing pieces are named. This check exists to answer
+               "why is the buy button disabled", and a bare red dot
+               answers it worse than the list does. */
+            return { status: 'fail', code: r.status, ping: r.ping,
+                     noteKey: 'coMissing', noteVal: (d.missing || []).join(', ') };
+          }).catch(function () { return { status: 'fail', code: r.status, ping: r.ping, noteKey: 'badStruct' }; });
+        });
+      },
+      coPage: function () {
+        return fetchTest('/checkout?tier=pro').then(function (r) {
+          if (!r.ok) return netFail();
+          if (r.status !== 200) return expectFail(r, '200');
+          return r.res.text().then(function (html) {
+            var hasForm = html.indexOf('id="email2"') !== -1;
+            var disabled = html.indexOf('id="pay" type="button" class="btn wide" disabled') !== -1;
+            if (!hasForm) return { status: 'fail', code: 200, ping: r.ping, noteKey: 'badStruct' };
+            /* A rendered form with a disabled button is a correctly
+               behaving page on a deployment whose secrets are not in
+               yet — a warning, not a failure. */
+            if (disabled) return { status: 'warn', code: 200, ping: r.ping, noteKey: 'coOff' };
+            return { status: 'pass', code: 200, ping: r.ping };
+          });
+        });
+      },
+      coOrderPage: function () {
+        return fetchTest('/order').then(function (r) {
+          if (!r.ok) return netFail();
+          if (r.status !== 200) return expectFail(r, '200');
+          return r.res.text().then(function (html) {
+            return html.indexOf('#UnityDocSnap') !== -1
+              ? { status: 'pass', code: 200, ping: r.ping }
+              : { status: 'fail', code: 200, ping: r.ping, noteKey: 'badStruct' };
+          });
+        });
+      },
+      coBadEmail: function () {
+        return postJson('/checkout/create', { tier: 'plus', email: 'not-an-email', lang: 'en' }).then(function (r) {
+          if (!r.ok) return netFail();
+          return r.status === 400
+            ? { status: 'pass', code: 400, ping: r.ping }
+            : offOrFail(r, '400');
+        });
+      },
+      coBadTier: function () {
+        return postJson('/checkout/create', { tier: 'enterprise', email: 'a@b.com', emailConfirm: 'a@b.com' }).then(function (r) {
+          if (!r.ok) return netFail();
+          return r.status === 400
+            ? { status: 'pass', code: 400, ping: r.ping }
+            : offOrFail(r, '400');
+        });
+      },
+      coWebhookUnsigned: function () {
+        /* The single most important assertion on this page. If an
+           unsigned callback is ever accepted, anybody who finds the
+           URL is issued a paid licence for free. */
+        return postJson('/checkout/webhook', { payment_status: 'finished', order_id: 'ord_forged', payment_id: 1 }).then(function (r) {
+          if (!r.ok) return netFail();
+          if (r.status === 401) return { status: 'pass', code: 401, ping: r.ping };
+          if (r.status === 503) return { status: 'warn', code: 503, ping: r.ping, noteKey: 'coOff' };
+          return { status: 'fail', code: r.status, ping: r.ping, noteKey: 'coForged' };
+        });
+      },
+      coStatusUnknown: function () {
+        return fetchTest('/checkout/status?o=ord_000000000000000000000000').then(function (r) {
+          if (!r.ok) return netFail();
+          if (r.status === 404) return { status: 'pass', code: 404, ping: r.ping };
+          return offOrFail(r, '404');
+        });
+      },
+      coLookupBad: function () {
+        return postJson('/order/lookup', { email: 'nope', lang: 'en' }).then(function (r) {
+          if (!r.ok) return netFail();
+          return r.status === 400
+            ? { status: 'pass', code: 400, ping: r.ping }
+            : offOrFail(r, '400');
+        });
+      },
+
+      /* ---------- videos ---------- */
+      vidPlay: function () {
+        return fetchTest('/video/en/1').then(function (r) {
+          if (!r.ok) return netFail();
+          if (r.status === 404) return { status: 'fail', code: 404, ping: r.ping, noteKey: 'vidNotInR2' };
+          if (r.status !== 200) return expectFail(r, '200');
+          var type = r.headers.get('Content-Type') || '';
+          var ranges = r.headers.get('Accept-Ranges');
+          if (ranges !== 'bytes') return { status: 'fail', code: 200, ping: r.ping, noteKey: 'missingHeaders', noteVal: 'Accept-Ranges' };
+          return { status: 'pass', code: 200, ping: r.ping, noteVal: type };
+        });
+      },
+      vidRange: function () {
+        /* Without a 206 here, seeking in the player either stalls or
+           silently does nothing — which looks like a broken video
+           rather than a missing feature. */
+        return fetchTest('/video/en/1', { headers: { Range: 'bytes=0-1023' } }).then(function (r) {
+          if (!r.ok) return netFail();
+          if (r.status === 404) return { status: 'fail', code: 404, ping: r.ping, noteKey: 'vidNotInR2' };
+          if (r.status !== 206) return expectFail(r, '206');
+          var cr = r.headers.get('Content-Range') || '';
+          return /^bytes 0-1023\\/\\d+$/.test(cr)
+            ? { status: 'pass', code: 206, ping: r.ping, noteVal: cr }
+            : { status: 'fail', code: 206, ping: r.ping, noteKey: 'missingHeaders', noteVal: 'Content-Range' };
+        });
+      },
+      vidHead: function () {
+        return fetchTest('/video/en/1', { method: 'HEAD' }).then(function (r) {
+          if (!r.ok) return netFail();
+          if (r.status === 404) return { status: 'fail', code: 404, ping: r.ping, noteKey: 'vidNotInR2' };
+          if (r.status !== 200) return expectFail(r, '200');
+          var len = r.headers.get('Content-Length');
+          return { status: 'pass', code: 200, ping: r.ping, noteVal: len ? (Math.round(len / 1048576 * 10) / 10) + ' MB' : '' };
+        });
+      },
+      vidJa: function () {
+        return fetchTest('/video/ja/1', { method: 'HEAD' }).then(function (r) {
+          if (!r.ok) return netFail();
+          if (r.status === 404) return { status: 'fail', code: 404, ping: r.ping, noteKey: 'vidNotInR2' };
+          return r.status === 200 ? { status: 'pass', code: 200, ping: r.ping } : expectFail(r, '200');
+        });
+      },
+      vidFa: function () {
+        return fetchTest('/video/fa/1', { method: 'HEAD' }).then(function (r) {
+          if (!r.ok) return netFail();
+          if (r.status === 404) return { status: 'fail', code: 404, ping: r.ping, noteKey: 'vidNotInR2' };
+          return r.status === 200 ? { status: 'pass', code: 200, ping: r.ping } : expectFail(r, '200');
+        });
+      },
+      vidMissing: function () {
+        /* Clip 10 was only recorded in English. Asking for it in
+           Persian must be a clean 404, not a sweep of three folders
+           that ends in one anyway. */
+        return fetchTest('/video/fa/10', { method: 'HEAD' }).then(function (r) {
+          if (!r.ok) return netFail();
+          return r.status === 404 ? { status: 'pass', code: 404, ping: r.ping } : expectFail(r, '404');
+        });
+      },
+
       sysMetrics: function () {
         return fetchTest('/metrics', { headers: { Accept: 'application/json' } }).then(function (r) {
           if (!r.ok) return netFail();
@@ -1809,6 +2202,117 @@ function dashClientScript() {
         out.textContent = dict.net + ': ' + e.message;
       });
     }
+
+    /* ---------- checkout simulator ---------- */
+    /* Every button here is one POST to /checkout/test, which is
+       gated by this panel's own session cookie. The admin bearer
+       token is deliberately NOT in this page - putting it in the
+       markup would hand a key-minting credential to anyone who
+       opens dev tools. */
+    var simOut = document.getElementById('ts-sim-out');
+    var simVerdict = document.getElementById('ts-sim-verdict');
+
+    function simShow(payload, verdict) {
+      simOut.classList.add('is-shown');
+      simOut.textContent = typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2);
+
+      if (!verdict) { simVerdict.className = 'ts-sim-verdict'; simVerdict.textContent = ''; return; }
+      simVerdict.className = 'ts-sim-verdict ' + (verdict.pass ? 'is-pass' : 'is-fail');
+      simVerdict.textContent = (verdict.pass ? '✓  ' : '✕  ') + verdict.message;
+    }
+
+    function simBusy(on) {
+      var dict = dictNow();
+      Array.prototype.forEach.call(document.querySelectorAll('.ts-sim-actions .ts-btn'), function (b) { b.disabled = on; });
+      if (on) { simOut.classList.add('is-shown'); simOut.textContent = dict.simWorking; simVerdict.textContent = ''; }
+    }
+
+    function simCall(payload) {
+      return fetch(BASE + '/checkout/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(function (res) {
+        return res.json().then(function (d) { return { status: res.status, data: d }; });
+      });
+    }
+
+    function simFields() {
+      return {
+        tier: document.getElementById('ts-sim-tier').value,
+        lang: document.getElementById('ts-sim-lang').value,
+        email: document.getElementById('ts-sim-email').value.trim(),
+        status: document.getElementById('ts-sim-status').value,
+        order: document.getElementById('ts-sim-order').value.trim()
+      };
+    }
+
+    function simRun(payload, needs) {
+      var dict = dictNow();
+      var f = simFields();
+      if (needs === 'email' && !f.email) { toast(dict.simNeedEmail, 'warn'); return Promise.resolve(null); }
+      if (needs === 'order' && !f.order) { toast(dict.simNeedOrder, 'warn'); return Promise.resolve(null); }
+
+      simBusy(true);
+      return simCall(payload)
+        .then(function (r) {
+          simBusy(false);
+          if (r.data.order && r.data.order.id) document.getElementById('ts-sim-order').value = r.data.order.id;
+          simShow(r.data, r.data.verdict);
+          return r;
+        })
+        .catch(function (e) { simBusy(false); simShow(dictNow().net + ': ' + e.message); return null; });
+    }
+
+    document.getElementById('ts-sim-order-btn').addEventListener('click', function () {
+      var f = simFields();
+      simRun({ action: 'order', tier: f.tier, email: f.email, lang: f.lang }, 'email');
+    });
+
+    document.getElementById('ts-sim-pay').addEventListener('click', function () {
+      var f = simFields();
+      simRun({ action: 'pay', order: f.order, status: f.status }, 'order');
+    });
+
+    document.getElementById('ts-sim-inspect').addEventListener('click', function () {
+      simRun({ action: 'inspect', order: simFields().order }, 'order');
+    });
+
+    document.getElementById('ts-sim-mail').addEventListener('click', function () {
+      var f = simFields();
+      simRun({ action: 'mail', email: f.email, lang: f.lang }, 'email');
+    });
+
+    document.getElementById('ts-sim-cron').addEventListener('click', function () {
+      simRun({ action: 'reconcile' });
+    });
+
+    document.getElementById('ts-sim-purge').addEventListener('click', function () {
+      simRun({ action: 'purge' });
+    });
+
+    /* The one-button path, which is what somebody actually wants:
+       create an order and immediately pay it, so the answer to
+       "does buying work" is one click and one verdict line. */
+    document.getElementById('ts-sim-full').addEventListener('click', function () {
+      var dict = dictNow();
+      var f = simFields();
+      if (!f.email) { toast(dict.simNeedEmail, 'warn'); return; }
+
+      simBusy(true);
+      simCall({ action: 'order', tier: f.tier, email: f.email, lang: f.lang })
+        .then(function (r) {
+          if (!r.data.ok) { simBusy(false); simShow(r.data); return null; }
+          document.getElementById('ts-sim-order').value = r.data.order.id;
+          return simCall({ action: 'pay', order: r.data.order.id, status: f.status });
+        })
+        .then(function (r) {
+          simBusy(false);
+          if (!r) return;
+          simShow(r.data, r.data.verdict);
+        })
+        .catch(function (e) { simBusy(false); simShow(dictNow().net + ': ' + e.message); });
+    });
 
     /* ---------- bindings + boot ---------- */
     document.getElementById('ts-run').addEventListener('click', runAll);

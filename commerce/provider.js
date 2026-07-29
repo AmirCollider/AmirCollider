@@ -116,6 +116,20 @@ export function isConfigured(env) {
 
 
 // ==========================================
+// isSandbox
+// Whether this deployment is pointed at the rehearsal API.
+//
+// Reported by the test panel, and worth reporting loudly:
+// a site quietly running against the sandbox looks
+// completely healthy - invoices open, callbacks arrive,
+// keys are delivered - and none of the money is real.
+// ==========================================
+export function isSandbox(env) {
+  return /sandbox/i.test(apiBase(env))
+}
+
+
+// ==========================================
 // call
 // One request to the provider, with a timeout and a
 // non-leaking failure.
@@ -132,12 +146,35 @@ export function isConfigured(env) {
 // does not benefit from reading an upstream API's opinion
 // of our request.
 // ==========================================
+// ==========================================
+// apiBase
+// Which NOWPayments to talk to.
+//
+// An environment override rather than only the constant in
+// config.js, so switching to the sandbox for a rehearsal is
+// `wrangler secret put NOWPAYMENTS_API_BASE` and switching
+// back is deleting it - neither of which is a code change
+// that could be forgotten in a deploy and leave the live
+// site taking sandbox money it will never receive.
+//
+// Live is the default precisely because that failure is
+// one-directional: a sandbox that is accidentally live
+// takes fake money and nobody loses anything, while a live
+// site accidentally pointed at the sandbox takes real
+// payments into an account that does not exist.
+// ==========================================
+function apiBase(env) {
+  const override = env && env.NOWPAYMENTS_API_BASE
+  return (override ? String(override) : CONFIG.COMMERCE.PROVIDER_API).replace(/\/+$/, '')
+}
+
+
 async function call(env, path, { method = 'GET', body = null } = {}) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 15000)
 
   try {
-    const response = await fetch(CONFIG.COMMERCE.PROVIDER_API + path, {
+    const response = await fetch(apiBase(env) + path, {
       method,
       headers: {
         'x-api-key': env.NOWPAYMENTS_API_KEY,

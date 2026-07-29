@@ -59,6 +59,7 @@ import {
   handleCheckoutWebhook
 } from './pages/checkout.js'
 import { handleOrderHelp, handleOrderLookup } from './pages/orderHelp.js'
+import { handleCheckoutTest } from './pages/checkoutTest.js'
 import { db as commerceDb } from './commerce/orders.js'
 import { reconcile } from './commerce/fulfilment.js'
 import {
@@ -471,6 +472,13 @@ const ROUTES = [
   { path: '/checkout/webhook', method: 'POST', handler: handleCheckoutWebhook },
   { path: '/order', method: 'GET', handler: handleOrderHelp },
   { path: '/order/lookup', method: 'POST', handler: handleOrderLookup },
+
+  // Rehearses the whole post-payment chain without money
+  // changing hands. Guarded by the admin token or a signed
+  // /testsite session, and it refuses to simulate a payment
+  // against any order it did not create itself - so it can
+  // never deliver a key for an invoice somebody has not paid.
+  { path: '/checkout/test', method: 'POST', handler: handleCheckoutTest },
 
   // ---- Unity DocSnap: demo clips ----
   //

@@ -42,7 +42,7 @@ import { enqueueAndSend, flushOutbox, mailConfigured } from './mailer.js'
 import {
   ORDER_STATE, getOrder, markPaid, claimForIssuing, attachLicense, markDelivered,
   setStatus, noteFailure, recordPayment, logEvent, findOpenOrders, wipeExpiredSeals,
-  pruneWebhookLog, countRecentMail, hasLicenseMail
+  pruneWebhookLog, countRecentMail, hasLicenseMail, isTestOrder
 } from './orders.js'
 import {
   PAYMENT_STATE, fetchPayment, fetchInvoicePayments, pickAuthoritative, isConfigured
@@ -507,6 +507,12 @@ export async function reconcile(env, database) {
 // and the invoice route is the only one that can say so.
 // ==========================================
 async function lookupPayment(env, order) {
+  // A rehearsal order has no invoice at the provider, so asking
+  // about it is a wasted API call whose only possible answer is
+  // "no such payment" - and on a busy account, a listing that
+  // could match somebody else's invoice by coincidence.
+  if (isTestOrder(order)) return null
+
   if (order.provider_payment_id) {
     const result = await fetchPayment(env, order.provider_payment_id)
     return result.ok ? result : null

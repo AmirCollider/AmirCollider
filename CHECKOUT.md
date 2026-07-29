@@ -194,6 +194,9 @@ without it. See `LICENSING.md`.
 | `DOCSNAP_KEY_WRAP_SECRET` | yes | Delivery throws; no order completes |
 | `DOCSNAP_ORDER_SECRET` | yes | Same |
 | `DOCSNAP_LICENSE_PRIVATE_KEY` | yes | Keys are delivered but cannot be activated |
+| `DOCSNAP_ADMIN_TOKEN` | for tooling | `/license/admin` and `/checkout/test` from a terminal |
+| `TestSitePassword` | for tooling | The `/testsite` panel and its checkout simulator |
+| `NOWPAYMENTS_API_BASE` | no | Set only to point at the sandbox; delete to go back to live |
 
 ### 6. Deploy
 
@@ -209,24 +212,134 @@ its whole safety net.
 
 ### 7. Test it before announcing anything
 
-1. Open `/checkout?tier=plus`. If it says purchase is not switched on,
-   a secret is missing — the page checks the provider, the mailer and
-   the database before it enables the button.
-2. Buy one yourself, with the cheapest coin you hold. $19.99 is the
-   cost of knowing the whole path works.
-3. Watch it: `npx wrangler tail`. You want to see
-   `Invoice opened` → `Licence issued for order` → `Order delivered`.
-4. Check the email arrived, the key is well-formed (`DSNAP-…`), and it
-   **activates in Unity**.
-5. Verify the row:
-   ```sql
-   SELECT id, status, tier, key_public, delivered_at FROM orders
-   ORDER BY created_at DESC LIMIT 5;
-   ```
+You do not have to spend money to find out whether this works.
 
-NOWPayments also has a sandbox (`api-sandbox.nowpayments.io`) if you
-want to rehearse without spending anything — change `PROVIDER_API` in
-`config.js`, test, and **change it back**.
+#### The fast way: the checkout simulator (recommended)
+
+Everything up to the payment can be checked by looking at it — the form
+renders, the invoice opens, NOWPayments shows a price and a coin list.
+Everything *after* the payment is the part that matters and the part
+you cannot see, because seeing it would mean sending real crypto to
+yourself.
+
+So the simulator synthesizes only the provider's message and leaves
+everything else real: it builds the exact JSON body NOWPayments would
+POST, signs it with your real `NOWPAYMENTS_IPN_SECRET`, and hands it to
+the real webhook. A rehearsal therefore exercises the signature check,
+the de-duplication ledger, the state machine, key minting, sealing, the
+mail queue and your mail provider. **A real key is minted and a real
+email is sent.** The only fiction is that the money moved.
+
+1. Set `TestSitePassword` if you have not already, and sign in at
+   **`/testsite`**.
+2. Scroll to **Checkout simulator**.
+3. Put a real address you can read into the email field, pick a tier
+   and an email language, and press
+   **"Run it all: order → payment → key → email"**.
+4. Read the verdict line. Green means the whole chain worked — go and
+   look in that inbox. Red names the step that failed and what to look
+   at.
+5. When you are finished, press **"Purge test data"**.
+
+The other buttons exist for when something is red:
+
+| Button | What it is for |
+|---|---|
+| Create order only | Get an order id without paying it, to inspect first |
+| Simulate payment only | Re-fire a callback at an existing rehearsal order |
+| Inspect order | Full state, event history and every mail attempt |
+| Send a test email | Is the mail provider working *at all*? Isolates mail from everything else |
+| Run cron now | Runs the reconciliation pass immediately instead of waiting five minutes |
+| Purge test data | Deletes rehearsal orders and **revokes** their keys |
+
+The **Payment status** dropdown lets you rehearse the unhappy paths
+too: `partially_paid` should refuse to deliver and alert you,
+`expired` and `failed` should close the order without minting
+anything.
+
+From a terminal, the same thing with the admin token:
+
+```bash
+BASE=https://amircollider.n95pluss.workers.dev
+AUTH="Authorization: Bearer $DOCSNAP_ADMIN_TOKEN"
+
+# What is wired up? (booleans only — never prints a secret)
+curl -s $BASE/checkout/test -H "$AUTH" -H 'Content-Type: application/json' \
+  -d '{"action":"config"}'
+
+# Create a rehearsal order
+curl -s $BASE/checkout/test -H "$AUTH" -H 'Content-Type: application/json' \
+  -d '{"action":"order","tier":"pro","email":"you@yourdomain.com","lang":"fa"}'
+
+# Pay it (use the id from the previous response)
+curl -s $BASE/checkout/test -H "$AUTH" -H 'Content-Type: application/json' \
+  -d '{"action":"pay","order":"ord_…","status":"finished"}'
+
+# Clean up
+curl -s $BASE/checkout/test -H "$AUTH" -H 'Content-Type: application/json' \
+  -d '{"action":"purge"}'
+```
+
+> **Is this a way to get a free licence?** No. It is gated on the same
+> credentials that already mint keys — the admin token can call
+> `/license/admin generate` directly — so it grants nothing new. And it
+> **refuses to simulate a payment against a real order**: only orders
+> it created itself, which are marked `provider='test'`, can be paid
+> this way. A rehearsal can never deliver a key for an invoice somebody
+> has not actually paid.
+
+#### Also run the automatic sweep
+
+The `/testsite` panel's **Run all** now includes a **Crypto checkout**
+group and a **Demo videos** group. They are read-only — every check
+asserts a refusal or a fetch — so they are safe to run against
+production at any time.
+
+The one to care about is **"Unsigned webhook"**. It posts an unsigned
+callback and requires a 401. If that check ever goes red, anybody who
+finds the URL can be issued a paid licence for free; treat it as an
+emergency and check `NOWPAYMENTS_IPN_SECRET`.
+
+The **Demo videos** group tells you whether the clips are actually
+reachable in R2 in each language, and whether `Range` requests work
+(without which seeking in the player silently does nothing).
+
+#### The true end-to-end: the NOWPayments sandbox
+
+If you want a real payment flow with fake money, NOWPayments has a
+sandbox. It exercises their side as well as ours.
+
+1. Make a sandbox account at <https://account-sandbox.nowpayments.io>.
+2. Get its API key and IPN secret — they are **different values** from
+   your live ones.
+3. Point the Worker at it, without a code change:
+   ```bash
+   npx wrangler secret put NOWPAYMENTS_API_BASE
+   # https://api-sandbox.nowpayments.io/v1
+   npx wrangler secret put NOWPAYMENTS_API_KEY      # the sandbox key
+   npx wrangler secret put NOWPAYMENTS_IPN_SECRET   # the sandbox secret
+   ```
+4. Buy something on `/checkout`. The sandbox lets you mark the payment
+   paid from its dashboard, and the callback comes back to you for real.
+5. **Put the live values back and delete `NOWPAYMENTS_API_BASE`.**
+
+The `config` action and the test panel both report `SANDBOX` when
+`NOWPAYMENTS_API_BASE` points at one, because a site quietly running
+against the sandbox looks completely healthy — invoices open, callbacks
+arrive, keys are delivered — and none of the money is real.
+
+#### And once, for real
+
+None of the above proves your payout wallet is right, because none of
+it moves money. Before you announce anything, buy one licence yourself
+with the cheapest coin you hold, and confirm the funds arrive in the
+wallet you configured at NOWPayments. That is the one thing only a real
+payment can tell you. Then check the key **activates in Unity**, and:
+
+```sql
+SELECT id, status, tier, key_public, delivered_at FROM orders
+WHERE provider != 'test' ORDER BY created_at DESC LIMIT 5;
+```
 
 ---
 
@@ -339,6 +452,12 @@ All in `CONFIG.COMMERCE` in `config.js`:
 | `MAIL_RETRY_MINUTES` | 1,3,10,30,120,360,720,1440 | Retries then stop; the list length is the ceiling. |
 | `STUCK_ALERT_MS` | 15 min | Paid-but-undelivered alert threshold. |
 | `ORDER_RATE_LIMIT` | 12/hour/IP | Each order is a real provider API call. |
+
+`PROVIDER_API` is the live NOWPayments URL. Override it per-deployment
+with the `NOWPAYMENTS_API_BASE` secret rather than editing it here — a
+code edit is a thing that can be forgotten in a deploy, and the
+direction that gets forgotten is the one that leaves a live site
+pointed at the sandbox.
 
 If you change the cron interval in `wrangler.jsonc`, change
 `DELIVERY_PROMISE_MINUTES` to match or the page is promising something

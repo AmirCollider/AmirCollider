@@ -124,6 +124,127 @@ export async function getOrder(database, id) {
 }
 
 
+// ==========================================
+// Test orders
+//
+// A rehearsal order is an ordinary row with provider =
+// 'test'. Everything downstream treats it identically -
+// same state machine, same minting, same email - because a
+// rehearsal that took a different code path would be
+// rehearsing the wrong thing.
+//
+// The marker exists for two jobs only: the reconciler must
+// not ask the real payment provider about an invoice that
+// was never opened, and cleanup must be able to find these
+// rows without a chance of touching a real sale.
+// ==========================================
+export const TEST_PROVIDER = 'test'
+
+export function isTestOrder(order) {
+  return Boolean(order && order.provider === TEST_PROVIDER)
+}
+
+
+// ==========================================
+// createTestOrder
+// A row that behaves like a paid-for order, without a
+// payment provider having been called.
+//
+// The invoice id is prefixed `test_` so it is obvious in
+// every listing and query which rows are rehearsals - the
+// question "is any of this real?" should be answerable by
+// looking, not by remembering.
+// ==========================================
+export async function createTestOrder(database, { id, tier, priceUsd, email, lang }) {
+  const at = now()
+
+  await database.prepare(
+    `INSERT INTO orders
+     (id, product, tier, price_usd, email, email_hash, lang, status,
+      provider, provider_invoice_id, delivery_attempts, created_at, updated_at)
+     VALUES (?, 'unity-docsnap', ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`
+  ).bind(
+    id, tier, String(priceUsd), email, await hashEmail(email), lang,
+    ORDER_STATE.AWAITING, TEST_PROVIDER, 'test_' + id.slice(4, 12), at, at
+  ).run()
+
+  return getOrder(database, id)
+}
+
+
+export async function listTestOrders(database, limit = 50) {
+  const { results } = await database.prepare(
+    'SELECT * FROM orders WHERE provider = ? ORDER BY created_at DESC LIMIT ?'
+  ).bind(TEST_PROVIDER, limit).all()
+  return results || []
+}
+
+
+// ==========================================
+// purgeTestOrders
+// Removes every rehearsal row and everything it created.
+//
+// Scoped by provider = 'test' at every step, including the
+// licences, which are found through the order id recorded
+// in their note. A cleanup that matched on anything looser
+// - a date range, an email pattern - is one careless
+// afternoon away from revoking a paying customer's key.
+//
+// Licences are revoked rather than deleted, so that a key
+// which somehow escaped into a real Unity install stops
+// working instead of quietly becoming an unknown key that
+// still verifies against an already-issued token.
+// ==========================================
+export async function purgeTestOrders(database) {
+  const orders = await listTestOrders(database, 500)
+  if (!orders.length) return { orders: 0, licenses: 0, mail: 0, events: 0 }
+
+  let licenses = 0
+  for (const order of orders) {
+    if (!order.key_hash) continue
+    const result = await database.prepare(
+      "UPDATE licenses SET status = 'revoked' WHERE key_hash = ? AND note = ?"
+    ).bind(order.key_hash, 'order:' + order.id).run()
+    if (result && result.meta && result.meta.changes) licenses += result.meta.changes
+
+    await database.prepare('DELETE FROM license_activations WHERE key_hash = ?').bind(order.key_hash).run()
+  }
+
+  const ids = orders.map(order => order.id)
+  const holes = ids.map(() => '?').join(', ')
+
+  const mail = await database.prepare(`DELETE FROM mail_outbox WHERE order_id IN (${holes})`).bind(...ids).run()
+  const events = await database.prepare(`DELETE FROM order_events WHERE order_id IN (${holes})`).bind(...ids).run()
+  await database.prepare(`DELETE FROM webhook_log WHERE order_id IN (${holes})`).bind(...ids).run()
+  await database.prepare('DELETE FROM orders WHERE provider = ?').bind(TEST_PROVIDER).run()
+
+  return {
+    orders: orders.length,
+    licenses,
+    mail: (mail.meta && mail.meta.changes) || 0,
+    events: (events.meta && events.meta.changes) || 0
+  }
+}
+
+
+// ==========================================
+// listOutbox
+// Every message an order produced, newest first.
+//
+// The bodies are excluded. They are tens of kilobytes of
+// rendered HTML each, and the questions this backs - did it
+// send, how many tries, what did the provider say - are all
+// answered by the columns around them.
+// ==========================================
+export async function listOutbox(database, orderId, limit = 20) {
+  const { results } = await database.prepare(
+    `SELECT id, kind, to_email, subject, attempts, next_attempt_at, sent_at, sent_via, last_error, created_at
+     FROM mail_outbox WHERE order_id = ? ORDER BY created_at DESC LIMIT ?`
+  ).bind(orderId, limit).all()
+  return results || []
+}
+
+
 export async function getOrderByInvoice(database, invoiceId) {
   if (!invoiceId) return null
   return database

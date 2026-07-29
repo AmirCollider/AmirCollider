@@ -88,6 +88,8 @@ const I18N = {
     videoNoSupport: 'مرورگرت این ویدیو را پخش نمی‌کند.',
     videoDownload: 'دانلود فایل ویدیو',
     videoOf: (index, count) => `کلیپ ${index} از ${count}`,
+    videoNoteTitle: 'یک نکته‌ی مهم',
+    videoNoteBody: 'همه‌ی قابلیت‌هایی که در این ویدیوها می‌بینی داخل ابزار وجود دارند. اما ابزار مرتب بروزرسانی می‌شود، پس ممکن است مسیر دسترسی به بعضی از آن‌ها یا ظاهرشان با چیزی که در ویدیو نشان داده شده کمی فرق داشته باشد.',
 
     colFeature: 'قابلیت',
     colFree: 'رایگان',
@@ -167,6 +169,8 @@ const I18N = {
     videoNoSupport: 'Your browser cannot play this video.',
     videoDownload: 'Download the video file',
     videoOf: (index, count) => `Clip ${index} of ${count}`,
+    videoNoteTitle: 'One thing worth knowing',
+    videoNoteBody: 'Everything shown in these clips is in the tool. It does keep being updated, though — so where you reach a feature from, and what it looks like on screen, may differ from the recording.',
 
     colFeature: 'Feature',
     colFree: 'Free',
@@ -246,6 +250,8 @@ const I18N = {
     videoNoSupport: 'お使いのブラウザではこの動画を再生できません。',
     videoDownload: '動画ファイルをダウンロード',
     videoOf: (index, count) => `${count} 本中 ${index} 本目`,
+    videoNoteTitle: 'ご注意ください',
+    videoNoteBody: 'これらの動画で紹介している機能は、すべて製品に含まれています。ただし更新を重ねているため、機能へのアクセス方法や画面の見た目が動画と異なる場合があります。',
 
     colFeature: '機能',
     colFree: '無料版',
@@ -660,6 +666,11 @@ function renderVideos(p, lang) {
         </div>
       </div>
       <ol class="vlist" id="vList">${items}</ol>
+    </div>
+
+    <div class="card vnote">
+      <h3>${escapeHtml(p.videoNoteTitle)}</h3>
+      <p>${escapeHtml(p.videoNoteBody)}</p>
     </div>`
 }
 
@@ -1090,6 +1101,13 @@ function css() {
       display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
     }
     .vdur { flex: 0 0 auto; font-size: 0.76em; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+
+    /* The "recordings age, the tool doesn't stand still" note.
+       Under the player rather than above it: it only makes sense
+       to somebody who has watched something, and above the
+       player it reads as an apology before the pitch. */
+    .vnote { margin-block-start: 16px; border-inline-start: 4px solid var(--gold); }
+    .vnote h3 { font-size: 1em; font-weight: 700; margin-block-end: 6px; }
 
     /* ---------- comparison ---------- */
     /* The table scrolls inside its own box so a long feature
