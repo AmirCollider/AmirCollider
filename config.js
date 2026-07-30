@@ -194,7 +194,7 @@ export const CONFIG = deepFreeze({
   TOKEN_MAX_AGE_MS: 60 * 60 * 1000,
   SESSION_MAX_AGE_MS: 7 * 24 * 60 * 60 * 1000,
   AUTO_COPY_CODE: true,
-  SUPPORT_EMAIL: 'amircollider@yahoo.com',
+  SUPPORT_EMAIL: 'amiru.koraida@gmail.com',
   AMIR_LOGO: '/assets/AmirColliderLogo.png',
   DEFAULT_GAME_LOGO: '/assets/DefaultGameLogo.png'
 })
