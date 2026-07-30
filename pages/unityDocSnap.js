@@ -46,6 +46,7 @@ import { createHtmlResponse } from '../utils.js'
 import {
   VIDEOS as VIDEOS_ALL, VIDEO_LANGS, videosFor, totalSecondsFor, formatDuration
 } from '../content/docsnapVideos.js'
+import { otherTools } from '../content/toolsCatalog.js'
 
 const DEFAULT_LANG = 'fa'
 const LANG_COOKIE_MAX_AGE = 60 * 60 * 24 * 365
@@ -866,6 +867,46 @@ function renderFaq(p) {
 
 
 // ==========================================
+// The rest of the shelf
+//
+// One line per sibling tool, below the FAQ and above the
+// footer - which is the only place on a product page where
+// pointing somewhere else is not competing with the thing
+// being sold. Somebody who has read to the bottom has either
+// decided or not, and either way the next useful thing to
+// know is that there is another tool by the same author.
+//
+// Read from content/toolsCatalog.js rather than hard-coded,
+// so a third tool appears here the moment it is added and
+// never has to be remembered.
+// ==========================================
+function renderShelf(lang) {
+  const neighbours = otherTools('unity-docsnap')
+  if (neighbours.length === 0) return ''
+
+  const heading = { fa: 'از همین قفسه', en: 'Also on this shelf', ja: '同じ棚から' }
+
+  const cards = neighbours.map(tool => {
+    const tagline = tool.i18n.tagline[lang] || tool.i18n.tagline.en
+    const cta = tool.i18n.cta[lang] || tool.i18n.cta.en
+    return `
+      <a class="shelf-item" href="${escapeHtml(tool.href)}">
+        <span class="shelf-mark" aria-hidden="true">${tool.mark}</span>
+        <span class="shelf-body">
+          <b>${escapeHtml(tool.name)}</b><br>
+          <span class="shelf-desc">${escapeHtml(tagline)}</span>
+        </span>
+        <span class="shelf-cta">${escapeHtml(cta)} &rarr;</span>
+      </a>`
+  }).join('')
+
+  return `
+    <h2 class="section">${escapeHtml(heading[lang] || heading.en)}</h2>
+    <div class="shelf">${cards}</div>`
+}
+
+
+// ==========================================
 // Page
 // ==========================================
 function renderPage(lang, theme) {
@@ -904,6 +945,7 @@ function renderPage(lang, theme) {
     ${renderCompare(p, lang)}
     ${renderPricing(p, lang)}
     ${renderFaq(p)}
+    ${renderShelf(lang)}
     <footer>
       <a href="/">${escapeHtml(p.footerBack)}</a>
       <span>·</span>
@@ -922,6 +964,20 @@ function renderPage(lang, theme) {
 
 function css() {
   return `
+    /* ---------- the rest of the shelf ---------- */
+    .shelf { display: grid; gap: 12px; margin-block-end: 30px; }
+    .shelf-item {
+      display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+      padding: 18px; border-radius: var(--radius); text-decoration: none; color: var(--text);
+      background: var(--surface); border: 1px solid var(--border);
+      transition: transform 0.18s ease, border-color 0.18s ease;
+    }
+    .shelf-item:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--brand) 42%, var(--border)); }
+    .shelf-mark { font-size: 1.8em; line-height: 1; }
+    .shelf-body { flex: 1 1 240px; min-width: 0; }
+    .shelf-desc { font-size: 0.88em; color: var(--text-dim); }
+    .shelf-cta { font-weight: 700; font-size: 0.9em; color: color-mix(in srgb, var(--brand) 58%, var(--text)); }
+
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     html { scrollbar-width: none; -ms-overflow-style: none; scroll-behavior: smooth; }
     html::-webkit-scrollbar { width: 0; height: 0; display: none; }

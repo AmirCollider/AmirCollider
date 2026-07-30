@@ -104,6 +104,28 @@ export const CONFIG = deepFreeze({
     }
   },
 
+  // Unity DirectTMP — the free Unity editor extension.
+  //
+  // Free and MIT, with no checkout, no licence server
+  // and no tiers, which is why this block is three
+  // lines where DOCSNAP is fifteen. It is still listed
+  // here rather than only in the tools catalogue,
+  // because the version number appears on the product
+  // page, in the catalogue card and in the release
+  // notes, and one constant is easier to keep honest
+  // than three literals.
+  //
+  // VERSION must match "version" in the package's own
+  // package.json and DirectTMPConstants.Version. The
+  // package's CI already fails when those two disagree;
+  // this is the third copy, and the one furthest from
+  // that check, so it is the one most likely to drift.
+  DIRECTTMP: {
+    REPO_URL: 'https://github.com/AmirCollider/UnityDirectTMP',
+    VERSION: '1.0.0',
+    GIT_URL: 'https://github.com/AmirCollider/UnityDirectTMP.git'
+  },
+
   // Crypto checkout.
   //
   // Every number here is a promise made to a customer on the

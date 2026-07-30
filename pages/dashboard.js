@@ -35,6 +35,7 @@ import { CONFIG } from '../config.js'
 import { getPageHead } from '../shared-styles.js'
 import { createHtmlResponse } from '../utils.js'
 import { createGamesCardsHTML } from './GamesCards.js'
+import { toolsFor } from '../content/toolsCatalog.js'
 
 const DEFAULT_LANG = 'fa'
 const LANG_COOKIE_MAX_AGE = 60 * 60 * 24 * 365
@@ -65,12 +66,7 @@ const DASH_I18N = {
     hlEdge: 'اجرا روی لبه شبکه',
     hlEdgeDesc: 'اجرا روی شبکه جهانی Cloudflare برای پاسخ‌دهی سریع و پایدار.',
     sectionTools: 'ابزارها',
-    toolDocSnapName: 'Unity DocSnap',
-    toolDocSnapDesc: 'کل پروژه‌ی یونیتی را می‌کند یک وب‌سایت آفلاین — برای آدم‌ها و برای هوش مصنوعی. نسخه‌ی رایگان بدون کد؛ نسخه‌های پولی خرید یک‌باره.',
-    toolDocSnapCta: 'ببین و بخر',
-    toolFree: 'رایگان',
-    toolPlus: 'Plus $19.99',
-    toolPro: 'Pro $49.99',
+    toolsAll: 'همه‌ی ابزارها',
     navMetrics: 'متریک‌ها',
     navTestPanel: 'پنل تست',
     navReleaseNotes: 'یادداشت‌های انتشار',
@@ -117,12 +113,7 @@ const DASH_I18N = {
     hlEdge: 'Runs at the edge',
     hlEdgeDesc: 'Served from Cloudflare’s global network for fast, reliable responses.',
     sectionTools: 'Tools',
-    toolDocSnapName: 'Unity DocSnap',
-    toolDocSnapDesc: 'Snaps a whole Unity project into an offline website — for humans and AI alike. Free needs no key; the paid editions are one-off.',
-    toolDocSnapCta: 'See it',
-    toolFree: 'Free',
-    toolPlus: 'Plus $19.99',
-    toolPro: 'Pro $49.99',
+    toolsAll: 'All tools',
     navMetrics: 'Metrics',
     navTestPanel: 'Test panel',
     navReleaseNotes: 'Release notes',
@@ -168,12 +159,7 @@ const DASH_I18N = {
     hlEdge: 'エッジで実行',
     hlEdgeDesc: 'Cloudflare のグローバルネットワークで高速かつ安定して配信します。',
     sectionTools: 'ツール',
-    toolDocSnapName: 'Unity DocSnap',
-    toolDocSnapDesc: 'Unity プロジェクト全体をオフラインの Web サイトに。人にも AI にも読める形で。無料版はキー不要、有料版は買い切りです。',
-    toolDocSnapCta: '詳しく見る',
-    toolFree: '無料版',
-    toolPlus: 'Plus $19.99',
-    toolPro: 'Pro $49.99',
+    toolsAll: 'すべてのツール',
     navMetrics: 'メトリクス',
     navTestPanel: 'テストパネル',
     navReleaseNotes: 'リリースノート',
@@ -543,17 +529,24 @@ function getDashboardCSS() {
     .hl h3 { font-size: 1.05em; font-weight: 700; margin-block-end: 6px; }
     .hl p  { font-size: 0.9em; line-height: 1.6; color: var(--text-dim); }
 
-    /* ---------- tools (the paid extension) ---------- */
+    /* ---------- tools (the editor extensions) ----------
+       Each card sets --tool / --tool-2 inline to its own
+       brand colour, so two products by one author keep two
+       identities instead of both being painted in the site's
+       violet. --brand is the fallback for a card that somehow
+       arrives without one. */
+    .tools-strip { display: grid; gap: 14px; margin-block-end: 14px; }
+
     .tool-card {
       display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
-      padding: 22px; margin-block-end: 44px; text-decoration: none; color: var(--text);
+      padding: 22px; text-decoration: none; color: var(--text);
       border-radius: var(--radius); background: var(--surface);
-      border: 1px solid color-mix(in srgb, var(--brand) 30%, var(--border));
+      border: 1px solid color-mix(in srgb, var(--tool, var(--brand)) 30%, var(--border));
       transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
     }
     .tool-card:hover {
       transform: translateY(-4px); background: var(--surface-2);
-      border-color: color-mix(in srgb, var(--brand) 55%, var(--border));
+      border-color: color-mix(in srgb, var(--tool, var(--brand)) 55%, var(--border));
     }
     .tool-ic { font-size: 2.2em; line-height: 1; }
     .tool-body { flex: 1 1 260px; min-width: 0; }
@@ -562,14 +555,22 @@ function getDashboardCSS() {
     .tool-tags { display: flex; gap: 8px; flex-wrap: wrap; }
     .tool-tag {
       font-size: 0.78em; font-weight: 700; padding: 3px 10px; border-radius: 999px;
-      color: var(--text-dim); background: var(--surface-2); border: 1px solid var(--border);
+      color: color-mix(in srgb, var(--tool, var(--brand)) 55%, var(--text));
+      background: color-mix(in srgb, var(--tool, var(--brand)) 12%, transparent);
+      border: 1px solid color-mix(in srgb, var(--tool, var(--brand)) 32%, transparent);
     }
     .tool-tag.is-pro {
-      color: color-mix(in srgb, var(--brand) 50%, var(--text));
-      background: color-mix(in srgb, var(--brand) 14%, transparent);
-      border-color: color-mix(in srgb, var(--brand) 38%, transparent);
+      color: color-mix(in srgb, var(--tool-2, var(--brand)) 58%, var(--text));
+      background: color-mix(in srgb, var(--tool-2, var(--brand)) 14%, transparent);
+      border-color: color-mix(in srgb, var(--tool-2, var(--brand)) 38%, transparent);
     }
-    .tool-cta { font-weight: 700; font-size: 0.9em; color: color-mix(in srgb, var(--brand) 55%, var(--text)); }
+    .tool-cta { font-weight: 700; font-size: 0.9em; color: color-mix(in srgb, var(--tool, var(--brand)) 55%, var(--text)); }
+
+    .tools-more { text-align: center; margin-block-end: 44px; }
+    .tools-more a {
+      font-size: 0.88em; font-weight: 700; text-decoration: none;
+      color: color-mix(in srgb, var(--brand) 55%, var(--text));
+    }
 
     /* ---------- system links ---------- */
     .syslinks { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-block-end: 44px; }
@@ -638,7 +639,7 @@ function getDashboardCSS() {
       .stats     { animation-delay: 0.10s; }
       .section-title, .games-grid { animation: dRise 0.5s cubic-bezier(0.16,1,0.3,1) both; animation-delay: 0.14s; }
       .highlights{ animation-delay: 0.18s; }
-      .tool-card { animation: dRise 0.5s cubic-bezier(0.16,1,0.3,1) both; animation-delay: 0.20s; }
+      .tools-strip, .tools-more { animation: dRise 0.5s cubic-bezier(0.16,1,0.3,1) both; animation-delay: 0.20s; }
       .syslinks  { animation-delay: 0.22s; }
       .pill .dot { animation: dPulse 1.9s ease-in-out infinite; }
       .spinner   { animation: dSpin 0.7s linear infinite; }
@@ -742,34 +743,66 @@ function renderHighlights(lang) {
 
 // ==========================================
 // renderTools
-// The paid Unity editor extension, on the landing page.
+// The Unity editor extensions, on the landing page.
 //
-// It sits below the games and above the system links,
-// which is where it belongs: this dashboard is a
-// developer's shop window, and the one thing on it that
-// somebody can actually buy should not be buried under
-// the health-check endpoints. One card rather than a
-// section of them, because there is one product - a grid
-// built for a catalogue that holds a single item looks
-// like a page waiting for content.
+// They sit below the games and above the system links,
+// which is where they belong: this dashboard is a
+// developer's shop window, and the things on it somebody
+// can actually install should not be buried under the
+// health-check endpoints.
+//
+// This used to be one hard-coded card, written inline
+// with its own copy of the name, the blurb in three
+// languages and the price tags. That was the right shape
+// for exactly one product; the second one would have
+// meant a second copy of all of it, and a price updated
+// in one place and not the other. The cards now come
+// from content/toolsCatalog.js, so adding a tool is one
+// entry there and nothing here.
+//
+// Each card carries its own brand colour rather than the
+// site's. Two tools by one author still have two
+// identities, and a strip that paints them both violet
+// reads as one product with two names.
 // ==========================================
 function renderTools(lang) {
   const p = pack(lang)
+
+  const cards = toolsFor(resolveLang(lang)).map(tool => {
+    const accent = safeColor(tool.accent, '#6c63ff')
+    const accentSoft = safeColor(tool.accentSoft, accent)
+
+    const tags = tool.tags.map(tag => {
+      const cls = tag.kind === 'paid' ? ' is-pro' : ''
+      return '<span class="tool-tag' + cls + '">' + escapeHtml(tag.label) + '</span>'
+    }).join('')
+
+    return `
+      <a class="tool-card" href="${escapeHtml(tool.href)}"
+         style="--tool: ${accent}; --tool-2: ${accentSoft}">
+        <span class="tool-ic" aria-hidden="true">${tool.mark}</span>
+        <span class="tool-body">
+          <span class="tool-name">${escapeHtml(tool.name)}</span>
+          <span class="tool-desc">${escapeHtml(tool.description)}</span>
+          <span class="tool-tags">${tags}</span>
+        </span>
+        <span class="tool-cta">${escapeHtml(tool.cta)} &rarr;</span>
+      </a>`
+  }).join('')
+
   return `
     <div class="section-title">${escapeHtml(p.sectionTools)}</div>
-    <a class="tool-card" href="/unity-docsnap">
-      <span class="tool-ic">🧋</span>
-      <span class="tool-body">
-        <span class="tool-name">${escapeHtml(p.toolDocSnapName)}</span>
-        <span class="tool-desc">${escapeHtml(p.toolDocSnapDesc)}</span>
-        <span class="tool-tags">
-          <span class="tool-tag">${escapeHtml(p.toolFree)}</span>
-          <span class="tool-tag is-pro">${escapeHtml(p.toolPlus)}</span>
-          <span class="tool-tag is-pro">${escapeHtml(p.toolPro)}</span>
-        </span>
-      </span>
-      <span class="tool-cta">${escapeHtml(p.toolDocSnapCta)} &rarr;</span>
-    </a>`
+    <div class="tools-strip">${cards}</div>
+    <div class="tools-more">
+      <a href="/tools">${escapeHtml(p.toolsAll)} &rarr;</a>
+    </div>`
+}
+
+// A colour is interpolated into a style attribute, which is
+// the one place HTML escaping is not enough - a value that is
+// not a hex colour has no business being there at all.
+function safeColor(value, fallback) {
+  return /^#[0-9a-fA-F]{6}$/.test(String(value || '')) ? value : fallback
 }
 
 function renderSystemLinks(lang) {

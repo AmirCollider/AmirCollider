@@ -49,6 +49,8 @@ import { handleMetrics } from './pages/metrics.js'
 import { handleDashboard } from './pages/dashboard.js'
 import { handleReleaseNotes } from './pages/releaseNotes.js'
 import { handleUnityDocSnap } from './pages/unityDocSnap.js'
+import { handleUnityDirectTMP } from './pages/unityDirectTMP.js'
+import { handleTools } from './pages/tools.js'
 import { handleDocSnapVideo } from './pages/video.js'
 import {
   handleCheckoutPage,
@@ -435,6 +437,25 @@ const ROUTES = [
   { path: '/testsite/logout', method: 'POST', handler: handleTestSiteLogout },
   { path: '/metrics', method: 'GET', handler: handleMetrics },
   { path: '/release-notes', method: 'GET', handler: handleReleaseNotes },
+
+  // ---- The tools catalogue ----
+  //
+  // One page listing every Unity tool on this shelf, rendered
+  // from content/toolsCatalog.js. The Unity editors link out
+  // to it by name ("more tools by this author"), so the path
+  // is a promise: it appears in shipped C# constants that
+  // cannot be updated once somebody has the package installed.
+  { path: '/tools', method: 'GET', handler: handleTools },
+
+  // ---- Unity DirectTMP: product page ----
+  //
+  // Free and MIT, so there is no checkout, no licence endpoint
+  // and no webhook - one GET is the whole surface. Both the
+  // long and short paths are registered because the short one
+  // is what people type and the long one is what the package's
+  // DirectTMPConstants.ProductUrl points at.
+  { path: '/unity-directtmp', method: 'GET', handler: handleUnityDirectTMP },
+  { path: '/directtmp', method: 'GET', handler: handleUnityDirectTMP },
 
   // ---- Unity DocSnap: product page + licensing ----
   //
