@@ -102,11 +102,15 @@ const CARD_I18N = {
     // primary actions
     account: 'ورود به حساب',
     accountHint: 'با حساب گوگل',
+    accountOpen: 'حساب من',
+    accountHintIn: 'وارد شده‌ای',
     store: 'خرید درون‌برنامه‌ای',
     storeHint: 'پرداخت با ارز دیجیتال',
     download: 'دانلود',
     downloadOff: 'دانلود در دسترس نیست',
     downloadFrom: 'دانلود از',
+    gamePage: 'صفحه‌ی بازی',
+    versions: 'نسخه‌ها',
     myket: 'مایکت',
     googleplay: 'گوگل پلی',
     apk: 'دانلود مستقیم APK',
@@ -141,11 +145,15 @@ const CARD_I18N = {
 
     account: 'Sign in',
     accountHint: 'with Google',
+    accountOpen: 'My account',
+    accountHintIn: 'signed in',
     store: 'In-app purchases',
     storeHint: 'pay with crypto',
     download: 'Download',
     downloadOff: 'Download unavailable',
     downloadFrom: 'Download on',
+    gamePage: 'Game page',
+    versions: 'Versions',
     myket: 'Myket',
     googleplay: 'Google Play',
     apk: 'Direct APK',
@@ -178,11 +186,15 @@ const CARD_I18N = {
 
     account: 'サインイン',
     accountHint: 'Google アカウント',
+    accountOpen: 'アカウント',
+    accountHintIn: 'サインイン済み',
     store: 'アプリ内購入',
     storeHint: '暗号資産で支払い',
     download: 'ダウンロード',
     downloadOff: 'ダウンロード停止中',
     downloadFrom: '入手先',
+    gamePage: 'ゲームページ',
+    versions: 'バージョン',
     myket: 'Myket',
     googleplay: 'Google Play',
     apk: 'APK 直接ダウンロード',
@@ -301,7 +313,9 @@ const ICONS = {
   cloud: '<path d="M7 18a4 4 0 0 1 0-8 5.5 5.5 0 0 1 10.5 1.5A3.5 3.5 0 0 1 17 18z"/>',
   key: '<circle cx="8" cy="12" r="4"/><path d="M12 12h9"/><path d="M18 12v3"/><path d="M15.5 12v2.5"/>',
   chevron: '<polyline points="9 6 15 12 9 18"/>',
-  play: '<path d="M8 5.5v13l11-6.5z"/>'
+  play: '<path d="M8 5.5v13l11-6.5z"/>',
+  home: '<path d="M3 9.5 12 3l9 6.5"/><path d="M5 10v10h14V10"/>',
+  versions: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>'
 }
 
 function icon(name, cls) {
@@ -413,6 +427,9 @@ function getGamesCardsCSS() {
     color: color-mix(in srgb, var(--accent) 32%, var(--gc-text));
     text-shadow: 0 2px 12px color-mix(in srgb, var(--accent) 35%, transparent);
   }
+  .gc-title a { color: inherit; text-decoration: none; }
+  .gc-title a:hover { text-decoration: underline; text-underline-offset: 4px; }
+
   .gc-desc {
     font-size: 0.9em; line-height: 1.55;
     color: var(--gc-text-dim);
@@ -648,10 +665,37 @@ function getGamesCardsCSS() {
     word-break: break-all;
   }
 
+  /* ---- mobile ----
+     The card now carries more than it used to: up to four store
+     buttons and five secondary links. Left alone at 360px that
+     is a store button per row at half width with a wrapped
+     label, which is the thing that looked worst on a phone. */
+  @media (max-width: 640px) {
+    .gc-card { padding: 22px 18px; }
+    .gc-head { gap: 12px; }
+    .gc-logo { width: 64px; height: 64px; border-radius: 18px; font-size: 1.6em; }
+    .gc-title { font-size: 1.12em; }
+    /* One store per row, full width, so the label never wraps. */
+    .gc-stores--many { grid-template-columns: 1fr; }
+    .gc-store { padding: 12px 15px; }
+    .gc-links { gap: 6px; }
+    .gc-link { flex: 1 1 calc(50% - 3px); justify-content: center; }
+  }
+
   @media (max-width: 480px) {
     .gc-grid { grid-template-columns: repeat(2, 1fr); }
-    .gc-card { padding: 22px; }
+    .gc-card { padding: 18px 15px; }
     .gc-actions { grid-template-columns: 1fr; }
+    .gc-caps { gap: 5px; }
+    .gc-cap { font-size: 0.74em; padding: 5px 9px; }
+    .gc-link { flex: 1 1 100%; }
+  }
+
+  /* Animation on a phone is a battery cost paid by every card on
+     screen at once, and the float/glow pair is decorative. */
+  @media (max-width: 640px) and (prefers-reduced-motion: no-preference) {
+    .gc-logo { animation: none; }
+    .gc-bar  { animation: none; }
   }
 
   @media (prefers-reduced-motion: no-preference) {
@@ -760,7 +804,7 @@ function offlineHint(game, lang) {
 // exists, because it is the only one of the three that is not
 // available anywhere else.
 // ==========================================
-function createPrimaryActions(game, lang) {
+function createPrimaryActions(game, lang, player) {
   const sid = safeId(game.id)
   const capability = caps(game)
   const actions = []
@@ -776,11 +820,18 @@ function createPrimaryActions(game, lang) {
   }
 
   if (capability.login) {
+    // "Sign in" to somebody already signed in reads as the
+    // sign-in having failed. The label and the hint both change,
+    // because "with Google" under "My account" is an instruction
+    // for something already done.
+    const signedIn = Boolean(player && player.playerId)
     actions.push({
       href: `/${sid}/account`,
       ic: 'user',
-      label: t(lang, 'account'),
-      hint: t(lang, 'accountHint')
+      label: signedIn ? t(lang, 'accountOpen') : t(lang, 'account'),
+      hint: signedIn
+        ? (player.name || player.email || t(lang, 'accountHintIn'))
+        : t(lang, 'accountHint')
     })
   }
 
@@ -863,6 +914,13 @@ function createSecondaryLinks(game, lang) {
   const capability = caps(game)
 
   const links = [
+    // The game's own landing page and its version history. First,
+    // because between them they are what somebody deciding
+    // whether to install came to read - and until they existed
+    // the card's only outward links were a policy page and a
+    // leaderboard.
+    { href: `/${sid}`, ic: 'home', label: t(lang, 'gamePage') },
+    { href: `/${sid}/versions`, ic: 'versions', label: t(lang, 'versions') },
     capability.leaderboard ? { href: `/${sid}/leaderboard`, ic: 'leaderboard', label: t(lang, 'leaderboard') } : null,
     { href: `/${sid}/privacy`, ic: 'privacy', label: t(lang, 'privacy') },
     { href: `/${sid}/terms`, ic: 'terms', label: t(lang, 'terms') }
@@ -931,7 +989,7 @@ function createTags(game, lang) {
 // Default accent-driven card
 // Themed entirely from game.color; works for any game.
 // ==========================================
-function createDefaultGameCard(id, game, baseUrl, lang, index) {
+function createDefaultGameCard(id, game, baseUrl, lang, index, player) {
   const sid = safeId(id)
   const accent = safeColor(game.color, '#667eea')
   const fallback = escapeHtml(game.icon || '')
@@ -948,7 +1006,7 @@ function createDefaultGameCard(id, game, baseUrl, lang, index) {
       <div class="gc-head">
         <div class="gc-logo">${fallback}${logoImg}</div>
         <div class="gc-meta">
-          <h2 class="gc-title">${escapeHtml(game.name)}</h2>
+          <h2 class="gc-title"><a href="/${sid}">${escapeHtml(game.name)}</a></h2>
           <div class="gc-desc">${escapeHtml(localizedDescription(game, lang))}</div>
           <div class="gc-badges">
             ${createStatusBadge(game, lang)}
@@ -961,7 +1019,7 @@ function createDefaultGameCard(id, game, baseUrl, lang, index) {
 
       <div class="gc-divider"></div>
 
-      ${createPrimaryActions(game, lang)}
+      ${createPrimaryActions(game, lang, player)}
       ${createDownloadButton(game, lang)}
       ${createSecondaryLinks(game, lang)}
       ${createDiagnostics(game, baseUrl, lang)}
@@ -980,11 +1038,11 @@ const CUSTOM_CARD_RENDERERS = {}
 // ==========================================
 // Build one card (bespoke or default)
 // ==========================================
-function createGameCard(id, game, baseUrl, lang, index) {
+function createGameCard(id, game, baseUrl, lang, index, player) {
   const renderer = CUSTOM_CARD_RENDERERS[id]
   return renderer
-    ? renderer(id, game, baseUrl, lang, index)
-    : createDefaultGameCard(id, game, baseUrl, lang, index)
+    ? renderer(id, game, baseUrl, lang, index, player)
+    : createDefaultGameCard(id, game, baseUrl, lang, index, player)
 }
 
 
@@ -994,8 +1052,9 @@ function createGameCard(id, game, baseUrl, lang, index) {
 // ==========================================
 export function createGamesCardsHTML(GAMES, baseUrl, options = {}) {
   const lang = resolveLang(options.lang)
+  const player = options.player || null
   const cards = Object.entries(GAMES || {})
-    .map(([id, game], i) => createGameCard(id, { ...game, id }, baseUrl, lang, i))
+    .map(([id, game], i) => createGameCard(id, { ...game, id }, baseUrl, lang, i, player))
     .join('')
 
   return `${getGamesCardsCSS()}

@@ -41,6 +41,10 @@ import {
 } from '../games/store.js'
 import { grantForOrder, grantManually } from '../games/purchase.js'
 import {
+  playerDb, listGamePlayers, getGamePlayer, setModeration,
+  setUsername, deleteGamePlayer, moderationOf
+} from '../games/players.js'
+import {
   gameSchemaSql, settingsSeedSql, productSeedSql, purgeSeedSql,
   setupCommands, slug, namesFor
 } from '../games/sql.js'
@@ -134,6 +138,37 @@ function present(game) {
       name: (product.i18n && product.i18n.name) || {},
       overrides: product.overrides || []
     }))
+  }
+}
+
+
+
+// ==========================================
+// presentPlayer
+// One player row, in the shape the panel holds.
+//
+// The moderation state is DERIVED here (games/players.js owns
+// the rule) rather than sent as a raw pair of timestamps the
+// browser would have to re-interpret - two implementations of
+// "is this restriction still running" is one too many.
+// ==========================================
+function presentPlayer(row) {
+  return {
+    playerId: row.player_id,
+    email: row.email || '',
+    username: row.username || '',
+    picture: row.profile_pic_url || '',
+    highScore: Number(row.high_score) || 0,
+    gamesPlayed: Number(row.games_played) || 0,
+    playTime: Number(row.total_play_time) || 0,
+    createdAt: Number(row.created_at) || 0,
+    lastLogin: Number(row.last_login) || 0,
+    state: moderationOf(row),
+    bannedAt: Number(row.banned_at) || 0,
+    banReason: row.ban_reason || '',
+    restrictedUntil: Number(row.restricted_until) || 0,
+    restrictReason: row.restrict_reason || '',
+    note: row.admin_note || ''
   }
 }
 
@@ -546,6 +581,167 @@ export async function handleTheGodApi(url, request, gameId, requestId, GAMES, en
     }
 
     // -----------------------------------------------------------
+    // players.list — everybody who has signed in
+    //
+    // Reads the GAME's own database, not the licence database.
+    // players.search below still exists and still answers the
+    // commercial question ("who bought things"); this answers the
+    // one the screen actually needed, which is "who plays this".
+    // -----------------------------------------------------------
+    case 'players.list': {
+      if (!game) return unknownGame()
+
+      const database = playerDb(env, game)
+      if (!database) {
+        return createJsonResponse({
+          ok: false, error: 'no_player_db',
+          message: `This game's database binding (${game.d1Binding || 'unset'}) is not bound on this `
+                 + 'deployment. Add it to wrangler.jsonc and deploy.'
+        }, 503)
+      }
+
+      const page = await listGamePlayers(database, {
+        q: String(body.q || ''),
+        limit: body.limit,
+        offset: body.offset,
+        status: ['active', 'restricted', 'banned'].includes(String(body.status)) ? String(body.status) : ''
+      })
+
+      return createJsonResponse({
+        ok: true,
+        total: page.total,
+        // False when the game's database predates 0006. The panel
+        // uses this to explain why the ban buttons are disabled
+        // rather than letting them fail one at a time.
+        moderation: page.moderation,
+        players: page.rows.map(presentPlayer)
+      })
+    }
+
+    // -----------------------------------------------------------
+    // player.profile — one player, with what they own
+    // -----------------------------------------------------------
+    case 'player.profile': {
+      if (!game) return unknownGame()
+
+      const database = playerDb(env, game)
+      if (!database) {
+        return createJsonResponse({ ok: false, error: 'no_player_db' }, 503)
+      }
+
+      const playerId = String(body.playerId || '')
+      const row = await getGamePlayer(database, playerId)
+      if (!row) return createJsonResponse({ ok: false, error: 'not_found' }, 404)
+
+      // Entitlements live in the licence database, so the two
+      // halves of a player are assembled here rather than by the
+      // browser making two calls and hoping both land.
+      const licence = db(env)
+      const [owned, events] = licence
+        ? await Promise.all([
+            listEntitlementsRaw(licence, game.id, playerId),
+            listEntitlementEvents(licence, game.id, playerId, 30)
+          ])
+        : [[], []]
+
+      return createJsonResponse({
+        ok: true,
+        player: presentPlayer(row),
+        entitlements: owned.map(item => ({
+          productId: item.product_id, kind: item.kind, quantity: item.quantity,
+          source: item.source, expiresAt: item.expires_at || 0, grantedAt: item.granted_at
+        })),
+        events: events.map(event => ({
+          productId: event.product_id, kind: event.kind,
+          amount: event.amount, detail: event.detail || '', at: event.at
+        }))
+      })
+    }
+
+    // -----------------------------------------------------------
+    // player.moderate — ban, restrict, note, or lift any of them
+    // -----------------------------------------------------------
+    case 'player.moderate': {
+      if (!game) return unknownGame()
+
+      const database = playerDb(env, game)
+      if (!database) return createJsonResponse({ ok: false, error: 'no_player_db' }, 503)
+
+      const playerId = String(body.playerId || '')
+      const patch = {}
+      if (body.banned !== undefined) patch.banned = Boolean(body.banned)
+      if (body.restrictDays !== undefined) {
+        const days = Math.max(0, Math.min(Number(body.restrictDays) || 0, 3650))
+        patch.restrictedUntil = days ? Date.now() + days * 24 * 60 * 60 * 1000 : 0
+      }
+      if (body.note !== undefined) patch.note = String(body.note || '')
+      if (body.reason !== undefined) patch.reason = String(body.reason || '')
+
+      const result = await setModeration(database, playerId, patch)
+      if (!result.ok) {
+        return createJsonResponse({
+          ok: false, error: result.reason,
+          message: result.reason === 'no_column'
+            ? 'This game\'s database has no moderation columns yet. Run '
+              + 'migrations/0006_player_moderation.sql against it.'
+            : 'That did not work.'
+        }, result.reason === 'no_column' ? 409 : 400)
+      }
+
+      logInfo('Player moderated', { requestId, gameId: game.id, playerId, patch: Object.keys(patch) })
+      const row = await getGamePlayer(database, playerId)
+      return createJsonResponse({ ok: true, player: row ? presentPlayer(row) : null })
+    }
+
+    // -----------------------------------------------------------
+    // player.rename
+    // -----------------------------------------------------------
+    case 'player.rename': {
+      if (!game) return unknownGame()
+
+      const database = playerDb(env, game)
+      if (!database) return createJsonResponse({ ok: false, error: 'no_player_db' }, 503)
+
+      const playerId = String(body.playerId || '')
+      const result = await setUsername(database, playerId, body.username)
+
+      if (!result.ok) {
+        const messages = {
+          bad_username: 'A username is 3 to 12 characters, English letters and digits only.',
+          taken: 'Another player already has that username.',
+          bad_input: 'Missing player id.'
+        }
+        return createJsonResponse({
+          ok: false, error: result.reason, message: messages[result.reason] || 'That did not work.'
+        }, 400)
+      }
+
+      logInfo('Player renamed from the panel', { requestId, gameId: game.id, playerId })
+      const row = await getGamePlayer(database, playerId)
+      return createJsonResponse({ ok: true, player: row ? presentPlayer(row) : null })
+    }
+
+    // -----------------------------------------------------------
+    // player.delete — the player record, and only that
+    //
+    // Their orders survive on purpose. An order is a financial
+    // record; deleting the money along with the account is how a
+    // chargeback six weeks later becomes unanswerable.
+    // -----------------------------------------------------------
+    case 'player.delete': {
+      if (!game) return unknownGame()
+
+      const database = playerDb(env, game)
+      if (!database) return createJsonResponse({ ok: false, error: 'no_player_db' }, 503)
+
+      const playerId = String(body.playerId || '')
+      const removed = await deleteGamePlayer(database, playerId)
+
+      logInfo('Player record deleted from the panel', { requestId, gameId: game.id, playerId, removed })
+      return createJsonResponse({ ok: true, removed })
+    }
+
+    // -----------------------------------------------------------
     // players.search / player.get / player.grant / player.revoke
     // -----------------------------------------------------------
     case 'players.search': {
@@ -846,7 +1042,8 @@ export async function handleTheGodApi(url, request, gameId, requestId, GAMES, en
         ok: false, error: 'bad_action',
         message: 'action must be one of: overview, game.get, game.save, game.reset, game.purge, '
                + 'product.save, product.reset, orders.list, order.grant, players.search, '
-               + 'player.get, player.grant, player.revoke, sql.game, sql.settings, env, '
+               + 'player.get, player.grant, player.revoke, players.list, player.profile, '
+               + 'player.moderate, player.rename, player.delete, sql.game, sql.settings, env, '
                + 'scaffold, unity.'
       }, 400)
   }

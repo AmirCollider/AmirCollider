@@ -304,6 +304,8 @@ const I18N = {
     fNote: 'یادداشت داخلی',
     fDownload: 'لینک‌های دانلود',
     fDownloadHint: 'یک خط برای هر فروشگاه، به شکل  نام=آدرس',
+    fDownloadKnown: 'این چهار نام لوگو و عنوان مخصوص خودشان را می‌گیرند:',
+    fDownloadOther: 'هر نام دیگری هم کار می‌کند، ولی با آیکون دانلود ساده و خودِ همان نام نمایش داده می‌شود.',
     fDeepLink: 'اسکیم دیپ‌لینک اندروید',
     fDeepLinkHint: 'همان چیزی که در AndroidManifest بیلد ثبت شده. بعد از ورود با گوگل، بازیکن با '
                  + 'آدرس «اسکیم://host» به بازی برمی‌گردد. خالی بگذاری، از مقدار داخل config.js استفاده می‌شود.',
@@ -335,7 +337,12 @@ const I18N = {
     capStore: 'خرید درون‌برنامه‌ای',
     capNote: 'قابلیت‌ها در کد تعریف می‌شوند، نه این‌جا — چون هر کدام به یک اتصال یا secret وابسته است.',
 
-    open: 'باز کردن صفحه',
+    open: 'پیش‌نمایش صفحه‌ها',
+    openHint: 'صفحه‌هایی که این تنظیمات روی آن‌ها اثر می‌گذارد. در تب تازه باز می‌شوند.',
+    openLanding: 'صفحه‌ی بازی',
+    openStore: 'فروشگاه',
+    openBoard: 'جدول امتیازات',
+    openVersions: 'نسخه‌ها',
 
     // store tab
     storeLede: 'محصول‌ها هم داخل کد تعریف می‌شوند، چون شناسه‌شان را بیلد منتشرشده حفظ کرده. این‌جا می‌توانی قیمت را عوض کنی، محصولی را از فروش برداری یا ترتیبشان را تغییر دهی.',
@@ -372,6 +379,44 @@ const I18N = {
     // players tab
     playersLede: 'هر کسی که چیزی خریده. می‌توانی ببینی چه دارد، چیزی به او بدهی، یا چیزی را پس بگیری.',
     plSearch: 'ایمیل یا شناسه‌ی بازیکن',
+    plState: 'وضعیت',
+    plAny: 'همه',
+    plActive: 'عادی',
+    plRestricted: 'محدود',
+    plBanned: 'مسدود',
+    plPlayer: 'بازیکن',
+    plScore: 'بالاترین امتیاز',
+    plRuns: 'تعداد بازی',
+    plPlayTime: 'مدت بازی',
+    plHours: 'س',
+    plMinutes: 'د',
+    plJoined: 'تاریخ عضویت',
+    plLastSeen: 'آخرین ورود',
+    plEmail: 'ایمیل',
+    plId: 'شناسه',
+    plTotal: 'کل بازیکن‌ها',
+    plManage: 'مدیریت',
+    plRename: 'تغییر نام کاربری',
+    plRenameHint: '۳ تا ۱۲ نویسه، فقط حروف انگلیسی و عدد. نام تکراری پذیرفته نمی‌شود.',
+    plModeration: 'محدودیت و مسدودسازی',
+    plBan: 'مسدود کردن',
+    plUnban: 'رفع مسدودی',
+    plRestrict7: 'محدودیت ۷ روزه',
+    plRestrict30: 'محدودیت ۳۰ روزه',
+    plLift: 'برداشتن محدودیت',
+    plBanAsk: 'این حساب مسدود شود؟\n\nثبت امتیاز جدیدش رد می‌شود و از جدول امتیازات حذف می‌شود. خریدهایش دست‌نخورده می‌ماند و هر وقت بخواهی می‌توانی برگردانی.',
+    plBanEffect: 'مسدود یا محدود که باشد، ثبت امتیاز جدیدش رد می‌شود و از جدول امتیازات کنار گذاشته می‌شود. حسابش پاک نمی‌شود و خریدهایش سر جایشان می‌مانند.',
+    plBannedAt: 'تاریخ مسدودی',
+    plUntil: 'تا تاریخ',
+    plNote: 'یادداشت داخلی',
+    plNoteHint: 'فقط برای خودت. بازیکن این را نمی‌بیند. با خارج شدن از فیلد ذخیره می‌شود.',
+    plReasonHint: 'مثلاً: امتیاز غیرواقعی',
+    plOwnsNone: 'هنوز چیزی ندارد.',
+    plDanger: 'حذف حساب',
+    plDelete: 'حذف کامل حساب',
+    plDeleteHint: 'ردیف بازیکن از دیتابیس بازی پاک می‌شود: نام کاربری، امتیاز، مدت بازی و آمارش. سفارش‌هایش پاک نمی‌شود چون سند مالی است. این کار برگشت‌پذیر نیست.',
+    plDeleteAsk: 'حساب این بازیکن برای همیشه پاک شود؟\n\nامتیاز و آمارش از بین می‌رود. سفارش‌هایش باقی می‌ماند. این کار برگشت‌پذیر نیست.',
+    plNoModeration: 'دیتابیس این بازی هنوز ستون‌های مسدودسازی را ندارد. برای فعال شدن این بخش، فایل migrations/0006_player_moderation.sql را روی دیتابیس همین بازی اجرا کن.',
     plFind: 'جست‌وجو',
     plNone: 'بازیکنی پیدا نشد.',
     plOrders: 'سفارش',
@@ -531,6 +576,8 @@ const I18N = {
     fNote: 'Internal note',
     fDownload: 'Download links',
     fDownloadHint: 'One per line, as  name=url',
+    fDownloadKnown: 'These four names get their own logo and label:',
+    fDownloadOther: 'Any other name still works — it renders with a plain download icon and the name you typed.',
     fDeepLink: 'Android deep-link scheme',
     fDeepLinkHint: 'The scheme the build registered in its AndroidManifest. After a Google sign-in the player '
                  + 'is handed back to the game at "scheme://host". Leave it empty to use the value in config.js.',
@@ -562,7 +609,12 @@ const I18N = {
     capStore: 'In-app purchases',
     capNote: 'Capabilities are set in code, not here — each one depends on a binding or a secret.',
 
-    open: 'Open the page',
+    open: 'Preview the pages',
+    openHint: 'The pages these settings actually affect. They open in a new tab.',
+    openLanding: 'Game page',
+    openStore: 'Store',
+    openBoard: 'Leaderboard',
+    openVersions: 'Versions',
 
     storeLede: 'Products are defined in code too, because a shipped build already hard-codes their ids. Here you can re-price one, take it off sale, or change the order.',
     pEnabled: 'On sale',
@@ -596,6 +648,44 @@ const I18N = {
 
     playersLede: 'Everybody who has bought something. See what they own, give them something, or take it back.',
     plSearch: 'Email or player id',
+    plState: 'State',
+    plAny: 'Any',
+    plActive: 'Active',
+    plRestricted: 'Restricted',
+    plBanned: 'Banned',
+    plPlayer: 'Player',
+    plScore: 'High score',
+    plRuns: 'Runs',
+    plPlayTime: 'Play time',
+    plHours: 'h',
+    plMinutes: 'm',
+    plJoined: 'Joined',
+    plLastSeen: 'Last seen',
+    plEmail: 'Email',
+    plId: 'Player id',
+    plTotal: 'Players',
+    plManage: 'Manage',
+    plRename: 'Change username',
+    plRenameHint: '3 to 12 characters, English letters and digits. A name in use is refused.',
+    plModeration: 'Restrict & ban',
+    plBan: 'Ban',
+    plUnban: 'Lift the ban',
+    plRestrict7: 'Restrict 7 days',
+    plRestrict30: 'Restrict 30 days',
+    plLift: 'Lift the restriction',
+    plBanAsk: 'Ban this account?\n\nNew score submissions are refused and it drops off the leaderboard. Its purchases are untouched, and you can lift this at any time.',
+    plBanEffect: 'While banned or restricted, new score submissions are refused and the account is left off the leaderboard. The account is not deleted and its purchases stay.',
+    plBannedAt: 'Banned on',
+    plUntil: 'Until',
+    plNote: 'Internal note',
+    plNoteHint: 'For you only — the player never sees it. Saved when you leave the field.',
+    plReasonHint: 'e.g. impossible score',
+    plOwnsNone: 'Owns nothing yet.',
+    plDanger: 'Delete the account',
+    plDelete: 'Delete this account',
+    plDeleteHint: 'Removes the player row from the game database: username, score, play time and stats. Orders are NOT removed — they are a financial record. This cannot be undone.',
+    plDeleteAsk: 'Permanently delete this player?\n\nTheir score and stats are gone. Their orders remain. This cannot be undone.',
+    plNoModeration: 'This game database has no moderation columns yet. Run migrations/0006_player_moderation.sql against this game\'s own database to enable this section.',
     plFind: 'Search',
     plNone: 'No player matched.',
     plOrders: 'orders',
@@ -751,6 +841,8 @@ const I18N = {
     fNote: '内部メモ',
     fDownload: 'ダウンロードリンク',
     fDownloadHint: '1 行につき  名前=URL',
+    fDownloadKnown: 'この 4 つの名前は専用のロゴとラベルが付きます：',
+    fDownloadOther: '他の名前も使えますが、汎用のダウンロードアイコンと入力した名前で表示されます。',
     fDeepLink: 'Android ディープリンクのスキーム',
     fDeepLinkHint: 'ビルドが AndroidManifest に登録したスキームです。Google サインイン後、プレイヤーは '
                  + '「scheme://host」でゲームに戻ります。空欄なら config.js の値が使われます。',
@@ -781,7 +873,12 @@ const I18N = {
     capStore: 'アプリ内購入',
     capNote: '機能はここではなくコードで設定します。各機能はバインディングやシークレットに依存するためです。',
 
-    open: 'ページを開く',
+    open: 'ページをプレビュー',
+    openHint: 'この設定が反映されるページです。新しいタブで開きます。',
+    openLanding: 'ゲームページ',
+    openStore: 'ストア',
+    openBoard: 'ランキング',
+    openVersions: 'バージョン',
 
     storeLede: '商品もコードで定義します。配布済みビルドが ID を保持しているためです。ここでは価格変更・販売停止・並び替えができます。',
     pEnabled: '販売中',
@@ -815,6 +912,44 @@ const I18N = {
 
     playersLede: '購入したことのある人の一覧です。所有物の確認、付与、取り消しができます。',
     plSearch: 'メールまたはプレイヤー ID',
+    plState: '状態',
+    plAny: 'すべて',
+    plActive: '通常',
+    plRestricted: '制限中',
+    plBanned: 'BAN',
+    plPlayer: 'プレイヤー',
+    plScore: 'ハイスコア',
+    plRuns: 'プレイ回数',
+    plPlayTime: 'プレイ時間',
+    plHours: '時間',
+    plMinutes: '分',
+    plJoined: '登録日',
+    plLastSeen: '最終ログイン',
+    plEmail: 'メール',
+    plId: 'プレイヤー ID',
+    plTotal: 'プレイヤー数',
+    plManage: '管理',
+    plRename: 'ユーザー名を変更',
+    plRenameHint: '3〜12 文字、英数字のみ。使用中の名前は拒否されます。',
+    plModeration: '制限と BAN',
+    plBan: 'BAN する',
+    plUnban: 'BAN を解除',
+    plRestrict7: '7 日間制限',
+    plRestrict30: '30 日間制限',
+    plLift: '制限を解除',
+    plBanAsk: 'このアカウントを BAN しますか？\n\n新しいスコア送信は拒否され、ランキングから外れます。購入履歴はそのままで、いつでも解除できます。',
+    plBanEffect: 'BAN または制限中は、新しいスコア送信が拒否されランキングから除外されます。アカウントは削除されず、購入履歴も残ります。',
+    plBannedAt: 'BAN 日時',
+    plUntil: '期限',
+    plNote: '内部メモ',
+    plNoteHint: '自分用です。プレイヤーには見えません。フォーカスを外すと保存されます。',
+    plReasonHint: '例：不正なスコア',
+    plOwnsNone: 'まだ何も所有していません。',
+    plDanger: 'アカウントを削除',
+    plDelete: 'このアカウントを削除',
+    plDeleteHint: 'ゲームデータベースからプレイヤー行を削除します（ユーザー名・スコア・プレイ時間・統計）。注文は財務記録のため削除されません。元に戻せません。',
+    plDeleteAsk: 'このプレイヤーを完全に削除しますか？\n\nスコアと統計は失われます。注文は残ります。元に戻せません。',
+    plNoModeration: 'このゲームのデータベースにはまだモデレーション用の列がありません。migrations/0006_player_moderation.sql をこのゲームのデータベースに対して実行してください。',
     plFind: '検索',
     plNone: '該当するプレイヤーはいません。',
     plOrders: '件の注文',
@@ -1104,12 +1239,65 @@ function panelCss() {
     .toast.show{opacity:1}
     .toast.bad{background:#e23b3b}
 
+    .plrow{display:flex;align-items:center;gap:10px}
+    .plavatar{position:relative;width:34px;height:34px;border-radius:50%;flex-shrink:0;overflow:hidden;
+      display:flex;align-items:center;justify-content:center;font-size:1em;
+      background:var(--surface-2);border:1px solid var(--border)}
+    .plavatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+    .plstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-block:14px}
+    .plstat{padding:12px 14px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border)}
+    .plstat b{display:block;font-size:1.15em;font-weight:800;margin-block-end:2px}
+    .plstat span{font-size:.76em;color:var(--dim)}
+
+    .storekeys{display:flex;flex-wrap:wrap;gap:6px;margin-block:6px}
+    .storekeys code{cursor:pointer;padding:3px 9px;border-radius:8px;font-size:.75em;direction:ltr;
+      color:var(--info);background:rgba(47,109,246,.1);border:1px solid rgba(47,109,246,.3);
+      transition:background .15s ease,transform .15s ease}
+    .storekeys code:hover{background:rgba(47,109,246,.2);transform:translateY(-1px)}
+
     .empty{padding:28px;text-align:center;color:var(--dim);font-size:.88em}
     .muted{color:var(--dim)}
 
-    @media (max-width:640px){
-      .tabs button{padding:9px 11px;font-size:.8em}
-      .card{padding:17px}
+    /* ---- mobile ----
+       The panel is the densest surface on the site and had two
+       lines of mobile handling. The problems were concrete: the
+       tab strip overflowed rather than wrapping, action rows put
+       four half-width buttons on a 360px screen, and the tables
+       set their own width so the page scrolled sideways instead
+       of the table doing it. */
+    @media (max-width:720px){
+      body{padding:14px 12px 44px}
+      .top{gap:10px}
+      .logo-mark{width:40px;height:40px;font-size:1.25em}
+
+      .tabs{gap:4px;padding:4px;overflow-x:auto;flex-wrap:nowrap;
+        scrollbar-width:none;-webkit-overflow-scrolling:touch}
+      .tabs::-webkit-scrollbar{display:none}
+      .tabs button{padding:9px 12px;font-size:.8em;white-space:nowrap;flex:0 0 auto}
+
+      .card{padding:16px}
+      .grid.two,.grid.three{grid-template-columns:1fr}
+      .gcards{grid-template-columns:1fr}
+
+      /* A row of buttons becomes a column of full-width ones.
+         Four 48%-wide buttons on a narrow screen is four labels
+         that wrap to two lines each. */
+      .row>.btn,.row>.btn.small{flex:1 1 100%}
+      .row>.btn.ghost.small{flex:1 1 auto}
+
+      /* The table scrolls inside its own box; the page never
+         scrolls sideways. */
+      .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+      .tbl{min-width:520px}
+      .tbl td,.tbl th{padding:8px}
+
+      .plstats{grid-template-columns:repeat(2,1fr)}
+      .code pre{font-size:.72em;max-height:340px}
+    }
+
+    @media (max-width:400px){
+      .plstats{grid-template-columns:1fr}
+      .seg button{padding:6px 8px;font-size:.74em}
     }
     @media (prefers-reduced-motion:no-preference){
       .card,.gcard{animation:tgRise .4s cubic-bezier(.16,1,.3,1) both}
@@ -1550,7 +1738,10 @@ function tgRenderEditor() {
 
   +   '<label class="f"><span>' + tgEsc(TG.t.fDownload) + '</span>'
   +     '<textarea id="f-links" dir="ltr">' + tgEsc(links) + '</textarea>'
-  +     '<span class="hint">' + tgEsc(TG.t.fDownloadHint) + '</span></label>'
+  +     '<span class="hint">' + tgEsc(TG.t.fDownloadHint) + '</span>'
+  +     '<span class="hint">' + tgEsc(TG.t.fDownloadKnown) + '</span>'
+  +     tgStoreLegend()
+  +     '<span class="hint">' + tgEsc(TG.t.fDownloadOther) + '</span></label>'
 
   +   '<label class="f"><span>' + tgEsc(TG.t.fDeepLink) + '</span>'
   +     '<input type="text" id="f-deeplink" dir="ltr" spellcheck="false"'
@@ -1572,10 +1763,12 @@ function tgRenderEditor() {
   +   '<div class="row" style="margin-block-start:20px">'
   +     '<button type="button" class="btn" id="tg-save" onclick="tgSaveGame()">' + tgEsc(TG.t.save) + '</button>'
   +     '<button type="button" class="btn ghost" onclick="tgResetGame()">' + tgEsc(TG.t.reset) + '</button>'
-  +     '<a class="btn ghost" href="/' + tgEsc(game.id) + '/store" target="_blank" rel="noopener">'
-  +       tgEsc(TG.t.open) + ' ↗</a>'
   +     '<span class="muted" style="font-size:.78em">' + tgEsc(TG.t.saved) + ': ' + tgEsc(tgDate(game.settingsAt)) + '</span>'
   +   '</div>'
+
+  +   '<h3 class="sub">' + tgEsc(TG.t.open) + '</h3>'
+  +   '<div class="hint" style="margin-block-end:10px">' + tgEsc(TG.t.openHint) + '</div>'
+  +   '<div class="row">' + tgPreviewLinks(game) + '</div>'
 
   +   '<h3 class="sub">' + tgEsc(TG.t.purge) + '</h3>'
   +   '<div class="note warn">' + tgEsc(TG.t.purgeHint)
@@ -1608,6 +1801,67 @@ function tgDeepLinkPreview() {
     ? scheme + '://' + (game.deepLinkHost || 'oauth') + '?code=…'
     : TG.t.fDeepLinkBad;
   box.style.color = ok ? '' : 'var(--err)';
+}
+
+// ==========================================
+// tgStoreLegend
+// Which names in the download box mean something.
+//
+// The field said "one line per store, as name=url" and stopped
+// there, so the only discoverable key was the one already in the
+// box. These four get a logo and a translated label on the game
+// card; anything else still works and renders generically.
+// ==========================================
+function tgStoreLegend() {
+  var known = [
+    ['myket', 'https://myket.ir/app/com.YourCompany.YourGame'],
+    ['googleplay', 'https://play.google.com/store/apps/details?id=com.YourCompany.YourGame'],
+    ['apk', 'https://amircollider.com/assets/YourGame.apk'],
+    ['web', 'https://amircollider.com/your-game/play']
+  ];
+
+  return '<span class="storekeys">' + known.map(function (pair) {
+    return '<code onclick="tgAddStoreLine(\'' + pair[0] + '\',\'' + pair[1] + '\')" title="'
+         + tgEsc(pair[1]) + '">' + pair[0] + '=…</code>';
+  }).join('') + '</span>';
+}
+
+// Clicking a key appends a starter line rather than making the
+// operator retype the shape. Never overwrites: an existing line
+// for that store is left exactly as it is.
+function tgAddStoreLine(store, example) {
+  var box = tgById('f-links');
+  if (!box) return;
+
+  var lines = (box.value || '').split('\n').filter(function (line) { return line.trim(); });
+  for (var i = 0; i < lines.length; i++) {
+    if (lines[i].split('=')[0].trim() === store) { tgToast(store + ' ✓'); return; }
+  }
+  lines.push(store + '=' + example);
+  box.value = lines.join('\n');
+  box.focus();
+}
+
+// ==========================================
+// tgPreviewLinks
+// The pages this editor actually changes.
+//
+// There used to be one button reading "open the page" that went
+// to the storefront - which is neither the only page these
+// settings drive nor an obvious destination for a button next to
+// "save" and "reset". Now every page the game has is listed by
+// name, and a page the game does not have is not offered.
+// ==========================================
+function tgPreviewLinks(game) {
+  var links = [['openLanding', '/' + game.id], ['openVersions', '/' + game.id + '/versions']];
+
+  if (game.capabilities.store) links.push(['openStore', '/' + game.id + '/store']);
+  if (game.capabilities.leaderboard) links.push(['openBoard', '/' + game.id + '/leaderboard']);
+
+  return links.map(function (pair) {
+    return '<a class="btn ghost small" href="' + tgEsc(pair[1]) + '" target="_blank" rel="noopener">'
+         + tgEsc(TG.t[pair[0]]) + ' ↗</a>';
+  }).join('');
 }
 
 function tgToggleDownload(enabled) {
@@ -1939,11 +2193,34 @@ function tgGrantOrder(orderId) {
 // ==========================================
 // Tab: players
 // ==========================================
+// ==========================================
+// Tab: players
+//
+// Rebuilt. The screen used to search game_orders in the licence
+// database, so the only people it could find were people who had
+// paid - somebody who signed in and played for forty hours
+// simply was not there. And the columns it could show were
+// commercial, which is why there was no username, no score and
+// no playtime on a screen called "players".
+//
+// It now reads the GAME's own players table, which is where all
+// of that lives and where moderation has to be written for
+// worker.js to enforce it.
+// ==========================================
 function tgRenderPlayers() {
   tgById('panel-players').innerHTML =
     '<p class="lede">' + tgEsc(TG.t.playersLede) + '</p>'
   + '<div class="card">'
-  +   tgGamePicker('tgPickGame', TG.t.sqlGame)
+  +   '<div class="grid two">'
+  +     tgGamePicker('tgPickGame', TG.t.sqlGame)
+  +     '<label class="f"><span>' + tgEsc(TG.t.plState) + '</span>'
+  +       '<select id="pl-state" onchange="tgFindPlayers()">'
+  +         '<option value="">' + tgEsc(TG.t.plAny) + '</option>'
+  +         '<option value="active">' + tgEsc(TG.t.plActive) + '</option>'
+  +         '<option value="restricted">' + tgEsc(TG.t.plRestricted) + '</option>'
+  +         '<option value="banned">' + tgEsc(TG.t.plBanned) + '</option>'
+  +       '</select></label>'
+  +   '</div>'
   +   '<div class="row">'
   +     '<label class="f" style="flex:1 1 260px"><span>' + tgEsc(TG.t.plSearch) + '</span>'
   +       '<input type="text" id="pl-q" dir="ltr" onkeydown="if(event.key===\'Enter\')tgFindPlayers()"></label>'
@@ -1956,90 +2233,271 @@ function tgRenderPlayers() {
   tgFindPlayers();
 }
 
+function tgPlayTime(seconds) {
+  var total = Number(seconds) || 0;
+  if (!total) return '—';
+  var h = Math.floor(total / 3600);
+  var m = Math.floor((total % 3600) / 60);
+  return h ? (h + TG.t.plHours + ' ' + m + TG.t.plMinutes) : (m + TG.t.plMinutes);
+}
+
+function tgStateChip(player) {
+  if (player.state === 'banned') return '<span class="chip err">' + tgEsc(TG.t.plBanned) + '</span>';
+  if (player.state === 'restricted') return '<span class="chip warn">' + tgEsc(TG.t.plRestricted) + '</span>';
+  return '<span class="chip ok">' + tgEsc(TG.t.plActive) + '</span>';
+}
+
 function tgFindPlayers() {
   var game = tgSelected();
   var target = tgById('tg-players');
+  if (!game) { target.innerHTML = ''; return; }
+
   target.innerHTML = '<div class="empty">' + tgEsc(TG.t.loading) + '</div>';
 
-  tgCall('players.search', {
-    gameId: game ? game.id : '',
-    q: tgById('pl-q') ? tgById('pl-q').value : ''
+  tgCall('players.list', {
+    gameId: game.id,
+    q: tgById('pl-q') ? tgById('pl-q').value : '',
+    status: tgById('pl-state') ? tgById('pl-state').value : '',
+    limit: 60
   }).then(function (data) {
-    if (!data) { target.innerHTML = ''; return; }
+    if (!data) { target.innerHTML = '<div class="empty">' + tgEsc(TG.t.failed) + '</div>'; return; }
+
+    // Remembered so the row buttons can be disabled with an
+    // explanation rather than failing one at a time.
+    TG.playerModeration = data.moderation;
+
+    var warn = data.moderation ? ''
+      : '<div class="note warn">' + tgEsc(TG.t.plNoModeration) + '</div>';
+
     if (!data.players.length) {
-      target.innerHTML = '<div class="empty">' + tgEsc(TG.t.plNone) + '</div>';
+      target.innerHTML = warn + '<div class="empty">' + tgEsc(TG.t.plNone) + '</div>';
       return;
     }
 
-    target.innerHTML = '<div class="scroll"><table class="tbl"><tbody>' + data.players.map(function (player) {
+    var rows = data.players.map(function (p) {
       return '<tr>'
-      + '<td dir="ltr"><b>' + tgEsc(player.email) + '</b><br><code class="muted">' + tgEsc(player.playerUid) + '</code></td>'
-      + '<td>' + player.orders + ' ' + tgEsc(TG.t.plOrders) + '</td>'
-      + '<td dir="ltr">$' + tgEsc(player.spentUsd) + ' ' + tgEsc(TG.t.plSpent) + '</td>'
-      + '<td><button type="button" class="btn small" onclick="tgOpenPlayer(\'' + tgEsc(player.gameId)
-      +   '\',\'' + tgEsc(player.playerUid) + '\')">' + tgEsc(TG.t.plOwns) + '</button></td>'
+      + '<td>'
+      +   '<div class="plrow">'
+      +     '<span class="plavatar">' + (p.picture
+              ? '<img src="' + tgEsc(p.picture) + '" alt="" onerror="this.style.display=\'none\'">' : '👤') + '</span>'
+      +     '<span><b>' + tgEsc(p.username || '—') + '</b><br>'
+      +       '<span class="muted" dir="ltr" style="font-size:.85em">' + tgEsc(p.email) + '</span></span>'
+      +   '</div>'
+      + '</td>'
+      + '<td dir="ltr"><b>' + Number(p.highScore).toLocaleString(TG.locale) + '</b>'
+      +   '<br><span class="muted" style="font-size:.8em">' + tgEsc(TG.t.plScore) + '</span></td>'
+      + '<td><b>' + Number(p.gamesPlayed).toLocaleString(TG.locale) + '</b>'
+      +   '<br><span class="muted" style="font-size:.8em">' + tgEsc(TG.t.plRuns) + '</span></td>'
+      + '<td>' + tgEsc(tgPlayTime(p.playTime))
+      +   '<br><span class="muted" style="font-size:.8em">' + tgEsc(TG.t.plPlayTime) + '</span></td>'
+      + '<td class="muted" style="font-size:.82em">' + tgEsc(tgDate(p.createdAt)) + '</td>'
+      + '<td>' + tgStateChip(p) + '</td>'
+      + '<td><button type="button" class="btn small" onclick="tgOpenPlayer(\'' + tgEsc(p.playerId) + '\')">'
+      +   tgEsc(TG.t.plManage) + '</button></td>'
       + '</tr>';
-    }).join('') + '</tbody></table></div>';
+    }).join('');
+
+    target.innerHTML = warn
+      + '<div class="muted" style="font-size:.82em;margin-block-end:8px">'
+      +   tgEsc(TG.t.plTotal) + ': ' + Number(data.total).toLocaleString(TG.locale) + '</div>'
+      + '<div class="scroll"><table class="tbl"><thead><tr>'
+      +   '<th>' + tgEsc(TG.t.plPlayer) + '</th><th>' + tgEsc(TG.t.plScore) + '</th>'
+      +   '<th>' + tgEsc(TG.t.plRuns) + '</th><th>' + tgEsc(TG.t.plPlayTime) + '</th>'
+      +   '<th>' + tgEsc(TG.t.plJoined) + '</th><th>' + tgEsc(TG.t.plState) + '</th><th></th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
   });
 }
 
-function tgOpenPlayer(gameId, playerUid) {
+// ==========================================
+// tgOpenPlayer
+// One player, everything about them, and every action.
+//
+// Identity and behaviour come from the game's database;
+// entitlements and history come from the licence database. The
+// server joins them so this screen cannot show half a player
+// because one of two calls failed.
+// ==========================================
+function tgOpenPlayer(playerId) {
+  var game = tgSelected();
   var target = tgById('tg-player-detail');
+  if (!game) return;
+
   target.innerHTML = '<div class="card"><div class="empty">' + tgEsc(TG.t.loading) + '</div></div>';
 
-  tgCall('player.get', { gameId: gameId, playerUid: playerUid }).then(function (data) {
+  tgCall('player.profile', { gameId: game.id, playerId: playerId }).then(function (data) {
     if (!data) { target.innerHTML = ''; return; }
 
-    var game = tgGame(gameId);
+    var p = data.player;
     var products = (game && game.products) || [];
+    var canModerate = TG.playerModeration !== false;
 
-    var owned = data.entitlements.map(function (row) {
-      var expired = row.expiresAt && row.expiresAt < Date.now();
-      return '<tr>'
-      + '<td><b>' + tgEsc(row.productId) + '</b><br><span class="chip">' + tgEsc(row.kind) + '</span></td>'
-      + '<td><b style="font-size:1.1em">' + Number(row.quantity).toLocaleString(TG.locale) + '</b></td>'
-      + '<td class="muted">' + Number(row.lifetime).toLocaleString(TG.locale) + '</td>'
-      + '<td><span class="chip ' + (expired ? 'err' : 'ok') + '">' + tgEsc(row.source) + '</span></td>'
-      + '<td class="muted" style="font-size:.85em">' + tgEsc(tgDate(row.grantedAt)) + '</td>'
-      + '<td><button type="button" class="btn ghost small" onclick="tgRevoke(\'' + tgEsc(gameId) + '\',\''
-      +   tgEsc(playerUid) + '\',\'' + tgEsc(row.productId) + '\')">' + tgEsc(TG.t.plRevoke) + '</button></td>'
-      + '</tr>';
-    }).join('');
+    var owned = data.entitlements.length
+      ? '<div class="scroll"><table class="tbl"><tbody>' + data.entitlements.map(function (row) {
+          var expired = row.expiresAt && row.expiresAt < Date.now();
+          return '<tr>'
+          + '<td><b>' + tgEsc(row.productId) + '</b> <span class="chip">' + tgEsc(row.kind) + '</span></td>'
+          + '<td><b>' + Number(row.quantity).toLocaleString(TG.locale) + '</b></td>'
+          + '<td class="muted" style="font-size:.82em">' + tgEsc(row.source) + '</td>'
+          + '<td>' + (row.expiresAt
+              ? '<span class="chip ' + (expired ? 'err' : 'ok') + '">' + tgEsc(tgDate(row.expiresAt)) + '</span>'
+              : '<span class="muted">—</span>') + '</td>'
+          + '<td><button type="button" class="btn ghost small" onclick="tgRevoke(\'' + tgEsc(game.id)
+          +   '\',\'' + tgEsc(p.playerId) + '\',\'' + tgEsc(row.productId) + '\')">'
+          +   tgEsc(TG.t.plRevoke) + '</button></td>'
+          + '</tr>';
+        }).join('') + '</tbody></table></div>'
+      : '<div class="empty">' + tgEsc(TG.t.plOwnsNone) + '</div>';
+
+    var history = data.events.length
+      ? '<div class="scroll"><table class="tbl"><tbody>' + data.events.map(function (e) {
+          return '<tr><td class="muted" style="font-size:.82em">' + tgEsc(tgDate(e.at)) + '</td>'
+          + '<td><b>' + tgEsc(e.productId) + '</b></td>'
+          + '<td><span class="chip">' + tgEsc(e.kind) + '</span></td>'
+          + '<td dir="ltr">' + tgEsc(e.amount) + '</td>'
+          + '<td class="muted" style="font-size:.82em">' + tgEsc(e.detail) + '</td></tr>';
+        }).join('') + '</tbody></table></div>'
+      : '<div class="empty">—</div>';
 
     var options = products.map(function (product) {
       return '<option value="' + tgEsc(product.id) + '">' + tgEsc(tgLocalized(product.name, product.id)) + '</option>';
     }).join('');
 
-    var history = data.events.map(function (event) {
-      return '<tr><td class="muted" style="font-size:.85em">' + tgEsc(tgDate(event.at)) + '</td>'
-      + '<td><span class="chip">' + tgEsc(event.kind) + '</span></td>'
-      + '<td>' + tgEsc(event.productId) + '</td>'
-      + '<td dir="ltr">' + (event.amount ? '+' + event.amount : '') + '</td>'
-      + '<td class="muted" style="font-size:.85em">' + tgEsc(event.detail || '') + '</td></tr>';
-    }).join('');
-
     target.innerHTML =
-      '<div class="card">'
-    +   '<h2 class="sec">👤 <code>' + tgEsc(playerUid) + '</code> <span class="chip">' + tgEsc(gameId) + '</span></h2>'
-    +   (owned
-        ? '<div class="scroll"><table class="tbl"><tbody>' + owned + '</tbody></table></div>'
-        : '<div class="empty">—</div>')
+      '<div class="card" style="margin-block-start:18px">'
+    +   '<h2 class="sec">'
+    +     '<span class="plavatar">' + (p.picture
+            ? '<img src="' + tgEsc(p.picture) + '" alt="" onerror="this.style.display=\'none\'">' : '👤') + '</span>'
+    +     tgEsc(p.username || p.playerId) + ' ' + tgStateChip(p)
+    +   '</h2>'
 
-    +   '<h3 class="sub">' + tgEsc(TG.t.plGrant) + '</h3>'
-    +   '<div class="row">'
-    +     '<label class="f" style="flex:1 1 200px"><span>' + tgEsc(TG.t.tabStore) + '</span>'
-    +       '<select id="gr-product">' + options + '</select></label>'
-    +     '<label class="f" style="width:120px"><span>' + tgEsc(TG.t.plQuantity) + '</span>'
-    +       '<input type="number" id="gr-qty" value="1" min="1"></label>'
-    +     '<label class="f" style="flex:1 1 200px"><span>' + tgEsc(TG.t.plReason) + '</span>'
-    +       '<input type="text" id="gr-reason"></label>'
-    +     '<button type="button" class="btn" onclick="tgGrant(\'' + tgEsc(gameId) + '\',\'' + tgEsc(playerUid) + '\')">'
-    +       tgEsc(TG.t.plGrant) + '</button>'
+    +   '<div class="plstats">'
+    +     tgStat(TG.t.plScore, Number(p.highScore).toLocaleString(TG.locale))
+    +     tgStat(TG.t.plRuns, Number(p.gamesPlayed).toLocaleString(TG.locale))
+    +     tgStat(TG.t.plPlayTime, tgPlayTime(p.playTime))
+    +     tgStat(TG.t.plJoined, tgDate(p.createdAt))
+    +     tgStat(TG.t.plLastSeen, tgDate(p.lastLogin))
     +   '</div>'
 
-    +   (history ? '<h3 class="sub">' + tgEsc(TG.t.plHistory) + '</h3>'
-        + '<div class="scroll"><table class="tbl"><tbody>' + history + '</tbody></table></div>' : '')
+    +   '<div class="scroll"><table class="tbl"><tbody>'
+    +     '<tr><td>' + tgEsc(TG.t.plEmail) + '</td><td dir="ltr"><code>' + tgEsc(p.email) + '</code></td></tr>'
+    +     '<tr><td>' + tgEsc(TG.t.plId) + '</td><td dir="ltr"><code>' + tgEsc(p.playerId) + '</code></td></tr>'
+    +     (p.state === 'banned'
+        ? '<tr><td>' + tgEsc(TG.t.plBannedAt) + '</td><td>' + tgEsc(tgDate(p.bannedAt))
+          + ' <span class="muted">' + tgEsc(p.banReason) + '</span></td></tr>' : '')
+    +     (p.state === 'restricted'
+        ? '<tr><td>' + tgEsc(TG.t.plUntil) + '</td><td>' + tgEsc(tgDate(p.restrictedUntil))
+          + ' <span class="muted">' + tgEsc(p.restrictReason) + '</span></td></tr>' : '')
+    +   '</tbody></table></div>'
+
+    +   '<h3 class="sub">' + tgEsc(TG.t.plRename) + '</h3>'
+    +   '<div class="row">'
+    +     '<input type="text" id="pl-name" dir="ltr" style="max-width:220px" value="' + tgEsc(p.username) + '">'
+    +     '<button type="button" class="btn small" onclick="tgRenamePlayer(\'' + tgEsc(p.playerId) + '\')">'
+    +       tgEsc(TG.t.save) + '</button>'
+    +     '<span class="hint">' + tgEsc(TG.t.plRenameHint) + '</span>'
+    +   '</div>'
+
+    +   '<h3 class="sub">' + tgEsc(TG.t.plModeration) + '</h3>'
+    +   (canModerate ? '' : '<div class="note warn">' + tgEsc(TG.t.plNoModeration) + '</div>')
+    +   '<label class="f"><span>' + tgEsc(TG.t.plReason) + '</span>'
+    +     '<input type="text" id="pl-reason" placeholder="' + tgEsc(TG.t.plReasonHint) + '"></label>'
+    +   '<div class="row">'
+    +     (p.state === 'banned'
+        ? '<button type="button" class="btn small" ' + (canModerate ? '' : 'disabled ')
+          + 'onclick="tgModerate(\'' + tgEsc(p.playerId) + '\',{banned:false})">' + tgEsc(TG.t.plUnban) + '</button>'
+        : '<button type="button" class="btn danger small" ' + (canModerate ? '' : 'disabled ')
+          + 'onclick="tgModerate(\'' + tgEsc(p.playerId) + '\',{banned:true})">' + tgEsc(TG.t.plBan) + '</button>')
+    +     '<button type="button" class="btn ghost small" ' + (canModerate ? '' : 'disabled ')
+    +       'onclick="tgModerate(\'' + tgEsc(p.playerId) + '\',{restrictDays:7})">' + tgEsc(TG.t.plRestrict7) + '</button>'
+    +     '<button type="button" class="btn ghost small" ' + (canModerate ? '' : 'disabled ')
+    +       'onclick="tgModerate(\'' + tgEsc(p.playerId) + '\',{restrictDays:30})">' + tgEsc(TG.t.plRestrict30) + '</button>'
+    +     (p.state === 'restricted'
+        ? '<button type="button" class="btn ghost small" onclick="tgModerate(\'' + tgEsc(p.playerId)
+          + '\',{restrictDays:0})">' + tgEsc(TG.t.plLift) + '</button>' : '')
+    +   '</div>'
+    +   '<div class="hint" style="margin-block-start:8px">' + tgEsc(TG.t.plBanEffect) + '</div>'
+
+    +   '<label class="f" style="margin-block-start:14px"><span>' + tgEsc(TG.t.plNote) + '</span>'
+    +     '<input type="text" id="pl-note" value="' + tgEsc(p.note) + '" '
+    +       'onchange="tgModerate(\'' + tgEsc(p.playerId) + '\',{note:this.value})">'
+    +     '<span class="hint">' + tgEsc(TG.t.plNoteHint) + '</span></label>'
+
+    +   '<h3 class="sub">' + tgEsc(TG.t.plOwns) + '</h3>'
+    +   owned
+
+    +   '<h3 class="sub">' + tgEsc(TG.t.plGrant) + '</h3>'
+    +   '<div class="grid three">'
+    +     '<label class="f"><span>' + tgEsc(TG.t.pKind) + '</span><select id="pl-product">' + options + '</select></label>'
+    +     '<label class="f"><span>' + tgEsc(TG.t.plQuantity) + '</span>'
+    +       '<input type="number" id="pl-qty" value="1" min="1"></label>'
+    +     '<label class="f"><span>' + tgEsc(TG.t.plReason) + '</span>'
+    +       '<input type="text" id="pl-grant-reason"></label>'
+    +   '</div>'
+    +   '<button type="button" class="btn" onclick="tgGrant(\'' + tgEsc(game.id) + '\',\'' + tgEsc(p.playerId) + '\')">'
+    +     tgEsc(TG.t.plGrant) + '</button>'
+
+    +   '<h3 class="sub">' + tgEsc(TG.t.plHistory) + '</h3>'
+    +   history
+
+    +   '<h3 class="sub">' + tgEsc(TG.t.plDanger) + '</h3>'
+    +   '<div class="note err">' + tgEsc(TG.t.plDeleteHint)
+    +     '<div class="row" style="margin-block-start:10px">'
+    +       '<button type="button" class="btn danger small" onclick="tgDeletePlayer(\'' + tgEsc(p.playerId) + '\')">'
+    +         tgEsc(TG.t.plDelete) + '</button>'
+    +     '</div>'
+    +   '</div>'
     + '</div>';
+
+    target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+}
+
+function tgStat(label, value) {
+  return '<div class="plstat"><b>' + tgEsc(value) + '</b><span>' + tgEsc(label) + '</span></div>';
+}
+
+function tgModerate(playerId, patch) {
+  var game = tgSelected();
+  if (!game) return;
+
+  var reason = tgById('pl-reason');
+  var payload = { gameId: game.id, playerId: playerId };
+  for (var key in patch) payload[key] = patch[key];
+  if (reason && reason.value) payload.reason = reason.value;
+
+  if (patch.banned === true && !window.confirm(TG.t.plBanAsk)) return;
+
+  tgCall('player.moderate', payload).then(function (data) {
+    if (!data) return;
+    tgToast(TG.t.saved);
+    tgOpenPlayer(playerId);
+    tgFindPlayers();
+  });
+}
+
+function tgRenamePlayer(playerId) {
+  var game = tgSelected();
+  if (!game) return;
+
+  tgCall('player.rename', {
+    gameId: game.id, playerId: playerId, username: tgById('pl-name').value
+  }).then(function (data) {
+    if (!data) return;
+    tgToast(TG.t.saved);
+    tgOpenPlayer(playerId);
+    tgFindPlayers();
+  });
+}
+
+function tgDeletePlayer(playerId) {
+  var game = tgSelected();
+  if (!game || !window.confirm(TG.t.plDeleteAsk)) return;
+
+  tgCall('player.delete', { gameId: game.id, playerId: playerId }).then(function (data) {
+    if (!data) return;
+    tgToast(TG.t.saved);
+    tgById('tg-player-detail').innerHTML = '';
+    tgFindPlayers();
   });
 }
 
@@ -2047,13 +2505,13 @@ function tgGrant(gameId, playerUid) {
   tgCall('player.grant', {
     gameId: gameId,
     playerUid: playerUid,
-    productId: tgById('gr-product').value,
-    quantity: Number(tgById('gr-qty').value) || 0,
-    reason: tgById('gr-reason').value
+    productId: tgById('pl-product').value,
+    quantity: Number(tgById('pl-qty').value) || 1,
+    reason: tgById('pl-grant-reason').value
   }).then(function (data) {
     if (!data) return;
     tgToast(TG.t.saved);
-    tgOpenPlayer(gameId, playerUid);
+    tgOpenPlayer(playerUid);
   });
 }
 
@@ -2064,7 +2522,7 @@ function tgRevoke(gameId, playerUid, productId) {
     .then(function (data) {
       if (!data) return;
       tgToast(TG.t.saved);
-      tgOpenPlayer(gameId, playerUid);
+      tgOpenPlayer(playerUid);
     });
 }
 

@@ -1,5 +1,5 @@
 // ==========================================
-// OAuth Proxy v6.7.1 - Secure Version
+// OAuth Proxy v6.7.2 - Secure Version
 // AmirCollider Games - Worker Core (routing, auth, data API)
 // ==========================================
 //
@@ -96,6 +96,7 @@ import {
   handleTheGodLogout
 } from './pages/thegod.js'
 import { handleTheGodApi } from './pages/thegodApi.js'
+import { handleGameLanding, handleGameVersions } from './pages/gameLanding.js'
 import {
   handleGameManifest,
   handleGameProducts,
@@ -107,6 +108,7 @@ import {
   handleGameAccount,
   handleGameAccountSignIn,
   handleGameAccountLogout,
+  handleGameAccountProfile,
   completeSiteSignIn
 } from './pages/gameAccount.js'
 import {
@@ -575,10 +577,12 @@ const ROUTES = [
   // purpose:'site'. It comes back to /oauth/callback, which is
   // already a registered redirect URI - so this page works
   // without anybody editing the Google Cloud console.
+  { path: '/:gameId/versions', method: 'GET', handler: handleGameVersions, dynamic: true },
   { path: '/:gameId/download', method: 'GET', handler: handleGameDownload, dynamic: true },
   { path: '/:gameId/account', method: 'GET', handler: handleGameAccount, dynamic: true },
   { path: '/:gameId/account/signin', method: 'GET', handler: handleGameAccountSignIn, dynamic: true },
   { path: '/:gameId/account/logout', method: 'POST', handler: handleGameAccountLogout, dynamic: true },
+  { path: '/:gameId/account/profile', method: 'POST', handler: handleGameAccountProfile, dynamic: true },
   { path: '/:gameId/store', method: 'GET', handler: handleGameStore, dynamic: true },
   { path: '/:gameId/store/buy', method: 'POST', handler: handleGameStoreBuy, dynamic: true },
   { path: '/:gameId/store/order', method: 'GET', handler: handleGameStoreOrder, dynamic: true },
@@ -594,7 +598,17 @@ const ROUTES = [
   { path: '/database/set/', method: 'POST', handler: handleDatabaseSet, prefix: true },
   { path: '/database/set/', method: 'PUT', handler: handleDatabaseSet, prefix: true },
   { path: '/database/patch/', method: 'PATCH', handler: handleDatabasePatch, prefix: true },
-  { path: '/database/patch/', method: 'POST', handler: handleDatabasePatch, prefix: true }
+  { path: '/database/patch/', method: 'POST', handler: handleDatabasePatch, prefix: true },
+
+  // A game's landing page, at the bare game id.
+  //
+  // LAST on purpose. Its pattern is one path segment, so it would
+  // happily answer for /checkout or /license - matchRoute tries
+  // every STATIC route before any dynamic one, which is what
+  // keeps those safe, and being last here keeps it behind the
+  // other dynamic routes too. An id that is not a game answers
+  // 404, same as every other game handler.
+  { path: '/:gameId', method: 'GET', handler: handleGameLanding, dynamic: true }
 ]
 
 
@@ -1217,10 +1231,12 @@ async function handleDatabaseGet(url, request, gameId, requestId, GAMES, env) {
     }
 
     if (dbPath.includes('leaderboard')) {
+      const moderated = await hasModerationColumns(db)
       const { results } = await db.prepare(`
         SELECT username, username AS displayName, high_score AS highScore,
                profile_pic_url AS photoURL, selected_color AS selectedColor
-        FROM players ORDER BY high_score DESC LIMIT 100
+        FROM players ${moderated ? 'WHERE banned_at IS NULL' : ''}
+        ORDER BY high_score DESC LIMIT 100
       `).all()
       const mapped = (results || []).map((row, index) => ({
         rank: index + 1,
@@ -1296,6 +1312,11 @@ async function handleDatabaseSet(url, request, gameId, requestId, GAMES, env) {
         return createJsonResponse({ error: 'user_not_found', message: 'Player not found in database', requestId }, 404)
       }
 
+      // A banned player's score never reaches the table, so it
+      // can never reach the board either.
+      const barred = await refuseIfBanned(db, uid, requestId)
+      if (barred) return barred
+
       const currentHighScore = player.high_score || 0
       if (newScore <= currentHighScore) {
         return createJsonResponse({
@@ -1337,7 +1358,8 @@ async function handleDatabaseSet(url, request, gameId, requestId, GAMES, env) {
         return createJsonResponse({ ...fieldError, requestId }, 400)
       }
 
-      const { updates, values } = buildProfileUpdate(userData)
+      const currentData = userData.dataPatch !== undefined ? await readPlayerData(db, uid) : null
+      const { updates, values } = buildProfileUpdate(userData, false, currentData)
       if (updates.length > 0) {
         updates.push('last_login = ?')
         values.push(Date.now(), uid)
@@ -1413,7 +1435,9 @@ async function handleDatabasePatch(url, request, gameId, requestId, GAMES, env) 
       return createJsonResponse({ ...fieldError, requestId }, 400)
     }
 
-    const { updates, values } = buildProfileUpdate(patchData, true)
+    const currentData = patchData.dataPatch !== undefined
+      ? await readPlayerData(db, ownerMatch[1]) : null
+    const { updates, values } = buildProfileUpdate(patchData, true, currentData)
     if (updates.length === 0) {
       return createJsonResponse({ error: 'no_fields', message: 'No valid fields to update', requestId }, 400)
     }
@@ -1450,7 +1474,47 @@ function mapPlayer(player) {
     purchasedColors: JSON.parse(player.purchased_colors || '["FFFFFF"]'),
     purchasedItems: JSON.parse(player.purchased_items || '{}'),
     createdAt: player.created_at,
-    lastLogin: player.last_login
+    lastLogin: player.last_login,
+
+    // Whatever this particular game decided to save.
+    //
+    // The Worker stores it, merges it and has no opinion about
+    // its contents - which is the point. A game that wants to
+    // keep `levelsCompleted` or an inventory adds a key here
+    // instead of a column, a mapping and a C# field.
+    //
+    // Absent on a database that has not run 0007, which reads as
+    // an empty object and behaves exactly as before.
+    data: safeJson(player.data_json)
+  }
+}
+
+
+// Reads one player's stored document, for a merge. Returns {} on
+// any failure, including a database that has not run 0007 - so a
+// dataPatch against an un-migrated game writes a fresh object
+// instead of failing the whole save.
+async function readPlayerData(db, playerId) {
+  try {
+    const row = await db.prepare('SELECT data_json FROM players WHERE player_id = ? LIMIT 1')
+      .bind(playerId).first()
+    return safeJson(row && row.data_json)
+  } catch {
+    return {}
+  }
+}
+
+
+// A stored JSON object, or {}. Never throws: one unparseable
+// value written months ago should not 500 the read path for a
+// player who has been fine ever since.
+function safeJson(raw) {
+  if (!raw) return {}
+  try {
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+  } catch {
+    return {}
   }
 }
 
@@ -1472,10 +1536,26 @@ function applyProfileFields(data) {
 }
 
 // Builds the column/value lists for an UPDATE from a profile payload.
-function buildProfileUpdate(data, includeGamesPlayed = false) {
+function buildProfileUpdate(data, includeGamesPlayed = false, currentData = null) {
   const updates = []
   const values = []
   const push = (column, value) => { updates.push(`${column} = ?`); values.push(value) }
+
+  // `data` replaces the document; `dataPatch` merges into it.
+  //
+  // Two verbs because both are wanted and they are not the same
+  // decision: a game syncing its whole save wants replace, and a
+  // game bumping one counter wants merge - and doing the second
+  // with the first is how a client with stale state silently
+  // deletes the keys it did not know about.
+  //
+  // The merge is shallow on purpose. A deep merge has no obvious
+  // answer for arrays, and an inventory is usually an array.
+  if (data.data !== undefined && data.data && typeof data.data === 'object') {
+    push('data_json', JSON.stringify(data.data))
+  } else if (data.dataPatch !== undefined && data.dataPatch && typeof data.dataPatch === 'object') {
+    push('data_json', JSON.stringify({ ...(currentData || {}), ...data.dataPatch }))
+  }
 
   if (data.username !== undefined) push('username', data.username)
   if (data.selectedColor !== undefined) push('selected_color', data.selectedColor)
@@ -1485,6 +1565,58 @@ function buildProfileUpdate(data, includeGamesPlayed = false) {
   if (includeGamesPlayed && data.gamesPlayed !== undefined) push('games_played', data.gamesPlayed)
 
   return { updates, values }
+}
+
+
+// ==========================================
+// Player moderation, enforced
+//
+// A ban that only shows in the panel is a note, not a ban. These
+// two helpers are what make it real: every write path asks
+// refuseIfBanned() before it changes anything, and the two
+// leaderboard queries exclude banned rows.
+//
+// Both are written to survive a game database that has not run
+// 0006 yet. bannedGuard() returns an empty string when the column
+// is absent, and refuseIfBanned() treats a failed lookup as "not
+// banned" - so an un-migrated game behaves exactly as it did
+// before moderation existed rather than refusing every save.
+// ==========================================
+async function hasModerationColumns(db) {
+  try {
+    await db.prepare('SELECT banned_at FROM players LIMIT 1').first()
+    return true
+  } catch {
+    return false
+  }
+}
+
+// Returns a refusal Response when the player is banned or their
+// restriction is still running, and null when they may proceed.
+async function refuseIfBanned(db, playerId, requestId) {
+  let row
+  try {
+    row = await db.prepare('SELECT banned_at, restricted_until FROM players WHERE player_id = ? LIMIT 1')
+      .bind(playerId).first()
+  } catch {
+    return null
+  }
+  if (!row) return null
+
+  const banned = Boolean(row.banned_at)
+  const restricted = row.restricted_until && Number(row.restricted_until) > Date.now()
+  if (!banned && !restricted) return null
+
+  logWarning('Refused a write for a moderated player', { requestId, playerId, banned, restricted })
+
+  // Deliberately vague. A refusal that explained which rule was
+  // hit, and until when, is a description of the detection handed
+  // to the person working around it.
+  return createJsonResponse({
+    error: 'account_restricted',
+    message: 'This account cannot submit data at the moment.',
+    requestId
+  }, 403)
 }
 
 

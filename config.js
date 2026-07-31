@@ -1,5 +1,5 @@
 // ==========================================
-// OAuth Proxy v6.7.1 - Secure Version
+// OAuth Proxy v6.7.2 - Secure Version
 // AmirCollider Games - Central Configuration
 // ==========================================
 //
@@ -67,7 +67,7 @@ export const CORS_HEADERS = deepFreeze({
 // Durations are milliseconds. Consumed across worker.js / utils.js / pages.
 // ==========================================
 export const CONFIG = deepFreeze({
-  VERSION: '6.7.1',
+  VERSION: '6.7.2',
 
   // The site's own public origin.
   //

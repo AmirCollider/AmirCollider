@@ -36,9 +36,12 @@ const META = {
 }
 
 const NAV = {
-  fa: { account: 'حساب من', store: 'فروشگاه', board: 'جدول امتیازات', download: 'دانلود', home: 'همه‌ی بازی‌ها' },
-  en: { account: 'My account', store: 'Store', board: 'Leaderboard', download: 'Download', home: 'All games' },
-  ja: { account: 'アカウント', store: 'ストア', board: 'ランキング', download: 'ダウンロード', home: 'ゲーム一覧' }
+  fa: { landing: 'صفحه‌ی بازی', account: 'حساب من', store: 'فروشگاه', board: 'جدول امتیازات',
+        versions: 'نسخه‌ها', download: 'دانلود', home: 'همه‌ی بازی‌ها' },
+  en: { landing: 'Game', account: 'My account', store: 'Store', board: 'Leaderboard',
+        versions: 'Versions', download: 'Download', home: 'All games' },
+  ja: { landing: 'ゲーム', account: 'アカウント', store: 'ストア', board: 'ランキング',
+        versions: 'バージョン', download: 'ダウンロード', home: 'ゲーム一覧' }
 }
 
 
@@ -220,6 +223,30 @@ export function chromeCss(accent) {
       background:var(--surface);border:1px solid var(--border);color:var(--dim);font-size:.85em}
     footer a{color:color-mix(in srgb,var(--accent) 55%,var(--text));text-decoration:none}
 
+    /* ---- mobile ----
+       The nav gained two more links (the game page and its
+       versions), which on a phone turned a single row into a
+       block four rows tall above every page. It now scrolls
+       horizontally as one strip, which is the same gesture the
+       tab bars elsewhere use. */
+    @media (max-width:720px){
+      body{padding:16px 12px 44px}
+      .gtop{gap:10px;margin-block-end:18px}
+      .gnav{flex-wrap:nowrap;overflow-x:auto;width:100%;
+        scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-block-end:2px}
+      .gnav::-webkit-scrollbar{display:none}
+      .gnav a{flex:0 0 auto;white-space:nowrap;padding:8px 12px}
+      .gseg{flex:0 0 auto}
+      .gbrand-logo{width:42px;height:42px;border-radius:13px;font-size:1.25em}
+      .gcard{padding:18px}
+      .gbtn{padding:12px 16px}
+    }
+
+    @media (max-width:420px){
+      .ghead{font-size:1.08em}
+      .gbtn{width:100%}
+    }
+
     @media (prefers-reduced-motion:no-preference){
       .gtop,.gcard,.ghead{animation:gRise .45s cubic-bezier(.16,1,.3,1) both}
       .gcard{animation-delay:.06s}
@@ -266,6 +293,12 @@ export function chromeTop(game, lang, active, { downloadable = true } = {}) {
   const nav = NAV[lang] || NAV.fa
   const items = []
 
+  // The game's own front page comes first: it is the page every
+  // other one is a sub-page of, and until it existed the brand
+  // link in the corner went to the dashboard, which is a
+  // different site's front page as far as a player is concerned.
+  items.push({ key: 'landing', href: `/${game.id}`, label: nav.landing })
+
   if (game.capabilities.login) {
     items.push({ key: 'account', href: `/${game.id}/account`, label: nav.account })
   }
@@ -275,6 +308,7 @@ export function chromeTop(game, lang, active, { downloadable = true } = {}) {
   if (game.capabilities.leaderboard) {
     items.push({ key: 'board', href: `/${game.id}/leaderboard`, label: nav.board })
   }
+  items.push({ key: 'versions', href: `/${game.id}/versions`, label: nav.versions })
   items.push({ key: 'download', href: `/${game.id}/download`, label: nav.download, off: !downloadable })
 
   const links = items.map(item =>
@@ -289,7 +323,7 @@ export function chromeTop(game, lang, active, { downloadable = true } = {}) {
 
   return `
     <div class="gtop">
-      <a class="gbrand" href="/">
+      <a class="gbrand" href="/${esc(game.id)}">
         <span class="gbrand-logo">${esc(game.icon || '🎮')}${game.logo
           ? `<img src="${esc(game.logo)}" alt="" onerror="this.style.display='none'">` : ''}</span>
         <span>

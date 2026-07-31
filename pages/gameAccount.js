@@ -40,6 +40,7 @@
 import { createHtmlResponse, createJsonResponse, logInfo, logWarning, logError } from '../utils.js'
 import { resolveGame, isDownloadable, effectiveProducts } from '../games/registry.js'
 import { db, listEntitlements } from '../games/store.js'
+import { playerDb, getGamePlayer, setUsername } from '../games/players.js'
 import {
   readPlayerSession, issuePlayerSession, clearPlayerSession, verifyGoogleIdToken
 } from '../games/session.js'
@@ -72,6 +73,26 @@ const I18N = {
     playerId: 'شناسه‌ی بازیکن',
     email: 'ایمیل',
     signOut: 'خروج از حساب',
+
+    statsTitle: 'آمار تو',
+    statScore: 'بالاترین امتیاز',
+    statRuns: 'تعداد بازی',
+    statPlayTime: 'مدت بازی',
+    statJoined: 'تاریخ عضویت',
+    statLastSeen: 'آخرین ورود',
+    hoursShort: 'س',
+    minutesShort: 'د',
+
+    profileTitle: 'پروفایل',
+    usernameLabel: 'نام کاربری',
+    usernameHint: '۳ تا ۱۲ نویسه، فقط حروف انگلیسی و عدد. همین نام در جدول امتیازات دیده می‌شود.',
+    avatarLabel: 'آدرس تصویر پروفایل',
+    avatarHint: 'فقط آدرس https. خالی بگذاری، تصویری نشان داده نمی‌شود.',
+    saveProfile: 'ذخیره',
+    avatarFromGoogle: 'برگرداندن تصویر گوگل',
+    profileSaved: 'ذخیره شد.',
+    nameTaken: 'این نام کاربری قبلاً گرفته شده. یکی دیگر انتخاب کن.',
+    nameBad: 'نام کاربری باید ۳ تا ۱۲ نویسه و فقط حروف انگلیسی و عدد باشد. آدرس تصویر هم باید با https شروع شود.',
 
     ownedTitle: 'خریدهای تو',
     ownedEmpty: 'هنوز چیزی نخریده‌ای. فروشگاه را ببین.',
@@ -115,6 +136,26 @@ const I18N = {
     email: 'Email',
     signOut: 'Sign out',
 
+    statsTitle: 'Your stats',
+    statScore: 'High score',
+    statRuns: 'Runs',
+    statPlayTime: 'Play time',
+    statJoined: 'Joined',
+    statLastSeen: 'Last seen',
+    hoursShort: 'h',
+    minutesShort: 'm',
+
+    profileTitle: 'Profile',
+    usernameLabel: 'Username',
+    usernameHint: '3 to 12 characters, English letters and digits. This is the name on the leaderboard.',
+    avatarLabel: 'Profile picture URL',
+    avatarHint: 'https addresses only. Leave it empty for no picture.',
+    saveProfile: 'Save',
+    avatarFromGoogle: 'Use my Google picture',
+    profileSaved: 'Saved.',
+    nameTaken: 'That username is already taken. Pick another.',
+    nameBad: 'A username is 3 to 12 characters, English letters and digits. A picture URL must start with https.',
+
     ownedTitle: 'What you own',
     ownedEmpty: 'Nothing yet. Have a look at the store.',
     ownedNote: 'This is the same list the game sees — whether you bought it in the game or here.',
@@ -156,6 +197,26 @@ const I18N = {
     playerId: 'プレイヤー ID',
     email: 'メール',
     signOut: 'サインアウト',
+
+    statsTitle: 'あなたの記録',
+    statScore: 'ハイスコア',
+    statRuns: 'プレイ回数',
+    statPlayTime: 'プレイ時間',
+    statJoined: '登録日',
+    statLastSeen: '最終ログイン',
+    hoursShort: '時間',
+    minutesShort: '分',
+
+    profileTitle: 'プロフィール',
+    usernameLabel: 'ユーザー名',
+    usernameHint: '3〜12 文字、英数字のみ。ランキングに表示される名前です。',
+    avatarLabel: 'プロフィール画像の URL',
+    avatarHint: 'https のアドレスのみ。空欄なら画像は表示されません。',
+    saveProfile: '保存',
+    avatarFromGoogle: 'Google の画像に戻す',
+    profileSaved: '保存しました。',
+    nameTaken: 'そのユーザー名は既に使われています。',
+    nameBad: 'ユーザー名は 3〜12 文字の英数字です。画像 URL は https で始まる必要があります。',
 
     ownedTitle: '所有アイテム',
     ownedEmpty: 'まだ何もありません。ストアをご覧ください。',
@@ -231,9 +292,103 @@ export async function handleGameAccount(url, request, gameId, requestId, GAMES, 
   const database = db(env)
   const owned = database ? await listEntitlements(database, game.id, player.playerId) : []
 
-  return createHtmlResponse(renderAccount(game, lang, theme, player, owned), 200, headers)
+  // The stats half of the page. It lives in the GAME's database,
+  // not the licence database - which is why the account page had
+  // no join date, no score and no play time until now: it was
+  // only ever reading the table that holds purchases.
+  //
+  // Null is a fine answer: a player who has signed in on the site
+  // but never launched the game has no row yet, and the page
+  // simply leaves that section out.
+  const gameDatabase = playerDb(env, game)
+  const record = gameDatabase ? await getGamePlayer(gameDatabase, player.playerId) : null
+
+  const saved = url.searchParams.get('saved') === '1'
+  const nameError = url.searchParams.get('name_error') || ''
+
+  return createHtmlResponse(
+    renderAccount(game, lang, theme, player, owned, record, { saved, nameError }),
+    200, headers
+  )
 }
 
+
+
+// ==========================================
+// handleGameAccountProfile
+// POST /:gameId/account/profile
+//
+// A player editing their own record: the name on the
+// leaderboard, and the picture beside it.
+//
+// The player id comes from the SESSION and never from the form.
+// That is the whole security model of this endpoint: there is no
+// field a caller could set to edit somebody else's row, because
+// the only id it will ever write to is the one in their own
+// signed cookie.
+//
+// Username goes through the same setUsername() the panel uses,
+// so a name typed here is held to the rule the game client is
+// held to, and cannot collide with somebody else's.
+// ==========================================
+export async function handleGameAccountProfile(url, request, gameId, requestId, GAMES, env) {
+  const id = gameIdFrom(url)
+  const game = await resolveGame(env, GAMES, id)
+  if (!game) return createJsonResponse({ ok: false, error: 'unknown_game', requestId }, 404)
+
+  const player = await readPlayerSession(env, GAMES, request)
+  if (!player) return Response.redirect(`${url.origin}/${id}/account`, 302)
+
+  const database = playerDb(env, game)
+  if (!database) return Response.redirect(`${url.origin}/${id}/account`, 302)
+
+  let form
+  try {
+    form = new URLSearchParams(await request.text())
+  } catch {
+    return Response.redirect(`${url.origin}/${id}/account`, 302)
+  }
+
+  const back = state => `${url.origin}/${id}/account${state}`
+
+  // Name first: if it is refused, nothing else is written either,
+  // so the player is not told "saved" about a form that half
+  // applied.
+  const username = String(form.get('username') || '').trim()
+  const current = await getGamePlayer(database, player.playerId)
+
+  if (username && username !== (current && current.username)) {
+    const named = await setUsername(database, player.playerId, username)
+    if (!named.ok) {
+      logWarning('Player rejected their own rename', { requestId, gameId: id, reason: named.reason })
+      return Response.redirect(back(`?name_error=${named.reason === 'taken' ? 'taken' : 'bad'}`), 302)
+    }
+  }
+
+  // The picture. "Reset" puts back whatever Google gave us at
+  // sign-in, which is the value the account already had before
+  // anybody typed in this box.
+  const reset = form.get('avatar_reset') === '1'
+  const avatar = String(form.get('avatar') || '').trim()
+  const next = reset ? String(player.picture || '') : avatar
+
+  // https only, and only when it is a URL at all. This string
+  // ends up in an <img src> on the leaderboard, where every
+  // other player will load it.
+  const acceptable = !next || /^https:\/\/[^\s"'<>]+$/i.test(next)
+  if (!acceptable) return Response.redirect(back('?name_error=bad'), 302)
+
+  try {
+    await database.prepare('UPDATE players SET profile_pic_url = ? WHERE player_id = ?')
+      .bind(next.slice(0, 300) || null, player.playerId).run()
+  } catch (error) {
+    logError('Profile picture not saved', { requestId, gameId: id, error: error.message })
+    return Response.redirect(back(''), 302)
+  }
+
+  logInfo('Player updated their profile', { requestId, gameId: id, playerId: player.playerId })
+  return Response.redirect(back('?saved=1'), 302)
+}
 
 // ==========================================
 // handleGameAccountSignIn
@@ -425,7 +580,7 @@ function renderSignIn(game, lang, theme, failed) {
 }
 
 
-function renderAccount(game, lang, theme, player, owned) {
+function renderAccount(game, lang, theme, player, owned, record, flash = {}) {
   const t = pack(lang)
   const locale = localeFor(lang)
 
@@ -467,7 +622,90 @@ function renderAccount(game, lang, theme, player, owned) {
       </div>`
   }).join('')
 
+  // ------------------------------------------------------------
+  // Stats and the profile form.
+  //
+  // Both are absent for a player with no row in the game's own
+  // database - somebody who signed in on the site but has never
+  // launched the game. An empty stats grid full of zeroes would
+  // claim they have played 0 runs, which is a different thing
+  // from "we have not seen you in the game yet".
+  // ------------------------------------------------------------
+  const stat = (value, label) => `
+    <div class="acc-stat"><b>${esc(value)}</b><span>${esc(label)}</span></div>`
+
+  const playTime = seconds => {
+    const total = Number(seconds) || 0
+    if (!total) return '—'
+    const h = Math.floor(total / 3600)
+    const m = Math.floor((total % 3600) / 60)
+    return h ? `${h}${t.hoursShort} ${m}${t.minutesShort}` : `${m}${t.minutesShort}`
+  }
+
+  const asDate = ms => (Number(ms) ? new Date(Number(ms)).toLocaleDateString(locale) : '—')
+
+  const statsBlock = record ? `
+    <div class="ghead" style="margin-block-start:26px">${esc(t.statsTitle)}</div>
+    <div class="gcard">
+      <div class="acc-stats">
+        ${stat(Number(record.high_score || 0).toLocaleString(locale), t.statScore)}
+        ${stat(Number(record.games_played || 0).toLocaleString(locale), t.statRuns)}
+        ${stat(playTime(record.total_play_time), t.statPlayTime)}
+        ${stat(asDate(record.created_at), t.statJoined)}
+        ${stat(asDate(record.last_login), t.statLastSeen)}
+      </div>
+      ${game.capabilities.leaderboard
+        ? `<div style="margin-block-start:14px">
+             <a class="gbtn gbtn--ghost" href="/${esc(game.id)}/leaderboard">${esc(t.toBoard)}</a>
+           </div>` : ''}
+    </div>` : ''
+
+  const profileBlock = record ? `
+    <div class="ghead" style="margin-block-start:26px">${esc(t.profileTitle)}</div>
+    <div class="gcard">
+      ${flash.saved ? `<div class="gnote is-ok" style="margin-block-end:14px">${esc(t.profileSaved)}</div>` : ''}
+      ${flash.nameError
+        ? `<div class="gnote is-err" style="margin-block-end:14px">${esc(
+            flash.nameError === 'taken' ? t.nameTaken : t.nameBad)}</div>` : ''}
+
+      <form method="POST" action="/${esc(game.id)}/account/profile" class="acc-form">
+        <label class="acc-field">
+          <span>${esc(t.usernameLabel)}</span>
+          <input type="text" name="username" dir="ltr" maxlength="12"
+                 value="${esc(record.username || '')}" placeholder="Player123">
+          <small>${esc(t.usernameHint)}</small>
+        </label>
+
+        <label class="acc-field">
+          <span>${esc(t.avatarLabel)}</span>
+          <input type="url" name="avatar" dir="ltr" maxlength="300"
+                 value="${esc(record.profile_pic_url || '')}" placeholder="https://…">
+          <small>${esc(t.avatarHint)}</small>
+        </label>
+
+        <div class="acc-actions">
+          <button type="submit" class="gbtn">${esc(t.saveProfile)}</button>
+          <button type="submit" name="avatar_reset" value="1" class="gbtn gbtn--ghost">${esc(t.avatarFromGoogle)}</button>
+        </div>
+      </form>
+    </div>` : ''
+
   const body = `
+    <style>
+      .acc-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px}
+      .acc-stat{padding:14px 16px;border-radius:14px;background:var(--surface-2);border:1px solid var(--border)}
+      .acc-stat b{display:block;font-size:1.25em;font-weight:800;margin-block-end:3px}
+      .acc-stat span{font-size:.76em;color:var(--dim)}
+      .acc-form{display:grid;gap:16px}
+      .acc-field{display:block}
+      .acc-field>span{display:block;font-size:.8em;font-weight:700;color:var(--dim);margin-block-end:6px}
+      .acc-field input{width:100%;padding:11px 14px;border-radius:12px;font:inherit;font-size:.9em;
+        color:var(--text);background:var(--surface-2);border:1px solid var(--border);outline:none}
+      .acc-field input:focus{border-color:var(--accent)}
+      .acc-field small{display:block;font-size:.76em;color:var(--dim);margin-block-start:5px;line-height:1.6}
+      .acc-actions{display:flex;gap:10px;flex-wrap:wrap}
+      @media (max-width:640px){ .acc-actions .gbtn{flex:1 1 100%} }
+    </style>
     <div class="ghead">${esc(t.title)}</div>
 
     <div class="gcard" style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">
@@ -491,6 +729,9 @@ function renderAccount(game, lang, theme, player, owned) {
         <button type="submit" class="gbtn gbtn--ghost">${esc(t.signOut)}</button>
       </form>
     </div>
+
+    ${statsBlock}
+    ${profileBlock}
 
     <div class="ghead" style="margin-block-start:26px">${esc(t.ownedTitle)}</div>
     <div class="gcard">

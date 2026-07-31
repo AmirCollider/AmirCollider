@@ -35,8 +35,21 @@ import { CONFIG } from '../config.js'
 import { getPageHead } from '../shared-styles.js'
 import { createHtmlResponse } from '../utils.js'
 import { createGamesCardsHTML } from './GamesCards.js'
+import { readPlayerSession } from '../games/session.js'
 import { toolsFor } from '../content/toolsCatalog.js'
 import { resolveGames } from '../games/registry.js'
+
+// ==========================================
+// SITE_NAME
+// What the browser tab says.
+//
+// The <title> used to be "AmirCollider Proxy - v6.7.1", which put
+// two things in a tab that has room for neither: "Proxy" is what
+// the service is rather than what the site is called, and the
+// version is already stamped on the page itself, where somebody
+// looking for it can actually read it. A tab is a bookmark label.
+// ==========================================
+const SITE_NAME = 'AmirCollider'
 
 const DEFAULT_LANG = 'fa'
 const LANG_COOKIE_MAX_AGE = 60 * 60 * 24 * 365
@@ -1005,7 +1018,7 @@ function getClientScript(baseUrl, lang) {
 // ==========================================
 // Page: Dashboard
 // ==========================================
-function createDashboardPage(GAMES, baseUrl, routesCount, lang, theme) {
+function createDashboardPage(GAMES, baseUrl, routesCount, lang, theme, player = null) {
   const amirLogo = CONFIG.AMIR_LOGO
   const resolved = resolveLang(lang)
   const dir = dirFor(resolved)
@@ -1014,7 +1027,7 @@ function createDashboardPage(GAMES, baseUrl, routesCount, lang, theme) {
   return `<!DOCTYPE html>
 <html dir="${dir}" lang="${resolved}"${themeAttr}>
 <head>
-  ${getPageHead({ title: `${pack(resolved).title} - v${CONFIG.VERSION}`, amirLogo })}
+  ${getPageHead({ title: SITE_NAME, amirLogo })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -1028,7 +1041,7 @@ function createDashboardPage(GAMES, baseUrl, routesCount, lang, theme) {
     ${renderStats(resolved, Object.keys(GAMES).length, routesCount)}
 
     <div class="section-title">${escapeHtml(pack(resolved).sectionGames)}</div>
-    ${createGamesCardsHTML(GAMES, baseUrl, { lang: resolved })}
+    ${createGamesCardsHTML(GAMES, baseUrl, { lang: resolved, player })}
 
     ${renderTools(resolved)}
 
@@ -1067,8 +1080,16 @@ export async function handleDashboard(url, request, gameId, requestId, GAMES, en
 
   const games = await resolveGames(env, GAMES)
 
+  // Whether this visitor is already signed in.
+  //
+  // Without it the card's button said "Sign in" to somebody who
+  // had signed in ten seconds earlier and was looking at their
+  // own session - which reads as the sign-in having failed. The
+  // session is site-wide, so one read answers it for every card.
+  const player = await readPlayerSession(env, GAMES, request).catch(() => null)
+
   return createHtmlResponse(
-    createDashboardPage(games, url.origin, availableEndpoints.length, lang, theme),
+    createDashboardPage(games, url.origin, availableEndpoints.length, lang, theme, player),
     200,
     headers
   )

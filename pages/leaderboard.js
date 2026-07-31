@@ -729,13 +729,29 @@ function createLeaderboardPage({ players, game, baseUrl, total, limit, lang, the
 // Data: read the top players from the game's D1 binding
 // ==========================================
 async function fetchTopPlayers(db, limit, gameId) {
-  const { results } = await db.prepare(`
-    SELECT username AS displayName, high_score AS highScore,
-           profile_pic_url AS photoURL, selected_color AS selectedColor
-    FROM players
-    ORDER BY high_score DESC
-    LIMIT ?
-  `).bind(limit).all()
+  // Banned players are excluded from the board. Tried with the
+  // filter and retried without it, so a game database that has
+  // not run 0006 still renders its leaderboard instead of
+  // failing on a column it does not have yet.
+  let results
+  try {
+    ({ results } = await db.prepare(`
+      SELECT username AS displayName, high_score AS highScore,
+             profile_pic_url AS photoURL, selected_color AS selectedColor
+      FROM players
+      WHERE banned_at IS NULL
+      ORDER BY high_score DESC
+      LIMIT ?
+    `).bind(limit).all())
+  } catch {
+    ({ results } = await db.prepare(`
+      SELECT username AS displayName, high_score AS highScore,
+             profile_pic_url AS photoURL, selected_color AS selectedColor
+      FROM players
+      ORDER BY high_score DESC
+      LIMIT ?
+    `).bind(limit).all())
+  }
 
   return (results || []).map((row, index) => ({
     rank: index + 1,

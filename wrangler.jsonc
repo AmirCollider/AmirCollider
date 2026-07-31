@@ -1,7 +1,7 @@
 {
   // ==========================================
   // Cloudflare Worker Config - amircollider
-  // AmirCollider Games - OAuth Proxy v6.7.1
+  // AmirCollider Games - OAuth Proxy v6.7.2
   // ==========================================
   "name": "amircollider",
   "main": "worker.js",

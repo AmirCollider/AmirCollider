@@ -12,6 +12,7 @@
 //   downloadUrl(game)
 //   gameManifest(game, origin)           -> the JSON a client reads
 //   schemeText(value)                    -> a valid URL scheme, or null
+//   landingVideo(url)                    -> { kind, embed } | null
 //   invalidateSettingsCache()
 //
 // ------------------------------------------------------------
@@ -126,6 +127,22 @@ function json(value, fallback) {
     return fallback
   }
 }
+
+// A JSON array, or []. Same forgiveness as json() above and for
+// the same reason: these blobs are edited as raw text in a
+// textarea, and one missing bracket should cost the section it
+// belongs to, not the whole page.
+function jsonArray(value) {
+  const raw = text(value)
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
 
 // A price the payment provider will accept: a positive decimal
 // with at most two places. Anything else falls back to the
@@ -246,6 +263,21 @@ function mergeGame(game, row, productRows) {
       scheme: deepLinkScheme || game.deepLink.scheme
     },
 
+    // The landing page's own content. Entirely database-driven:
+    // config.js has no opinion about trailers, and a game with no
+    // row here gets a landing page built from what the card
+    // already knows - which is a correct page, just a shorter one.
+    landing: {
+      hero: text(row && row.hero_url) || '',
+      videos: jsonArray(row && row.videos_json),
+      devices: jsonArray(row && row.devices_json),
+      about: {
+        fa: text(row && row.about_fa) || '',
+        en: text(row && row.about_en) || '',
+        ja: text(row && row.about_ja) || ''
+      }
+    },
+
     store: {
       ...game.store,
       products: applyProductOverrides(game, productRows)
@@ -350,6 +382,35 @@ export async function resolveGame(env, GAMES, gameId, options = {}) {
   if (!gameId || !GAMES || !GAMES[gameId]) return null
   const merged = await resolveGames(env, GAMES, options)
   return merged[gameId] || null
+}
+
+
+// ==========================================
+// landingVideo
+// How to show one promotional video.
+//
+// Two hosts are embedded and everything else is linked, which is
+// a security decision rather than a laziness one: an <iframe>
+// whose src is operator input is somebody else's JavaScript
+// running inside our origin's frame. YouTube and Aparat are
+// recognised by pattern, their ids are extracted, and the embed
+// URL is BUILT here - the operator's string is never passed
+// through to the src attribute.
+//
+// Returns null for anything unparseable, and the caller renders
+// a plain link instead.
+// ==========================================
+export function landingVideo(url) {
+  const raw = String(url || '').trim()
+  if (!raw) return null
+
+  const youtube = raw.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{6,20})/)
+  if (youtube) return { kind: 'youtube', embed: `https://www.youtube-nocookie.com/embed/${youtube[1]}` }
+
+  const aparat = raw.match(/aparat\.com\/v\/([A-Za-z0-9]{4,20})/)
+  if (aparat) return { kind: 'aparat', embed: `https://www.aparat.com/video/video/embed/videohash/${aparat[1]}/vt/frame` }
+
+  return null
 }
 
 

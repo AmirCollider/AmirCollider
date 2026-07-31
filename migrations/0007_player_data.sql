@@ -1,0 +1,51 @@
+-- ==========================================
+-- 0007_player_data.sql
+--
+-- ############################################################
+-- RUN THIS AGAINST EACH GAME'S OWN DATABASE — NOT THE
+-- LICENCE DATABASE.
+-- ############################################################
+--
+--   npx wrangler d1 execute neon-katana-db --remote \
+--       --file=./migrations/0007_player_data.sql
+--
+-- ------------------------------------------------------------
+-- WHAT THIS IS FOR
+-- ------------------------------------------------------------
+-- Every field a game could save used to be a column, and every
+-- column had to be known in three places: the players table
+-- here, mapPlayer/buildProfileUpdate in worker.js, and the
+-- PlayerProfile struct in the Unity kit.
+--
+-- That is fine for the fields every game has - a score, a play
+-- time, a name. It is wrong for everything else. A puzzle game
+-- wanting `levelsCompleted`, or an RPG wanting an inventory,
+-- had to change a schema, a Worker and a C# struct before it
+-- could save a single number. Which is the "each game needs its
+-- own big changes" problem, exactly.
+--
+-- So: one column, holding a JSON object the game owns outright.
+-- The Worker stores it and merges it and has no opinion about
+-- what is in it. Adding a saved field to a game is now a line of
+-- C# in that game and nothing anywhere else.
+--
+-- The fixed columns stay. high_score is the leaderboard's sort
+-- key and total_play_time is on the account page, so those are
+-- read by this side and have to keep their own shape. This is
+-- for everything this side does not need to understand.
+--
+-- ------------------------------------------------------------
+-- RUNNING IT TWICE
+-- ------------------------------------------------------------
+-- Fails with "duplicate column name: data_json", which means it
+-- already ran. Nothing to fix.
+-- ==========================================
+
+-- A JSON object, defaulting to an empty one so nothing has to
+-- handle NULL. Read through a try/catch on this side: a value
+-- that will not parse is treated as {} rather than 500ing the
+-- save endpoint for one bad write months ago.
+--
+-- PATCH merges into it one key at a time; SET replaces it whole.
+-- Both are documented in GAMES.md.
+ALTER TABLE players ADD COLUMN data_json TEXT NOT NULL DEFAULT '{}';

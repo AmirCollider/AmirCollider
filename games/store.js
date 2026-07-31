@@ -22,6 +22,10 @@
 //   readProductOverrides / saveProductOverride / resetProductOverride
 //   resetAllProductOverrides / purgeGameRows
 //
+//   -- the landing page and the version history --
+//   saveLandingFields / listVersions / listAllVersions
+//   saveVersion / deleteVersion
+//
 //   -- the storefront's orders --
 //   GAME_ORDER_STATE / newGameOrderId / createGameOrder / getGameOrder
 //   getGameOrderByInvoice / markInvoiceOpened / recordPayment / markPaid
@@ -351,6 +355,146 @@ export async function purgeGameRows(database, gameId) {
   const settings = await resetSettings(database, gameId)
 
   return { settings, products }
+}
+
+
+// ==========================================================
+// The landing page and the version history
+// ==========================================================
+
+// ==========================================
+// LANDING_COLUMNS
+// The columns 0005 added, in one place.
+//
+// Written through their own statement for the same reason
+// deeplink_scheme is: they arrived after 0003, so a database that
+// stopped at an earlier migration does not have them, and naming
+// them in the main upsert would make one missing column cost the
+// operator's name, colour and description too.
+// ==========================================
+const LANDING_COLUMNS = [
+  'hero_url', 'videos_json', 'devices_json', 'about_fa', 'about_en', 'about_ja'
+]
+
+export async function saveLandingFields(database, gameId, patch = {}, clear = []) {
+  if (!database || !gameId) return { ok: false, reason: 'no_database' }
+
+  const sets = []
+  const values = []
+  for (const column of LANDING_COLUMNS) {
+    if (clear.includes(column)) { sets.push(`${column} = NULL`); continue }
+    if (Object.prototype.hasOwnProperty.call(patch, column)) {
+      sets.push(`${column} = ?`)
+      values.push(patch[column])
+    }
+  }
+  if (!sets.length) return { ok: true, reason: '' }
+
+  try {
+    await database
+      .prepare(`UPDATE game_settings SET ${sets.join(', ')}, updated_at = ? WHERE game_id = ?`)
+      .bind(...values, now(), gameId)
+      .run()
+    return { ok: true, reason: '' }
+  } catch (error) {
+    return {
+      ok: false,
+      reason: /no such column/i.test(String(error && error.message)) ? 'no_column' : 'failed'
+    }
+  }
+}
+
+
+// ==========================================
+// listVersions
+// One game's releases, newest first.
+//
+// [] on any failure, so a deployment that has not run 0005 shows
+// a versions page saying "nothing published yet" instead of a
+// 500. That is the honest answer for a game with no rows anyway.
+// ==========================================
+export async function listVersions(database, gameId, limit = 50) {
+  if (!database || !gameId) return []
+  try {
+    const { results } = await database
+      .prepare('SELECT * FROM game_versions WHERE game_id = ? ORDER BY released_at DESC LIMIT ?')
+      .bind(gameId, Math.max(1, Math.min(Number(limit) || 50, 200)))
+      .all()
+    return results || []
+  } catch {
+    return []
+  }
+}
+
+
+// ==========================================
+// listAllVersions
+// The newest release of every game, keyed by game id.
+//
+// One query rather than one per game: the dashboard draws a
+// "v1.4.2" badge on every card, and a grid of five cards should
+// not be five round trips.
+// ==========================================
+export async function listAllVersions(database) {
+  if (!database) return {}
+  try {
+    const { results } = await database.prepare(
+      `SELECT v.* FROM game_versions v
+        WHERE v.released_at = (
+          SELECT MAX(v2.released_at) FROM game_versions v2 WHERE v2.game_id = v.game_id
+        )`
+    ).all()
+
+    const out = {}
+    for (const row of results || []) out[row.game_id] = row
+    return out
+  } catch {
+    return {}
+  }
+}
+
+
+export async function saveVersion(database, gameId, version, fields = {}) {
+  if (!database || !gameId || !version) return { ok: false, reason: 'bad_input' }
+
+  try {
+    await database.prepare(
+      `INSERT INTO game_versions
+         (game_id, version, released_at, notes_fa, notes_en, notes_ja, download_url, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT (game_id, version) DO UPDATE SET
+         released_at  = excluded.released_at,
+         notes_fa     = excluded.notes_fa,
+         notes_en     = excluded.notes_en,
+         notes_ja     = excluded.notes_ja,
+         download_url = excluded.download_url`
+    ).bind(
+      gameId, version,
+      Number(fields.released_at) || now(),
+      fields.notes_fa || null, fields.notes_en || null, fields.notes_ja || null,
+      fields.download_url || null,
+      now()
+    ).run()
+    return { ok: true, reason: '' }
+  } catch (error) {
+    return {
+      ok: false,
+      reason: /no such table/i.test(String(error && error.message)) ? 'no_table' : 'failed'
+    }
+  }
+}
+
+
+export async function deleteVersion(database, gameId, version) {
+  if (!database || !gameId || !version) return false
+  try {
+    const result = await database
+      .prepare('DELETE FROM game_versions WHERE game_id = ? AND version = ?')
+      .bind(gameId, version).run()
+    return changed(result)
+  } catch {
+    return false
+  }
 }
 
 

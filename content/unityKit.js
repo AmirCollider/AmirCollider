@@ -565,6 +565,33 @@ using UnityEngine;
 namespace AmirCollider
 {
     [Serializable]
+    // ==========================================
+    // GameData
+    // Whatever THIS game saves, in one place.
+    //
+    // The Worker stores this object and never inspects it, so
+    // adding a saved field is a field here and nothing anywhere
+    // else - no migration, no Worker change, no new endpoint.
+    // That is the difference between a new game costing an
+    // afternoon and costing a deploy.
+    //
+    // Replace the fields below with your game's own. They are
+    // examples, not a contract.
+    //
+    // Unity's JsonUtility only serialises public fields of
+    // [Serializable] types, and has no Dictionary support - so
+    // parallel arrays or a nested [Serializable] class, not a
+    // Dictionary<string, object>.
+    // ==========================================
+    [Serializable]
+    public class GameData
+    {
+        public int levelsCompleted;
+        public string[] unlockedItems;
+        public bool soundEnabled = true;
+    }
+
+    [Serializable]
     public class PlayerProfile
     {
         public string uid;
@@ -575,6 +602,11 @@ namespace AmirCollider
         public int highScore;
         public int gamesPlayed;
         public int totalPlayTime;
+
+        // The free-form document. Empty on a game database that
+        // has not run 0007, which reads as a default GameData
+        // rather than an error.
+        public GameData data;
         public string selectedColor;
         public long createdAt;
         public long lastLogin;
@@ -597,6 +629,12 @@ namespace AmirCollider
         public string username;
         public string selectedColor;
         public int totalPlayTime;
+
+        // Merged into the stored document key by key, so a build
+        // that has never heard of a field somebody added last
+        // month does not delete it. Use SaveData() below rather
+        // than setting this by hand.
+        public GameData dataPatch;
     }
 
     public static class AmirColliderPlayer
@@ -678,6 +716,27 @@ namespace AmirCollider
                 JsonUtility.ToJson(patch),
                 token,
                 result => { if (done != null) done(result.Ok); });
+        }
+
+        // ==========================================
+        // SaveData
+        // This game's own saved state, merged.
+        //
+        // The one call a game needs for everything that is not a
+        // score, a name or a play time. Adding a saved field is a
+        // field on GameData - there is no migration to run, no
+        // Worker endpoint to add and no column to create, which
+        // is the whole reason this exists.
+        //
+        // MERGED, not replaced: keys the running build does not
+        // know about are left alone. That matters the first week
+        // after a release, when half the players are on the old
+        // build and would otherwise wipe the new field every time
+        // they saved.
+        // ==========================================
+        public static IEnumerator SaveData(GameData data, Action<bool> done)
+        {
+            yield return Save(new ProfilePatch { dataPatch = data }, done);
         }
     }
 }

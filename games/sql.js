@@ -199,15 +199,55 @@ CREATE TABLE IF NOT EXISTS players (
   purchased_colors TEXT NOT NULL DEFAULT '["FFFFFF"]',
   purchased_items  TEXT NOT NULL DEFAULT '{}',
 
+  -- Anything else THIS game wants to save.
+  --
+  -- A JSON object the Worker stores, merges and never inspects.
+  -- The columns above are the ones this side reads by name - the
+  -- leaderboard needs high_score, the account page needs
+  -- total_play_time - and this is for everything it does not
+  -- need to understand.
+  --
+  -- That is what keeps a new game from needing a schema change:
+  -- levelsCompleted, an inventory, unlocked characters, a
+  -- difficulty setting - all of it is a key in here rather than
+  -- a column, a Worker mapping and a C# field.
+  --
+  --   PATCH  { "dataPatch": { "levelsCompleted": 12 } }   merges
+  --   POST   { "data":      { ... whole document ... } }  replaces
+  data_json        TEXT NOT NULL DEFAULT '{}',
+
   created_at      INTEGER NOT NULL,
-  last_login      INTEGER
+  last_login      INTEGER,
+
+  -- Moderation. NULL everywhere means an ordinary account.
+  --
+  -- banned_at is permanent until lifted; restricted_until is the
+  -- time-boxed version and needs no clearing, because a value in
+  -- the past is simply not a restriction. The state shown in the
+  -- panel is derived from these two, so there is no third column
+  -- that can disagree with them.
+  --
+  -- worker.js reads banned_at on every score submission and both
+  -- leaderboard queries. A game whose table lacks these columns
+  -- still works - every check falls back to "not banned" - which
+  -- is what migrations/0006_player_moderation.sql exists to fix
+  -- for games created before this block did.
+  banned_at        INTEGER,
+  ban_reason       TEXT,
+  restricted_until INTEGER,
+  restrict_reason  TEXT,
+  admin_note       TEXT
 );
 
 -- The leaderboard query, which is the only hot read in this
 -- database: ORDER BY high_score DESC LIMIT n, run on every
 -- board view.
 CREATE INDEX IF NOT EXISTS idx_players_score ON players (high_score DESC);
-CREATE INDEX IF NOT EXISTS idx_players_email ON players (email);`
+CREATE INDEX IF NOT EXISTS idx_players_email ON players (email);
+
+-- The board query is "highest scores, excluding banned", so the
+-- index carries both columns.
+CREATE INDEX IF NOT EXISTS idx_players_active_score ON players (banned_at, high_score DESC);`
 
   const purchases = `
 
