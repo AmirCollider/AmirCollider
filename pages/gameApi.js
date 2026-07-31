@@ -267,8 +267,18 @@ export async function handleGameDownload(url, request, gameId, requestId, GAMES,
   const lang = langFrom(url, request)
 
   if (isDownloadable(game)) {
-    logInfo('Download redirect', { requestId, gameId: game.id })
-    return Response.redirect(downloadUrl(game), 302)
+    // ?store=<key> picks WHICH link, now that a game may be
+    // published in several places and the card renders a button
+    // for each. The key is looked up in the game's own links
+    // rather than trusted: a query parameter that could name a
+    // destination would make this endpoint an open redirect with
+    // the site's name on it.
+    const asked = String(url.searchParams.get('store') || '')
+    const links = (game.download && game.download.links) || {}
+    const target = (asked && links[asked]) || downloadUrl(game)
+
+    logInfo('Download redirect', { requestId, gameId: game.id, store: asked && links[asked] ? asked : 'primary' })
+    return Response.redirect(target, 302)
   }
 
   logWarning('Download requested while withheld', { requestId, gameId: game.id, status: game.status })

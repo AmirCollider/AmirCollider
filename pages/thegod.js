@@ -307,7 +307,6 @@ const I18N = {
     fDeepLink: 'اسکیم دیپ‌لینک اندروید',
     fDeepLinkHint: 'همان چیزی که در AndroidManifest بیلد ثبت شده. بعد از ورود با گوگل، بازیکن با '
                  + 'آدرس «اسکیم://host» به بازی برمی‌گردد. خالی بگذاری، از مقدار داخل config.js استفاده می‌شود.',
-    fDeepLinkPreview: 'لینک برگشت به بازی',
     fDeepLinkBad: 'اسکیم فقط حروف انگلیسی، عدد و نویسه‌های + - . — بدون فاصله و بدون //:',
 
     purge: 'پاک کردن ردیف‌های دیتابیس',
@@ -408,11 +407,14 @@ const I18N = {
     envMissing: 'تنظیم نشده',
     envChars: 'نویسه',
     envHidden: 'مقدارش نشان داده نمی‌شود',
-    envPublic: 'این مقدار عمومی است و پنهان کردنش فایده‌ای ندارد.',
     envBindingTitle: 'اتصال‌ها (wrangler.jsonc)',
     envBindingHint: 'این‌ها در «Variables and secrets» نیستند؛ در wrangler.jsonc تعریف می‌شوند و با deploy فعال می‌شوند.',
     envSharedTitle: 'متغیرهای مشترک سایت',
     envGameTitle: 'متغیرهای این بازی',
+    envPublicTag: 'عمومی',
+    envSecretTag: 'محرمانه',
+    envPublicWhy: 'این مقدار همین حالا هم در آدرس صفحه‌ی ورود گوگل یا داخل فایل APK دیده می‌شود.',
+    envSecretSafe: 'ردیف‌های «عمومی» چیزهایی‌اند که هر بازدیدکننده‌ی سایت از قبل می‌بیند — Client ID در آدرس صفحه‌ی ورود گوگل، و اسکیم دیپ‌لینک داخل فایل APK. ردیف «محرمانه» هیچ‌وقت به مرورگر فرستاده نمی‌شود؛ فقط طولش شمرده می‌شود تا بفهمی موقع paste چیز اضافه‌ای وارد نشده باشد.',
     envOptional: 'اختیاری',
     envRequired: 'لازم',
 
@@ -447,6 +449,14 @@ const I18N = {
     nColor: 'رنگ',
     nPackage: 'نام package اندروید',
     nMyket: 'لینک مایکت',
+    nGooglePlay: 'لینک گوگل پلی',
+    nApk: 'لینک مستقیم APK',
+    nWeb: 'آدرس بازی تحت وب',
+    nDownloads: 'روش‌های دانلود',
+    nDownloadsHint: 'هر کدام را که داشته باشی همان‌قدر دکمه روی کارت بازی ساخته می‌شود. خالی بگذاری، آن دکمه اصلاً نمایش داده نمی‌شود. پس هم «فقط یک روش» و هم «چند روش» با همین یک فرم درست می‌شود.',
+    nPrimary: 'روش اصلی',
+    nPrimaryAuto: 'خودکار (اولین موردی که پر کرده‌ای)',
+    nPrimaryHint: 'دکمه‌ی اصلی اول می‌آید و حاشیه‌ی رنگی می‌گیرد. بقیه هم نمایش داده می‌شوند، فقط بعد از آن.',
     nDescFa: 'توضیح فارسی',
     nDescEn: 'توضیح انگلیسی',
     nDescJa: 'توضیح ژاپنی',
@@ -524,7 +534,6 @@ const I18N = {
     fDeepLink: 'Android deep-link scheme',
     fDeepLinkHint: 'The scheme the build registered in its AndroidManifest. After a Google sign-in the player '
                  + 'is handed back to the game at "scheme://host". Leave it empty to use the value in config.js.',
-    fDeepLinkPreview: 'Return link',
     fDeepLinkBad: 'A scheme is letters, digits and + - . — no spaces, no "://".',
 
     purge: 'Delete the database rows',
@@ -620,11 +629,14 @@ const I18N = {
     envMissing: 'not set',
     envChars: 'chars',
     envHidden: 'value not shown',
-    envPublic: 'This value is public; hiding it would buy nothing.',
     envBindingTitle: 'Bindings (wrangler.jsonc)',
     envBindingHint: 'These are not in "Variables and secrets" — they live in wrangler.jsonc and take effect on deploy.',
     envSharedTitle: 'Site-wide variables',
     envGameTitle: 'This game’s variables',
+    envPublicTag: 'public',
+    envSecretTag: 'secret',
+    envPublicWhy: 'This value is already visible in the Google sign-in URL, or inside the APK.',
+    envSecretSafe: 'The "public" rows are things every visitor already sees — the client ID travels in the Google sign-in URL, and the deep-link scheme ships inside the APK. The "secret" row is never sent to the browser; only its length is counted, so you can tell a clean paste from one with something extra in it.',
     envOptional: 'optional',
     envRequired: 'required',
 
@@ -659,6 +671,14 @@ const I18N = {
     nColor: 'Colour',
     nPackage: 'Android package',
     nMyket: 'Myket link',
+    nGooglePlay: 'Google Play link',
+    nApk: 'Direct APK link',
+    nWeb: 'Browser game URL',
+    nDownloads: 'Download methods',
+    nDownloadsHint: 'Each one you fill in becomes a button on the game card. Leave a box empty and that button is not rendered — so "one method only" and "several methods" are the same form.',
+    nPrimary: 'Primary method',
+    nPrimaryAuto: 'Automatic (the first one you filled in)',
+    nPrimaryHint: 'The primary button comes first and gets the accent edge. The others are still shown, just after it.',
     nDescFa: 'Persian description',
     nDescEn: 'English description',
     nDescJa: 'Japanese description',
@@ -734,7 +754,6 @@ const I18N = {
     fDeepLink: 'Android ディープリンクのスキーム',
     fDeepLinkHint: 'ビルドが AndroidManifest に登録したスキームです。Google サインイン後、プレイヤーは '
                  + '「scheme://host」でゲームに戻ります。空欄なら config.js の値が使われます。',
-    fDeepLinkPreview: '復帰リンク',
     fDeepLinkBad: 'スキームは英字・数字・+ - . のみ。空白や "://" は使えません。',
 
     purge: 'データベースの行を削除',
@@ -829,11 +848,14 @@ const I18N = {
     envMissing: '未設定',
     envChars: '文字',
     envHidden: '値は表示しません',
-    envPublic: 'この値は公開情報なので、隠しても意味がありません。',
     envBindingTitle: 'バインディング（wrangler.jsonc）',
     envBindingHint: 'これらは「Variables and secrets」ではなく wrangler.jsonc で定義し、デプロイで有効になります。',
     envSharedTitle: 'サイト共通の変数',
     envGameTitle: 'このゲームの変数',
+    envPublicTag: '公開',
+    envSecretTag: '秘密',
+    envPublicWhy: 'この値は Google サインインの URL や APK の中で既に見えています。',
+    envSecretSafe: '「公開」の行は、訪問者が既に目にしている値です。クライアント ID は Google サインインの URL に含まれ、ディープリンクのスキームは APK に入っています。「秘密」の行はブラウザーに送られません。文字数だけを数えているので、余計なものが混ざった貼り付けを見分けられます。',
     envOptional: '任意',
     envRequired: '必須',
 
@@ -866,6 +888,14 @@ const I18N = {
     nColor: '色',
     nPackage: 'Android パッケージ',
     nMyket: 'Myket リンク',
+    nGooglePlay: 'Google Play リンク',
+    nApk: 'APK 直リンク',
+    nWeb: 'ブラウザーゲームの URL',
+    nDownloads: '配信方法',
+    nDownloadsHint: '入力した数だけゲームカードにボタンが並びます。空欄の項目はボタンが表示されません。「1 つだけ」も「複数」も同じフォームで設定できます。',
+    nPrimary: '主な配信方法',
+    nPrimaryAuto: '自動（最初に入力したもの）',
+    nPrimaryHint: '主なボタンが先頭に来てアクセント枠が付きます。他のボタンもその後ろに表示されます。',
     nDescFa: 'ペルシャ語の説明',
     nDescEn: '英語の説明',
     nDescJa: '日本語の説明',
@@ -2167,15 +2197,25 @@ function tgEnvRow(entry, options) {
   // a public value prints itself, a secret prints its length and
   // never its value, and a binding has no value at all - it is
   // either wired up or it is not, which the chip already said.
+  //
+  // The "public / secret" tag is PER ROW rather than a sentence
+  // under the table. It used to be one note below a table that
+  // also listed the client secret, so it read as "everything
+  // here is public" - which was alarming and untrue about the
+  // one row it appeared to describe.
   var shown;
+  var tag = '';
   if (!entry.set) shown = '<span class="muted">—</span>';
-  else if (entry.value) shown = '<code>' + tgEsc(entry.value) + '</code>';
-  else if (entry.length) {
+  else if (entry.value) {
+    shown = '<code>' + tgEsc(entry.value) + '</code>';
+    tag = '<span class="chip info" title="' + tgEsc(TG.t.envPublicWhy) + '">' + tgEsc(TG.t.envPublicTag) + '</span>';
+  } else if (entry.length) {
     shown = '<span class="muted">' + tgEsc(TG.t.envHidden) + ' · ' + entry.length + ' ' + tgEsc(TG.t.envChars) + '</span>';
+    tag = '<span class="chip warn">' + tgEsc(TG.t.envSecretTag) + '</span>';
   } else shown = '<span class="muted">—</span>';
 
   return '<tr><td><code>' + tgEsc(entry.key) + '</code></td>'
-       + '<td>' + chip + ' ' + need + '</td>'
+       + '<td>' + chip + ' ' + need + ' ' + tag + '</td>'
        + '<td style="word-break:break-all">' + shown + '</td></tr>';
 }
 
@@ -2215,7 +2255,7 @@ function tgEnvGame(game) {
     +   '<h2 class="sec">🎮 ' + tgEsc(game.name) + ' <span class="chip">' + tgEsc(game.id) + '</span></h2>'
     +   '<h3 class="sub">' + tgEsc(TG.t.envGameTitle) + '</h3>'
     +   tgEnvTable(rows)
-    +   '<div class="hint" style="margin-block-start:8px">' + tgEsc(TG.t.envPublic) + '</div>'
+    +   '<div class="note ok" style="margin-block-start:10px">' + tgEsc(TG.t.envSecretSafe) + '</div>'
 
     +   '<h3 class="sub">' + tgEsc(TG.t.envBindingTitle) + '</h3>'
     +   tgEnvTable([tgEnvRow(game.binding, { optional: false })])
@@ -2286,14 +2326,41 @@ function tgRenderNew() {
   +     '<label class="f"><span>' + tgEsc(TG.t.nName) + '</span>'
   +       '<input type="text" id="n-name" placeholder="Pixel Runner"></label>'
   +   '</div>'
-  +   '<div class="grid three">'
+  +   '<div class="grid two">'
   +     '<label class="f"><span>' + tgEsc(TG.t.nIcon) + '</span>'
   +       '<input type="text" id="n-icon" value="🎮"></label>'
   +     '<label class="f"><span>' + tgEsc(TG.t.nColor) + '</span>'
   +       '<input type="color" id="n-color" value="#6c63ff"></label>'
-  +     '<label class="f"><span>' + tgEsc(TG.t.nMyket) + '</span>'
-  +       '<input type="text" id="n-myket" dir="ltr"></label>'
   +   '</div>'
+
+  // Four ways to publish a game, not one. Leave a box empty and
+  // that button simply is not rendered on the card, so a game
+  // sold only on Myket looks exactly as it did - and a game on
+  // Play and Myket with a direct APK gets three buttons without
+  // anybody editing config.js by hand afterwards.
+  +   '<h3 class="sub">' + tgEsc(TG.t.nDownloads) + '</h3>'
+  +   '<div class="hint" style="margin-block-end:12px">' + tgEsc(TG.t.nDownloadsHint) + '</div>'
+  +   '<div class="grid two">'
+  +     '<label class="f"><span>' + tgEsc(TG.t.nMyket) + '</span>'
+  +       '<input type="text" id="n-myket" dir="ltr" placeholder="https://myket.ir/app/…"></label>'
+  +     '<label class="f"><span>' + tgEsc(TG.t.nGooglePlay) + '</span>'
+  +       '<input type="text" id="n-googleplay" dir="ltr" placeholder="https://play.google.com/store/apps/details?id=…"></label>'
+  +   '</div>'
+  +   '<div class="grid two">'
+  +     '<label class="f"><span>' + tgEsc(TG.t.nApk) + '</span>'
+  +       '<input type="text" id="n-apk" dir="ltr" placeholder="https://…/game.apk"></label>'
+  +     '<label class="f"><span>' + tgEsc(TG.t.nWeb) + '</span>'
+  +       '<input type="text" id="n-web" dir="ltr" placeholder="https://…"></label>'
+  +   '</div>'
+  +   '<label class="f" style="max-width:320px"><span>' + tgEsc(TG.t.nPrimary) + '</span>'
+  +     '<select id="n-primary">'
+  +       '<option value="">' + tgEsc(TG.t.nPrimaryAuto) + '</option>'
+  +       '<option value="myket">' + tgEsc(TG.t.nMyket) + '</option>'
+  +       '<option value="googleplay">' + tgEsc(TG.t.nGooglePlay) + '</option>'
+  +       '<option value="apk">' + tgEsc(TG.t.nApk) + '</option>'
+  +       '<option value="web">' + tgEsc(TG.t.nWeb) + '</option>'
+  +     '</select>'
+  +     '<span class="hint">' + tgEsc(TG.t.nPrimaryHint) + '</span></label>'
   +   '<label class="f"><span>' + tgEsc(TG.t.nPackage) + '</span>'
   +     '<input type="text" id="n-package" dir="ltr" placeholder="com.AmirColliderGames.PixelRunner"></label>'
   +   '<label class="f"><span>' + tgEsc(TG.t.nDescFa) + '</span>'
@@ -2338,7 +2405,13 @@ function tgBuildScaffold() {
       descriptionFa: tgById('n-desc-fa').value,
       descriptionEn: tgById('n-desc-en').value,
       descriptionJa: tgById('n-desc-ja').value,
-      downloadLinks: { myket: tgById('n-myket').value },
+      downloadLinks: {
+        myket: (tgById('n-myket').value || '').trim(),
+        googleplay: (tgById('n-googleplay').value || '').trim(),
+        apk: (tgById('n-apk').value || '').trim(),
+        web: (tgById('n-web').value || '').trim()
+      },
+      downloadPrimary: tgById('n-primary').value,
       onlinePlay: tgById('n-online').checked,
       login: tgById('n-login').checked,
       cloudSave: tgById('n-cloud').checked,

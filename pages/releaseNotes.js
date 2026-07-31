@@ -76,9 +76,107 @@ const RN_I18N = {
 // ==========================================
 const RELEASES = [
   {
+    version: '6.7.1',
+    date: '2026-07-31',
+    tag: 'latest',
+    summary: {
+      fa: 'رفع اشکال‌های پنل‌ها و کارت بازی: هویت پنل تست، نمایش لوگوها، خروج اسکیم دیپ‌لینک از secretها، تب متغیرها، و پشتیبانی از چند روش دانلود.',
+      en: 'Panel and game-card fixes: the test panel’s own identity, logo rendering, the deep-link scheme out of secrets, an Environment tab, and support for several download methods.',
+      ja: 'パネルとゲームカードの修正：テストパネルの識別、ロゴ表示、ディープリンクのシークレット解除、環境変数タブ、複数の配信方法への対応。'
+    },
+    groups: [
+      {
+        title: { fa: 'پنل‌ها', en: 'Panels', ja: 'パネル' },
+        items: {
+          fa: [
+            'پنل تست دیگر خودش را با نام و رنگ اولین بازی رجیستری معرفی نمی‌کند؛ نام سایت و رنگ صفحه‌ی ورود خودش را دارد.',
+            'تب جدید «متغیرها» در پنل TheGod: فهرست همه‌ی متغیرهایی که Worker می‌خواند، وضعیت تنظیم‌شدن هرکدام، و آدرس redirect که باید در Google Cloud Console ثبت شود.',
+            'مقدار هیچ secretی به مرورگر فرستاده نمی‌شود؛ فقط «تنظیم شده / نشده» و تعداد نویسه‌ها، که برای تشخیص paste اشتباه کافی است.',
+            'برچسب «عمومی» و «محرمانه» برای هر ردیف جدا، تا معلوم باشد کدام مقدار از قبل قابل دیدن بوده و کدام هیچ‌وقت نمایش داده نمی‌شود.',
+            'دکمه‌ی «پاک کردن ردیف‌های دیتابیس» و SQL معادلش، برای برگرداندن یک بازی به دقیقاً همان چیزی که در config.js نوشته شده.',
+            'خروجی SQL تنظیمات حالا می‌نویسد کدام ستون‌ها واقعاً مقدار دارند، به‌جای چاپ یک دیوار NULL.'
+          ],
+          en: [
+            'The test panel no longer introduces itself with the first registered game’s name and colour; it uses the site’s own brand and its login page’s accent.',
+            'New Environment tab in TheGod: every variable the Worker reads, whether each one is set, and the redirect URI to register in the Google Cloud console.',
+            'No secret’s value is sent to the browser — only “set / not set” and a character count, which is enough to spot a bad paste.',
+            'Per-row “public” and “secret” tags, so it is clear which values were already visible and which are never shown.',
+            'A “delete the database rows” button and the matching SQL, to put a game back to exactly what config.js says.',
+            'The settings SQL now names which columns actually hold a value instead of printing a wall of NULLs.'
+          ],
+          ja: [
+            'テストパネルが最初のゲームの名前と色を借りるのをやめ、サイト自身のブランドとログインページのアクセントを使うようになりました。',
+            'TheGod に「環境変数」タブを追加：Worker が読むすべての変数、設定状況、Google Cloud コンソールに登録すべきリダイレクト URI を表示。',
+            'シークレットの値はブラウザーに送信されません。「設定済み / 未設定」と文字数だけを表示します。',
+            '行ごとの「公開」「秘密」タグにより、元から見えている値と決して表示されない値を区別。',
+            'ゲームを config.js の状態に戻す「データベースの行を削除」ボタンと対応する SQL。',
+            '設定 SQL が NULL の羅列ではなく、実際に値のある列を明示するようになりました。'
+          ]
+        }
+      },
+      {
+        title: { fa: 'ورود با گوگل و دیپ‌لینک', en: 'Google sign-in & deep links', ja: 'Google サインインとディープリンク' },
+        items: {
+          fa: [
+            'اسکیم دیپ‌لینک دیگر secret نیست. حالا به ترتیب از پنل، سپس متغیر Cloudflare، سپس مقدار پشتیبان داخل config.js خوانده می‌شود.',
+            'قبلاً این متغیر در فهرست «الزامی» بود و پاک کردنش کل سایت را با خطای ۵۰۰ از کار می‌انداخت — از جمله خود پنل‌ها. دیگر این‌طور نیست.',
+            'بررسی متغیرهای الزامی حالا از روی رجیستری بازی‌ها ساخته می‌شود، پس بازی دوم هم بررسی می‌شود.',
+            'اسکیم دیپ‌لینک هنگام ذخیره و هنگام خواندن اعتبارسنجی می‌شود؛ مقداری که اسکیم معتبر نباشد پذیرفته نمی‌شود.',
+            'مسیر /oauth/auth دیگر هر client_id دلخواهی را قبول نمی‌کند. فرستادن client_id اندروید به آن دقیقاً خطای redirect_uri_mismatch می‌ساخت.',
+            'مهاجرت 0004_deeplink.sql: یک ستون deeplink_scheme به جدول game_settings اضافه می‌کند.'
+          ],
+          en: [
+            'The deep-link scheme is no longer a secret. It now resolves from the panel, then a Cloudflare variable, then the fallback in config.js.',
+            'It used to be on the required list, so deleting the variable took the whole site down with a 500 — including the panels. No longer.',
+            'The required-variable check is now derived from the game registry, so a second game is actually checked.',
+            'The scheme is validated on write and on read; a value that is not a URL scheme is refused.',
+            '/oauth/auth no longer accepts an arbitrary client_id. Passing an Android client id there produced exactly the redirect_uri_mismatch error.',
+            'Migration 0004_deeplink.sql adds one deeplink_scheme column to game_settings.'
+          ],
+          ja: [
+            'ディープリンクのスキームはシークレットではなくなりました。パネル → Cloudflare 変数 → config.js の既定値の順で解決されます。',
+            '以前は必須リストにあり、変数を削除するとパネルを含むサイト全体が 500 になりました。もう起きません。',
+            '必須変数のチェックをゲームレジストリから導出するようになり、2 つ目のゲームも検査されます。',
+            'スキームは書き込み時と読み込み時に検証され、URL スキームでない値は拒否されます。',
+            '/oauth/auth は任意の client_id を受け付けなくなりました。Android の client id を渡すと redirect_uri_mismatch になっていました。',
+            'マイグレーション 0004_deeplink.sql が game_settings に deeplink_scheme 列を追加します。'
+          ]
+        }
+      },
+      {
+        title: { fa: 'کارت بازی و ظاهر', en: 'Game card & appearance', ja: 'ゲームカードと表示' },
+        items: {
+          fa: [
+            'لوگوی بازی‌ها درست نمایش داده می‌شود. جعبه‌ی لوگو یک flex بود که اموجی و تصویر عرضش را بین خودشان تقسیم می‌کردند و از لوگو یک باریکه می‌ماند.',
+            'پشتیبانی از چند روش دانلود: مایکت، گوگل پلی، APK مستقیم و بازی تحت وب — هرکدام با لوگوی خودش.',
+            'یک روش یا چند روش، هر دو با یک فرم ساخته می‌شود؛ فیلد خالی یعنی آن دکمه ساخته نشود.',
+            'مسیر /{بازی}/download?store=… فقط بین لینک‌های خود بازی انتخاب می‌کند، پس نمی‌شود از آن به‌عنوان redirect باز سوءاستفاده کرد.',
+            'حذف جمله‌ی تکراری زیر برچسب «قابل بازی بدون اینترنت» — همان اطلاعات را چیپ‌های کنارش می‌گفتند.',
+            'رفع اشکال «بدون برچسب»: برداشتن ریبون یک محصول ذخیره می‌شد ولی ریبون از config.js دوباره برمی‌گشت.'
+          ],
+          en: [
+            'Game logos render correctly. The logo box was a flex container where the emoji and the image split the width, leaving a sliver of the logo.',
+            'Support for several download methods: Myket, Google Play, a direct APK and a browser game — each with its own logo.',
+            'One method or several are the same form; an empty field simply means that button is not rendered.',
+            '/{game}/download?store=… only picks among the game’s own links, so it cannot be abused as an open redirect.',
+            'Removed the sentence duplicating the “plays offline” chip — the chips beside it already said the same thing.',
+            'Fixed “No ribbon”: taking a product’s ribbon off appeared to save and then came back from config.js.'
+          ],
+          ja: [
+            'ゲームのロゴが正しく表示されます。ロゴ枠が flex で、絵文字と画像が幅を分け合っていました。',
+            '複数の配信方法に対応：Myket、Google Play、APK 直リンク、ブラウザーゲーム。それぞれ専用ロゴ付き。',
+            '1 つでも複数でも同じフォームで設定でき、空欄の項目はボタンが表示されません。',
+            '/{game}/download?store=… はそのゲームのリンクからのみ選ぶため、オープンリダイレクトになりません。',
+            '「オフラインで遊べる」チップの下にあった重複した一文を削除しました。',
+            '「リボンなし」の不具合を修正：保存したように見えて config.js のリボンが戻っていました。'
+          ]
+        }
+      }
+    ]
+  },
+  {
     version: '6.7',
     date: '2026-06-24',
-    tag: 'latest',
     summary: {
       fa: 'بازسازی کامل سایت: سیستم طراحی جدید، پشتیبانی سه‌زبانه، تم روشن/تاریک/خودکار، میزبانی فایل‌ها روی R2 و انتقال دامنه.',
       en: 'A full site rebuild: a new design system, trilingual support, light/dark/auto theming, R2-hosted assets and a domain migration.',

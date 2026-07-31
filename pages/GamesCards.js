@@ -48,8 +48,35 @@
 //   - Bespoke card:      register a renderer in CUSTOM_CARD_RENDERERS.
 // ==========================================
 
-const MYKET_LOGO_URL = '/assets/MyketLogo.png'
 const DEFAULT_LANG = 'fa'
+
+// ==========================================
+// Where a game can be downloaded from
+//
+// One entry per store this site knows how to badge. The card used
+// to hard-code Myket's logo and render only the PRIMARY link, so
+// a game published in two places advertised one of them and a
+// game published anywhere else got a generic download glyph.
+//
+// A key that is not in here still works: it renders with the
+// download glyph and its own key as the label, which is what a
+// game with a store nobody has drawn a logo for should do.
+// Adding a store is one entry here plus the file in R2.
+//
+// `web` is the odd one out and deliberately included: a browser
+// game is not downloaded at all, so its button says "play" and
+// points at wherever the game runs.
+// ==========================================
+const STORES = {
+  myket: { logo: '/assets/MyketLogo.png', label: 'myket' },
+  googleplay: { logo: '/assets/GooglePlayStoreLogo.png', label: 'googleplay' },
+  apk: { logo: '/assets/AndroidAPKLogo.png', label: 'apk' },
+  web: { logo: '/assets/WebLogo.png', label: 'web', play: true }
+}
+
+function storeMeta(key) {
+  return STORES[String(key || '').toLowerCase()] || null
+}
 
 // ==========================================
 // i18n - card UI strings (fa / en / ja)
@@ -81,6 +108,10 @@ const CARD_I18N = {
     downloadOff: 'دانلود در دسترس نیست',
     downloadFrom: 'دانلود از',
     myket: 'مایکت',
+    googleplay: 'گوگل پلی',
+    apk: 'دانلود مستقیم APK',
+    web: 'بازی در مرورگر',
+    playOn: 'اجرا در',
 
     // secondary
     leaderboard: 'جدول امتیازات',
@@ -116,6 +147,10 @@ const CARD_I18N = {
     downloadOff: 'Download unavailable',
     downloadFrom: 'Download on',
     myket: 'Myket',
+    googleplay: 'Google Play',
+    apk: 'Direct APK',
+    web: 'Play in browser',
+    playOn: 'Play on',
 
     leaderboard: 'Leaderboard',
     privacy: 'Privacy',
@@ -149,6 +184,10 @@ const CARD_I18N = {
     downloadOff: 'ダウンロード停止中',
     downloadFrom: '入手先',
     myket: 'Myket',
+    googleplay: 'Google Play',
+    apk: 'APK 直接ダウンロード',
+    web: 'ブラウザーで遊ぶ',
+    playOn: 'プレイ',
 
     leaderboard: 'ランキング',
     privacy: 'プライバシー',
@@ -261,7 +300,8 @@ const ICONS = {
   wifiOff: '<path d="M2 2l20 20"/><path d="M8.5 16.5a5 5 0 0 1 7 0"/><path d="M5 12.5a10 10 0 0 1 3.5-2.3"/><path d="M19 12.5a10 10 0 0 0-6-2.4"/><circle cx="12" cy="20" r="1"/>',
   cloud: '<path d="M7 18a4 4 0 0 1 0-8 5.5 5.5 0 0 1 10.5 1.5A3.5 3.5 0 0 1 17 18z"/>',
   key: '<circle cx="8" cy="12" r="4"/><path d="M12 12h9"/><path d="M18 12v3"/><path d="M15.5 12v2.5"/>',
-  chevron: '<polyline points="9 6 15 12 9 18"/>'
+  chevron: '<polyline points="9 6 15 12 9 18"/>',
+  play: '<path d="M8 5.5v13l11-6.5z"/>'
 }
 
 function icon(name, cls) {
@@ -435,18 +475,6 @@ function getGamesCardsCSS() {
     border-color: color-mix(in srgb, var(--accent) 30%, transparent);
   }
 
-  .gc-offline-note {
-    display: flex; align-items: flex-start; gap: 10px;
-    margin-block-start: 14px; padding: 11px 14px;
-    border-radius: 13px;
-    font-size: 0.8em; line-height: 1.6;
-    color: var(--gc-text-dim);
-    background: var(--gc-surface);
-    border: 1px solid var(--gc-border);
-    border-inline-start: 3px solid color-mix(in srgb, var(--accent) 55%, transparent);
-  }
-  .gc-offline-note svg { width: 16px; height: 16px; flex-shrink: 0; margin-block-start: 2px; }
-
   .gc-divider {
     height: 1px; margin: 18px 0 16px;
     background: linear-gradient(90deg, transparent,
@@ -503,11 +531,18 @@ function getGamesCardsCSS() {
     opacity: 0.5; cursor: not-allowed; pointer-events: none;
   }
 
-  /* ---------- store button (download) ---------- */
-  .gc-myket {
+  /* ---------- store buttons (download / play) ----------
+     One button per place the game can be got from. A game with a
+     single link renders exactly as it used to; two or more sit in
+     a responsive grid so three stores do not become three
+     full-width bars pushing the card to twice its height. */
+  .gc-stores { display: grid; gap: 10px; margin-block-start: 12px; }
+  .gc-stores--many { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+
+  .gc-store {
     display: flex; align-items: center; gap: 12px;
     inline-size: 100%; box-sizing: border-box;
-    margin-block-start: 12px; padding: 13px 18px;
+    padding: 13px 18px;
     border-radius: 16px; text-decoration: none; color: #fff;
     font-weight: 700; font-size: 0.95em; letter-spacing: 0.3px;
     background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
@@ -515,25 +550,36 @@ function getGamesCardsCSS() {
     box-shadow: 0 4px 20px rgba(15,52,96,0.45), inset 0 1px 0 rgba(255,255,255,0.06);
     transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
   }
-  .gc-myket:hover  { transform: translateY(-3px); filter: brightness(1.1); }
-  .gc-myket:active { transform: scale(0.98); }
-  .gc-myket:focus-visible { outline: 2px solid #90caf9; outline-offset: 2px; }
-  .gc-myket-logo {
+  /* The primary keeps the accent edge, so "where we would rather
+     you got it" survives the others being equally present. */
+  .gc-store--primary { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+  .gc-store:hover  { transform: translateY(-3px); filter: brightness(1.1); }
+  .gc-store:active { transform: scale(0.98); }
+  .gc-store:focus-visible { outline: 2px solid #90caf9; outline-offset: 2px; }
+
+  .gc-store-logo {
+    position: relative;
     width: 36px; height: 36px; flex-shrink: 0;
     border-radius: 10px; overflow: hidden; background: #fff;
+    display: flex; align-items: center; justify-content: center; color: #1a1a2e;
     box-shadow: 0 2px 8px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15);
   }
-  .gc-myket-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .gc-myket-text { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
-  .gc-myket-text small { font-size: 0.72em; opacity: 0.65; font-weight: 500; }
-  .gc-myket-text strong { font-size: 1.05em; font-weight: 800; }
-  .gc-myket-dl {
+  /* Absolute, so the glyph underneath is the fallback when the
+     logo 404s rather than a second flex item beside it. */
+  .gc-store-logo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+  .gc-store-glyph { display: flex; align-items: center; justify-content: center; }
+  .gc-store-glyph svg { width: 18px; height: 18px; }
+
+  .gc-store-text { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 0; }
+  .gc-store-text small { font-size: 0.72em; opacity: 0.65; font-weight: 500; }
+  .gc-store-text strong { font-size: 1.05em; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .gc-store-go {
     margin-inline-start: auto;
-    width: 32px; height: 32px; border-radius: 50%;
+    width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
     background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
   }
-  .gc-myket--off {
+  .gc-store--off {
     filter: grayscale(0.8); opacity: 0.55;
     cursor: not-allowed; pointer-events: none;
   }
@@ -665,7 +711,7 @@ function createCapabilities(game, lang) {
   if (capability.onlinePlay) {
     chips.push({ ic: 'ping', label: t(lang, 'capOnline'), lead: true })
   } else {
-    chips.push({ ic: 'wifiOff', label: t(lang, 'capOffline'), lead: true })
+    chips.push({ ic: 'wifiOff', label: t(lang, 'capOffline'), lead: true, title: offlineHint(game, lang) })
   }
 
   if (capability.login) chips.push({ ic: 'key', label: t(lang, 'capLogin') })
@@ -676,28 +722,32 @@ function createCapabilities(game, lang) {
   if (!chips.length) return ''
 
   return `<div class="gc-caps">${chips.map(chip =>
-    `<span class="gc-cap${chip.lead ? ' gc-cap--lead' : ''}">${icon(chip.ic)}<span>${escapeHtml(chip.label)}</span></span>`
+    `<span class="gc-cap${chip.lead ? ' gc-cap--lead' : ''}"` +
+    `${chip.title ? ` title="${escapeHtml(chip.title)}"` : ''}>` +
+    `${icon(chip.ic)}<span>${escapeHtml(chip.label)}</span></span>`
   ).join('')}</div>`
 }
 
 
 // ==========================================
 // Offline explainer
-// Shown only for a game that plays offline AND still wants the
-// network for something. Saying "plays offline" and then
-// offering a sign-in button is a contradiction on the face of
-// it; this is the sentence that resolves it.
+//
+// Removed as a block of its own. It sat directly under the
+// "plays offline" chip and said the same thing again in a
+// sentence - and the exception it spelled out ("the network is
+// only needed to sign in, sync and buy") is already the literal
+// list of chips sitting beside it. Two lines of card space to
+// repeat the row above it.
+//
+// The nuance is kept where it costs nothing: as the title on the
+// offline chip itself, for anybody who wonders why an offline
+// game has a sign-in button.
 // ==========================================
-function createOfflineNote(game, lang) {
+function offlineHint(game, lang) {
   const capability = caps(game)
   if (capability.onlinePlay) return ''
   if (!capability.login && !capability.cloudSave && !capability.store) return ''
-
-  return `
-    <div class="gc-offline-note">
-      ${icon('wifiOff')}
-      <span>${escapeHtml(t(lang, 'offlineNote'))}</span>
-    </div>`
+  return t(lang, 'offlineNote')
 }
 
 
@@ -763,25 +813,44 @@ function createPrimaryActions(game, lang) {
 function createDownloadButton(game, lang) {
   const sid = safeId(game.id)
   const links = downloadLinks(game)
-  if (!Object.keys(links).length) return ''
+  const keys = Object.keys(links)
+  if (!keys.length) return ''
 
   const enabled = downloadEnabled(game)
-  const primary = (game.download && game.download.primary) || Object.keys(links)[0]
-  const isMyket = primary === 'myket'
 
-  return `
-    <a class="gc-myket${enabled ? '' : ' gc-myket--off'}"
-       href="${enabled ? `/${sid}/download` : '#'}"
+  // The primary first, then the rest in the order the registry
+  // listed them. A game with one link looks exactly as it did;
+  // a game with three now shows three, rather than picking one
+  // and hiding the others behind nothing at all.
+  const primary = (game.download && game.download.primary) || keys[0]
+  const ordered = keys.includes(primary) ? [primary, ...keys.filter(k => k !== primary)] : keys
+
+  const buttons = ordered.map((key, index) => {
+    const meta = storeMeta(key)
+    const label = meta ? t(lang, meta.label) : key
+    // A browser game is not downloaded, so the verb changes. The
+    // withheld state still reads "unavailable" either way.
+    const lead = !enabled
+      ? t(lang, 'downloadOff')
+      : (meta && meta.play ? t(lang, 'playOn') : t(lang, 'downloadFrom'))
+
+    return `
+    <a class="gc-store${index === 0 ? ' gc-store--primary' : ''}${enabled ? '' : ' gc-store--off'}"
+       href="${enabled ? `/${sid}/download?store=${encodeURIComponent(key)}` : '#'}"
        ${enabled ? '' : 'aria-disabled="true" tabindex="-1"'}>
-      <span class="gc-myket-logo">${isMyket
-        ? `<img src="${escapeHtml(MYKET_LOGO_URL)}" alt="Myket">`
-        : `<span style="display:flex;align-items:center;justify-content:center;height:100%;color:#1a1a2e">${icon('download')}</span>`}</span>
-      <span class="gc-myket-text">
-        <small>${escapeHtml(enabled ? t(lang, 'downloadFrom') : t(lang, 'downloadOff'))}</small>
-        <strong>${escapeHtml(isMyket ? t(lang, 'myket') : primary || t(lang, 'download'))}</strong>
+      <span class="gc-store-logo">${meta
+        ? `<img src="${escapeHtml(meta.logo)}" alt="${escapeHtml(label)}" loading="lazy"
+             onerror="this.style.display='none'">`
+        : ''}<span class="gc-store-glyph">${icon('download')}</span></span>
+      <span class="gc-store-text">
+        <small>${escapeHtml(lead)}</small>
+        <strong>${escapeHtml(label)}</strong>
       </span>
-      <span class="gc-myket-dl">${icon('download')}</span>
+      <span class="gc-store-go">${icon(meta && meta.play ? 'play' : 'download')}</span>
     </a>`
+  }).join('')
+
+  return `<div class="gc-stores${ordered.length > 1 ? ' gc-stores--many' : ''}">${buttons}</div>`
 }
 
 
@@ -889,7 +958,6 @@ function createDefaultGameCard(id, game, baseUrl, lang, index) {
       </div>
 
       ${createCapabilities(game, lang)}
-      ${createOfflineNote(game, lang)}
 
       <div class="gc-divider"></div>
 

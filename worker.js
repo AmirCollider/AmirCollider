@@ -1,5 +1,5 @@
 // ==========================================
-// OAuth Proxy v6.7 - Secure Version
+// OAuth Proxy v6.7.1 - Secure Version
 // AmirCollider Games - Worker Core (routing, auth, data API)
 // ==========================================
 //
