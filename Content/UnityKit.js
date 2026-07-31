@@ -1,15 +1,47 @@
 // ==========================================
 // Content/UnityKit.js
-// The Unity side of every game on this Worker, as code somebody
-// can paste into a project.
+// The Unity side of every game on this Worker, as files somebody
+// can paste into a project and have it work.
 //
 // Public exports:
-//   unityModules(game, origin)  -> [{ id, file, title, summary, notes, code }]
+//   unityModules(game, origin, options)  -> [{ id, file, title, summary, notes, code }]
 //   unityModule(game, origin, id)
+//   constantsSource(spec, origin)        -> the <Name>Constants.cs text
+//   androidManifestSource(spec)          -> AndroidManifest.xml text
 //   MODULE_IDS
+//
+// WHAT "COMPLETE" MEANS HERE
+// A kit is complete when somebody can follow it from an empty
+// Unity project to a signed-in player with a saved score and
+// nothing else open in another tab. That means the C# is not
+// enough on its own:
+//
+//   Constants   every other file references it by name, so a kit
+//               without it does not compile. It was the one file
+//               this module never produced.
+//   Manifest    Android hands the OAuth code back on a deep link.
+//               No intent-filter, no code, no sign-in.
+//   link.xml    IL2CPP strips [Serializable] classes that are only
+//               ever constructed by JsonUtility, which turns every
+//               parsed response into null in the release build and
+//               nothing at all in the editor.
+//   Google      the client ids, the SHA-1, the redirect URI and
+//               the Play Console product ids. All of it outside
+//               Unity, all of it required.
+//   Bootstrap   one scene component showing the order the calls go
+//               in, because six static classes and no example is a
+//               puzzle rather than a kit.
+//
+// Everything is generated for ONE game: its id, its scheme, its
+// package, its product ids, and this deployment's own origin.
 // ==========================================
 
-export const MODULE_IDS = ['api', 'auth', 'player', 'leaderboard', 'store', 'status']
+import { gamePlatforms } from '../Games/Registry.js'
+
+export const MODULE_IDS = [
+  'readme', 'constants', 'api', 'auth', 'player', 'leaderboard',
+  'store', 'status', 'bootstrap', 'manifest', 'link', 'google'
+]
 
 
 // ==========================================
@@ -26,10 +58,233 @@ function base(origin) {
 }
 
 
+function upperSnake(id) {
+  return String(id || 'game').replace(/-/g, '_').toUpperCase()
+}
+
+
+// A C# identifier from a product id. Leading digits get a prefix,
+// because "1000Shards" does not compile and a generator that
+// emits code which does not compile is worse than no generator.
+function csharpName(id) {
+  const parts = String(id || 'item').split(/[^a-zA-Z0-9]+/).filter(Boolean)
+  const name = parts.map(part => part[0].toUpperCase() + part.slice(1)).join('')
+  return /^[0-9]/.test(name) ? 'P' + name : (name || 'Item')
+}
+
+
+// The shape every generator below reads, from either a merged
+// game (the Unity tab) or a scaffold spec (the New game tab).
+// One reader means the two screens cannot drift apart.
+function readGame(game, origin) {
+  const id = String((game && game.id) || 'game')
+  const pkg = (game && game.package) || `com.AmirColliderGames.${pascal(id)}`
+  const deepLink = (game && game.deepLink) || {}
+  const capabilities = (game && game.capabilities) || {}
+  const products = ((game && game.store && game.store.products) || [])
+    .filter(product => product && product.id)
+
+  return {
+    id,
+    name: (game && game.name) || pascal(id),
+    pascal: pascal(id),
+    upper: upperSnake(id),
+    package: pkg,
+    scheme: deepLink.scheme || pkg.toLowerCase(),
+    host: deepLink.host || 'oauth',
+    base: base(origin),
+    capabilities,
+    products,
+    platforms: gamePlatforms(game || {})
+  }
+}
+
+
+// The environment variable names this game's OAuth secrets live
+// under. Passed in by the caller when it knows them (the panel
+// reads them from Config); derived from the id otherwise, which
+// is the rule the scaffold generates by.
+function envKeysFor(spec, provided) {
+  const keys = provided || {}
+  return {
+    web: keys.web || `${spec.upper}_GOOGLE_CLIENT_ID_WEB`,
+    android: keys.android || `${spec.upper}_GOOGLE_CLIENT_ID_ANDROID`,
+    secret: keys.secret || `${spec.upper}_GOOGLE_CLIENT_SECRET`,
+    deepLinkScheme: keys.deepLinkScheme || `${spec.upper}_DEEPLINK_SCHEME`
+  }
+}
+
+
+// ==========================================
+// Module: <Name>Constants.cs
+//
+// THE file. Every other module in this kit references it by
+// name, and until now the kit did not contain it - so a project
+// assembled from the Unity tab did not compile, and the missing
+// symbol was a class the tab never mentioned.
+// ==========================================
+export function constantsSource(spec) {
+  const products = spec.products || []
+
+  const productIds = products.length
+    ? products.map(product =>
+        `            public const string ${csharpName(product.id)} = "${product.id}";`).join('\n')
+    : '            // No products in this game\'s catalogue yet.'
+
+  const skus = products.length
+    ? products.map(product =>
+        `            public const string ${csharpName(product.id)} = "${product.sku || String(product.id).replace(/-/g, '_')}";`).join('\n')
+    : '            // No products in this game\'s catalogue yet.'
+
+  const deepLink = spec.platforms.android
+    ? `
+        // ---- Android deep link ----
+        // The scheme this build registered in its
+        // AndroidManifest.xml. After a Google sign-in the Worker
+        // hands the player back at DeepLinkRedirect, and Android
+        // only delivers that URL to an app whose manifest claims
+        // this exact scheme. The two are one string in two files:
+        // change it here and change it there, or sign-in silently
+        // dead-ends on a blank browser tab.
+        public const string DeepLinkScheme   = "${spec.scheme}";
+        public const string DeepLinkHost     = "${spec.host}";
+        public const string DeepLinkRedirect = "${spec.scheme}://${spec.host}";
+`
+    : `
+        // This game is published on the web, so there is no deep
+        // link: the browser never leaves, and the OAuth code comes
+        // back on the page's own URL.
+        public const string DeepLinkScheme   = "";
+        public const string DeepLinkHost     = "";
+        public const string DeepLinkRedirect = "";
+`
+
+  return `// ==========================================
+// ${spec.pascal}Constants.cs
+// Generated by the AmirCollider TheGod panel for "${spec.name}".
+//
+// Save as: Assets/Scripts/AmirCollider/${spec.pascal}Constants.cs
+//
+// Nothing in this file is a secret. Every value below is either
+// already in the APK, already in a URL a player can see, or
+// already served by a public endpoint. The credential that is
+// not here - the Google client secret - lives in the Worker and
+// never reaches a build, which is the whole reason sign-in goes
+// through the Worker instead of straight to Google.
+// ==========================================
+
+namespace AmirCollider
+{
+    public static class ${spec.pascal}Constants
+    {
+        // The Worker. No trailing slash - every path below starts
+        // with one, and two slashes is a 404 that reads like a
+        // server problem.
+        public const string BaseUrl = "${spec.base}";
+
+        // The game id, exactly as it appears in GAME_REGISTRY in
+        // the Worker's Config.js. It is part of nearly every path,
+        // so a typo here fails everything at once rather than one
+        // feature at a time - which is the better failure.
+        public const string GameId = "${spec.id}";
+
+        public const string GameName    = "${String(spec.name).replace(/"/g, '\\"')}";
+        public const string PackageName = "${spec.package}";
+${deepLink}
+        // ---- sign-in ----
+        public const string OAuthStart    = BaseUrl + "/oauth/auth";
+        public const string OAuthToken    = BaseUrl + "/oauth/token";
+        public const string AuthRefresh   = BaseUrl + "/auth/refresh";
+        public const string AuthValidate  = BaseUrl + "/auth/validate";
+        public const string AuthCheck     = BaseUrl + "/auth/check";
+
+        // ---- the player's own row ----
+        public const string PlayerGet     = BaseUrl + "/database/get/games/" + GameId + "/users/";
+        public const string PlayerSet     = BaseUrl + "/database/set/games/" + GameId + "/users/";
+        public const string PlayerPatch   = BaseUrl + "/database/patch/games/" + GameId + "/users/";
+        public const string Leaderboard   = BaseUrl + "/" + GameId + "/leaderboard";
+
+        // ---- the store ----
+        public const string Manifest      = BaseUrl + "/games/" + GameId + "/manifest";
+        public const string Products      = BaseUrl + "/games/" + GameId + "/products";
+        public const string Entitlements  = BaseUrl + "/games/" + GameId + "/entitlements";
+        public const string Consume       = BaseUrl + "/games/" + GameId + "/entitlements/consume";
+
+        // ---- pages, for Application.OpenURL ----
+        public const string WebStore      = BaseUrl + "/" + GameId + "/store";
+        public const string WebAccount    = BaseUrl + "/" + GameId + "/account";
+        public const string WebLanding    = BaseUrl + "/" + GameId;
+        public const string WebVersions   = BaseUrl + "/" + GameId + "/versions";
+        public const string WebPrivacy    = BaseUrl + "/" + GameId + "/privacy";
+        public const string WebTerms      = BaseUrl + "/" + GameId + "/terms";
+
+        // ---- product ids ----
+        // What this Worker and its entitlements API call each
+        // product. Generated from the catalogue, so a product
+        // renamed in Config.js is renamed here the next time this
+        // file is generated - and a build still holding the old
+        // string is exactly what the sku split below is for.
+        public static class Products_
+        {
+${productIds}
+        }
+
+        // What the PLATFORM store calls the same products. A sku
+        // is what Google Play is asked for; the id above is what
+        // this Worker grants. They are allowed to differ, they
+        // usually do, and confusing the two is a purchase that
+        // completes and grants nothing.
+        public static class Skus
+        {
+${skus}
+        }
+    }
+}
+`
+}
+
+
+function constantsModule(spec) {
+  return {
+    id: 'constants',
+    file: `${spec.pascal}Constants.cs`,
+    icon: '📌',
+    title: {
+      fa: 'فایل ثابت‌ها — از این‌جا شروع کن',
+      en: 'The constants file — start here',
+      ja: '定数ファイル — ここから'
+    },
+    summary: {
+      fa: 'هر فایل دیگری در این کیت به این کلاس اشاره می‌کند. بدون آن هیچ‌کدام کامپایل نمی‌شوند. همه‌ی مقدارها برای همین بازی پر شده‌اند.',
+      en: 'Every other file in this kit references this class by name; without it none of them compile. Every value is already filled in for this game.',
+      ja: 'このキットの他のファイルはすべてこのクラスを参照します。これが無ければコンパイルできません。値はこのゲーム用に設定済みです。'
+    },
+    notes: {
+      fa: [
+        'اول این را اضافه کن، بعد بقیه را. ترتیب مهم است چون بقیه به این وابسته‌اند.',
+        'هیچ‌چیز این فایل secret نیست؛ client secret هیچ‌وقت داخل بیلد نمی‌آید و کار تبادل توکن با Worker است.',
+        'شناسه‌ی محصول (Products_) چیزی است که این Worker می‌شناسد و sku چیزی است که گوگل‌پلی می‌شناسد — این دو عمداً می‌توانند فرق کنند.'
+      ],
+      en: [
+        'Add this first and the rest after it. The order matters: everything else depends on this file.',
+        'Nothing here is a secret. The client secret never enters a build — exchanging the code for tokens is the Worker\'s job.',
+        'Products_ is what this Worker knows a product as; Skus is what Google Play knows it as. They are deliberately allowed to differ.'
+      ],
+      ja: [
+        '最初にこれを追加し、その後に他を追加します。他のすべてがこれに依存します。',
+        'ここに秘密情報はありません。クライアントシークレットはビルドに入らず、トークン交換は Worker が行います。',
+        'Products_ は Worker 側の ID、Skus は Google Play 側の ID です。意図的に異なることが許されています。'
+      ]
+    },
+    code: constantsSource(spec)
+  }
+}
+
+
 // ==========================================
 // Module: AmirColliderApi.cs
 // ==========================================
-function apiModule(game, origin) {
+function apiModule(spec) {
   const code = `// ==========================================
 // AmirColliderApi.cs
 // One place where HTTP happens.
@@ -104,7 +359,7 @@ namespace AmirCollider
             // the path does not name one. Sending it always costs
             // nothing and removes a whole class of "why is it
             // reading the wrong database" afternoon.
-            request.SetRequestHeader("X-Game-ID", ${pascal(game.id)}Constants.GameId);
+            request.SetRequestHeader("X-Game-ID", ${spec.pascal}Constants.GameId);
 
             if (!string.IsNullOrEmpty(idToken))
             {
@@ -188,22 +443,97 @@ namespace AmirCollider
 // ==========================================
 // Module: AmirColliderAuth.cs
 // ==========================================
-function authModule(game, origin) {
-  const name = pascal(game.id)
-  const code = `// ==========================================
-// AmirColliderAuth.cs
-// Signing a player in with Google, through the Worker.
-//
-// Two platforms, one flow:
+function authModule(spec) {
+  const name = spec.pascal
+
+  const header = spec.platforms.android
+    ? `// Two platforms, one flow:
 //
 //   Android   the browser opens, Google returns to
-//             ${game.deepLink ? game.deepLink.scheme || 'yourscheme' : 'yourscheme'}://oauth?code=...  and the app
+//             ${spec.scheme}://${spec.host}?code=...  and the app
 //             wakes up holding the code.
 //
 //   Editor    there is no deep link, so the Worker shows the
 //   / desktop code on a page and the player pastes it in. Ugly,
 //             and it is the only honest option for a build with
-//             no URL scheme registered.
+//             no URL scheme registered.`
+    : `// This game runs in a browser, so there is no deep link and
+// nothing to register: the Worker shows the code on a page and
+// SubmitCode() takes it. The same flow the editor uses.`
+
+  const signIn = spec.platforms.android
+    ? `#if UNITY_ANDROID && !UNITY_EDITOR
+            string redirect = UnityWebRequestEscape(${name}Constants.DeepLinkRedirect);
+            string url = ${name}Constants.OAuthStart
+                       + "?redirect_uri=" + redirect
+                       + "&platform=android"
+                       + "&game=" + ${name}Constants.GameId;
+#else
+            // http://localhost is what the Worker recognises as a
+            // desktop loopback; it answers with a page that shows
+            // the code rather than trying to redirect anywhere.
+            string url = ${name}Constants.OAuthStart
+                       + "?redirect_uri=" + UnityWebRequestEscape("http://localhost")
+                       + "&game=" + ${name}Constants.GameId;
+#endif
+            Application.OpenURL(url);`
+    : `            // No registered scheme, so the Worker shows the code on
+            // a page and SubmitCode() takes it from there.
+            string url = ${name}Constants.OAuthStart
+                       + "?redirect_uri=" + UnityWebRequestEscape("http://localhost")
+                       + "&game=" + ${name}Constants.GameId;
+
+            Application.OpenURL(url);`
+
+  const deepLinkWiring = spec.platforms.android
+    ? `            Application.deepLinkActivated += OnDeepLink;
+
+            // A cold start from a deep link delivers the URL here
+            // rather than through the event, because the event was
+            // subscribed to after the activation happened.
+            if (!string.IsNullOrEmpty(Application.absoluteURL))
+            {
+                OnDeepLink(Application.absoluteURL);
+            }`
+    : `            // No deep link on this platform. SubmitCode() is the
+            // only way in, and that is not a limitation to work
+            // around - it is what a browser build has.`
+
+  const deepLinkHandler = spec.platforms.android
+    ? `
+        private void OnDeepLink(string url)
+        {
+            if (string.IsNullOrEmpty(url)) return;
+
+            int at = url.IndexOf("code=", StringComparison.Ordinal);
+            if (at < 0) return;
+
+            string code = url.Substring(at + 5);
+            int amp = code.IndexOf('&');
+            if (amp >= 0) code = code.Substring(0, amp);
+
+            StartCoroutine(ExchangeCode(Uri.UnescapeDataString(code)));
+        }
+`
+    : ''
+
+  const platformField = spec.platforms.android
+    ? `            string body = "code=" + UnityWebRequestEscape(code) + "&platform="
+#if UNITY_ANDROID && !UNITY_EDITOR
+                        + "android";
+#else
+                        + "web";
+#endif`
+    : `            string body = "code=" + UnityWebRequestEscape(code) + "&platform=web";`
+
+  const code = `// ==========================================
+// AmirColliderAuth.cs
+// Signing a player in with Google, through the Worker.
+//
+${header}
+//
+// Put this on ONE GameObject in the first scene. It survives
+// scene loads and refuses to exist twice.
 // ==========================================
 
 using System;
@@ -235,9 +565,11 @@ namespace AmirCollider
         public string PlayerId { get; private set; }
         public string Email { get; private set; }
 
+        public bool IsSignedIn { get { return !string.IsNullOrEmpty(IdToken); } }
+
         public event Action<bool> OnSignInFinished;
 
-        private const string RefreshKey = "amircollider_refresh_${game.id}";
+        private const string RefreshKey = "amircollider_refresh_${spec.id}";
 
         private void Awake()
         {
@@ -245,39 +577,17 @@ namespace AmirCollider
             Instance = this;
             DontDestroyOnLoad(gameObject);
 
-            Application.deepLinkActivated += OnDeepLink;
-
-            // A cold start from a deep link delivers the URL here
-            // rather than through the event, because the event was
-            // subscribed to after the activation happened.
-            if (!string.IsNullOrEmpty(Application.absoluteURL))
-            {
-                OnDeepLink(Application.absoluteURL);
-            }
+${deepLinkWiring}
         }
 
         // ==========================================
         // SignIn
         // Opens the browser. Everything after this happens in
-        // OnDeepLink, or in the editor path below.
+        // OnDeepLink, or on the paste-the-code path below.
         // ==========================================
         public void SignIn()
         {
-#if UNITY_ANDROID && !UNITY_EDITOR
-            string redirect = UnityWebRequestEscape(${name}Constants.DeepLinkRedirect);
-            string url = ${name}Constants.OAuthStart
-                       + "?redirect_uri=" + redirect
-                       + "&platform=android"
-                       + "&game=" + ${name}Constants.GameId;
-#else
-            // http://localhost is what the Worker recognises as a
-            // desktop loopback; it answers with a page that shows
-            // the code rather than trying to redirect anywhere.
-            string url = ${name}Constants.OAuthStart
-                       + "?redirect_uri=" + UnityWebRequestEscape("http://localhost")
-                       + "&game=" + ${name}Constants.GameId;
-#endif
-            Application.OpenURL(url);
+${signIn}
         }
 
         // Paste-the-code path, for the editor and for any build
@@ -286,21 +596,7 @@ namespace AmirCollider
         {
             StartCoroutine(ExchangeCode(code));
         }
-
-        private void OnDeepLink(string url)
-        {
-            if (string.IsNullOrEmpty(url)) return;
-
-            int at = url.IndexOf("code=", StringComparison.Ordinal);
-            if (at < 0) return;
-
-            string code = url.Substring(at + 5);
-            int amp = code.IndexOf('&');
-            if (amp >= 0) code = code.Substring(0, amp);
-
-            StartCoroutine(ExchangeCode(Uri.UnescapeDataString(code)));
-        }
-
+${deepLinkHandler}
         // ==========================================
         // ExchangeCode
         // The one call that needs the Worker rather than Google.
@@ -311,12 +607,7 @@ namespace AmirCollider
         // ==========================================
         private IEnumerator ExchangeCode(string code)
         {
-            string body = "code=" + UnityWebRequestEscape(code) + "&platform="
-#if UNITY_ANDROID && !UNITY_EDITOR
-                        + "android";
-#else
-                        + "web";
-#endif
+${platformField}
 
             using (UnityEngine.Networking.UnityWebRequest request =
                    UnityEngine.Networking.UnityWebRequest.Post(${name}Constants.OAuthToken, ""))
@@ -340,7 +631,7 @@ namespace AmirCollider
                 Adopt(tokens);
             }
 
-            if (OnSignInFinished != null) OnSignInFinished(!string.IsNullOrEmpty(IdToken));
+            if (OnSignInFinished != null) OnSignInFinished(IsSignedIn);
         }
 
         // ==========================================
@@ -374,6 +665,14 @@ namespace AmirCollider
                     }
                     if (done != null) done(result.Ok);
                 });
+        }
+
+        // True when a stored refresh token exists, so a returning
+        // player can be signed back in without a browser opening
+        // in their face on every launch.
+        public bool CanResume()
+        {
+            return !string.IsNullOrEmpty(PlayerPrefs.GetString(RefreshKey, ""));
         }
 
         private void Adopt(TokenResponse tokens)
@@ -410,7 +709,6 @@ namespace AmirCollider
         // ==========================================
         // PlayerIdFromEmail
         // The same derivation the Worker makes.
-        //
         // ==========================================
         public static string PlayerIdFromEmail(string email)
         {
@@ -453,6 +751,18 @@ namespace AmirCollider
 }
 `
 
+  const androidNotes = {
+    fa: 'روی اندروید کد از طریق deep link برمی‌گردد — پس AndroidManifest.xml این کیت الزامی است، نه اختیاری.',
+    en: 'On Android the code comes back on a deep link — so the AndroidManifest.xml in this kit is required, not optional.',
+    ja: 'Android では code はディープリンクで戻ります。本キットの AndroidManifest.xml は必須です。'
+  }
+  const webNotes = {
+    fa: 'این بازی تحت وب است: کد را Worker روی صفحه نشان می‌دهد و SubmitCode آن را می‌گیرد. دیپ‌لینک و manifest اصلاً لازم نیست.',
+    en: 'This is a browser game: the Worker shows the code on a page and SubmitCode takes it. No deep link and no manifest are involved.',
+    ja: 'これはブラウザーゲームです。Worker がページにコードを表示し、SubmitCode が受け取ります。ディープリンクも manifest も不要です。'
+  }
+  const first = spec.platforms.android ? androidNotes : webNotes
+
   return {
     id: 'auth',
     file: 'AmirColliderAuth.cs',
@@ -469,19 +779,22 @@ namespace AmirCollider
     },
     notes: {
       fa: [
-        'روی اندروید کد از طریق deep link برمی‌گردد؛ در ادیتور صفحه‌ای کد را نشان می‌دهد تا دستی وارد شود.',
+        first.fa,
         'شناسه‌ی بازیکن دقیقاً مثل سرور ساخته می‌شود (بخش اول ایمیل، حروف کوچک، ۱۵ کاراکتر) — اگر فرق کند حساب خالی خوانده می‌شود.',
-        'id_token حدود یک ساعت اعتبار دارد؛ روی OnApplicationPause و روی هر ۴۰۱، Refresh را صدا بزن.'
+        'id_token حدود یک ساعت اعتبار دارد؛ روی OnApplicationPause و روی هر ۴۰۱، Refresh را صدا بزن.',
+        'CanResume() می‌گوید توکن ذخیره‌شده هست یا نه — با آن می‌شود بازیکن قدیمی را بدون باز شدن مرورگر برگرداند.'
       ],
       en: [
-        'On Android the code comes back on a deep link; in the editor the Worker shows it on a page to paste.',
+        first.en,
         'The player id is derived exactly as the server derives it — local part, lowercased, 15 characters. Differ and you read an empty account.',
-        'An id_token lasts about an hour. Call Refresh on resume and on any 401.'
+        'An id_token lasts about an hour. Call Refresh on resume and on any 401.',
+        'CanResume() reports whether a refresh token is stored, so a returning player can be signed back in without a browser opening in their face.'
       ],
       ja: [
-        'Android ではディープリンクで code が戻り、エディタではページに表示されたコードを貼り付けます。',
+        first.ja,
         'プレイヤー ID はサーバーと同じ導出（ローカル部・小文字・15 文字）。違えば空のアカウントを読みます。',
-        'id_token は約 1 時間有効。復帰時と 401 時に Refresh を呼んでください。'
+        'id_token は約 1 時間有効。復帰時と 401 時に Refresh を呼んでください。',
+        'CanResume() は保存済みトークンの有無を返します。再訪プレイヤーをブラウザーを開かずに復帰できます。'
       ]
     },
     code
@@ -492,8 +805,8 @@ namespace AmirCollider
 // ==========================================
 // Module: AmirColliderPlayer.cs
 // ==========================================
-function playerModule(game, origin) {
-  const name = pascal(game.id)
+function playerModule(spec) {
+  const name = spec.pascal
   const code = `// ==========================================
 // AmirColliderPlayer.cs
 // The player's own row: profile, high score, inventory.
@@ -514,14 +827,13 @@ using UnityEngine;
 
 namespace AmirCollider
 {
-    [Serializable]
     // ==========================================
     // GameData
     // Whatever THIS game saves, in one place.
     //
     // Replace the fields below with your game's own. They are
-    // examples, not a contract.
-    //
+    // examples, not a contract - the Worker stores this document
+    // and never inspects it.
     // ==========================================
     [Serializable]
     public class GameData
@@ -633,7 +945,6 @@ namespace AmirCollider
         // ==========================================
         // Save
         // Writes named profile fields.
-        //
         // ==========================================
         public static IEnumerator Save(ProfilePatch patch, Action<bool> done)
         {
@@ -650,7 +961,6 @@ namespace AmirCollider
         // ==========================================
         // SaveData
         // This game's own saved state, merged.
-        //
         // ==========================================
         public static IEnumerator SaveData(GameData data, Action<bool> done)
         {
@@ -699,8 +1009,8 @@ namespace AmirCollider
 // ==========================================
 // Module: AmirColliderLeaderboard.cs
 // ==========================================
-function leaderboardModule(game, origin) {
-  const name = pascal(game.id)
+function leaderboardModule(spec) {
+  const name = spec.pascal
   const code = `// ==========================================
 // AmirColliderLeaderboard.cs
 // The public score table.
@@ -789,9 +1099,9 @@ namespace AmirCollider
 // ==========================================
 // Module: AmirColliderStore.cs
 // ==========================================
-function storeModule(game, origin) {
-  const name = pascal(game.id)
-  const products = (game.store && game.store.products) || []
+function storeModule(spec) {
+  const name = spec.pascal
+  const products = spec.products
 
   const code = `// ==========================================
 // AmirColliderStore.cs
@@ -799,6 +1109,10 @@ function storeModule(game, origin) {
 //
 // There are two ways to buy in this game and they end in the
 // same place:
+//
+//   on the web    the site's storefront, opened with
+//                 OpenWebStore() below. The Worker grants the
+//                 entitlement the moment the payment confirms.
 //
 //   in the game   the platform store (Google Play), handled by
 //                 whatever IAP plugin the project uses.
@@ -861,7 +1175,6 @@ namespace AmirCollider
         // ==========================================
         // Refresh
         // Asks what this player owns.
-        //
         // ==========================================
         public static IEnumerator Refresh(Action<bool> done)
         {
@@ -904,7 +1217,6 @@ namespace AmirCollider
         // ==========================================
         // Consume
         // Spends part of one product's balance.
-        //
         // ==========================================
         public static IEnumerator Consume(string productId, int amount, Action<ConsumeResponse> done)
         {
@@ -941,7 +1253,6 @@ namespace AmirCollider
         // Smallest balance first, so the packs that are nearly
         // used up get emptied rather than left as scattered
         // remainders the player can see and cannot spend.
-        //
         // ==========================================
         public static IEnumerator Spend(string currencyCode, int amount, Action<bool> done)
         {
@@ -993,8 +1304,8 @@ namespace AmirCollider
             switch (productId)
             {
 ${products.map(product => {
-  const code = product.grant && product.grant.code ? product.grant.code : ''
-  const kind = product.kind === 'consumable' && code ? code : ''
+  const grantCode = product.grant && product.grant.code ? product.grant.code : ''
+  const kind = product.kind === 'consumable' && grantCode ? grantCode : ''
   return `                case "${product.id}": return "${kind}";`
 }).join('\n') || '                default: return "";'}
             }
@@ -1007,7 +1318,8 @@ ${products.map(product => {
         //
         // They sign in with the same Google account, so whatever
         // they buy is already theirs the next time Refresh()
-        // runs.
+        // runs. Call Refresh() on OnApplicationFocus for exactly
+        // that reason.
         // ==========================================
         public static void OpenWebStore()
         {
@@ -1035,17 +1347,20 @@ ${products.map(product => {
       fa: [
         'موجودی به‌ازای هر محصول نگهداری می‌شود نه به‌ازای هر ارز؛ Spend() خرج کردن را بین ردیف‌ها انجام می‌دهد.',
         'هیچ‌وقت مالکیت را سمت کلاینت تصمیم نگیر — پاسخ سرور تنها منبع درست است.',
-        'بعد از برگشتن از فروشگاه وب حتماً Refresh() را صدا بزن؛ خرید همان لحظه‌ی تأیید پرداخت ثبت می‌شود.'
+        'بعد از برگشتن از فروشگاه وب حتماً Refresh() را صدا بزن؛ خرید همان لحظه‌ی تأیید پرداخت ثبت می‌شود.',
+        'برای خرید داخل بازی، sku ها را از ' + spec.pascal + 'Constants.Skus بردار — همان‌هایی که باید در Play Console ساخته شوند.'
       ],
       en: [
         'Balances are per product, not per currency. Spend() walks the rows so nothing else has to.',
         'Never decide ownership client-side. The server answer is the only one that counts.',
-        'Call Refresh() after sending someone to the web store — the grant lands the moment the payment confirms.'
+        'Call Refresh() after sending someone to the web store — the grant lands the moment the payment confirms.',
+        'For in-app purchases take the skus from ' + spec.pascal + 'Constants.Skus — the same strings to create in the Play Console.'
       ],
       ja: [
         '残高は通貨単位ではなく商品単位です。Spend() が行をまたいで消費します。',
         '所有判定をクライアントで行わないこと。サーバーの回答だけが正です。',
-        'Web ストアから戻ったら必ず Refresh()。支払い確定と同時に付与されます。'
+        'Web ストアから戻ったら必ず Refresh()。支払い確定と同時に付与されます。',
+        'アプリ内購入では ' + spec.pascal + 'Constants.Skus の値を使用します。Play Console で作成する ID と同じです。'
       ]
     },
     code
@@ -1056,8 +1371,12 @@ ${products.map(product => {
 // ==========================================
 // Module: AmirColliderStatus.cs
 // ==========================================
-function statusModule(game, origin) {
-  const name = pascal(game.id)
+function statusModule(spec) {
+  const name = spec.pascal
+  const line = spec.capabilities && spec.capabilities.onlinePlay
+    ? 'This game needs the\n// network to play, so a failure here is worth a retry and a\n// message - but not a locked door on a plane.'
+    : 'This game plays\n// offline; the network is only wanted for signing in and\n// buying. A manifest that does not load must never be a\n// player who cannot play.'
+
   const code = `// ==========================================
 // AmirColliderStatus.cs
 // Asking the Worker what state this game is in.
@@ -1072,9 +1391,7 @@ function statusModule(game, origin) {
 //
 // The game starts anyway.
 //
-// That is the important line in this file. ${game.capabilities && game.capabilities.onlinePlay
-    ? 'This game needs the\n// network to play, so a failure here is worth a retry and a\n// message - but not a locked door on a plane.'
-    : 'This game plays\n// offline; the network is only wanted for signing in and\n// buying. A manifest that does not load must never be a\n// player who cannot play.'}
+// That is the important line in this file. ${line}
 // ==========================================
 
 using System;
@@ -1142,6 +1459,15 @@ namespace AmirCollider
             });
         }
 
+        // Where to send a player who is told to update. The
+        // versions page lists every release and links the
+        // download, so it works whether the game ships on one
+        // store or four.
+        public static void OpenUpdatePage()
+        {
+            Application.OpenURL(${name}Constants.WebVersions);
+        }
+
         // "1.2.10" is newer than "1.2.9", which a string compare
         // gets backwards. Compared part by part as numbers, with a
         // missing or unparsable value meaning "no requirement" -
@@ -1185,17 +1511,20 @@ namespace AmirCollider
       fa: [
         'اگر این درخواست شکست خورد بازی باید بالا بیاید — «manifest نیامد» هرگز نباید یعنی «بازی اجرا نمی‌شود».',
         'مقایسه‌ی نسخه عددی است نه رشته‌ای؛ «1.2.10» از «1.2.9» جدیدتر است.',
-        'حالت maintenance یعنی فقط لینک دانلود برداشته شده — ورود، خرید و جدول امتیازات همچنان کار می‌کنند.'
+        'حالت maintenance یعنی فقط لینک دانلود برداشته شده — ورود، خرید و جدول امتیازات همچنان کار می‌کنند.',
+        'مقدار minVersion را از تب «بازی‌ها»ی همین پنل عوض می‌کنی؛ نیازی به بیلد جدید نیست.'
       ],
       en: [
         'If the fetch fails the game still starts. "The manifest did not load" must never mean "you cannot play".',
         'Versions are compared numerically, not as strings — "1.2.10" is newer than "1.2.9".',
-        'Maintenance withdraws the download only. Sign-in, purchases and the leaderboard keep working.'
+        'Maintenance withdraws the download only. Sign-in, purchases and the leaderboard keep working.',
+        'minVersion is changed in this panel\'s Games tab. No new build is involved.'
       ],
       ja: [
         '取得に失敗してもゲームは起動します。「マニフェスト未取得」が「プレイ不可」になってはいけません。',
         'バージョンは文字列でなく数値で比較します（1.2.10 > 1.2.9）。',
-        'maintenance はダウンロードのみ停止。ログイン・購入・ランキングは動作します。'
+        'maintenance はダウンロードのみ停止。ログイン・購入・ランキングは動作します。',
+        'minVersion はこのパネルの「ゲーム」タブで変更します。再ビルドは不要です。'
       ]
     },
     code
@@ -1204,25 +1533,908 @@ namespace AmirCollider
 
 
 // ==========================================
-// unityModules
-// The whole kit, in the order somebody should read it.
+// Module: AmirColliderBootstrap.cs
+//
+// Six static classes and no example is a puzzle, not a kit. This
+// is the order the calls go in, on one component, with the
+// mistakes already made.
 // ==========================================
-export function unityModules(game, origin) {
-  const modules = [
-    apiModule(game, origin),
-    authModule(game, origin)
-  ]
+function bootstrapModule(spec) {
+  const name = spec.pascal
+  const cloud = spec.capabilities.cloudSave
+  const board = spec.capabilities.leaderboard
+  const store = spec.capabilities.store
 
-  if (game.capabilities && game.capabilities.cloudSave) modules.push(playerModule(game, origin))
-  if (game.capabilities && game.capabilities.leaderboard) modules.push(leaderboardModule(game, origin))
-  if (game.capabilities && game.capabilities.store) modules.push(storeModule(game, origin))
+  const afterSignIn = [
+    cloud ? '            StartCoroutine(LoadProfile());' : '',
+    store ? '            StartCoroutine(AmirColliderStore.Refresh(ok => Debug.Log("[AmirCollider] Entitlements: " + ok)));' : ''
+  ].filter(Boolean).join('\n') || '            Debug.Log("[AmirCollider] Signed in.");'
 
-  modules.push(statusModule(game, origin))
+  const profileBlock = cloud
+    ? `
+        // ==========================================
+        // LoadProfile
+        // A 404 is a player with no row yet, not an error. The
+        // first write creates it.
+        // ==========================================
+        private IEnumerator LoadProfile()
+        {
+            yield return AmirColliderPlayer.Load(profile =>
+            {
+                if (profile == null)
+                {
+                    Debug.Log("[AmirCollider] No profile row yet - the first save creates it.");
+                    return;
+                }
 
-  return modules
+                Profile = profile;
+                Debug.Log("[AmirCollider] High score: " + profile.highScore);
+            });
+        }
+
+        // ==========================================
+        // EndRun
+        // Call this when a run finishes.
+        //
+        // The score goes up on its own endpoint and the rest of
+        // the profile is a separate merge, because the server
+        // keeps the HIGHER of two scores and would have to guess
+        // at everything else.
+        // ==========================================
+        public void EndRun(int score, int secondsPlayed)
+        {
+            StartCoroutine(SubmitRun(score, secondsPlayed));
+        }
+
+        private IEnumerator SubmitRun(int score, int secondsPlayed)
+        {
+            if (!AmirColliderAuth.Instance.IsSignedIn) yield break;
+
+            yield return AmirColliderPlayer.SubmitScore(score, result =>
+            {
+                // success:false is "not a new record", not a
+                // failure. Retrying it forever is the bug this
+                // comment exists to prevent.
+                if (result != null && result.success)
+                {
+                    Debug.Log("[AmirCollider] New record: " + result.newHighScore);
+                }
+            });
+
+            ProfilePatch patch = new ProfilePatch { totalPlayTime = secondsPlayed };
+            yield return AmirColliderPlayer.Save(patch, null);
+        }
+`
+    : ''
+
+  const boardBlock = board
+    ? `
+        // ==========================================
+        // ShowLeaderboard
+        // No token needed: the board is public.
+        // ==========================================
+        public void ShowLeaderboard()
+        {
+            StartCoroutine(AmirColliderLeaderboard.Top(10, rows =>
+            {
+                foreach (LeaderboardRow row in rows)
+                {
+                    Debug.Log(row.rank + ". " + row.username + " - " + row.highScore);
+                }
+            }));
+        }
+`
+    : ''
+
+  const storeBlock = store
+    ? `
+        // ==========================================
+        // OnApplicationFocus
+        // The player may have bought something on the site while
+        // this build sat in the background. Coming back is the
+        // only moment it can find out.
+        // ==========================================
+        private void OnApplicationFocus(bool focused)
+        {
+            if (!focused || !AmirColliderAuth.Instance.IsSignedIn) return;
+            StartCoroutine(AmirColliderStore.Refresh(null));
+        }
+`
+    : ''
+
+  const code = `// ==========================================
+// AmirColliderBootstrap.cs
+// The order everything happens in, on one component.
+//
+// Put this and AmirColliderAuth on ONE GameObject in the first
+// scene. Nothing else in the kit is a MonoBehaviour.
+//
+// What this file is really for: the six classes beside it are
+// each obvious on their own, and the order they go in is not.
+// This is that order.
+// ==========================================
+
+using System.Collections;
+using UnityEngine;
+
+namespace AmirCollider
+{
+    [RequireComponent(typeof(AmirColliderAuth))]
+    public class AmirColliderBootstrap : MonoBehaviour
+    {
+        public static AmirColliderBootstrap Instance { get; private set; }
+${cloud ? '\n        public PlayerProfile Profile { get; private set; }\n' : ''}
+        private void Awake()
+        {
+            if (Instance != null && Instance != this) { Destroy(gameObject); return; }
+            Instance = this;
+            DontDestroyOnLoad(gameObject);
+        }
+
+        private IEnumerator Start()
+        {
+            // 1. Ask the Worker what state this game is in.
+            //    It is allowed to fail. The game starts anyway.
+            yield return AmirColliderStatus.Fetch(manifest =>
+            {
+                if (manifest == null)
+                {
+                    Debug.Log("[AmirCollider] Manifest unavailable - carrying on offline.");
+                    return;
+                }
+                if (AmirColliderStatus.UpdateRequired)
+                {
+                    Debug.LogWarning("[AmirCollider] This build is older than minVersion.");
+                }
+            });
+
+            // 2. A returning player has a refresh token. Use it
+            //    rather than opening a browser in their face on
+            //    every single launch.
+            if (AmirColliderAuth.Instance.CanResume())
+            {
+                yield return AmirColliderAuth.Instance.Refresh(ok =>
+                {
+                    if (ok) OnSignedIn();
+                });
+            }
+
+            // 3. Anything else is a button the player presses.
+            AmirColliderAuth.Instance.OnSignInFinished += signedIn =>
+            {
+                if (signedIn) OnSignedIn();
+                else Debug.LogWarning("[AmirCollider] Sign-in did not complete.");
+            };
+        }
+
+        // The button. Opens the browser; the answer arrives on
+        // OnSignInFinished, which is wired up above.
+        public void SignInPressed()
+        {
+            AmirColliderAuth.Instance.SignIn();
+        }
+
+        private void OnSignedIn()
+        {
+${afterSignIn}
+        }
+${profileBlock}${boardBlock}${storeBlock}
+        // ==========================================
+        // OnApplicationPause
+        // An id_token lasts about an hour. A game resumed after
+        // lunch is holding an expired one and does not know.
+        // ==========================================
+        private void OnApplicationPause(bool paused)
+        {
+            if (paused || !AmirColliderAuth.Instance.CanResume()) return;
+            StartCoroutine(AmirColliderAuth.Instance.Refresh(null));
+        }
+    }
+}
+`
+
+  return {
+    id: 'bootstrap',
+    file: 'AmirColliderBootstrap.cs',
+    icon: '🚀',
+    title: {
+      fa: 'نمونه‌ی کامل — ترتیب صدا زدن‌ها',
+      en: 'The worked example — what calls what, and when',
+      ja: '実装例 — 呼び出しの順序'
+    },
+    summary: {
+      fa: 'یک کامپوننت که همه‌چیز را به هم وصل می‌کند: بررسی وضعیت، ورود خودکار بازیکن قدیمی، خواندن پروفایل، ثبت امتیاز و تازه کردن خریدها.',
+      en: 'One component that wires the rest together: check status, resume a returning player, read the profile, submit a score, refresh entitlements.',
+      ja: 'すべてをつなぐ 1 コンポーネント：状態確認、再訪プレイヤーの復帰、プロフィール取得、スコア送信、権利の再取得。'
+    },
+    notes: {
+      fa: [
+        'این و AmirColliderAuth باید روی یک GameObject در اولین صحنه باشند؛ بقیه‌ی فایل‌ها MonoBehaviour نیستند.',
+        'ترتیب مهم است: اول Status، بعد تلاش برای ادامه‌ی نشست قبلی، و ورود دستی فقط وقتی بازیکن دکمه را زد.',
+        'روی OnApplicationPause توکن تازه می‌شود و روی OnApplicationFocus خریدها — این دو جا همان جاهایی‌اند که وضعیت کهنه می‌شود.'
+      ],
+      en: [
+        'This and AmirColliderAuth go on one GameObject in the first scene; nothing else in the kit is a MonoBehaviour.',
+        'The order matters: status first, then resume, and an interactive sign-in only when the player presses the button.',
+        'The token is refreshed on pause and entitlements on focus — the two moments state goes stale.'
+      ],
+      ja: [
+        'これと AmirColliderAuth を最初のシーンの 1 つの GameObject に置きます。他は MonoBehaviour ではありません。',
+        '順序が重要です：まず状態、次に復帰、対話的サインインはボタン押下時のみ。',
+        '一時停止でトークン、フォーカス復帰で権利を更新します。状態が古くなるのはこの 2 か所です。'
+      ]
+    },
+    code
+  }
 }
 
 
-export function unityModule(game, origin, id) {
-  return unityModules(game, origin).find(module => module.id === id) || null
+// ==========================================
+// Module: AndroidManifest.xml
+//
+// The file the kit never had, and the reason sign-in "works in
+// the editor and does nothing on the phone": Android delivers a
+// deep link only to an app whose manifest claims that scheme.
+// ==========================================
+export function androidManifestSource(spec) {
+  return `<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ==========================================
+  AndroidManifest.xml
+  Generated by the AmirCollider TheGod panel for "${spec.name}".
+
+  Save as: Assets/Plugins/Android/AndroidManifest.xml
+  (create the folders if they do not exist)
+
+  In Unity: Project Settings ▸ Player ▸ Android ▸ Publishing
+  Settings ▸ tick "Custom Main Manifest". Unity writes a starter
+  file at that exact path; replace its <activity> block with the
+  one below, or replace the whole file if you have not edited it.
+
+  WHY THIS FILE MATTERS
+  Sign-in opens the system browser. Google sends the player back
+  to ${spec.scheme}://${spec.host}?code=... and ANDROID decides which
+  app receives that URL. It decides by looking for an app whose
+  manifest declares this scheme. Without the intent-filter below,
+  the browser opens a blank tab, the app never wakes up, and
+  nothing anywhere logs an error - which is the worst possible
+  failure and the one this file prevents.
+
+  THE THREE THINGS THAT MUST AGREE
+    1. android:scheme below                     -> ${spec.scheme}
+    2. ${spec.pascal}Constants.DeepLinkScheme
+    3. the scheme the Worker resolves for this game
+       (TheGod ▸ Games tab, or its Environment tab, which says
+        which of the three layers the value came from)
+
+  If they disagree the player signs in, sees "success" in the
+  browser and returns to a game that never heard about it.
+  ==========================================
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Every call this kit makes is HTTPS to the Worker. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Optional: lets the game tell "offline" from "the server
+         is down" before it spends 15 seconds finding out. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <application
+        android:allowBackup="false"
+        android:usesCleartextTraffic="false">
+
+        <!--
+          Two things on the <activity> below are load-bearing:
+
+          android:name
+              Unity 2021/2022/2023  com.unity3d.player.UnityPlayerActivity
+              Unity 6 (GameActivity) com.unity3d.player.UnityPlayerGameActivity
+              Use whichever Player Settings ▸ Application Entry Point
+              selects. The wrong one builds an APK that opens to a
+              black screen.
+
+          android:launchMode="singleTask"
+              Not decoration. Without it Android starts a SECOND
+              copy of the game to deliver the deep link, and the
+              copy holding the sign-in code is not the copy the
+              player was looking at.
+        -->
+        <activity
+            android:name="com.unity3d.player.UnityPlayerActivity"
+            android:theme="@style/UnityThemeSelector"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:screenOrientation="fullSensor"
+            android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|orientation|screenLayout|uiMode|screenSize|smallestScreenSize|fontScale|layoutDirection|density"
+            android:hardwareAccelerated="false"
+            android:resizeableActivity="false">
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!--
+              THE SIGN-IN RETURN PATH: ${spec.scheme}://${spec.host}
+              Application.deepLinkActivated in AmirColliderAuth.cs
+              receives whatever matches this filter.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="${spec.scheme}"
+                    android:host="${spec.host}" />
+            </intent-filter>
+
+            <meta-data android:name="unityplayer.UnityActivity" android:value="true" />
+        </activity>
+    </application>
+</manifest>
+`
+}
+
+
+function manifestModule(spec) {
+  return {
+    id: 'manifest',
+    file: 'AndroidManifest.xml',
+    icon: '🤖',
+    title: {
+      fa: 'AndroidManifest.xml — بدون این، ورود روی گوشی کار نمی‌کند',
+      en: 'AndroidManifest.xml — without it, sign-in does nothing on a phone',
+      ja: 'AndroidManifest.xml — これが無いと端末でサインインできません'
+    },
+    summary: {
+      fa: `اسکیم «${spec.scheme}» را برای این بازی ثبت می‌کند تا اندروید کد بازگشتی گوگل را به همین اپ بدهد. مسیر فایل: Assets/Plugins/Android/AndroidManifest.xml`,
+      en: `Registers the "${spec.scheme}" scheme so Android hands Google's returning code to this app. Save it at Assets/Plugins/Android/AndroidManifest.xml`,
+      ja: `「${spec.scheme}」スキームを登録し、Google からの復帰 URL をこのアプリに届けます。保存先：Assets/Plugins/Android/AndroidManifest.xml`
+    },
+    notes: {
+      fa: [
+        'در Unity: Project Settings ▸ Player ▸ Android ▸ Publishing Settings ▸ گزینه‌ی Custom Main Manifest را تیک بزن.',
+        'launchMode="singleTask" تزئینی نیست: بدون آن اندروید نسخه‌ی دومی از بازی باز می‌کند و کد به نسخه‌ای می‌رسد که بازیکن نمی‌بیندش.',
+        'اسم Activity در یونیتی ۶ فرق دارد (UnityPlayerGameActivity) — اگر صفحه سیاه ماند، اول این را چک کن.',
+        'اسکیم اینجا، مقدار داخل Constants و مقداری که پنل نشان می‌دهد باید دقیقاً یکی باشند.'
+      ],
+      en: [
+        'In Unity: Project Settings ▸ Player ▸ Android ▸ Publishing Settings ▸ tick "Custom Main Manifest".',
+        'launchMode="singleTask" is not decoration: without it Android starts a second copy of the game and the code lands in the copy the player cannot see.',
+        'Unity 6 with GameActivity uses a different activity name (UnityPlayerGameActivity). A black screen on launch is this line.',
+        'The scheme here, the one in Constants and the one the panel shows must be the same string.'
+      ],
+      ja: [
+        'Unity：Project Settings ▸ Player ▸ Android ▸ Publishing Settings で "Custom Main Manifest" をオン。',
+        'launchMode="singleTask" は必須です。無いと 2 つ目のインスタンスが起動し、コードが見えない方に届きます。',
+        'Unity 6 (GameActivity) はアクティビティ名が異なります（UnityPlayerGameActivity）。黒画面はここです。',
+        'ここのスキーム、Constants の値、パネルが示す値は完全に一致させてください。'
+      ]
+    },
+    code: androidManifestSource(spec)
+  }
+}
+
+
+// ==========================================
+// Module: link.xml
+//
+// IL2CPP strips types nothing appears to construct. Every
+// [Serializable] class in this kit is constructed by
+// JsonUtility through reflection, which the stripper cannot
+// see. The symptom is specific and awful: works in the editor,
+// works in a development build, returns null for every parsed
+// response in the release APK.
+// ==========================================
+function linkModule(spec) {
+  const code = `<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ==========================================
+  link.xml
+  Save as: Assets/link.xml
+
+  WHAT THIS PREVENTS
+  Release builds use IL2CPP with managed code stripping. The
+  stripper removes types that nothing appears to construct - and
+  nothing appears to construct PlayerProfile, Entitlement,
+  GameManifest or TokenResponse, because JsonUtility builds them
+  through reflection at runtime.
+
+  The symptom is the worst kind: it works in the editor, it
+  works in a development build, and in the release APK every
+  parsed response is null. No exception, no log line, just a
+  game where sign-in "succeeds" and the player has no name.
+
+  This file tells the stripper to keep them.
+  ==========================================
+-->
+<linker>
+    <!-- Everything in this kit lives in one namespace. -->
+    <assembly fullname="Assembly-CSharp">
+        <namespace fullname="AmirCollider" preserve="all" />
+    </assembly>
+
+    <!-- UnityWebRequest itself, for the same reason. -->
+    <assembly fullname="UnityEngine.UnityWebRequestModule" preserve="all" />
+    <assembly fullname="UnityEngine.JSONSerializeModule" preserve="all" />
+</linker>
+`
+
+  return {
+    id: 'link',
+    file: 'link.xml',
+    icon: '🧱',
+    title: {
+      fa: 'link.xml — جلوگیری از حذف کلاس‌ها در بیلد نهایی',
+      en: 'link.xml — stops IL2CPP deleting the response classes',
+      ja: 'link.xml — IL2CPP による型の削除を防ぐ'
+    },
+    summary: {
+      fa: 'در بیلد Release با IL2CPP، کلاس‌هایی که فقط JsonUtility می‌سازدشان حذف می‌شوند و همه‌ی پاسخ‌ها null می‌شوند — بدون هیچ خطایی. این فایل جلویش را می‌گیرد.',
+      en: 'In a release IL2CPP build the classes only JsonUtility ever constructs get stripped, and every parsed response becomes null with no error at all. This file stops that.',
+      ja: 'Release の IL2CPP ビルドでは JsonUtility だけが生成する型が削除され、応答がすべて null になります（エラーなし）。このファイルで防ぎます。'
+    },
+    notes: {
+      fa: [
+        'در ادیتور و در Development Build همه‌چیز درست کار می‌کند — این باگ فقط در بیلد نهایی دیده می‌شود. پس همین الآن اضافه‌اش کن.',
+        'اگر اسکریپت‌ها را داخل یک Assembly Definition جدا گذاشته‌ای، به‌جای Assembly-CSharp اسم همان اسمبلی را بنویس.'
+      ],
+      en: [
+        'The editor and development builds are fine — this only shows up in the release APK. Add it now rather than after the first store upload.',
+        'If the scripts live in their own Assembly Definition, put that assembly name in place of Assembly-CSharp.'
+      ],
+      ja: [
+        'エディタと開発ビルドでは問題なく、リリース APK でのみ発生します。ストア提出前に追加してください。',
+        'スクリプトを独自の Assembly Definition に置いている場合は Assembly-CSharp をその名前に置き換えます。'
+      ]
+    },
+    code
+  }
+}
+
+
+// ==========================================
+// Module: GOOGLE-SETUP.md
+//
+// Everything that is not in Unity and not in the Worker, which
+// is where every sign-in failure that is nobody's code actually
+// comes from.
+// ==========================================
+function googleModule(spec, envKeys) {
+  const products = spec.products
+  const skuLines = products.length
+    ? products.map(product => {
+        const kind = product.kind === 'consumable' ? 'consumable'
+          : product.kind === 'pass' ? 'subscription (or consumable, if the pass is time-boxed by the Worker)'
+          : 'non-consumable'
+        return `      ${product.sku || String(product.id).replace(/-/g, '_')}
+          type   ${kind}
+          price  $${product.priceUsd || '—'}
+          grants ${product.grant ? JSON.stringify(product.grant) : '—'}`
+      }).join('\n\n')
+    : '      This game has no products in its catalogue yet.'
+
+  const androidClient = spec.platforms.android
+    ? `
+    2b. Android client   (type: Android)
+        Package name          ${spec.package}
+        SHA-1 certificate     see "Getting the SHA-1" below
+
+        Stored in the Worker as:
+            ${envKeys.android}
+
+        This one identifies the APK to Google. It is not a
+        credential and it is inside every build you ship.
+`
+    : `
+    2b. No Android client is needed: this game runs in a browser
+        and has no APK to identify.
+`
+
+  const sha = spec.platforms.android
+    ? `
+    ------------------------------------------------------------
+    GETTING THE SHA-1
+    ------------------------------------------------------------
+    Google needs the fingerprint of the key that SIGNS the APK,
+    and there are usually two of them.
+
+    Your own upload/debug keystore:
+
+        keytool -list -v -keystore my-release-key.keystore -alias my-alias
+
+    Unity's debug keystore (for a build made without a custom
+    keystore):
+
+        keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android
+
+    And - the one everybody misses - if Google Play App Signing
+    is on, PLAY re-signs your upload with a different key. Its
+    SHA-1 is in:
+
+        Play Console ▸ your app ▸ Setup ▸ App integrity ▸
+        App signing key certificate
+
+    Add every fingerprint that will ever sign a build people
+    install. A build signed by a key Google has not been told
+    about fails sign-in on the device and works perfectly in
+    the editor, which is a very long afternoon.
+`
+    : ''
+
+  const deepLink = spec.platforms.android
+    ? `
+    ------------------------------------------------------------
+    5. THE DEEP-LINK SCHEME
+    ------------------------------------------------------------
+    Not a Google setting and not a secret - it is a string in
+    three places that must agree:
+
+        AndroidManifest.xml   android:scheme="${spec.scheme}"
+        Constants.cs          DeepLinkScheme = "${spec.scheme}"
+        The Worker            TheGod ▸ Games ▸ this game
+
+    The Worker resolves it in this order, first one wins:
+
+        1. the panel (game_settings.deeplink_scheme)
+        2. ${envKeys.deepLinkScheme}  (if it is still set)
+        3. the fallback in Config.js  (always present)
+
+    TheGod ▸ Environment says which of the three the live value
+    came from, which is the question worth asking when a build
+    signs in and never comes back.
+`
+    : ''
+
+  const code = `# Google setup for ${spec.name}
+
+Everything below happens OUTSIDE Unity and outside the Worker.
+It is also where most "sign-in does not work" reports actually
+come from, because none of it produces an error message in a
+place a developer is looking.
+
+Work top to bottom. It is about twenty minutes once.
+
+
+    ------------------------------------------------------------
+    1. THE PROJECT
+    ------------------------------------------------------------
+    console.cloud.google.com ▸ create (or pick) a project.
+
+    APIs & Services ▸ OAuth consent screen:
+
+        User type     External
+        App name      ${spec.name}
+        Support email your address
+        Scopes        email, profile, openid  (nothing more -
+                      every extra scope is another consent
+                      screen line and another review question)
+
+    While the app is in "Testing" only accounts on the test-user
+    list can sign in, and tokens expire in seven days. Publish it
+    before you tell anybody the game is out.
+
+
+    ------------------------------------------------------------
+    2. THE OAUTH CLIENTS
+    ------------------------------------------------------------
+    APIs & Services ▸ Credentials ▸ Create credentials ▸
+    OAuth client ID.
+
+    2a. Web client   (type: Web application)
+        Authorized redirect URIs:
+
+            ${spec.base}/oauth/callback
+
+        Add ONE LINE PER HOSTNAME this Worker answers on - the
+        custom domain AND the *.workers.dev address. Google
+        compares the redirect against this list and refuses
+        anything not on it, which is Error 400:
+        redirect_uri_mismatch. No Worker setting can fix that;
+        the check happens on Google's side.
+
+        Stored in the Worker as:
+            ${envKeys.web}      the client id
+            ${envKeys.secret}   the client secret
+
+        The secret is a real credential. It lives in the Worker
+        and never in a build - that is the entire reason the
+        token exchange goes through /oauth/token instead of the
+        game talking to Google directly.
+${androidClient}
+    Set them with:
+
+        npx wrangler secret put ${envKeys.web}
+        npx wrangler secret put ${envKeys.secret}${spec.platforms.android ? `
+        npx wrangler secret put ${envKeys.android}` : ''}
+
+    Or in the Cloudflare dashboard: Workers ▸ this Worker ▸
+    Settings ▸ Variables and secrets.
+
+    TheGod ▸ Environment lists all of them and says which are
+    set, without ever showing a secret's value.
+${sha}
+    ------------------------------------------------------------
+    3. AFTER YOU SAVE
+    ------------------------------------------------------------
+    Google takes anywhere from a few seconds to a few minutes to
+    apply a credentials change. A redirect_uri_mismatch that
+    persists for exactly five minutes and then stops was never a
+    bug.
+
+
+    ------------------------------------------------------------
+    4. TESTING IT
+    ------------------------------------------------------------
+    Open in a browser:
+
+        ${spec.base}/oauth/auth?redirect_uri=http%3A%2F%2Flocalhost&game=${spec.id}
+
+    A correct setup ends on a page showing an authorization
+    code. Paste that into AmirColliderAuth.SubmitCode() in the
+    editor and the same flow the phone uses runs on the desktop.
+${deepLink}
+    ------------------------------------------------------------
+    ${spec.platforms.android ? '6' : '5'}. GOOGLE PLAY IN-APP PRODUCTS
+    ------------------------------------------------------------
+    Only if this game sells through Play as well as through the
+    site. Create these ids in Play Console ▸ Monetise ▸ In-app
+    products, exactly as written - they are the strings in
+    ${spec.pascal}Constants.Skus:
+
+${skuLines}
+
+    The Worker knows these products by their OTHER id (the one
+    in ${spec.pascal}Constants.Products_). The two are allowed to
+    differ and usually do: Play requires lowercase and
+    underscores, and the Worker's ids were chosen to read well
+    in a URL. Mapping one to the other is what those two nested
+    classes are for.
+
+    Prices in Play are set per country in the Play Console. The
+    price in this panel is what the SITE charges; the two are
+    separate shops and neither reads the other.
+`
+
+  return {
+    id: 'google',
+    file: 'GOOGLE-SETUP.md',
+    icon: '🔒',
+    title: {
+      fa: 'تنظیمات گوگل — کلاینت‌ها، SHA-1، redirect URI و محصول‌های پلی',
+      en: 'Google setup — clients, SHA-1, redirect URI, Play products',
+      ja: 'Google 設定 — クライアント・SHA-1・リダイレクト URI・Play 商品'
+    },
+    summary: {
+      fa: 'هرچیزی که بیرون یونیتی و بیرون Worker است و بیشتر خطاهای «ورود کار نمی‌کند» از همین‌جا می‌آید. آدرس‌ها و نام متغیرها برای همین بازی نوشته شده‌اند.',
+      en: 'Everything outside Unity and outside the Worker — which is where most "sign-in does not work" reports actually come from. Every URL and variable name below is this game\'s own.',
+      ja: 'Unity と Worker の外側の設定。「サインインできない」の多くはここが原因です。URL と変数名はこのゲーム用です。'
+    },
+    notes: {
+      fa: [
+        'خطای «Error 400: redirect_uri_mismatch» همیشه یعنی این آدرس در فهرست گوگل نیست — هیچ تنظیمی در Worker آن را درست نمی‌کند.',
+        spec.platforms.android
+          ? 'اگر Play App Signing روشن است، اثر انگشت SHA-1 خود گوگل را هم اضافه کن، نه فقط کلید آپلود خودت.'
+          : 'برای بازی تحت وب نیازی به کلاینت اندروید و SHA-1 نیست.',
+        'تا وقتی صفحه‌ی رضایت (consent screen) در حالت Testing است، فقط حساب‌های تست می‌توانند وارد شوند و توکن‌ها ۷ روزه منقضی می‌شوند.'
+      ],
+      en: [
+        '"Error 400: redirect_uri_mismatch" always means this address is not on Google\'s list. No Worker setting can fix it.',
+        spec.platforms.android
+          ? 'With Play App Signing on, add Google\'s own SHA-1 as well as your upload key\'s — Play re-signs the build people install.'
+          : 'A browser game needs no Android client and no SHA-1.',
+        'While the consent screen is in Testing, only test accounts can sign in and their tokens expire after seven days.'
+      ],
+      ja: [
+        '「Error 400: redirect_uri_mismatch」は常に「この URL が Google の一覧に無い」の意味です。Worker 側では直せません。',
+        spec.platforms.android
+          ? 'Play App Signing が有効な場合、アップロード鍵に加えて Google 側の SHA-1 も登録してください。'
+          : 'ブラウザーゲームでは Android クライアントも SHA-1 も不要です。',
+        '同意画面が Testing の間はテストユーザーのみログイン可能で、トークンは 7 日で失効します。'
+      ]
+    },
+    code
+  }
+}
+
+
+// ==========================================
+// Module: README.md
+// The order to do things in, which is the one thing a pile of
+// files cannot say for itself.
+// ==========================================
+function readmeModule(spec, modules) {
+  const list = modules
+    .filter(module => module.id !== 'readme')
+    .map(module => `      ${module.file.padEnd(30)} ${module.id === 'constants' ? '(add this first)' : ''}`)
+    .join('\n')
+
+  const caps = [
+    ['login', 'Google sign-in'],
+    ['cloudSave', 'Cloud save & profile'],
+    ['leaderboard', 'Leaderboard'],
+    ['store', 'In-app purchases'],
+    ['onlinePlay', 'Online play']
+  ].map(([key, label]) =>
+    `      ${(spec.capabilities[key] ? '[x]' : '[ ]')} ${label}`).join('\n')
+
+  const androidSteps = spec.platforms.android
+    ? `
+    5. Android only
+       Assets/Plugins/Android/AndroidManifest.xml   the deep link
+       Assets/link.xml                              IL2CPP stripping
+
+       Project Settings ▸ Player ▸ Android:
+         Package Name                ${spec.package}
+         Minimum API Level           24 or higher
+         Scripting Backend           IL2CPP
+         Target Architectures        ARM64 (ARMv7 optional)
+         Custom Main Manifest        ticked
+`
+    : `
+    5. Browser build
+       No manifest and no deep link: the OAuth code is shown on a
+       page and handed to SubmitCode(). Nothing in this kit needs
+       an Android setting.
+`
+
+  return {
+    id: 'readme',
+    file: 'README.md',
+    icon: '📖',
+    title: {
+      fa: 'از کجا شروع کنم — ترتیب کارها',
+      en: 'Start here — the order to do things in',
+      ja: 'はじめに — 作業の順序'
+    },
+    summary: {
+      fa: 'فهرست فایل‌ها، ترتیب اضافه کردنشان، تنظیمات لازم پروژه، و چک‌لیستی که با آن می‌فهمی چیزی جا نمانده.',
+      en: 'The file list, the order to add them in, the project settings that matter, and a checklist for telling whether anything is missing.',
+      ja: 'ファイル一覧、追加順序、必要なプロジェクト設定、そして不足がないか確認するチェックリスト。'
+    },
+    notes: {
+      fa: [
+        'اگر فقط یک فایل را اشتباه جا بیندازی، معمولاً ' + spec.pascal + 'Constants.cs است و نتیجه‌اش خطای کامپایل در همه‌ی فایل‌های دیگر است.',
+        'همه‌ی فایل‌ها با دکمه‌ی «دانلود فایل» با اسم درست ذخیره می‌شوند.'
+      ],
+      en: [
+        'The one file people miss is ' + spec.pascal + 'Constants.cs, and missing it is a compile error in every other file at once.',
+        'Every block on this page has a download button that saves the file under its correct name.'
+      ],
+      ja: [
+        '見落としやすいのは ' + spec.pascal + 'Constants.cs です。無いと他のすべてがコンパイルエラーになります。',
+        '各ブロックのダウンロードボタンで正しいファイル名のまま保存できます。'
+      ]
+    },
+    code: `# ${spec.name} — AmirCollider Unity kit
+
+Generated by the TheGod panel for game id "${spec.id}".
+Worker: ${spec.base}
+
+This kit is what the game needs to talk to this Worker. Nothing
+in it is a package to import - they are plain files, and they
+are meant to be read.
+
+
+    ------------------------------------------------------------
+    WHAT THIS GAME USES
+    ------------------------------------------------------------
+${caps}
+
+    Only the files for ticked capabilities are generated. Turn one
+    on in Config.js and re-open this tab to get the rest.
+
+
+    ------------------------------------------------------------
+    THE ORDER
+    ------------------------------------------------------------
+    1. Create the folder
+       Assets/Scripts/AmirCollider/
+
+    2. Add ${spec.pascal}Constants.cs FIRST
+       Every other file references it by name. Added last, the
+       project shows twenty compile errors that all say the same
+       thing.
+
+    3. Add the rest of the .cs files to the same folder:
+
+${list}
+
+    4. Put AmirColliderAuth and AmirColliderBootstrap on ONE
+       GameObject in the first scene. Nothing else in the kit is
+       a MonoBehaviour, and both survive scene loads.
+${androidSteps}
+    6. Google
+       Follow GOOGLE-SETUP.md. Sign-in cannot work before that is
+       done, and its failures do not produce useful errors.
+
+
+    ------------------------------------------------------------
+    CHECKING IT WORKS
+    ------------------------------------------------------------
+    In the editor, in this order:
+
+    1. Play. The console logs the manifest fetch. If it fails,
+       the game still runs - that is deliberate.
+
+    2. Call AmirColliderAuth.Instance.SignIn(). A browser opens
+       and ends on a page showing a code.
+
+    3. Paste the code into AmirColliderAuth.Instance.SubmitCode().
+       The console logs a signed-in player.
+
+    4. Open ${spec.base}/${spec.id}/leaderboard
+       and confirm the same player is there.
+
+    On a phone, step 2 and 3 are one step: the browser returns to
+    the game by itself. If it does not, the manifest's scheme and
+    the Constants' scheme disagree - that is the only cause.
+
+
+    ------------------------------------------------------------
+    WHEN SOMETHING IS WRONG
+    ------------------------------------------------------------
+    Sign-in opens the browser and never comes back
+        Android only. The scheme in AndroidManifest.xml does not
+        match ${spec.pascal}Constants.DeepLinkScheme, or
+        launchMode="singleTask" is missing.
+
+    "Error 400: redirect_uri_mismatch"
+        ${spec.base}/oauth/callback is not on the Google client's
+        authorized list. See GOOGLE-SETUP.md.
+
+    Everything parses to null in the release build only
+        link.xml is missing. IL2CPP stripped the response classes.
+
+    A score submits and nothing changes
+        The server keeps the HIGHER score and answers 200 with
+        success:false. That is not an error.
+
+    The leaderboard comes back empty
+        The response was HTML, not JSON. Check the game id in
+        ${spec.pascal}Constants.GameId.
+`
+  }
+}
+
+
+// ==========================================
+// unityModules
+// The whole kit, in the order somebody should read it.
+//
+// Which files appear is decided by what the game actually is: a
+// browser game gets no AndroidManifest, a game without a store
+// gets no entitlements client, and neither gets a file it would
+// have to read before deleting.
+// ==========================================
+export function unityModules(game, origin, options = {}) {
+  const spec = readGame(game, origin)
+  const envKeys = envKeysFor(spec, options.envKeys)
+  const capabilities = spec.capabilities
+
+  const modules = [constantsModule(spec), apiModule(spec)]
+
+  if (capabilities.login !== false) modules.push(authModule(spec))
+  if (capabilities.cloudSave) modules.push(playerModule(spec))
+  if (capabilities.leaderboard) modules.push(leaderboardModule(spec))
+  if (capabilities.store) modules.push(storeModule(spec))
+
+  modules.push(statusModule(spec))
+  modules.push(bootstrapModule(spec))
+
+  if (spec.platforms.android) {
+    modules.push(manifestModule(spec))
+    modules.push(linkModule(spec))
+  }
+  if (capabilities.login !== false) modules.push(googleModule(spec, envKeys))
+
+  // Built last because it lists the others, and put first
+  // because it is the file to read first.
+  return [readmeModule(spec, modules), ...modules]
+}
+
+
+export function unityModule(game, origin, id, options = {}) {
+  return unityModules(game, origin, options).find(module => module.id === id) || null
 }

@@ -70,8 +70,18 @@ export function gameAccent(value) {
 export function chromeCss(accent) {
   return `
     *{margin:0;padding:0;box-sizing:border-box}
-    html{scrollbar-width:none;-ms-overflow-style:none}
-    html::-webkit-scrollbar{width:0;height:0;display:none}
+
+    /* Scrollbars are visible, and thin. Hiding them entirely -
+       which this file used to do, on <html> and on the nav strip -
+       removes the only signal that a page or a strip has more
+       content sideways. On a game page with a screenshot gallery
+       that is the difference between a gallery and one picture. */
+    html{-webkit-text-size-adjust:100%;scrollbar-width:thin;
+      scrollbar-color:var(--border) transparent}
+    ::-webkit-scrollbar{width:10px;height:10px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:var(--border);border-radius:10px;
+      border:2px solid transparent;background-clip:content-box}
 
     :root{
       --accent:${gameAccent(accent)};
@@ -80,7 +90,19 @@ export function chromeCss(accent) {
       --bg-1:#0b0e16;--bg-2:#141a2e;
       --surface:rgba(255,255,255,.05);--surface-2:rgba(255,255,255,.085);
       --border:rgba(255,255,255,.10);
-      --text:rgba(255,255,255,.92);--dim:rgba(255,255,255,.58);
+      --text:rgba(255,255,255,.92);--dim:rgba(255,255,255,.66);
+
+      /* Named once here and used by every page in this chrome.
+         The stack has to carry three scripts: Persian, Latin and
+         Japanese. Vazirmatn covers the first two and is fetched
+         from Google Fonts, which is not reachable from every
+         network these pages are opened on - so the fallbacks are
+         real faces rather than a bare "sans-serif". */
+      --font-ui:'Vazirmatn','Segoe UI',Roboto,-apple-system,BlinkMacSystemFont,
+                'Noto Sans JP','Hiragino Sans','Yu Gothic',Meiryo,
+                Tahoma,'Iranian Sans',Arial,sans-serif;
+      --font-mono:ui-monospace,'JetBrains Mono','Cascadia Mono','SF Mono',
+                  Consolas,'Liberation Mono','Courier New',monospace;
       color-scheme:dark;
     }
     @media (prefers-color-scheme:light){
@@ -102,15 +124,34 @@ export function chromeCss(accent) {
     }
 
     body{
-      font-family:'Vazirmatn','Segoe UI',Tahoma,Arial,sans-serif;
-      min-height:100vh;padding:22px 18px 54px;color:var(--text);
+      font-family:var(--font-ui);
+      min-height:100vh;padding:22px 18px 54px;color:var(--text);line-height:1.75;
       background:
         radial-gradient(1000px 500px at 80% -10%,color-mix(in srgb,var(--accent) 20%,transparent),transparent 60%),
         radial-gradient(820px 440px at 6% 4%,color-mix(in srgb,var(--brand) 14%,transparent),transparent 60%),
         linear-gradient(160deg,var(--bg-1),var(--bg-2));
       background-attachment:fixed;
+      -webkit-font-smoothing:antialiased;
     }
     .wrap{max-width:var(--maxw);margin:0 auto}
+
+    /* An unmarked Latin run inside an RTL paragraph is reordered
+       by the browser: a version string, a package name or a URL
+       comes out with its pieces in an order nobody typed. These
+       two rules make each such run resolve on its own. */
+    code,kbd,samp,pre,.mono{direction:ltr;unicode-bidi:isolate;text-align:left;
+      font-family:var(--font-mono)}
+    .num{direction:ltr;unicode-bidi:isolate;font-variant-numeric:tabular-nums}
+    bdi,[dir="ltr"],[dir="auto"]{unicode-bidi:isolate}
+
+    :focus-visible{outline:3px solid color-mix(in srgb,var(--accent) 70%,#fff);
+      outline-offset:3px;border-radius:8px}
+    ::selection{background:color-mix(in srgb,var(--accent) 40%,transparent)}
+
+    .skip{position:absolute;inset-inline-start:-9999px;top:8px;z-index:99;padding:10px 16px;
+      border-radius:10px;background:var(--surface-2);border:1px solid var(--border);
+      font-weight:700;text-decoration:none;color:var(--text)}
+    .skip:focus{inset-inline-start:8px}
 
     /* ---------- top bar ---------- */
     .gtop{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-block-end:26px}
@@ -186,8 +227,7 @@ export function chromeCss(accent) {
       body{padding:16px 12px 44px}
       .gtop{gap:10px;margin-block-end:18px}
       .gnav{flex-wrap:nowrap;overflow-x:auto;width:100%;
-        scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-block-end:2px}
-      .gnav::-webkit-scrollbar{display:none}
+        scrollbar-width:thin;-webkit-overflow-scrolling:touch;padding-block-end:4px}
       .gnav a{flex:0 0 auto;white-space:nowrap;padding:8px 12px}
       .gseg{flex:0 0 auto}
       .gbrand-logo{width:42px;height:42px;border-radius:13px;font-size:1.25em}
@@ -217,12 +257,16 @@ export function chromeCss(accent) {
 // because a page that renders light and then flips to dark
 // looks broken on every single load for anybody who chose dark.
 // ==========================================
-export function chromeHead({ title, description = '', accent }) {
+export function chromeHead({ title, description = '', accent, head = '' }) {
+  const font = 'https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap'
+
   return `
   ${getPageHead({ title: escapeHtml(title), amirLogo: CONFIG.AMIR_LOGO, description: escapeHtml(description) })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="${font}" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="${font}"></noscript>
+  ${head}
   <script>
     (function(){try{var t=localStorage.getItem('ac_theme');
       if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
@@ -330,18 +374,24 @@ export function chromeScript() {
 // page
 // A whole document, assembled.
 // ==========================================
-export function page({ game, lang, theme, title, description = '', active, body, script = '', downloadable = true }) {
+export function page({
+  game, lang, theme, title, description = '', active, body,
+  script = '', head = '', downloadable = true, skipLabel = ''
+}) {
   const themeAttr = theme === 'light' || theme === 'dark' ? ` data-theme="${theme}"` : ''
 
   return `<!DOCTYPE html>
 <html lang="${escapeHtml(lang)}" dir="${dirFor(lang)}"${themeAttr}>
 <head>
-${chromeHead({ title, description, accent: game.color })}
+${chromeHead({ title, description, accent: game.color, head })}
 </head>
 <body>
+  ${skipLabel ? `<a class="skip" href="#main">${escapeHtml(skipLabel)}</a>` : ''}
   <div class="wrap">
     ${chromeTop(game, lang, active, { downloadable })}
+    <main id="main">
     ${body}
+    </main>
     ${chromeFoot(game, lang)}
   </div>
   ${chromeScript()}

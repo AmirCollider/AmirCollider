@@ -10,6 +10,7 @@
 //   productPrice(game, productId)        -> decimal string, or null
 //   isDownloadable(game) / isPlayable(game)
 //   downloadUrl(game)
+//   gamePlatforms(game)                  -> { android, web, kind }
 //   gameManifest(game, origin)           -> the JSON a client reads
 //   schemeText(value)                    -> a valid URL scheme, or null
 //   landingVideo(url)                    -> { kind, embed } | null
@@ -210,6 +211,11 @@ function mergeGame(game, row, productRows) {
     // Config.js has no opinion about trailers, and a game with no
     // row here gets a landing page built from what the card
     // already knows - which is a correct page, just a shorter one.
+    //
+    // Everything from 0008 reads as undefined on a database that
+    // stopped at 0005, which text() and jsonArray() both turn
+    // into "nothing to show" rather than an error. So the page
+    // degrades one section at a time instead of all at once.
     landing: {
       hero: text(row && row.hero_url) || '',
       videos: jsonArray(row && row.videos_json),
@@ -218,7 +224,15 @@ function mergeGame(game, row, productRows) {
         fa: text(row && row.about_fa) || '',
         en: text(row && row.about_en) || '',
         ja: text(row && row.about_ja) || ''
-      }
+      },
+      tagline: {
+        fa: text(row && row.tagline_fa) || '',
+        en: text(row && row.tagline_en) || '',
+        ja: text(row && row.tagline_ja) || ''
+      },
+      features: jsonArray(row && row.features_json),
+      screenshots: jsonArray(row && row.screenshots_json),
+      faq: jsonArray(row && row.faq_json)
     },
 
     store: {
@@ -375,6 +389,43 @@ export function downloadUrl(game) {
   const download = (game && game.download) || {}
   const links = download.links || {}
   return links[download.primary] || Object.values(links)[0] || ''
+}
+
+
+// ==========================================
+// gamePlatforms
+// Where this game actually runs, derived rather than declared.
+//
+// Derived because there is no column for it and adding one would
+// mean two places that can disagree: a game with an Android
+// package and three store links is an Android game whatever a
+// dropdown says, and one published at a URL and nowhere else is
+// a browser game.
+//
+// Read by the landing page (which buttons to draw), by the Unity
+// kit (whether an AndroidManifest and a deep link are part of
+// the answer) and by the panel (which fields to ask for).
+// ==========================================
+const ANDROID_LINKS = ['myket', 'googleplay', 'apk', 'bazaar', 'cafebazaar']
+
+export function gamePlatforms(game) {
+  const links = Object.keys(((game && game.download) || {}).links || {})
+    .map(key => String(key).toLowerCase())
+
+  const android = Boolean(game && game.package) || links.some(key => ANDROID_LINKS.includes(key))
+  const web = links.includes('web')
+
+  return {
+    android,
+    web,
+    // A game with neither is one whose links have not been filled
+    // in yet. Treated as Android, because that is what every game
+    // on this Worker has been so far and it is the answer that
+    // shows MORE setup rather than less - a web game handed an
+    // AndroidManifest deletes a file; an Android game that was
+    // never handed one debugs a sign-in for an afternoon.
+    kind: web && android ? 'both' : web ? 'web' : 'android'
+  }
 }
 
 

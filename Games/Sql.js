@@ -11,7 +11,7 @@
 //   productSeedSql(gameId, products)  -> product overrides, as SQL
 //   purgeSeedSql(gameId)              -> the DELETEs that clear both
 //   wranglerSnippet(gameId)           -> the d1_databases entry
-//   setupCommands(gameId)             -> the wrangler commands, in order
+//   setupCommands(gameId, options)    -> the wrangler commands, in order
 //
 // It does not execute anything. Not against D1, not against
 // anything. The output is text on a page with a copy button.
@@ -333,7 +333,24 @@ export function settingsSeedSql(gameId, settings = {}) {
     ['download_json', sqlText(settings.download_json)],
     ['min_version', sqlText(settings.min_version)],
     ['note', sqlText(settings.note)],
-    ['deeplink_scheme', sqlText(settings.deeplink_scheme)]
+    ['deeplink_scheme', sqlText(settings.deeplink_scheme)],
+
+    // The landing page (0005 and 0008). Carried across with
+    // everything else, because a staging site that matches the
+    // live one on prices and not on its screenshots is not a
+    // staging site - it is a second game page to maintain.
+    ['hero_url', sqlText(settings.hero_url)],
+    ['videos_json', sqlText(settings.videos_json)],
+    ['devices_json', sqlText(settings.devices_json)],
+    ['about_fa', sqlText(settings.about_fa)],
+    ['about_en', sqlText(settings.about_en)],
+    ['about_ja', sqlText(settings.about_ja)],
+    ['tagline_fa', sqlText(settings.tagline_fa)],
+    ['tagline_en', sqlText(settings.tagline_en)],
+    ['tagline_ja', sqlText(settings.tagline_ja)],
+    ['features_json', sqlText(settings.features_json)],
+    ['screenshots_json', sqlText(settings.screenshots_json)],
+    ['faq_json', sqlText(settings.faq_json)]
   ]
 
   // Every value NULL means there is no override to carry
@@ -360,19 +377,23 @@ export function settingsSeedSql(gameId, settings = {}) {
          + `-- DELETE FROM game_settings WHERE game_id = ${sqlText(id)};\n`
   }
 
-  const names = columns.map(([name]) => name)
+  // Only the columns that are actually SET are named. Two
+  // reasons, and the second is the one that bites: naming a NULL
+  // column adds nothing, and naming a column the target database
+  // does not have yet - a deployment that stopped at 0005 - fails
+  // the whole statement over a field that was empty anyway.
+  const names = set.map(([name]) => name)
 
   return `-- Overrides for '${id}', as they stand right now.
 -- Safe to re-run: the ON CONFLICT clause updates in place.
 --
--- A NULL column is not "empty", it is "no override" - that field
--- comes from config.js. Only these are actually set here:
-${set.map(([name]) => `--   ${name}`).join('\n')}
+-- Only the fields that are actually set appear below. Everything
+-- not named here is "no override" and comes from Config.js.
 INSERT INTO game_settings
   (game_id, ${names.join(', ')}, updated_at)
 VALUES (
   ${sqlText(id)},
-${columns.map(([, value]) => `  ${value}`).join(',\n')},
+${set.map(([, value]) => `  ${value}`).join(',\n')},
   ${at}
 )
 ON CONFLICT (game_id) DO UPDATE SET
@@ -462,46 +483,61 @@ export function wranglerSnippet(gameId) {
 // ==========================================
 // setupCommands
 // Everything to run, in the order it has to be run in.
+//
+// Options describe what KIND of game this is, because half of
+// these steps do not apply to all of them:
+//
+//   android  false for a browser game - no APK, so no Android
+//            OAuth client and no deep-link scheme
+//   login    false for a game that never signs anybody in - no
+//            Google clients at all, and no redirect URI
+//   origin   this deployment's own address, so step 5 prints the
+//            line to paste rather than a placeholder
+//
+// The steps are renumbered after filtering, so "step 4" is
+// always the fourth thing to actually do.
 // ==========================================
-export function setupCommands(gameId) {
+export function setupCommands(gameId, { android = true, login = true, origin = '' } = {}) {
   const names = namesFor(gameId)
+  const base = String(origin || '').replace(/\/+$/, '')
+  const redirect = base ? `${base}/oauth/callback` : 'https://<your-domain>/oauth/callback'
 
-  return [
+  const secrets = [
+    `npx wrangler secret put ${names.env.web}`,
+    `npx wrangler secret put ${names.env.secret}`
+  ]
+  if (android) secrets.push(`npx wrangler secret put ${names.env.android}`)
+
+  const steps = [
     {
-      step: 1,
       title: 'Create the database',
       command: `npx wrangler d1 create ${names.database}`,
       note: 'Prints a database_id. Copy it — the next step needs it.'
     },
     {
-      step: 2,
       title: 'Add the binding',
       command: wranglerSnippet(gameId),
       note: `Paste into the "d1_databases" array in wrangler.jsonc, with the id from step 1.`,
       isFile: true
     },
     {
-      step: 3,
       title: 'Create the tables',
       command: `npx wrangler d1 execute ${names.database} --remote --file=./migrations/${names.id}.sql`,
       note: 'Save the generated SQL as that file first.'
     },
-    {
-      step: 4,
+    login && {
       title: 'Set the OAuth secrets',
-      command: [
-        `npx wrangler secret put ${names.env.web}`,
-        `npx wrangler secret put ${names.env.secret}`,
-        `npx wrangler secret put ${names.env.android}`
-      ].join('\n'),
-      note: 'From the Google Cloud console, OAuth 2.0 client IDs. Android may be skipped for a web-only game. '
-          + `${names.env.deepLinkScheme} is deliberately NOT here: the deep-link scheme is not a secret, `
-          + 'it has a fallback in config.js, and the TheGod panel can change it without a deploy.'
+      command: secrets.join('\n'),
+      note: 'From the Google Cloud console, OAuth 2.0 client IDs. '
+          + (android
+              ? 'The Android client identifies the APK and needs the signing key\'s SHA-1. '
+              : 'A browser game needs no Android client, so there is none here. ')
+          + `${names.env.deepLinkScheme} is deliberately NOT on this list: a deep-link scheme is not a `
+          + 'secret, it has a fallback in config.js, and the TheGod panel changes it without a deploy.'
     },
-    {
-      step: 5,
+    login && {
       title: 'Authorise the redirect URI in Google',
-      command: 'https://<your-domain>/oauth/callback',
+      command: redirect,
       note: 'Google Cloud console ▸ Credentials ▸ your Web client ▸ Authorized redirect URIs. '
           + 'Add one line per hostname this Worker answers on — the custom domain AND the '
           + '*.workers.dev address. A hostname that is missing here is Error 400: redirect_uri_mismatch, '
@@ -509,20 +545,28 @@ export function setupCommands(gameId) {
           + 'The Environment tab of the panel prints the exact lines for this deployment.',
       isFile: true
     },
+    android && {
+      title: 'Register the deep link in the Unity build',
+      command: 'Assets/Plugins/Android/AndroidManifest.xml',
+      note: 'The Unity tab generates this file with the right scheme already in it. Without the '
+          + 'intent-filter it contains, Android has nowhere to deliver the sign-in code and the '
+          + 'browser simply opens a blank tab — with no error anywhere.',
+      isFile: true
+    },
     {
-      step: 6,
       title: 'Add the game to the code',
-      command: `// paste the generated entry into GAME_REGISTRY in config.js`,
+      command: `// paste the generated entry into GAME_REGISTRY in Config.js`,
       note: 'This is the step that makes the game exist. Nothing before it puts a game on the site.',
       isFile: true
     },
     {
-      step: 7,
       title: 'Deploy',
       command: 'npx wrangler deploy',
       note: 'The game appears on the dashboard the moment this finishes.'
     }
-  ]
+  ].filter(Boolean)
+
+  return steps.map((entry, index) => ({ ...entry, step: index + 1 }))
 }
 
 

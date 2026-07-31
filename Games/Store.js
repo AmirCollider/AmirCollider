@@ -302,38 +302,77 @@ export async function purgeGameRows(database, gameId) {
 
 // ==========================================
 // LANDING_COLUMNS
-// The columns 0005 added, in one place.
+// The landing page's columns, in one place.
+//
+// Two migrations wrote them and a deployment may have run only
+// the first, so they are grouped rather than listed flat: a save
+// that names a 0008 column on a database that stopped at 0005
+// fails the WHOLE statement, taking the hero image and the about
+// text down with the FAQ. Writing each group in its own UPDATE
+// costs one extra round trip and means a partial migration
+// costs only the fields it actually lacks.
 // ==========================================
-const LANDING_COLUMNS = [
-  'hero_url', 'videos_json', 'devices_json', 'about_fa', 'about_en', 'about_ja'
+const LANDING_GROUPS = [
+  {
+    migration: '0005_game_pages.sql',
+    columns: ['hero_url', 'videos_json', 'devices_json', 'about_fa', 'about_en', 'about_ja']
+  },
+  {
+    migration: '0008_landing_extra.sql',
+    columns: [
+      'tagline_fa', 'tagline_en', 'tagline_ja',
+      'features_json', 'screenshots_json', 'faq_json'
+    ]
+  }
 ]
 
+export const LANDING_COLUMNS = LANDING_GROUPS.flatMap(group => group.columns)
+
+
+// ==========================================
+// saveLandingFields
+// Writes only the landing columns the caller named.
+//
+// Returns { ok, reason, missing } where `missing` lists the
+// migrations whose columns are not in this database. ok is true
+// when at least the applied groups were written, so the caller
+// can save what it can and say plainly what it could not.
+// ==========================================
 export async function saveLandingFields(database, gameId, patch = {}, clear = []) {
-  if (!database || !gameId) return { ok: false, reason: 'no_database' }
+  if (!database || !gameId) return { ok: false, reason: 'no_database', missing: [] }
 
-  const sets = []
-  const values = []
-  for (const column of LANDING_COLUMNS) {
-    if (clear.includes(column)) { sets.push(`${column} = NULL`); continue }
-    if (Object.prototype.hasOwnProperty.call(patch, column)) {
-      sets.push(`${column} = ?`)
-      values.push(patch[column])
+  const missing = []
+  let wrote = false
+  let failed = ''
+
+  for (const group of LANDING_GROUPS) {
+    const sets = []
+    const values = []
+
+    for (const column of group.columns) {
+      if (clear.includes(column)) { sets.push(`${column} = NULL`); continue }
+      if (Object.prototype.hasOwnProperty.call(patch, column)) {
+        sets.push(`${column} = ?`)
+        values.push(patch[column])
+      }
+    }
+    if (!sets.length) continue
+
+    try {
+      await database
+        .prepare(`UPDATE game_settings SET ${sets.join(', ')}, updated_at = ? WHERE game_id = ?`)
+        .bind(...values, now(), gameId)
+        .run()
+      wrote = true
+    } catch (error) {
+      if (/no such column/i.test(String(error && error.message))) missing.push(group.migration)
+      else failed = 'failed'
     }
   }
-  if (!sets.length) return { ok: true, reason: '' }
 
-  try {
-    await database
-      .prepare(`UPDATE game_settings SET ${sets.join(', ')}, updated_at = ? WHERE game_id = ?`)
-      .bind(...values, now(), gameId)
-      .run()
-    return { ok: true, reason: '' }
-  } catch (error) {
-    return {
-      ok: false,
-      reason: /no such column/i.test(String(error && error.message)) ? 'no_column' : 'failed'
-    }
-  }
+  if (failed) return { ok: false, reason: 'failed', missing }
+  if (missing.length && !wrote) return { ok: false, reason: 'no_column', missing }
+  return { ok: true, reason: missing.length ? 'partial' : '', missing }
 }
 
 

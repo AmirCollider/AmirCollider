@@ -58,16 +58,31 @@ game; it only returns that game to its coded defaults.
 with its own cookie scoped `Path=/thegod` so a browser will not send one
 panel's session to the other.
 
-Eight tabs:
+Nine tabs:
 
 **Games** — every game from the registry, with its overrides. Change the
-name, logo, accent colour, status, the description in all three
-languages, the download links, the minimum client version, the Android
-deep-link scheme. One switch takes the download offline. "Back to the
-coded values" drops the settings row; "Delete the database rows" drops
-that **and** the product overrides, putting the game back to exactly
-what `Config.js` says. Neither can delete the game, and neither touches
-orders or entitlements.
+name, logo, accent colour, status, the tags, the description in all
+three languages, the download links, the minimum client version, the
+Android deep-link scheme. One switch takes the download offline. "Back
+to the coded values" drops the settings row; "Delete the database rows"
+drops that **and** the product overrides, putting the game back to
+exactly what `Config.js` says. Neither can delete the game, and neither
+touches orders or entitlements.
+
+**Game page** — everything `/{game}` renders, and the release history
+under it: the header image, the one-line pitch, the long description,
+the feature strip, the screenshot gallery, the trailers, the device
+list and the FAQ — each in all three languages. Below them, one row per
+release: version, date, per-language notes and an optional download
+link, with the newest date being what the site calls "the current
+version".
+
+The columns behind most of it arrived with `0005_game_pages.sql` and
+`0008_landing_extra.sql`, and the landing page has always read them.
+Until this tab existed nothing could write one, which is why a game's
+own page rendered as a correct, empty template. A database that has run
+only 0005 still saves the fields it has and says plainly which
+migration the rest are waiting on.
 
 **Storefront** — the catalogue for one game. Re-price a product, take it
 off sale, give it a ribbon, change the order. It cannot create one: a
@@ -101,10 +116,18 @@ values (a Google client id, a deep-link scheme) are shown in full,
 because they already travel in a URL or ship inside the APK.
 
 **New game** — writes the `GAME_REGISTRY` entry, the `wrangler.jsonc`
-binding, the SQL and the Unity constants file. You paste them and deploy.
+binding, the SQL, the Unity constants file and — for a game that ships
+an APK — its `AndroidManifest.xml`. You paste them and deploy.
 
-**Unity code** — the C# that connects a game to this Worker, with the
-selected game's real id, endpoints and product ids already in it.
+It asks **where the game runs** first, and everything after that follows
+from the answer. A browser game has no Android package, no deep-link
+scheme, no manifest and no Android OAuth client, so it is not asked for
+any of them, none of them reach the generated entry, and the setup steps
+that cover them are not printed. An Android game is asked for its store
+links and gets the manifest and the scheme. "Both" asks for all of it.
+
+**Unity code** — the whole kit for the selected game, not just the C#.
+See below.
 
 ### What the panel deliberately cannot do
 
@@ -289,13 +312,34 @@ endpoints and product constants are that game's real ones.
 
 | file | what it is for |
 |---|---|
-| `{Game}Constants.cs` | every address, in one place |
+| `README.md` | the order to add them in, the project settings, a checklist |
+| `{Game}Constants.cs` | every address, product id and Play sku, in one place |
 | `AmirColliderApi.cs` | one timeout, one definition of "failed", one place to add a header |
 | `AmirColliderAuth.cs` | Google sign-in through the proxy — Android deep link, editor paste-the-code |
 | `AmirColliderPlayer.cs` | profile, cloud save, high score |
 | `AmirColliderLeaderboard.cs` | the public board |
 | `AmirColliderStore.cs` | entitlements, consuming, opening the web store |
 | `AmirColliderStatus.cs` | the manifest, the offline switch, version check |
+| `AmirColliderBootstrap.cs` | the worked example: what calls what, and in which order |
+| `AndroidManifest.xml` | the intent-filter the sign-in code comes back through |
+| `link.xml` | stops IL2CPP stripping the classes only `JsonUtility` constructs |
+| `GOOGLE-SETUP.md` | the OAuth clients, the SHA-1, the redirect URI, the Play product ids |
+
+Which files appear depends on the game. A browser game gets no
+`AndroidManifest.xml` and no `link.xml`, because a deep link is not part
+of its answer; a game without a store gets no entitlements client. A
+file whose only correct use is deleting it is one more thing to wonder
+about.
+
+The last four are the difference between a kit and a folder of C#. The
+constants file is referenced by name from every other file, so a kit
+without it does not compile — and it was, for a while, the one file this
+tab did not produce. The manifest is the reason sign-in "works in the
+editor and does nothing on the phone": Android delivers a deep link only
+to an app whose manifest claims that scheme. `link.xml` is the reason a
+release build parses every response to `null` while the editor is fine.
+And Google's console is where most sign-in failures actually live, none
+of which produce an error message anywhere a developer is looking.
 
 Plain C#: coroutines and `JsonUtility`, no third-party JSON, no
 async/await over `UnityWebRequest`. A sample that needs three packages

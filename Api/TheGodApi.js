@@ -25,12 +25,14 @@ import {
   resolveGames,
   isDownloadable,
   effectiveProducts,
+  gamePlatforms,
   schemeText,
   invalidateSettingsCache
 } from '../Games/Registry.js'
 import {
   db, readSettings, saveSettings, resetSettings, saveDeepLinkScheme,
   saveProductOverride, resetProductOverride, purgeGameRows,
+  saveLandingFields, listVersions, saveVersion, deleteVersion,
   listGameOrders, gameOrderStats, getGameOrder,
   findPlayers, listEntitlementsRaw, listEntitlementEvents,
   revokeEntitlement, GAME_ORDER_STATE
@@ -201,6 +203,30 @@ function cleanPatch(patch) {
     if (['live', 'maintenance', 'soon'].includes(status)) out.status = status
   }
 
+  // Tags. The column existed from 0003 and the merge layer has
+  // always read it; nothing could write it, so the only way to
+  // re-tag a game was a deploy. Re-serialised from a parsed
+  // array rather than stored as given, for the same reason the
+  // download links are: what lands in the column is then known
+  // to be the shape the reader expects.
+  if (patch.tags_json !== undefined) {
+    try {
+      const parsed = JSON.parse(patch.tags_json)
+      const tags = (Array.isArray(parsed) ? parsed : []).slice(0, 8)
+        .map(tag => ({
+          fa: text(tag && tag.fa, 40),
+          en: text(tag && tag.en, 40),
+          ja: text(tag && tag.ja, 40)
+        }))
+        .filter(tag => tag.fa || tag.en || tag.ja)
+
+      if (tags.length) out.tags_json = JSON.stringify(tags)
+    } catch {
+      // Dropped rather than rejected: the rest of the save is
+      // still what the operator asked for.
+    }
+  }
+
   if (patch.download_enabled !== undefined) {
     out.download_enabled = Number(patch.download_enabled) ? 1 : 0
   }
@@ -255,6 +281,179 @@ function cleanProductPatch(patch) {
 
 function cleanClear(clear, allowed) {
   return (Array.isArray(clear) ? clear : []).filter(field => allowed.includes(field))
+}
+
+
+// ==========================================
+// The landing page's fields
+//
+// Everything below is operator input that ends up on a public
+// page, so it is cleaned here rather than at render time. The
+// rule for a URL is the strict one - an absolute http(s) address
+// and nothing else - because these are interpolated into src and
+// href attributes, where "javascript:" is a script tag with
+// extra steps.
+// ==========================================
+function cleanText(value, max) {
+  return String(value == null ? '' : value).trim().slice(0, max)
+}
+
+function cleanUrl(value) {
+  const url = cleanText(value, 500)
+  return /^https?:\/\//i.test(url) ? url : ''
+}
+
+// A relative /assets/... path is allowed too: the site serves
+// its own images from there and asking an operator to type the
+// full origin for a file already on this domain is a way to end
+// up with a staging hostname baked into a live page.
+function cleanImage(value) {
+  const url = cleanText(value, 500)
+  if (/^https?:\/\//i.test(url)) return url
+  if (/^\/[A-Za-z0-9._~\-/]*$/.test(url)) return url
+  return ''
+}
+
+function cleanI18n(map, max) {
+  const source = map && typeof map === 'object' ? map : {}
+  return {
+    fa: cleanText(source.fa, max),
+    en: cleanText(source.en, max),
+    ja: cleanText(source.ja, max)
+  }
+}
+
+function hasAnyText(map) {
+  return Boolean(map && (map.fa || map.en || map.ja))
+}
+
+// A list, cleaned entry by entry, capped, and returned as the
+// JSON string the column holds - or '' when nothing survived,
+// which the caller turns into "clear this column".
+function cleanList(input, limit, mapper) {
+  const rows = Array.isArray(input) ? input.slice(0, limit) : []
+  const out = []
+  for (const row of rows) {
+    const cleaned = mapper(row && typeof row === 'object' ? row : {})
+    if (cleaned) out.push(cleaned)
+  }
+  return out.length ? JSON.stringify(out) : ''
+}
+
+const DEVICE_KINDS = ['android', 'ios', 'windows', 'web', 'vr', 'generic']
+
+function cleanLanding(landing = {}) {
+  const patch = {}
+  const clear = []
+
+  const put = (column, value) => {
+    if (value) patch[column] = value
+    else clear.push(column)
+  }
+
+  put('hero_url', cleanImage(landing.hero))
+
+  const about = cleanI18n(landing.about, 4000)
+  put('about_fa', about.fa)
+  put('about_en', about.en)
+  put('about_ja', about.ja)
+
+  const tagline = cleanI18n(landing.tagline, 160)
+  put('tagline_fa', tagline.fa)
+  put('tagline_en', tagline.en)
+  put('tagline_ja', tagline.ja)
+
+  put('videos_json', cleanList(landing.videos, 8, row => {
+    const url = cleanUrl(row.url)
+    return url ? { url, title: cleanText(row.title, 120) } : null
+  }))
+
+  put('devices_json', cleanList(landing.devices, 12, row => {
+    const kind = DEVICE_KINDS.includes(String(row.kind || '').toLowerCase())
+      ? String(row.kind).toLowerCase()
+      : 'generic'
+    const label = cleanText(row.label, 60)
+    return label ? { kind, label } : null
+  }))
+
+  put('features_json', cleanList(landing.features, 8, row => {
+    const text = cleanI18n(row, 120)
+    if (!hasAnyText(text)) return null
+    return { icon: cleanText(row.icon, 8), ...text }
+  }))
+
+  put('screenshots_json', cleanList(landing.screenshots, 12, row => {
+    const url = cleanImage(row.url)
+    return url ? { url, caption: cleanText(row.caption, 140) } : null
+  }))
+
+  put('faq_json', cleanList(landing.faq, 12, row => {
+    const question = cleanI18n(row.q, 200)
+    const answer = cleanI18n(row.a, 1200)
+    return hasAnyText(question) && hasAnyText(answer) ? { q: question, a: answer } : null
+  }))
+
+  return { patch, clear }
+}
+
+
+// The landing columns as the panel's editor holds them: parsed
+// lists rather than JSON strings, so the browser never has to
+// parse a blob that might not be JSON.
+function presentLanding(row) {
+  const list = value => {
+    try {
+      const parsed = JSON.parse(String(value || '[]'))
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  }
+
+  return {
+    hero: (row && row.hero_url) || '',
+    about: {
+      fa: (row && row.about_fa) || '',
+      en: (row && row.about_en) || '',
+      ja: (row && row.about_ja) || ''
+    },
+    tagline: {
+      fa: (row && row.tagline_fa) || '',
+      en: (row && row.tagline_en) || '',
+      ja: (row && row.tagline_ja) || ''
+    },
+    videos: list(row && row.videos_json),
+    devices: list(row && row.devices_json),
+    features: list(row && row.features_json),
+    screenshots: list(row && row.screenshots_json),
+    faq: list(row && row.faq_json)
+  }
+}
+
+
+function presentVersion(row) {
+  return {
+    version: row.version,
+    releasedAt: Number(row.released_at) || 0,
+    notes: {
+      fa: row.notes_fa || '',
+      en: row.notes_en || '',
+      ja: row.notes_ja || ''
+    },
+    downloadUrl: row.download_url || ''
+  }
+}
+
+
+// Which migrations a database is missing, phrased as the
+// sentence the panel shows. A save that could not write half its
+// fields must say so: "saved" over a section that did not save
+// is how somebody spends an evening re-typing a FAQ.
+function migrationWarning(missing) {
+  if (!missing || !missing.length) return ''
+  return 'Some fields were not saved: this database has not run '
+       + missing.map(name => `migrations/${name}`).join(' or ')
+       + '. Everything else on this screen was saved.'
 }
 
 
@@ -405,6 +604,132 @@ export async function handleTheGodApi(url, request, gameId, requestId, GAMES, en
         game: present(merged[game.id]),
         removed
       })
+    }
+
+    // -----------------------------------------------------------
+    // landing.get — the game's own page, as the editor holds it
+    //
+    // The landing page and the version history in one answer,
+    // because the screen that edits one edits the other and two
+    // round trips to draw one tab is one round trip too many.
+    // -----------------------------------------------------------
+    case 'landing.get': {
+      if (!game) return unknownGame()
+
+      const database = db(env)
+      const [row, versions] = database
+        ? await Promise.all([readSettings(database, game.id), listVersions(database, game.id, 60)])
+        : [null, []]
+
+      return createJsonResponse({
+        ok: true,
+        gameId: game.id,
+        landing: presentLanding(row),
+        versions: versions.map(presentVersion),
+        // Where the page these fields feed actually is, so the
+        // editor can link to the thing it is editing.
+        preview: `${String(url.origin).replace(/\/+$/, '')}/${game.id}`
+      })
+    }
+
+    // landing.save — everything on the game's own page
+    //
+    // Writes only the landing columns. The game's name, colour
+    // and download links are game.save's business, and keeping
+    // the two apart means a database missing 0008 fails the FAQ
+    // rather than the download switch.
+    case 'landing.save': {
+      if (!game) return unknownGame()
+
+      const { database, refusal: noDb } = needDatabase(env)
+      if (noDb) return noDb
+
+      const { patch, clear } = cleanLanding(body.landing || {})
+
+      // saveLandingFields UPDATEs; a game whose settings row has
+      // never been written has nothing to update. An empty
+      // saveSettings upserts that row and changes nothing else.
+      await saveSettings(database, game.id, {}, [])
+
+      const written = await saveLandingFields(database, game.id, patch, clear)
+      invalidateSettingsCache()
+
+      if (!written.ok && written.reason !== 'no_column') {
+        return createJsonResponse({
+          ok: false, error: 'save_failed',
+          message: 'The landing page could not be saved.'
+        }, 500)
+      }
+
+      const row = await readSettings(database, game.id)
+      logInfo('Landing page saved', { requestId, gameId: game.id, missing: written.missing })
+
+      return createJsonResponse({
+        ok: true,
+        landing: presentLanding(row),
+        warning: migrationWarning(written.missing)
+      })
+    }
+
+    // -----------------------------------------------------------
+    // version.save / version.delete — the release history
+    //
+    // The newest released_at is "the current version", on the
+    // game's page and on its dashboard card. There is no second
+    // column holding a number that can disagree with this table,
+    // which is why publishing a release is one row here and
+    // nothing else anywhere.
+    // -----------------------------------------------------------
+    case 'version.save': {
+      if (!game) return unknownGame()
+
+      const { database, refusal: noDb } = needDatabase(env)
+      if (noDb) return noDb
+
+      const version = String(body.version || '').trim().slice(0, 24)
+      if (!/^[0-9A-Za-z][0-9A-Za-z.\-+_]*$/.test(version)) {
+        return createJsonResponse({
+          ok: false, error: 'bad_version',
+          message: 'A version is letters, digits and . - + _ — for example 1.4.2.'
+        }, 400)
+      }
+
+      const notes = body.notes || {}
+      const written = await saveVersion(database, game.id, version, {
+        released_at: Number(body.releasedAt) || Date.now(),
+        notes_fa: cleanText(notes.fa, 3000) || null,
+        notes_en: cleanText(notes.en, 3000) || null,
+        notes_ja: cleanText(notes.ja, 3000) || null,
+        download_url: cleanUrl(body.downloadUrl) || null
+      })
+
+      if (!written.ok) {
+        return createJsonResponse({
+          ok: false, error: written.reason,
+          message: written.reason === 'no_table'
+            ? 'This database has no game_versions table yet. Run migrations/0005_game_pages.sql.'
+            : 'That version could not be saved.'
+        }, written.reason === 'no_table' ? 409 : 400)
+      }
+
+      logInfo('Game version saved', { requestId, gameId: game.id, version })
+      const versions = await listVersions(database, game.id, 60)
+
+      return createJsonResponse({ ok: true, versions: versions.map(presentVersion) })
+    }
+
+    case 'version.delete': {
+      if (!game) return unknownGame()
+
+      const { database, refusal: noDb } = needDatabase(env)
+      if (noDb) return noDb
+
+      const version = String(body.version || '').trim()
+      const removed = await deleteVersion(database, game.id, version)
+      logInfo('Game version deleted', { requestId, gameId: game.id, version, removed })
+
+      const versions = await listVersions(database, game.id, 60)
+      return createJsonResponse({ ok: true, removed, versions: versions.map(presentVersion) })
     }
 
     // -----------------------------------------------------------
@@ -791,7 +1116,11 @@ export async function handleTheGodApi(url, request, gameId, requestId, GAMES, en
           withSessions: Boolean(body.withSessions),
           withSeed: Boolean(body.withSeed)
         }),
-        commands: setupCommands(id)
+        commands: setupCommands(id, {
+          android: known ? gamePlatforms(known).android : true,
+          login: known ? known.capabilities.login !== false : true,
+          origin: url.origin
+        })
       })
     }
 
@@ -920,23 +1249,36 @@ export async function handleTheGodApi(url, request, gameId, requestId, GAMES, en
       }
 
       const built = scaffold({ ...spec, id }, url.origin)
-      logInfo('Scaffold generated', { requestId, gameId: id })
+      logInfo('Scaffold generated', { requestId, gameId: id, platform: built.platform })
 
-      return createJsonResponse({ ok: true, names: built.names, files: built.files, commands: built.commands })
+      return createJsonResponse({
+        ok: true,
+        names: built.names,
+        platform: built.platform,
+        files: built.files,
+        commands: built.commands
+      })
     }
 
     // -----------------------------------------------------------
-    // unity — the C# for one game, in the panel's language
+    // unity — the whole kit for one game, in the panel's language
+    //
+    // The env key names are passed in rather than derived, so the
+    // Google setup file prints the variables THIS deployment
+    // actually reads - which for a game added before the naming
+    // convention settled is not what the convention would guess.
     // -----------------------------------------------------------
     case 'unity': {
       if (!game) return unknownGame()
 
       const lang = LANGS.includes(String(body.lang || '')) ? String(body.lang) : 'fa'
-      const modules = unityModules(game, url.origin)
+      const spec = getGameEnvNames()[game.id]
+      const modules = unityModules(game, url.origin, { envKeys: spec ? spec.keys : null })
 
       return createJsonResponse({
         ok: true,
         gameId: game.id,
+        platform: gamePlatforms(game).kind,
         modules: modules.map(module => ({
           id: module.id,
           file: module.file,
@@ -953,6 +1295,7 @@ export async function handleTheGodApi(url, request, gameId, requestId, GAMES, en
       return createJsonResponse({
         ok: false, error: 'bad_action',
         message: 'action must be one of: overview, game.get, game.save, game.reset, game.purge, '
+               + 'landing.get, landing.save, version.save, version.delete, '
                + 'product.save, product.reset, orders.list, order.grant, players.search, '
                + 'player.get, player.grant, player.revoke, players.list, player.profile, '
                + 'player.moderate, player.rename, player.delete, sql.game, sql.settings, env, '

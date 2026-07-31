@@ -180,6 +180,62 @@ function jsonBlob(value) {
 
 
 // ==========================================
+// Bidi isolation for the Persian interface
+//
+// This is the fix for the most visible thing wrong with this
+// panel, and it is worth spelling out because the cause is not
+// obvious from looking at the code.
+//
+// The Persian UI is an RTL paragraph. Inside one, a filename
+// like "0003_games.sql" is not one run to the browser: the
+// digits resolve to a number, the letters resolve to Latin, and
+// the underscore between them is a NEUTRAL. By rule N1 of the
+// bidi algorithm a neutral between a number and a letter takes
+// the paragraph direction - RTL - which splits the string into
+// three pieces at different embedding levels and lays them out
+// right to left. The reader sees "games.sql_0003".
+//
+// It is not a font problem and it is not a typo in the
+// translation: the string in the source is correct and the
+// screen is wrong. Wrapping each technical run in an isolate
+// (U+2068 … U+2069) tells the browser to resolve that run on its
+// own and treat the result as a single neutral object, which is
+// exactly what it is.
+//
+// Isolates rather than <bdi> elements on purpose: half of these
+// strings end up in window.confirm(), in a toast's textContent
+// and in title attributes, none of which render markup. A
+// character works in all of them.
+// ==========================================
+const FIRST_STRONG_ISOLATE = '⁨'
+const POP_DIRECTIONAL_ISOLATE = '⁩'
+
+function isolateTechnicalRuns(text) {
+  return String(text).replace(/[A-Za-z0-9][A-Za-z0-9._+/@:-]*/g, run =>
+    /[A-Za-z]/.test(run) ? FIRST_STRONG_ISOLATE + run + POP_DIRECTIONAL_ISOLATE : run)
+}
+
+// The dictionary as the page should use it. Only for an RTL
+// language: an LTR paragraph has no reordering to prevent, and
+// isolating every word of the English copy would be two invisible
+// characters per word for no effect at all.
+//
+// `dir` is skipped because it is not a label - it is interpolated
+// into a dir="" attribute, and an isolated "rtl" is not a
+// direction any browser recognises.
+function localizedDict(lang) {
+  const dict = I18N[lang] || I18N.fa
+  if (dict.dir !== 'rtl') return dict
+
+  const out = {}
+  for (const [key, value] of Object.entries(dict)) {
+    out[key] = key === 'dir' || typeof value !== 'string' ? value : isolateTechnicalRuns(value)
+  }
+  return out
+}
+
+
+// ==========================================
 // i18n
 // ==========================================
 const I18N = {
@@ -447,8 +503,94 @@ const I18N = {
     nIdBad: 'شناسه فقط حروف کوچک انگلیسی، عدد و خط تیره.',
 
     // unity tab
-    unityLede: 'کد ++C# برای وصل شدن بازی به این Worker. مقدارها همین حالا برای همین بازی پر شده‌اند — شناسه، آدرس‌ها و شناسه‌ی محصول‌ها.',
+    unityLede: 'کیت کامل یونیتی برای وصل شدن این بازی به Worker: فایل ثابت‌ها، لایه‌ی شبکه، ورود با گوگل، '
+             + 'AndroidManifest، link.xml، راهنمای گوگل و یک نمونه‌ی کامل. مقدارها همین حالا برای همین بازی پر شده‌اند.',
     unityGame: 'برای کدام بازی؟',
+    unityCount: 'فایل',
+    unityPlatformAndroid: 'بازی اندرویدی — AndroidManifest و link.xml هم ساخته شده‌اند.',
+    unityPlatformWeb: 'بازی تحت وب — دیپ‌لینک و AndroidManifest برای این بازی معنایی ندارد و ساخته نشده.',
+    unityPlatformBoth: 'هم اندروید و هم وب — فایل‌های اندروید هم ساخته شده‌اند.',
+    unityOrder: 'اول فایل ثابت‌ها را اضافه کن؛ بقیه به آن اشاره می‌کنند.',
+    unityAll: 'دانلود همه (به‌صورت یک فایل)',
+
+    // games tab — tags
+    fTags: 'برچسب‌ها',
+    fTagsHint: 'هر خط یک برچسب، به شکل  فارسی | English | 日本語 . خالی بگذاری، برچسب‌های داخل کد استفاده می‌شوند.',
+
+    // game page tab
+    tabPage: 'صفحه‌ی بازی',
+    pgLede: 'محتوای صفحه‌ی عمومی بازی — همان چیزی که بازدیدکننده روی نشانی خود بازی می‌بیند. '
+          + 'هیچ‌کدام از این‌ها deploy نمی‌خواهد.',
+    pgOpen: 'دیدن صفحه',
+    pgHero: 'تصویر بالای صفحه (بنر)',
+    pgHeroHint: 'آدرس یک تصویر پهن. خالی باشد، پس‌زمینه از رنگ اصلی بازی ساخته می‌شود.',
+    pgTagline: 'یک‌خطی معرفی',
+    pgTaglineHint: 'زیر اسم بازی می‌آید، و در پیش‌نمایش لینک (تلگرام، واتساپ، توییتر) هم همین نشان داده می‌شود.',
+    pgAbout: 'توضیح بلند',
+    pgAboutHint: 'چند پاراگراف. خط‌های خالی حفظ می‌شوند.',
+    pgFeatures: 'ویژگی‌ها',
+    pgFeaturesHint: 'سه تا شش مورد؛ هرکدام یک آیکون و یک عبارت کوتاه. این بخش بالای صفحه و قبل از متن بلند می‌آید.',
+    pgScreens: 'تصاویر بازی',
+    pgScreensHint: 'گالری اسکرین‌شات. توضیح هر تصویر به‌عنوان متن جایگزین (alt) هم استفاده می‌شود.',
+    pgVideos: 'ویدیوها',
+    pgVideosHint: 'لینک یوتیوب یا آپارات داخل صفحه پخش می‌شود؛ هر آدرس دیگری فقط به‌صورت لینک می‌آید.',
+    pgDevices: 'روی چه دستگاه‌هایی اجرا می‌شود',
+    pgDevicesHint: 'نوع دستگاه آیکون را انتخاب می‌کند؛ متن همان چیزی است که بازدیدکننده می‌خواند.',
+    pgFaq: 'پرسش‌های پرتکرار',
+    pgFaqHint: 'همان چیزهایی که قبل از نصب پرسیده می‌شود: حجم، اینترنت، خرید، حساب.',
+    pgAdd: 'افزودن',
+    pgRemove: 'حذف این ردیف',
+    pgIcon: 'آیکون',
+    pgUrl: 'آدرس',
+    pgTitle: 'عنوان',
+    pgCaption: 'توضیح تصویر',
+    pgKind: 'نوع دستگاه',
+    pgLabel: 'متن نمایشی',
+    pgQuestion: 'پرسش',
+    pgAnswer: 'پاسخ',
+    pgEmpty: 'هنوز موردی اضافه نشده.',
+    pgMigration: 'برای ذخیره‌ی این بخش‌ها باید migrations/0008_landing_extra.sql را اجرا کرده باشی.',
+    pgPreviewImage: 'پیش‌نمایش',
+
+    // versions
+    vsTitle: 'نسخه‌ها',
+    vsLede: 'هر انتشار یک ردیف. جدیدترین تاریخ یعنی «نسخه‌ی فعلی» — روی صفحه‌ی بازی و روی کارت داشبورد.',
+    vsVersion: 'شماره‌ی نسخه',
+    vsDate: 'تاریخ انتشار',
+    vsNotes: 'تغییرات این نسخه',
+    vsNotesHint: 'هر خط یک مورد.',
+    vsDownload: 'لینک دانلود این نسخه (اختیاری)',
+    vsDownloadHint: 'خالی بگذاری، از لینک‌های دانلود خود بازی استفاده می‌شود.',
+    vsAdd: 'ثبت نسخه',
+    vsEdit: 'ویرایش',
+    vsDelete: 'حذف',
+    vsDeleteAsk: 'این نسخه از تاریخچه حذف شود؟',
+    vsNone: 'هنوز نسخه‌ای ثبت نشده.',
+    vsCurrent: 'نسخه‌ی فعلی',
+    vsBadVersion: 'شماره‌ی نسخه فقط حروف انگلیسی، عدد و . - + _',
+    vsClear: 'فرم خالی',
+
+    // new game — platform
+    nPlatform: 'این بازی کجا اجرا می‌شود؟',
+    nPlatformAndroid: 'اندروید (APK)',
+    nPlatformWeb: 'تحت وب (مرورگر)',
+    nPlatformBoth: 'هر دو',
+    nPlatformHint: 'انتخابت تعیین می‌کند چه چیزی پرسیده شود و چه فایل‌هایی ساخته شود. بازی تحت وب نه package '
+                 + 'اندروید دارد، نه دیپ‌لینک، نه AndroidManifest و نه کلاینت اندرویدِ گوگل.',
+    nWebNote: 'بازی تحت وب: فقط آدرس بازی لازم است. سه گزینه‌ی دیگر برای این بازی معنایی ندارند، پرسیده نمی‌شوند و در کد هم نمی‌آیند.',
+    nAndroidNote: 'بازی اندرویدی: هر لینکی که پر کنی یک دکمه روی کارت بازی می‌شود. AndroidManifest و اسکیم دیپ‌لینک هم ساخته می‌شوند.',
+    nBothNote: 'هر دو: هم لینک‌های اندروید و هم آدرس نسخه‌ی تحت وب پرسیده می‌شود.',
+    nWebNeeded: 'برای بازی تحت وب، آدرس بازی لازم است.',
+
+    // a11y / view
+    skip: 'رفتن به محتوا',
+    textSize: 'اندازه‌ی متن',
+    textSmall: 'کوچک',
+    textNormal: 'عادی',
+    textLarge: 'بزرگ',
+    themeToggle: 'روشن یا تاریک',
+    langLabel: 'زبان پنل',
+    tabsLabel: 'بخش‌های پنل',
 
     // misc
     loading: 'در حال بارگذاری…',
@@ -713,8 +855,90 @@ const I18N = {
     nIdTaken: 'That id already exists.',
     nIdBad: 'Lowercase letters, digits and hyphens only.',
 
-    unityLede: 'The C# that connects a game to this Worker. Every value is already filled in for the game you pick — its id, its endpoints and its product ids.',
+    unityLede: 'The whole Unity kit for this game: the constants file, the network layer, Google sign-in, '
+             + 'the AndroidManifest, link.xml, the Google console walkthrough and a worked example. '
+             + 'Every value is already filled in for the game you pick.',
     unityGame: 'Which game?',
+    unityCount: 'files',
+    unityPlatformAndroid: 'An Android game — the AndroidManifest and link.xml are generated too.',
+    unityPlatformWeb: 'A browser game — a deep link and an AndroidManifest mean nothing here, so neither is generated.',
+    unityPlatformBoth: 'Android and browser — the Android files are generated as well.',
+    unityOrder: 'Add the constants file first; everything else references it by name.',
+    unityAll: 'Download everything (one file)',
+
+    fTags: 'Tags',
+    fTagsHint: 'One per line, as  فارسی | English | 日本語 . Leave it empty to use the tags in code.',
+
+    tabPage: 'Game page',
+    pgLede: 'What the game\'s own public page says — the page a visitor lands on at its address. '
+          + 'None of this needs a deploy.',
+    pgOpen: 'Open the page',
+    pgHero: 'Header image (banner)',
+    pgHeroHint: 'A wide image. Empty falls back to a header built from the game\'s accent colour.',
+    pgTagline: 'One-line pitch',
+    pgTaglineHint: 'Sits under the game\'s name, and is what a link preview shows in Telegram, WhatsApp and X.',
+    pgAbout: 'The long description',
+    pgAboutHint: 'A few paragraphs. Blank lines are kept.',
+    pgFeatures: 'Features',
+    pgFeaturesHint: 'Three to six of them, each an icon and a short phrase. They sit above the fold, before the long text.',
+    pgScreens: 'Screenshots',
+    pgScreensHint: 'The gallery. A caption doubles as the image\'s alt text, which is the reason to write one.',
+    pgVideos: 'Videos',
+    pgVideosHint: 'A YouTube or Aparat link plays in the page; any other address renders as a link.',
+    pgDevices: 'Runs on',
+    pgDevicesHint: 'The kind picks the icon; the label is what a visitor actually reads.',
+    pgFaq: 'Frequently asked',
+    pgFaqHint: 'The questions asked before anybody installs anything: size, internet, purchases, accounts.',
+    pgAdd: 'Add',
+    pgRemove: 'Remove this row',
+    pgIcon: 'Icon',
+    pgUrl: 'URL',
+    pgTitle: 'Title',
+    pgCaption: 'Caption',
+    pgKind: 'Device kind',
+    pgLabel: 'Label',
+    pgQuestion: 'Question',
+    pgAnswer: 'Answer',
+    pgEmpty: 'Nothing added yet.',
+    pgMigration: 'Saving these sections needs migrations/0008_landing_extra.sql to have been run.',
+    pgPreviewImage: 'Preview',
+
+    vsTitle: 'Versions',
+    vsLede: 'One row per release. The newest date is "the current version" — on the game\'s page and on its dashboard card.',
+    vsVersion: 'Version',
+    vsDate: 'Released',
+    vsNotes: 'What changed',
+    vsNotesHint: 'One item per line.',
+    vsDownload: 'Download link for this release (optional)',
+    vsDownloadHint: 'Empty uses the game\'s own download links.',
+    vsAdd: 'Publish this version',
+    vsEdit: 'Edit',
+    vsDelete: 'Delete',
+    vsDeleteAsk: 'Remove this version from the history?',
+    vsNone: 'No version has been published yet.',
+    vsCurrent: 'Current',
+    vsBadVersion: 'A version is letters, digits and . - + _',
+    vsClear: 'Clear the form',
+
+    nPlatform: 'Where does this game run?',
+    nPlatformAndroid: 'Android (APK)',
+    nPlatformWeb: 'Browser',
+    nPlatformBoth: 'Both',
+    nPlatformHint: 'Your answer decides what is asked for and what is generated. A browser game has no Android '
+                 + 'package, no deep link, no AndroidManifest and no Android Google client.',
+    nWebNote: 'Browser game: the game\'s URL is all that is needed. The other three boxes mean nothing here, so they are not asked for and never reach the code.',
+    nAndroidNote: 'Android game: every link you fill in becomes a button on the game card. The AndroidManifest and the deep-link scheme are generated too.',
+    nBothNote: 'Both: the Android store links and the browser URL are asked for.',
+    nWebNeeded: 'A browser game needs its URL.',
+
+    skip: 'Skip to content',
+    textSize: 'Text size',
+    textSmall: 'Small',
+    textNormal: 'Normal',
+    textLarge: 'Large',
+    themeToggle: 'Light or dark',
+    langLabel: 'Panel language',
+    tabsLabel: 'Panel sections',
 
     loading: 'Loading…',
     failed: 'That did not work',
@@ -975,8 +1199,88 @@ const I18N = {
     nIdTaken: 'その ID は既に存在します。',
     nIdBad: '小文字英字・数字・ハイフンのみ。',
 
-    unityLede: 'ゲームをこの Worker に接続する C# コードです。選択したゲームの ID・エンドポイント・商品 ID が既に埋め込まれています。',
+    unityLede: 'このゲーム用の Unity キット一式：定数ファイル、ネットワーク層、Google サインイン、'
+             + 'AndroidManifest、link.xml、Google コンソール手順、実装例。値は選択したゲーム用に設定済みです。',
     unityGame: '対象のゲーム',
+    unityCount: 'ファイル',
+    unityPlatformAndroid: 'Android ゲーム — AndroidManifest と link.xml も生成されます。',
+    unityPlatformWeb: 'ブラウザーゲーム — ディープリンクと AndroidManifest は不要なため生成されません。',
+    unityPlatformBoth: 'Android とブラウザーの両方 — Android 用ファイルも生成されます。',
+    unityOrder: '最初に定数ファイルを追加してください。他のすべてがこれを参照します。',
+    unityAll: 'すべてダウンロード（1 ファイル）',
+
+    fTags: 'タグ',
+    fTagsHint: '1 行 1 タグ、  فارسی | English | 日本語  の形式。空ならコードのタグを使います。',
+
+    tabPage: 'ゲームページ',
+    pgLede: 'ゲーム自身の公開ページの内容です。デプロイは不要です。',
+    pgOpen: 'ページを開く',
+    pgHero: 'ヘッダー画像（バナー）',
+    pgHeroHint: '横長の画像 URL。空ならアクセント色から生成されたヘッダーになります。',
+    pgTagline: '1 行のキャッチコピー',
+    pgTaglineHint: 'ゲーム名の下に表示され、リンクプレビュー（Telegram・WhatsApp・X）にも使われます。',
+    pgAbout: '長い説明',
+    pgAboutHint: '数段落。空行は保持されます。',
+    pgFeatures: '特徴',
+    pgFeaturesHint: '3〜6 件。アイコンと短い語句。長文より上に表示されます。',
+    pgScreens: 'スクリーンショット',
+    pgScreensHint: 'ギャラリーです。キャプションは alt テキストとしても使われます。',
+    pgVideos: '動画',
+    pgVideosHint: 'YouTube と Aparat はページ内で再生され、他の URL はリンクとして表示されます。',
+    pgDevices: '対応デバイス',
+    pgDevicesHint: '種類がアイコンを決め、ラベルが実際に読まれる文字です。',
+    pgFaq: 'よくある質問',
+    pgFaqHint: 'インストール前に聞かれること：容量、通信、購入、アカウント。',
+    pgAdd: '追加',
+    pgRemove: 'この行を削除',
+    pgIcon: 'アイコン',
+    pgUrl: 'URL',
+    pgTitle: 'タイトル',
+    pgCaption: 'キャプション',
+    pgKind: 'デバイス種別',
+    pgLabel: 'ラベル',
+    pgQuestion: '質問',
+    pgAnswer: '回答',
+    pgEmpty: 'まだ何も追加されていません。',
+    pgMigration: 'これらの保存には migrations/0008_landing_extra.sql の実行が必要です。',
+    pgPreviewImage: 'プレビュー',
+
+    vsTitle: 'バージョン',
+    vsLede: 'リリースごとに 1 行。最新の日付が「現在のバージョン」です。',
+    vsVersion: 'バージョン',
+    vsDate: 'リリース日',
+    vsNotes: '変更点',
+    vsNotesHint: '1 行 1 項目。',
+    vsDownload: 'このリリースのダウンロード URL（任意）',
+    vsDownloadHint: '空ならゲーム自身のダウンロードリンクを使います。',
+    vsAdd: 'このバージョンを公開',
+    vsEdit: '編集',
+    vsDelete: '削除',
+    vsDeleteAsk: 'この バージョンを履歴から削除しますか？',
+    vsNone: 'まだバージョンがありません。',
+    vsCurrent: '現在',
+    vsBadVersion: 'バージョンは英数字と . - + _ のみ',
+    vsClear: 'フォームをクリア',
+
+    nPlatform: 'このゲームはどこで動きますか？',
+    nPlatformAndroid: 'Android（APK）',
+    nPlatformWeb: 'ブラウザー',
+    nPlatformBoth: '両方',
+    nPlatformHint: '選択によって入力項目と生成ファイルが変わります。ブラウザーゲームには Android パッケージも '
+                 + 'ディープリンクも AndroidManifest も Android クライアントもありません。',
+    nWebNote: 'ブラウザーゲーム：必要なのは URL だけです。他の 3 項目は意味を持たないため入力もコード生成もされません。',
+    nAndroidNote: 'Android ゲーム：入力したリンクの数だけカードにボタンが並びます。AndroidManifest とスキームも生成されます。',
+    nBothNote: '両方：Android のストアリンクとブラウザー URL の両方を入力します。',
+    nWebNeeded: 'ブラウザーゲームには URL が必要です。',
+
+    skip: '本文へスキップ',
+    textSize: '文字サイズ',
+    textSmall: '小',
+    textNormal: '標準',
+    textLarge: '大',
+    themeToggle: 'ライト / ダーク',
+    langLabel: 'パネルの言語',
+    tabsLabel: 'パネルのセクション',
 
     loading: '読み込み中…',
     failed: '実行できませんでした',
@@ -991,121 +1295,228 @@ const I18N = {
 // Shares the token names the rest of the site uses, so the
 // panel is recognisably the same product rather than an admin
 // tool bolted to the side of it.
+//
+// ------------------------------------------------------------
+// THE THREE THINGS THAT MADE IT UNREADABLE
+// ------------------------------------------------------------
+// 1. Bidi. The panel's default language is Persian, so <html>
+//    is dir="rtl" - and an unmarked Latin run inside RTL text is
+//    reordered by the browser. "NEON_KATANA_DB (required)"
+//    renders as "(required) NEON_KATANA_DB", a URL ending in a
+//    slash grows one at the front, and a version like 1.2.10
+//    comes out backwards. Every identifier, key, URL, price and
+//    version below is therefore isolated: `unicode-bidi:isolate`
+//    plus `direction:ltr`, which tells the browser this run is
+//    its own paragraph and stops the reordering at its edges.
+//
+// 2. Size. Everything was expressed as a fraction of 1em on a
+//    16px root: .76em hints, .78em code, .72em chips. That is
+//    11-12px of Latin text inside a Persian face at a weight
+//    chosen for headings. The scale below starts at .82em and
+//    the whole panel is multiplied by --ui-scale, which the text
+//    size control in the header sets and localStorage keeps.
+//
+// 3. Scrollbars. The old rule hid them outright - on <html> and
+//    on every strip that scrolls. A table wider than its box
+//    then had no indication that it scrolled at all, which is
+//    "I cannot get to it" rather than "it looks untidy". They
+//    are back, styled thin, in both themes.
+//
+// The font is the fourth: Vazirmatn is fetched from Google
+// Fonts, which is not reachable everywhere this panel is opened.
+// The stack below therefore names real fallbacks for all three
+// scripts rather than ending at sans-serif, and the panel is
+// designed to be legible when the download never lands.
 // ==========================================
 function panelCss() {
   return `
     *{margin:0;padding:0;box-sizing:border-box}
-    html{scrollbar-width:none;-ms-overflow-style:none}
-    html::-webkit-scrollbar{width:0;height:0;display:none}
 
     :root{
-      --brand:#8b5cf6;--brand-2:#c4b5fd;
-      --ok:#18a558;--warn:#e08600;--err:#e23b3b;--info:#2f6df6;
+      --brand:#7c4dff;--brand-2:#b39dff;
+      --ok:#0f8a4a;--warn:#b56a00;--err:#c62828;--info:#1b5fd9;
       --radius:16px;--maxw:1180px;
-      --bg:#f5f6fb;--bg-2:#eceefa;--surface:#fff;--surface-2:#f7f8fd;
-      --text:#1d2433;--dim:#6b7488;--border:rgba(20,28,45,.11);
+
+      --bg:#f4f6fc;--bg-2:#e9ecf8;--surface:#fff;--surface-2:#f4f6fc;
+      --text:#161c29;--dim:#525c72;--border:rgba(20,28,45,.16);
       --shadow:0 10px 30px rgba(20,28,45,.09);
+      --focus:#1b5fd9;
+      --code-bg:#0f1524;--code-fg:#e4ebfa;
+
+      /* Persian first, then a Latin UI face, then Japanese, then
+         a Persian-capable fallback that every Windows install
+         has had for twenty years. Ending at sans-serif alone is
+         what produces the mismatched-glyph look when the web
+         font does not arrive. */
+      --font-ui:'Vazirmatn','Segoe UI',Roboto,-apple-system,BlinkMacSystemFont,
+                'Noto Sans JP','Hiragino Sans','Yu Gothic',Meiryo,
+                Tahoma,'Iranian Sans',Arial,sans-serif;
+      --font-mono:ui-monospace,'JetBrains Mono','Cascadia Mono','SF Mono',
+                  Consolas,'Liberation Mono','Courier New',monospace;
+
       color-scheme:light;
     }
+
     :root[data-theme="dark"]{
-      --bg:#0d1119;--bg-2:#121826;--surface:#161d2a;--surface-2:#1c2434;
-      --text:#e7ecf5;--dim:#95a1b8;--border:rgba(255,255,255,.09);
+      --bg:#0b0f18;--bg-2:#111827;--surface:#151d2b;--surface-2:#1b2436;
+      --text:#eef2fa;--dim:#a6b2c9;--border:rgba(255,255,255,.14);
       --shadow:0 14px 36px rgba(0,0,0,.45);
+      --ok:#3ecf7e;--warn:#f0a92e;--err:#ff6b6b;--info:#6ba4ff;
+      --focus:#8fb4ff;
       color-scheme:dark;
     }
     @media (prefers-color-scheme:dark){
       :root:not([data-theme="light"]){
-        --bg:#0d1119;--bg-2:#121826;--surface:#161d2a;--surface-2:#1c2434;
-        --text:#e7ecf5;--dim:#95a1b8;--border:rgba(255,255,255,.09);
+        --bg:#0b0f18;--bg-2:#111827;--surface:#151d2b;--surface-2:#1b2436;
+        --text:#eef2fa;--dim:#a6b2c9;--border:rgba(255,255,255,.14);
         --shadow:0 14px 36px rgba(0,0,0,.45);
+        --ok:#3ecf7e;--warn:#f0a92e;--err:#ff6b6b;--info:#6ba4ff;
+        --focus:#8fb4ff;
         color-scheme:dark;
       }
     }
 
-    body{font-family:'Vazirmatn','Segoe UI',Tahoma,Arial,sans-serif;min-height:100vh;
+    /* The text size control writes --ui-scale on <html>. Every
+       size in this sheet is relative to the root, so one number
+       moves the whole panel rather than 60 declarations. */
+    html{
+      font-size:calc(16px * var(--ui-scale,1));
+      -webkit-text-size-adjust:100%;
+      scrollbar-width:thin;
+      scrollbar-color:var(--border) transparent;
+    }
+    ::-webkit-scrollbar{width:10px;height:10px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:var(--border);border-radius:10px;
+      border:2px solid transparent;background-clip:content-box}
+    ::-webkit-scrollbar-thumb:hover{background:var(--dim);background-clip:content-box}
+
+    body{font-family:var(--font-ui);min-height:100vh;line-height:1.75;
       padding:20px 16px 60px;color:var(--text);
-      background:radial-gradient(900px 480px at 82% -10%,rgba(139,92,246,.16),transparent 62%),
-                 linear-gradient(170deg,var(--bg),var(--bg-2));background-attachment:fixed}
+      background:radial-gradient(900px 480px at 82% -10%,rgba(124,77,255,.14),transparent 62%),
+                 linear-gradient(170deg,var(--bg),var(--bg-2));background-attachment:fixed;
+      -webkit-font-smoothing:antialiased}
     .wrap{max-width:var(--maxw);margin:0 auto}
+
+    /* ---- bidi isolation ----
+       The single most important block in this file. See the note
+       at the top: without it, every Latin identifier inside the
+       Persian UI is rendered in an order nobody typed. */
+    code,kbd,samp,pre,.mono,.ltr{
+      direction:ltr;unicode-bidi:isolate;text-align:left;
+      font-family:var(--font-mono);font-variant-ligatures:none}
+    code,kbd,samp{font-size:.94em;word-break:break-word}
+    .num{direction:ltr;unicode-bidi:isolate;font-variant-numeric:tabular-nums}
+    [dir="ltr"]{unicode-bidi:isolate}
+    input[dir="ltr"],textarea[dir="ltr"]{direction:ltr;text-align:left;font-family:var(--font-mono)}
+    a[href^="http"],.url{unicode-bidi:isolate}
+
+    /* ---- focus ----
+       Two rules rather than one: the ring, and a guarantee it is
+       not clipped by the rounded card it sits inside. */
+    :focus-visible{outline:3px solid var(--focus);outline-offset:2px;border-radius:8px}
+    .tabs button:focus-visible,.seg button:focus-visible{outline-offset:-2px}
+
+    ::selection{background:rgba(124,77,255,.28)}
+
+    .skip{position:absolute;inset-inline-start:-9999px;top:8px;z-index:99;
+      padding:10px 16px;border-radius:10px;background:var(--surface);
+      border:1px solid var(--border);font-weight:700;text-decoration:none;color:var(--text)}
+    .skip:focus{inset-inline-start:8px}
 
     /* ---- top ---- */
     .top{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-block-end:20px}
     .logo{display:flex;align-items:center;gap:12px}
     .logo-mark{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;
       font-size:1.5em;color:#fff;background:linear-gradient(135deg,var(--brand),var(--brand-2));
-      box-shadow:0 8px 22px rgba(139,92,246,.36)}
-    .logo b{display:block;font-size:1.15em;font-weight:800;letter-spacing:.4px}
-    .logo span{font-size:.8em;color:var(--dim)}
+      box-shadow:0 8px 22px rgba(124,77,255,.36)}
+    .logo b{display:block;font-size:1.16em;font-weight:800;letter-spacing:.3px}
+    .logo>span>span{font-size:.86em;color:var(--dim)}
     .top-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
 
     .seg{display:inline-flex;padding:3px;gap:2px;border-radius:11px;background:var(--surface);border:1px solid var(--border)}
-    .seg button{border:0;cursor:pointer;padding:6px 11px;border-radius:8px;font:inherit;font-size:.79em;
-      font-weight:700;color:var(--dim);background:transparent}
+    .seg button{border:0;cursor:pointer;padding:8px 12px;border-radius:8px;font:inherit;font-size:.85em;
+      font-weight:700;color:var(--dim);background:transparent;min-height:34px}
+    .seg button:hover{color:var(--text)}
     .seg button[aria-pressed="true"]{color:#fff;background:linear-gradient(135deg,var(--brand),var(--brand-2))}
-    .ibtn{width:36px;height:36px;border-radius:10px;cursor:pointer;display:inline-flex;align-items:center;
-      justify-content:center;color:var(--text);background:var(--surface);border:1px solid var(--border);font-size:1em}
+    .ibtn{min-width:40px;height:40px;border-radius:10px;cursor:pointer;display:inline-flex;align-items:center;
+      justify-content:center;color:var(--text);background:var(--surface);border:1px solid var(--border);font-size:1.05em}
+    .ibtn:hover{border-color:var(--brand)}
 
     /* ---- health strip ---- */
     .health{display:flex;gap:8px;flex-wrap:wrap;margin-block-end:16px}
-    .hpill{display:inline-flex;align-items:center;gap:7px;padding:6px 13px;border-radius:999px;font-size:.79em;
+    .hpill{display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:999px;font-size:.85em;
       font-weight:700;background:var(--surface);border:1px solid var(--border);color:var(--dim)}
-    .hdot{width:8px;height:8px;border-radius:50%;background:var(--err)}
+    .hdot{width:9px;height:9px;border-radius:50%;background:var(--err);flex-shrink:0}
+    .hpill.is-on{color:var(--text)}
     .hpill.is-on .hdot{background:var(--ok)}
-    .hpill.is-warn{color:var(--warn);border-color:rgba(224,134,0,.4)}
+    .hpill.is-warn{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 45%,transparent)}
     .hpill.is-warn .hdot{background:var(--warn)}
 
-    /* ---- tabs ---- */
-    .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-block-end:18px;padding:5px;border-radius:14px;
-      background:var(--surface);border:1px solid var(--border);box-shadow:var(--shadow)}
-    .tabs button{border:0;cursor:pointer;padding:10px 16px;border-radius:10px;font:inherit;font-size:.86em;
-      font-weight:700;color:var(--dim);background:transparent;transition:color .16s ease,background .16s ease}
-    .tabs button:hover{color:var(--text)}
+    /* ---- tabs ----
+       Sticky, because this panel is long and the tab you are in
+       is the thing you lose track of first. */
+    .tabs{position:sticky;top:0;z-index:20;display:flex;gap:6px;flex-wrap:wrap;margin-block-end:18px;padding:6px;
+      border-radius:14px;background:color-mix(in srgb,var(--surface) 92%,transparent);
+      border:1px solid var(--border);box-shadow:var(--shadow);backdrop-filter:blur(10px)}
+    .tabs button{border:0;cursor:pointer;padding:11px 16px;border-radius:10px;font:inherit;font-size:.92em;
+      font-weight:700;color:var(--dim);background:transparent;min-height:42px;
+      transition:color .16s ease,background .16s ease}
+    .tabs button:hover{color:var(--text);background:var(--surface-2)}
     .tabs button[aria-selected="true"]{color:#fff;background:linear-gradient(135deg,var(--brand),var(--brand-2))}
 
     .panel{display:none}
     .panel.is-active{display:block}
+    .panel:focus{outline:none}
 
     /* ---- generic ---- */
     .card{padding:22px;border-radius:var(--radius);background:var(--surface);border:1px solid var(--border);
       box-shadow:var(--shadow);margin-block-end:16px}
-    .lede{color:var(--dim);font-size:.89em;line-height:1.75;margin-block-end:16px}
-    h2.sec{font-size:1.05em;font-weight:800;margin-block-end:12px;display:flex;align-items:center;gap:9px}
-    h3.sub{font-size:.92em;font-weight:800;margin-block:16px 10px;color:var(--dim)}
+    .lede{color:var(--dim);font-size:.95em;line-height:1.85;margin-block-end:16px;max-width:78ch}
+    h2.sec{font-size:1.12em;font-weight:800;margin-block-end:12px;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+    h3.sub{font-size:1em;font-weight:800;margin-block:20px 10px;color:var(--text);
+      padding-block-end:6px;border-block-end:1px solid var(--border)}
 
     .grid{display:grid;gap:14px}
     .grid.two{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
     .grid.three{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
     .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 
-    label.f{display:block;margin-block-end:12px}
-    label.f>span{display:block;font-size:.78em;font-weight:700;color:var(--dim);margin-block-end:5px}
-    input[type=text],input[type=password],input[type=number],select,textarea{
-      width:100%;padding:10px 13px;border-radius:11px;font:inherit;font-size:.88em;
-      color:var(--text);background:var(--surface-2);border:1px solid var(--border);outline:none}
-    input:focus,select:focus,textarea:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(139,92,246,.16)}
-    textarea{min-height:78px;resize:vertical;line-height:1.6}
-    input[type=color]{width:52px;height:38px;padding:2px;border-radius:10px;border:1px solid var(--border);background:var(--surface-2)}
-    .hint{font-size:.76em;color:var(--dim);margin-block-start:4px;line-height:1.55}
+    label.f{display:block;margin-block-end:14px}
+    label.f>span{display:block;font-size:.86em;font-weight:700;color:var(--text);margin-block-end:6px}
+    input[type=text],input[type=password],input[type=number],input[type=date],input[type=url],select,textarea{
+      width:100%;padding:11px 13px;border-radius:11px;font:inherit;font-size:.95em;line-height:1.6;
+      color:var(--text);background:var(--surface-2);border:1px solid var(--border);outline:none;min-height:42px}
+    input:focus,select:focus,textarea:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(124,77,255,.2)}
+    input::placeholder,textarea::placeholder{color:var(--dim);opacity:.8}
+    textarea{min-height:84px;resize:vertical}
+    input[type=color]{width:56px;height:42px;padding:2px;border-radius:10px;border:1px solid var(--border);background:var(--surface-2)}
+    .hint{font-size:.85em;color:var(--dim);margin-block-start:5px;line-height:1.7;max-width:78ch}
 
-    .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 17px;border-radius:11px;
-      border:1px solid transparent;font:inherit;font-size:.85em;font-weight:700;cursor:pointer;text-decoration:none;
-      color:#fff;background:linear-gradient(135deg,var(--brand),var(--brand-2));
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:11px 18px;border-radius:11px;
+      border:1px solid transparent;font:inherit;font-size:.92em;font-weight:700;cursor:pointer;text-decoration:none;
+      color:#fff;background:linear-gradient(135deg,var(--brand),var(--brand-2));min-height:42px;
       transition:transform .15s ease,filter .15s ease}
     .btn:hover{transform:translateY(-1px);filter:brightness(1.07)}
-    .btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+    .btn:disabled{opacity:.55;cursor:not-allowed;transform:none}
     .btn.ghost{color:var(--text);background:var(--surface-2);border-color:var(--border)}
-    .btn.danger{background:linear-gradient(135deg,#e23b3b,#f87171)}
-    .btn.small{padding:7px 12px;font-size:.79em}
+    .btn.ghost:hover{border-color:var(--brand)}
+    .btn.danger{background:linear-gradient(135deg,#c62828,#ef5350)}
+    .btn.small{padding:8px 13px;font-size:.86em;min-height:36px}
 
-    .chip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;font-size:.72em;
+    .chip{display:inline-flex;align-items:center;gap:5px;padding:4px 11px;border-radius:999px;font-size:.8em;
       font-weight:700;color:var(--dim);background:var(--surface-2);border:1px solid var(--border)}
-    .chip.ok{color:var(--ok);background:rgba(24,165,88,.12);border-color:rgba(24,165,88,.34)}
-    .chip.warn{color:var(--warn);background:rgba(224,134,0,.12);border-color:rgba(224,134,0,.34)}
-    .chip.err{color:var(--err);background:rgba(226,59,59,.12);border-color:rgba(226,59,59,.34)}
-    .chip.info{color:var(--info);background:rgba(47,109,246,.12);border-color:rgba(47,109,246,.34)}
+    .chip.ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent);
+      border-color:color-mix(in srgb,var(--ok) 40%,transparent)}
+    .chip.warn{color:var(--warn);background:color-mix(in srgb,var(--warn) 14%,transparent);
+      border-color:color-mix(in srgb,var(--warn) 40%,transparent)}
+    .chip.err{color:var(--err);background:color-mix(in srgb,var(--err) 14%,transparent);
+      border-color:color-mix(in srgb,var(--err) 40%,transparent)}
+    .chip.info{color:var(--info);background:color-mix(in srgb,var(--info) 14%,transparent);
+      border-color:color-mix(in srgb,var(--info) 40%,transparent)}
 
-    .note{padding:12px 15px;border-radius:12px;font-size:.84em;line-height:1.7;background:var(--surface-2);
-      border:1px solid var(--border);border-inline-start:3px solid var(--dim);margin-block-end:14px}
+    .note{padding:13px 16px;border-radius:12px;font-size:.92em;line-height:1.8;background:var(--surface-2);
+      border:1px solid var(--border);border-inline-start:4px solid var(--dim);margin-block-end:14px}
     .note.ok{border-inline-start-color:var(--ok)}
     .note.warn{border-inline-start-color:var(--warn)}
     .note.err{border-inline-start-color:var(--err)}
@@ -1116,100 +1527,121 @@ function panelCss() {
     .gcard{padding:18px;border-radius:var(--radius);background:var(--surface);border:1px solid var(--border);
       box-shadow:var(--shadow);cursor:pointer;transition:transform .18s ease,border-color .18s ease}
     .gcard:hover{transform:translateY(-3px);border-color:var(--brand)}
-    .gcard[aria-selected="true"]{border-color:var(--brand);box-shadow:0 0 0 3px rgba(139,92,246,.18)}
+    .gcard[aria-selected="true"]{border-color:var(--brand);box-shadow:0 0 0 3px rgba(124,77,255,.22)}
     .gcard-top{display:flex;align-items:center;gap:12px;margin-block-end:12px}
     /* The emoji is the fallback UNDER the logo, not a sibling
        beside it. As flex items the two shared the 52px box, so a
        game with both showed its emoji next to a squeezed sliver
-       of its logo - which is what "the panel does not show the
-       logos properly" looked like. Taking the image out of flow
-       lets it cover the box, and the emoji is what remains
-       visible when the file 404s and onerror hides it. */
+       of its logo. Taking the image out of flow lets it cover the
+       box, and the emoji is what remains visible when the file
+       404s and onerror hides it. */
     .gcard-logo{position:relative;width:52px;height:52px;border-radius:15px;flex-shrink:0;display:flex;
       align-items:center;justify-content:center;font-size:1.5em;background:#fff;overflow:hidden;
       border:2px solid var(--border)}
     .gcard-logo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
-    .gcard-name{font-weight:800;font-size:1.02em}
-    .gcard-id{font-size:.76em;color:var(--dim);direction:ltr}
+    .gcard-name{display:block;font-weight:800;font-size:1.05em}
+    .gcard-id{display:block;font-size:.82em;color:var(--dim);direction:ltr;unicode-bidi:isolate}
     .gcard-chips{display:flex;gap:6px;flex-wrap:wrap}
 
     /* ---- tables ---- */
-    .tbl{width:100%;border-collapse:collapse;font-size:.84em}
-    .tbl th{text-align:start;font-size:.78em;color:var(--dim);font-weight:700;padding:8px 10px;
+    .tbl{width:100%;border-collapse:collapse;font-size:.92em}
+    .tbl th{text-align:start;font-size:.86em;color:var(--dim);font-weight:700;padding:9px 10px;
       border-block-end:1px solid var(--border);white-space:nowrap}
-    .tbl td{padding:10px;border-block-end:1px solid var(--border);vertical-align:middle}
+    .tbl td{padding:11px 10px;border-block-end:1px solid var(--border);vertical-align:middle}
     .tbl tr:last-child td{border-block-end:0}
-    .tbl code{font-size:.92em;direction:ltr;display:inline-block}
-    .scroll{overflow-x:auto}
+    .scroll{overflow-x:auto;overscroll-behavior-x:contain}
 
     /* ---- code output ---- */
     .code{position:relative;margin-block-end:14px}
-    .code pre{padding:16px;border-radius:12px;background:#0d1220;color:#dbe4f5;font-family:ui-monospace,'Courier New',monospace;
-      font-size:.78em;line-height:1.65;overflow-x:auto;direction:ltr;text-align:left;max-height:460px}
+    .code pre{padding:16px;border-radius:12px;background:var(--code-bg);color:var(--code-fg);
+      font-family:var(--font-mono);font-size:.86em;line-height:1.7;overflow:auto;
+      direction:ltr;unicode-bidi:isolate;text-align:left;max-height:520px;tab-size:2}
+    .code pre::-webkit-scrollbar-thumb{background:rgba(255,255,255,.22);background-clip:content-box}
     .code-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
-      margin-block-end:7px}
-    .code-name{font-size:.82em;font-weight:800}
-    .code-hint{font-size:.76em;color:var(--dim);line-height:1.6;margin-block-end:7px}
+      margin-block-end:8px}
+    .code-name{font-size:.92em;font-weight:800;direction:ltr;unicode-bidi:isolate}
+    .code-hint{font-size:.86em;color:var(--dim);line-height:1.7;margin-block-end:8px}
 
     .steps{counter-reset:s;list-style:none;margin:0;padding:0}
-    .steps li{position:relative;padding:0 0 16px 0;margin-inline-start:30px}
-    .steps li::before{counter-increment:s;content:counter(s);position:absolute;inset-inline-start:-30px;
-      width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-      font-size:.72em;font-weight:800;color:#fff;background:var(--brand)}
-    .steps b{display:block;font-size:.88em;margin-block-end:4px}
-    .steps .hint{margin-block-start:5px}
+    .steps li{position:relative;padding:0 0 18px 0;margin-inline-start:32px}
+    .steps li::before{counter-increment:s;content:counter(s);position:absolute;inset-inline-start:-32px;
+      width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+      font-size:.8em;font-weight:800;color:#fff;background:var(--brand)}
+    .steps b{display:block;font-size:.98em;margin-block-end:6px}
+    .steps pre{padding:11px 13px;border-radius:10px;background:var(--code-bg);color:var(--code-fg);
+      font-family:var(--font-mono);font-size:.85em;line-height:1.65;overflow-x:auto;
+      direction:ltr;unicode-bidi:isolate;text-align:left}
+    .steps .hint{margin-block-start:6px}
 
-    .switch{display:inline-flex;align-items:center;gap:10px;cursor:pointer;font-size:.86em;font-weight:700}
+    .switch{display:inline-flex;align-items:center;gap:10px;cursor:pointer;font-size:.92em;font-weight:700;
+      min-height:38px}
     .switch input{width:0;height:0;opacity:0;position:absolute}
     .track{width:46px;height:26px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);
-      position:relative;transition:background .18s ease}
+      position:relative;transition:background .18s ease;flex-shrink:0}
     .track::after{content:'';position:absolute;inset-block-start:3px;inset-inline-start:3px;width:18px;height:18px;
       border-radius:50%;background:var(--dim);transition:transform .18s ease,background .18s ease}
-    .switch input:checked+.track{background:rgba(24,165,88,.22);border-color:rgba(24,165,88,.5)}
+    .switch input:checked+.track{background:color-mix(in srgb,var(--ok) 24%,transparent);
+      border-color:color-mix(in srgb,var(--ok) 55%,transparent)}
     .switch input:checked+.track::after{background:var(--ok);transform:translateX(20px)}
     [dir="rtl"] .switch input:checked+.track::after{transform:translateX(-20px)}
+    .switch input:focus-visible+.track{outline:3px solid var(--focus);outline-offset:2px}
 
     .toast{position:fixed;inset-block-end:22px;inset-inline-start:50%;transform:translateX(-50%);
-      padding:11px 20px;border-radius:12px;font-size:.85em;font-weight:700;color:#fff;background:#18a558;
-      box-shadow:0 10px 30px rgba(0,0,0,.24);opacity:0;pointer-events:none;transition:opacity .2s ease;z-index:50}
+      padding:12px 22px;border-radius:12px;font-size:.94em;font-weight:700;color:#fff;background:#0f8a4a;
+      box-shadow:0 10px 30px rgba(0,0,0,.24);opacity:0;pointer-events:none;transition:opacity .2s ease;z-index:50;
+      max-width:min(92vw,540px);text-align:center;line-height:1.6}
     .toast.show{opacity:1}
-    .toast.bad{background:#e23b3b}
+    .toast.bad{background:#c62828}
 
     .plrow{display:flex;align-items:center;gap:10px}
     .plavatar{position:relative;width:34px;height:34px;border-radius:50%;flex-shrink:0;overflow:hidden;
       display:flex;align-items:center;justify-content:center;font-size:1em;
       background:var(--surface-2);border:1px solid var(--border)}
     .plavatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-    .plstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-block:14px}
-    .plstat{padding:12px 14px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border)}
-    .plstat b{display:block;font-size:1.15em;font-weight:800;margin-block-end:2px}
-    .plstat span{font-size:.76em;color:var(--dim)}
+    .plstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:10px;margin-block:14px}
+    .plstat{padding:13px 15px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border)}
+    .plstat b{display:block;font-size:1.2em;font-weight:800;margin-block-end:2px}
+    .plstat span{font-size:.84em;color:var(--dim)}
 
-    .storekeys{display:flex;flex-wrap:wrap;gap:6px;margin-block:6px}
-    .storekeys code{cursor:pointer;padding:3px 9px;border-radius:8px;font-size:.75em;direction:ltr;
-      color:var(--info);background:rgba(47,109,246,.1);border:1px solid rgba(47,109,246,.3);
+    .storekeys{display:flex;flex-wrap:wrap;gap:6px;margin-block:8px}
+    .storekeys code{cursor:pointer;padding:5px 10px;border-radius:8px;font-size:.85em;
+      color:var(--info);background:color-mix(in srgb,var(--info) 12%,transparent);
+      border:1px solid color-mix(in srgb,var(--info) 36%,transparent);
       transition:background .15s ease,transform .15s ease}
-    .storekeys code:hover{background:rgba(47,109,246,.2);transform:translateY(-1px)}
+    .storekeys code:hover{background:color-mix(in srgb,var(--info) 22%,transparent);transform:translateY(-1px)}
 
-    .empty{padding:28px;text-align:center;color:var(--dim);font-size:.88em}
+    /* ---- repeating rows (features, screenshots, videos, FAQ) ----
+       Every list on the game-page tab is the same shape: a stack
+       of bordered rows with a remove button, and one add button
+       under them. One set of rules rather than five. */
+    .rep{display:flex;flex-direction:column;gap:12px;margin-block-end:12px}
+    .rep-row{padding:14px;border-radius:13px;background:var(--surface-2);border:1px solid var(--border)}
+    .rep-row .grid{margin-block-end:0}
+    .rep-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-block-end:10px}
+    .rep-num{font-size:.85em;font-weight:800;color:var(--dim)}
+    .rep-row label.f{margin-block-end:10px}
+    .rep-row label.f:last-child{margin-block-end:0}
+    .thumb{width:100%;max-width:340px;aspect-ratio:16/9;object-fit:cover;border-radius:10px;
+      border:1px solid var(--border);background:var(--surface);display:block;margin-block-start:8px}
+
+    .empty{padding:28px;text-align:center;color:var(--dim);font-size:.95em}
     .muted{color:var(--dim)}
+    .stack{display:flex;flex-direction:column;gap:8px}
 
     /* ---- mobile ----
-       The panel is the densest surface on the site and had two
-       lines of mobile handling. The problems were concrete: the
-       tab strip overflowed rather than wrapping, action rows put
-       four half-width buttons on a 360px screen, and the tables
-       set their own width so the page scrolled sideways instead
-       of the table doing it. */
+       The panel is the densest surface on the site. The problems
+       were concrete: the tab strip overflowed rather than
+       wrapping, action rows put four half-width buttons on a
+       360px screen, and the tables set their own width so the
+       page scrolled sideways instead of the table doing it. */
     @media (max-width:720px){
       body{padding:14px 12px 44px}
       .top{gap:10px}
-      .logo-mark{width:40px;height:40px;font-size:1.25em}
+      .logo-mark{width:42px;height:42px;font-size:1.3em}
 
-      .tabs{gap:4px;padding:4px;overflow-x:auto;flex-wrap:nowrap;
-        scrollbar-width:none;-webkit-overflow-scrolling:touch}
-      .tabs::-webkit-scrollbar{display:none}
-      .tabs button{padding:9px 12px;font-size:.8em;white-space:nowrap;flex:0 0 auto}
+      .tabs{gap:4px;padding:5px;overflow-x:auto;flex-wrap:nowrap;
+        scrollbar-width:thin;-webkit-overflow-scrolling:touch}
+      .tabs button{padding:10px 13px;font-size:.88em;white-space:nowrap;flex:0 0 auto}
 
       .card{padding:16px}
       .grid.two,.grid.three{grid-template-columns:1fr}
@@ -1223,29 +1655,50 @@ function panelCss() {
 
       /* The table scrolls inside its own box; the page never
          scrolls sideways. */
-      .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
       .tbl{min-width:520px}
-      .tbl td,.tbl th{padding:8px}
+      .tbl td,.tbl th{padding:9px 8px}
 
       .plstats{grid-template-columns:repeat(2,1fr)}
-      .code pre{font-size:.72em;max-height:340px}
+      .code pre{font-size:.8em;max-height:380px}
     }
 
     @media (max-width:400px){
       .plstats{grid-template-columns:1fr}
-      .seg button{padding:6px 8px;font-size:.74em}
+      .seg button{padding:7px 9px;font-size:.82em}
     }
+
     @media (prefers-reduced-motion:no-preference){
       .card,.gcard{animation:tgRise .4s cubic-bezier(.16,1,.3,1) both}
     }
+    @media (prefers-reduced-motion:reduce){
+      *,*::before,*::after{animation-duration:.001ms !important;transition-duration:.001ms !important}
+    }
     @keyframes tgRise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+    @media print{
+      .tabs,.top-actions,.toast{display:none}
+      .panel{display:block !important}
+      body{background:#fff;color:#000}
+    }
   `
 }
 
 
+// ==========================================
+// themeBoot
+// Theme and text size, applied before first paint.
+//
+// Both come from localStorage rather than from the server,
+// because both are per-device choices and a flash of the wrong
+// one on every page load reads as a broken page.
+// ==========================================
 function themeBoot() {
-  return `<script>(function(){try{var t=localStorage.getItem('ac_theme');
-    if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>`
+  return `<script>(function(){try{
+    var t=localStorage.getItem('ac_theme');
+    if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);
+    var s=parseFloat(localStorage.getItem('ac_ui_scale'));
+    if(s>=0.85&&s<=1.35)document.documentElement.style.setProperty('--ui-scale',String(s));
+  }catch(e){}})();</script>`
 }
 
 
@@ -1253,28 +1706,28 @@ function themeBoot() {
 // Login page
 // ==========================================
 function renderLogin(lang, theme, failed) {
-  const t = I18N[lang] || I18N.fa
+  const t = localizedDict(lang)
   const themeAttr = theme === 'light' || theme === 'dark' ? ` data-theme="${theme}"` : ''
 
   return `<!DOCTYPE html>
 <html lang="${escapeHtml(lang)}" dir="${t.dir}"${themeAttr}>
 <head>
   ${getPageHead({ title: `${t.brand} — ${t.loginTitle}`, amirLogo: CONFIG.AMIR_LOGO })}
-  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  ${panelFont()}
   ${themeBoot()}
   <style>${panelCss()}
     body{display:flex;align-items:center;justify-content:center;padding:24px}
-    .login{width:100%;max-width:400px}
+    .login{width:100%;max-width:420px}
   </style>
 </head>
 <body>
-  <div class="login">
+  <main class="login">
     <div class="card" style="text-align:center">
-      <div class="logo-mark" style="margin:0 auto 16px;width:60px;height:60px;font-size:1.8em">⚡</div>
-      <h1 style="font-size:1.25em;font-weight:800;margin-block-end:6px">${escapeHtml(t.loginTitle)}</h1>
-      <p class="muted" style="font-size:.85em;margin-block-end:22px">${escapeHtml(t.loginSub)}</p>
+      <div class="logo-mark" style="margin:0 auto 16px;width:60px;height:60px;font-size:1.8em" aria-hidden="true">⚡</div>
+      <h1 style="font-size:1.3em;font-weight:800;margin-block-end:6px">${escapeHtml(t.loginTitle)}</h1>
+      <p class="muted" style="font-size:.92em;margin-block-end:22px">${escapeHtml(t.loginSub)}</p>
 
-      ${failed ? `<div class="note err" style="text-align:start">${escapeHtml(t.loginError)}</div>` : ''}
+      ${failed ? `<div class="note err" style="text-align:start" role="alert">${escapeHtml(t.loginError)}</div>` : ''}
 
       <form method="POST" action="/thegod/login">
         <label class="f" style="text-align:start">
@@ -1282,17 +1735,41 @@ function renderLogin(lang, theme, failed) {
           <input type="password" name="password" id="pw" required autofocus
                  placeholder="${escapeHtml(t.loginPlaceholder)}" autocomplete="current-password">
         </label>
-        <label class="row" style="font-size:.8em;color:var(--dim);margin-block-end:16px;cursor:pointer">
+        <label class="row" style="font-size:.9em;color:var(--dim);margin-block-end:16px;cursor:pointer">
           <input type="checkbox" onchange="document.getElementById('pw').type=this.checked?'text':'password'"
-                 style="width:auto">
+                 style="width:auto;min-height:0">
           <span>${escapeHtml(t.showPassword)}</span>
         </label>
         <button type="submit" class="btn" style="width:100%">${escapeHtml(t.loginButton)}</button>
       </form>
     </div>
-  </div>
+  </main>
 </body>
 </html>`
+}
+
+
+// ==========================================
+// panelFont
+// The web font, and the reason it is not depended on.
+//
+// Vazirmatn is the Persian face the rest of the site uses, and
+// it comes from Google Fonts - which is not reachable from every
+// network this panel is opened on. preconnect makes it arrive
+// sooner where it arrives at all; the stack in panelCss() is
+// what the panel actually looks like where it does not.
+//
+// media="print" + onload is the standard non-blocking pattern:
+// a stylesheet that never loads then costs nothing rather than
+// holding first paint for the length of a DNS timeout.
+// ==========================================
+function panelFont() {
+  const href = 'https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap'
+  return `
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="${href}" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="${href}"></noscript>`
 }
 
 
@@ -1300,7 +1777,7 @@ function renderLogin(lang, theme, failed) {
 // Panel page
 // ==========================================
 function renderPanel(games, lang, theme, health, origin) {
-  const t = I18N[lang] || I18N.fa
+  const t = localizedDict(lang)
   const themeAttr = theme === 'light' || theme === 'dark' ? ` data-theme="${theme}"` : ''
 
   const list = Object.values(games).map(game => ({
@@ -1349,68 +1826,77 @@ function renderPanel(games, lang, theme, health, origin) {
     ? `<span class="hpill is-warn"><span class="hdot"></span>${escapeHtml(t.hSandbox)}</span>` : ''
 
   const langSeg = LANGS.map(code =>
-    `<button type="button" onclick="tgLang('${code}')" aria-pressed="${code === lang ? 'true' : 'false'}">${escapeHtml(META[code].label)}</button>`
+    `<button type="button" onclick="tgLang('${code}')" lang="${code}"
+             aria-pressed="${code === lang ? 'true' : 'false'}">${escapeHtml(META[code].label)}</button>`
   ).join('')
 
-  const tabs = [
-    ['games', t.tabGames, '🎮'],
-    ['store', t.tabStore, '🛒'],
-    ['orders', t.tabOrders, '💳'],
-    ['players', t.tabPlayers, '👥'],
-    ['sql', t.tabSql, '🗄️'],
-    ['env', t.tabEnv, '🔑'],
-    ['new', t.tabNew, '✨'],
-    ['unity', t.tabUnity, '🧩']
-  ].map(([key, label, icon], index) =>
-    `<button type="button" role="tab" data-tab="${key}" aria-selected="${index === 0 ? 'true' : 'false'}"
-             onclick="tgTab('${key}')">${icon} ${escapeHtml(label)}</button>`
+  // Text size, persisted per device. The panel's job is dense
+  // Latin identifiers inside a Persian interface, and there is no
+  // single size that is right for a 13" laptop and a phone held
+  // at arm's length. Three steps, one localStorage key, applied
+  // before first paint by themeBoot().
+  const sizeSeg = [['0.9', t.textSmall, 'A'], ['1', t.textNormal, 'A'], ['1.15', t.textLarge, 'A']]
+    .map(([value, label, glyph], index) =>
+      `<button type="button" onclick="tgScale('${value}')" data-scale="${value}"
+               title="${escapeHtml(label)}" aria-label="${escapeHtml(t.textSize)}: ${escapeHtml(label)}"
+               style="font-size:${0.78 + index * 0.16}em">${glyph}</button>`
+    ).join('')
+
+  const tabs = TAB_KEYS.map(([key, labelKey, icon], index) =>
+    `<button type="button" role="tab" id="tab-${key}" data-tab="${key}"
+             aria-selected="${index === 0 ? 'true' : 'false'}" aria-controls="panel-${key}"
+             tabindex="${index === 0 ? '0' : '-1'}"
+             onclick="tgTab('${key}')"><span aria-hidden="true">${icon}</span> ${escapeHtml(t[labelKey])}</button>`
   ).join('')
+
+  const panels = TAB_KEYS.map(([key], index) =>
+    `<section class="panel${index === 0 ? ' is-active' : ''}" id="panel-${key}"
+              role="tabpanel" aria-labelledby="tab-${key}" tabindex="0"></section>`
+  ).join('\n    ')
 
   return `<!DOCTYPE html>
 <html lang="${escapeHtml(lang)}" dir="${t.dir}"${themeAttr}>
 <head>
   ${getPageHead({ title: `${t.brand} — ${t.tagline}`, amirLogo: CONFIG.AMIR_LOGO })}
-  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <meta name="robots" content="noindex, nofollow">
+  ${panelFont()}
   ${themeBoot()}
   <style>${panelCss()}</style>
 </head>
 <body>
+  <a class="skip" href="#panel-games">${escapeHtml(t.skip)}</a>
   <div class="wrap">
-    <div class="top">
+    <header class="top">
       <div class="logo">
-        <span class="logo-mark">⚡</span>
+        <span class="logo-mark" aria-hidden="true">⚡</span>
         <span>
           <b>${escapeHtml(t.brand)}</b>
           <span>${escapeHtml(t.tagline)}</span>
         </span>
       </div>
       <div class="top-actions">
-        <span class="seg" role="group">${langSeg}</span>
-        <button type="button" class="ibtn" onclick="tgTheme()" aria-label="theme">◐</button>
+        <span class="seg" role="group" aria-label="${escapeHtml(t.langLabel)}">${langSeg}</span>
+        <span class="seg" role="group" aria-label="${escapeHtml(t.textSize)}" id="tg-scale">${sizeSeg}</span>
+        <button type="button" class="ibtn" onclick="tgTheme()"
+                aria-label="${escapeHtml(t.themeToggle)}" title="${escapeHtml(t.themeToggle)}">◐</button>
         <form method="POST" action="/thegod/logout" style="display:inline">
           <button type="submit" class="btn ghost small">${escapeHtml(t.logout)}</button>
         </form>
       </div>
-    </div>
+    </header>
 
     <div class="health">${healthPills}${sandboxPill}</div>
 
     ${health.sandbox ? `<div class="note warn">${escapeHtml(t.hSandboxWarn)}</div>` : ''}
     ${!health.database ? `<div class="note err">${escapeHtml(t.hDbWarn)} ${escapeHtml(t.hNoMigration)}</div>` : ''}
 
-    <div class="tabs" role="tablist">${tabs}</div>
+    <nav class="tabs" role="tablist" aria-label="${escapeHtml(t.tabsLabel)}"
+         onkeydown="tgTabKeys(event)">${tabs}</nav>
 
-    <section class="panel is-active" id="panel-games"></section>
-    <section class="panel" id="panel-store"></section>
-    <section class="panel" id="panel-orders"></section>
-    <section class="panel" id="panel-players"></section>
-    <section class="panel" id="panel-sql"></section>
-    <section class="panel" id="panel-env"></section>
-    <section class="panel" id="panel-new"></section>
-    <section class="panel" id="panel-unity"></section>
+    ${panels}
   </div>
 
-  <div class="toast" id="tg-toast"></div>
+  <div class="toast" id="tg-toast" role="status" aria-live="polite"></div>
 
   <script>
     var TG = {
@@ -1420,6 +1906,7 @@ function renderPanel(games, lang, theme, health, origin) {
       t: ${jsonBlob(t)},
       games: ${jsonBlob(list)},
       health: ${jsonBlob(health)},
+      tabs: ${jsonBlob(TAB_KEYS.map(([key]) => key))},
       selected: ${jsonBlob(list.length ? list[0].id : '')}
     };
   </script>
@@ -1427,6 +1914,28 @@ function renderPanel(games, lang, theme, health, origin) {
 </body>
 </html>`
 }
+
+
+// ==========================================
+// TAB_KEYS
+// The panel's sections, in one list.
+//
+// The tab strip, the panel elements, the keyboard handler and
+// the "which tab was I on" restore all read this. They used to
+// be four hand-written lists, which is four chances for a ninth
+// tab to appear in three of them.
+// ==========================================
+const TAB_KEYS = [
+  ['games', 'tabGames', '🎮'],
+  ['page', 'tabPage', '🖼️'],
+  ['store', 'tabStore', '🛒'],
+  ['orders', 'tabOrders', '💳'],
+  ['players', 'tabPlayers', '👥'],
+  ['sql', 'tabSql', '🗄️'],
+  ['env', 'tabEnv', '🔑'],
+  ['new', 'tabNew', '✨'],
+  ['unity', 'tabUnity', '🧩']
+]
 
 
 // ==========================================
@@ -1464,7 +1973,32 @@ function tgTheme() {
 
 function tgLang(code) {
   document.cookie = 'lang=' + code + ';path=/;max-age=31536000;samesite=lax';
-  window.location.href = '/thegod?lang=' + encodeURIComponent(code);
+  window.location.href = '/thegod?lang=' + encodeURIComponent(code) + tgHash();
+}
+
+// ==========================================
+// tgScale
+// The text size control.
+//
+// Sets --ui-scale on <html>, which every size in the stylesheet
+// is relative to, and remembers it. themeBoot() applies it again
+// before first paint on the next load, so the choice does not
+// flash back to normal on every navigation.
+// ==========================================
+function tgScale(value) {
+  var scale = parseFloat(value) || 1;
+  document.documentElement.style.setProperty('--ui-scale', String(scale));
+  try { localStorage.setItem('ac_ui_scale', String(scale)); } catch (e) {}
+  tgMarkScale();
+}
+
+function tgMarkScale() {
+  var current = getComputedStyle(document.documentElement).getPropertyValue('--ui-scale').trim() || '1';
+  var buttons = document.querySelectorAll('#tg-scale button');
+  for (var i = 0; i < buttons.length; i++) {
+    var mine = parseFloat(buttons[i].getAttribute('data-scale'));
+    buttons[i].setAttribute('aria-pressed', Math.abs(mine - parseFloat(current)) < 0.01 ? 'true' : 'false');
+  }
 }
 
 
@@ -1519,20 +2053,68 @@ function tgStatusLabel(status) {
   return TG.t.stLive;
 }
 
-function tgTab(key) {
+// ==========================================
+// Tabs
+//
+// The active tab lives in the URL hash as well as in the DOM, so
+// a save that reloads, a language switch and a bookmark all come
+// back to the section somebody was working in. Nine tabs deep
+// into a panel, being dropped back on the first one every time
+// is most of what "unusable" means.
+// ==========================================
+function tgTab(key, options) {
+  var opts = options || {};
   var buttons = document.querySelectorAll('.tabs button');
   for (var i = 0; i < buttons.length; i++) {
-    buttons[i].setAttribute('aria-selected', buttons[i].getAttribute('data-tab') === key ? 'true' : 'false');
+    var mine = buttons[i].getAttribute('data-tab') === key;
+    buttons[i].setAttribute('aria-selected', mine ? 'true' : 'false');
+    buttons[i].setAttribute('tabindex', mine ? '0' : '-1');
+    if (mine && opts.focus) buttons[i].focus();
   }
+
   var panels = document.querySelectorAll('.panel');
   for (var j = 0; j < panels.length; j++) {
     panels[j].className = 'panel' + (panels[j].id === 'panel-' + key ? ' is-active' : '');
   }
+
+  if (!opts.silent) {
+    try { history.replaceState(null, '', '#' + key); } catch (e) {}
+  }
   tgRender(key);
+}
+
+function tgHash() {
+  var active = document.querySelector('.tabs button[aria-selected="true"]');
+  return active ? '#' + active.getAttribute('data-tab') : '';
+}
+
+// Left/right move between tabs, Home/End jump to the ends. This
+// is the standard tab-list keyboard contract, and without it the
+// only way through nine tabs is nine presses of Tab.
+function tgTabKeys(event) {
+  var keys = TG.tabs || [];
+  var active = document.querySelector('.tabs button[aria-selected="true"]');
+  var at = active ? keys.indexOf(active.getAttribute('data-tab')) : 0;
+  if (at < 0) at = 0;
+
+  var rtl = document.documentElement.getAttribute('dir') === 'rtl';
+  var next = null;
+
+  if (event.key === 'ArrowRight') next = at + (rtl ? -1 : 1);
+  else if (event.key === 'ArrowLeft') next = at + (rtl ? 1 : -1);
+  else if (event.key === 'Home') next = 0;
+  else if (event.key === 'End') next = keys.length - 1;
+  else return;
+
+  event.preventDefault();
+  if (next < 0) next = keys.length - 1;
+  if (next >= keys.length) next = 0;
+  tgTab(keys[next], { focus: true });
 }
 
 function tgRender(key) {
   if (key === 'games') return tgRenderGames();
+  if (key === 'page') return tgRenderPage();
   if (key === 'store') return tgRenderStore();
   if (key === 'orders') return tgRenderOrders();
   if (key === 'players') return tgRenderPlayers();
@@ -1576,6 +2158,7 @@ function tgRenderGames() {
     else chips += '<span class="chip">' + tgEsc(TG.t.fromCode) + '</span>';
 
     return '<div class="gcard" role="button" tabindex="0" aria-selected="' + (game.id === TG.selected) + '"'
+         + ' onkeydown="tgCardKey(event,\'' + tgEsc(game.id) + '\')"'
          + ' onclick="tgPickGame(\'' + tgEsc(game.id) + '\')">'
          + '<div class="gcard-top">'
          +   '<span class="gcard-logo" style="border-color:' + tgEsc(game.color) + '">' + tgEsc(game.icon || '🎮')
@@ -1594,6 +2177,16 @@ function tgRenderGames() {
 
   tgById('panel-games').innerHTML = html;
   tgRenderEditor();
+}
+
+// A card is role="button", so a keyboard has to be able to press
+// it. Enter and Space are what a real button answers to, and
+// tabindex="0" without this is a control that focuses and then
+// does nothing.
+function tgCardKey(event, id) {
+  if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar') return;
+  event.preventDefault();
+  tgPickGame(id);
 }
 
 function tgRenderEditor() {
@@ -1656,6 +2249,10 @@ function tgRenderEditor() {
   +       '<textarea id="f-desc-ja" dir="ltr">' + tgEsc(game.description.ja || '') + '</textarea></label>'
   +   '</div>'
 
+  +   '<label class="f"><span>' + tgEsc(TG.t.fTags) + '</span>'
+  +     '<textarea id="f-tags" rows="3">' + tgEsc(tgTagLines(game)) + '</textarea>'
+  +     '<span class="hint">' + tgEsc(TG.t.fTagsHint) + '</span></label>'
+
   +   '<label class="f"><span>' + tgEsc(TG.t.fDownload) + '</span>'
   +     '<textarea id="f-links" dir="ltr">' + tgEsc(links) + '</textarea>'
   +     '<span class="hint">' + tgEsc(TG.t.fDownloadHint) + '</span>'
@@ -1699,6 +2296,41 @@ function tgRenderEditor() {
   +   '</div>'
   + '</div>';
 }
+
+// ==========================================
+// Tags
+//
+// Three languages per tag, edited as one line each rather than
+// as a JSON blob or as 3xN inputs. The column has existed since
+// 0003 and the card has always rendered it; nothing could write
+// it, so re-tagging a game meant a deploy.
+// ==========================================
+function tgTagLines(game) {
+  return (game.tags || []).map(function (tag) {
+    return [tag.fa || '', tag.en || '', tag.ja || ''].join(' | ');
+  }).join('\n');
+}
+
+function tgTagsFromLines(text) {
+  var lines = String(text || '').split('\n');
+  var tags = [];
+
+  for (var i = 0; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
+    var parts = lines[i].split('|');
+    var tag = {
+      fa: (parts[0] || '').trim(),
+      en: (parts[1] || '').trim(),
+      ja: (parts[2] || '').trim()
+    };
+    // One language is enough. A tag written only in Persian
+    // renders in Persian everywhere, which is better than
+    // refusing the line and better than an empty chip.
+    if (tag.fa || tag.en || tag.ja) tags.push(tag);
+  }
+  return tags;
+}
+
 
 // The link the OAuth callback builds for an Android player, shown
 // as it is typed. The scheme on its own is an abstraction; the
@@ -1837,6 +2469,10 @@ function tgSaveGame() {
   if (Object.keys(links).length) patch.download_json = JSON.stringify(links);
   else clear.push('download_json');
 
+  var tags = tgTagsFromLines(tgById('f-tags').value);
+  if (tags.length) patch.tags_json = JSON.stringify(tags);
+  else clear.push('tags_json');
+
   patch.download_enabled = tgById('f-download').checked ? 1 : 0;
 
   tgCall('game.save', { gameId: game.id, patch: patch, clear: clear }).then(function (data) {
@@ -1889,6 +2525,510 @@ function tgApplyGame(updated) {
     if (TG.games[i].id === updated.id) { TG.games[i] = updated; break; }
   }
   tgRenderGames();
+}
+
+
+// ==========================================
+// Tab: the game's own page
+//
+// Everything /{game} renders, and the release history under it.
+//
+// This tab is why the landing page looked like an empty
+// template: the columns for a hero image, a pitch, screenshots,
+// features, videos, devices and an FAQ have existed since
+// migration 0005, the page has always read them, and there was
+// no screen anywhere that could write one of them. A page with
+// nothing in it renders as a page with nothing in it.
+// ==========================================
+var TG_LANG_NAMES = ['فارسی', 'English', '日本語'];
+var TG_LANG_CODES = ['fa', 'en', 'ja'];
+
+function tgRenderPage() {
+  var game = tgSelected();
+  var box = tgById('panel-page');
+  if (!game) { box.innerHTML = '<div class="empty">—</div>'; return; }
+
+  box.innerHTML =
+    '<p class="lede">' + tgEsc(TG.t.pgLede) + '</p>'
+  + '<div class="card">'
+  +   '<div class="row" style="justify-content:space-between;align-items:flex-end">'
+  +     tgGamePicker('tgPickGame', TG.t.sqlGame)
+  +     '<a class="btn ghost small" href="/' + tgEsc(game.id) + '" target="_blank" rel="noopener">'
+  +       tgEsc(TG.t.pgOpen) + ' ↗</a>'
+  +   '</div>'
+  + '</div>'
+  + '<div id="tg-page-out"><div class="card"><div class="empty">' + tgEsc(TG.t.loading) + '</div></div></div>';
+
+  tgCall('landing.get', { gameId: game.id }).then(function (data) {
+    var target = tgById('tg-page-out');
+    if (!target) return;
+    if (!data) {
+      target.innerHTML = '<div class="card"><div class="empty">' + tgEsc(TG.t.failed) + '</div></div>';
+      return;
+    }
+    TG.page = data;
+    tgDrawPage(data);
+  });
+}
+
+
+// Three inputs, one per language, as one field group. Used for
+// the tagline and the long description, which are the two things
+// on this page that exist once per language.
+function tgLangFields(prefix, label, values, multiline) {
+  var out = '<h3 class="sub">' + tgEsc(label) + '</h3>';
+
+  for (var i = 0; i < TG_LANG_CODES.length; i++) {
+    var code = TG_LANG_CODES[i];
+    var value = (values && values[code]) || '';
+    var dir = code === 'fa' ? 'rtl' : 'ltr';
+
+    out += '<label class="f"><span>' + tgEsc(TG_LANG_NAMES[i]) + '</span>'
+        + (multiline
+            ? '<textarea id="' + prefix + '-' + code + '" dir="' + dir + '" rows="5">' + tgEsc(value) + '</textarea>'
+            : '<input type="text" id="' + prefix + '-' + code + '" dir="' + dir + '" value="' + tgEsc(value) + '">')
+        + '</label>';
+  }
+  return out;
+}
+
+function tgLangRead(prefix) {
+  var out = {};
+  for (var i = 0; i < TG_LANG_CODES.length; i++) {
+    var field = tgById(prefix + '-' + TG_LANG_CODES[i]);
+    out[TG_LANG_CODES[i]] = field ? field.value : '';
+  }
+  return out;
+}
+
+
+// ==========================================
+// Repeating rows
+//
+// Five of the sections on this tab are lists of the same shape:
+// an ordered set of small records, added and removed one at a
+// time. One shell, one reader, five body renderers - rather than
+// five copies of the same add/remove/renumber code, which is
+// five places for the remove button to renumber wrongly.
+// ==========================================
+function tgRepShell(kind, index, body) {
+  return '<div class="rep-row">'
+  +   '<div class="rep-head">'
+  +     '<span class="rep-num">' + (index + 1) + '</span>'
+  +     '<button type="button" class="btn ghost small" onclick="tgRepRemove(this)" '
+  +       'aria-label="' + tgEsc(TG.t.pgRemove) + '">✕</button>'
+  +   '</div>'
+  +   body
+  + '</div>';
+}
+
+function tgRepRemove(button) {
+  var row = button.closest('.rep-row');
+  var list = row.parentNode;
+  row.parentNode.removeChild(row);
+  tgRepRenumber(list);
+}
+
+function tgRepRenumber(list) {
+  var rows = list.querySelectorAll('.rep-row .rep-num');
+  for (var i = 0; i < rows.length; i++) rows[i].textContent = String(i + 1);
+}
+
+function tgRepAdd(kind) {
+  var list = tgById('rep-' + kind);
+  if (!list) return;
+
+  var placeholder = list.querySelector('.empty');
+  if (placeholder) list.removeChild(placeholder);
+
+  var wrap = document.createElement('div');
+  wrap.innerHTML = tgRepBody(kind, list.querySelectorAll('.rep-row').length, {});
+  list.appendChild(wrap.firstChild);
+  tgRepRenumber(list);
+
+  var added = list.querySelectorAll('.rep-row');
+  var first = added[added.length - 1].querySelector('[data-key]');
+  if (first) first.focus();
+}
+
+// Every input in a row carries data-key, so reading a list is
+// the same three lines whatever the row contains.
+function tgRepRead(kind) {
+  var list = tgById('rep-' + kind);
+  if (!list) return [];
+
+  var rows = list.querySelectorAll('.rep-row');
+  var out = [];
+
+  for (var i = 0; i < rows.length; i++) {
+    var fields = rows[i].querySelectorAll('[data-key]');
+    var record = {};
+    for (var j = 0; j < fields.length; j++) {
+      record[fields[j].getAttribute('data-key')] = fields[j].value;
+    }
+    out.push(record);
+  }
+  return out;
+}
+
+function tgRepList(kind, rows) {
+  var body = (rows || []).map(function (row, index) {
+    return tgRepBody(kind, index, row);
+  }).join('');
+
+  return '<div class="rep" id="rep-' + kind + '">'
+  +   (body || '<div class="empty">' + tgEsc(TG.t.pgEmpty) + '</div>')
+  + '</div>'
+  + '<button type="button" class="btn ghost small" onclick="tgRepAdd(\'' + kind + '\')">+ '
+  +   tgEsc(TG.t.pgAdd) + '</button>';
+}
+
+function tgRepBody(kind, index, row) {
+  var value = function (key) { return tgEsc((row && row[key]) || ''); };
+
+  if (kind === 'features') {
+    return tgRepShell(kind, index,
+      '<div class="grid two">'
+    +   '<label class="f"><span>' + tgEsc(TG.t.pgIcon) + '</span>'
+    +     '<input type="text" data-key="icon" maxlength="4" value="' + value('icon') + '" placeholder="⚔️"></label>'
+    +   '<label class="f"><span>' + tgEsc(TG_LANG_NAMES[0]) + '</span>'
+    +     '<input type="text" data-key="fa" dir="rtl" value="' + value('fa') + '"></label>'
+    + '</div>'
+    + '<div class="grid two">'
+    +   '<label class="f"><span>' + tgEsc(TG_LANG_NAMES[1]) + '</span>'
+    +     '<input type="text" data-key="en" dir="ltr" value="' + value('en') + '"></label>'
+    +   '<label class="f"><span>' + tgEsc(TG_LANG_NAMES[2]) + '</span>'
+    +     '<input type="text" data-key="ja" dir="ltr" value="' + value('ja') + '"></label>'
+    + '</div>');
+  }
+
+  if (kind === 'screenshots') {
+    var shot = (row && row.url) || '';
+    return tgRepShell(kind, index,
+      '<label class="f"><span>' + tgEsc(TG.t.pgUrl) + '</span>'
+    +   '<input type="text" data-key="url" dir="ltr" value="' + value('url') + '"'
+    +     ' oninput="tgRepPreview(this)" placeholder="https://…/shot-1.jpg"></label>'
+    + '<label class="f"><span>' + tgEsc(TG.t.pgCaption) + '</span>'
+    +   '<input type="text" data-key="caption" value="' + value('caption') + '"></label>'
+    + (shot
+        ? '<img class="thumb" src="' + tgEsc(shot) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
+        : '<img class="thumb" alt="" hidden>'));
+  }
+
+  if (kind === 'videos') {
+    return tgRepShell(kind, index,
+      '<label class="f"><span>' + tgEsc(TG.t.pgUrl) + '</span>'
+    +   '<input type="text" data-key="url" dir="ltr" value="' + value('url') + '"'
+    +     ' placeholder="https://www.youtube.com/watch?v=…"></label>'
+    + '<label class="f"><span>' + tgEsc(TG.t.pgTitle) + '</span>'
+    +   '<input type="text" data-key="title" value="' + value('title') + '"></label>');
+  }
+
+  if (kind === 'devices') {
+    var kinds = ['android', 'ios', 'windows', 'web', 'vr', 'generic'];
+    var options = kinds.map(function (name) {
+      return '<option value="' + name + '"' + ((row && row.kind) === name ? ' selected' : '') + '>' + name + '</option>';
+    }).join('');
+
+    return tgRepShell(kind, index,
+      '<div class="grid two">'
+    +   '<label class="f"><span>' + tgEsc(TG.t.pgKind) + '</span>'
+    +     '<select data-key="kind">' + options + '</select></label>'
+    +   '<label class="f"><span>' + tgEsc(TG.t.pgLabel) + '</span>'
+    +     '<input type="text" data-key="label" value="' + value('label') + '" placeholder="Android 8+"></label>'
+    + '</div>');
+  }
+
+  if (kind === 'faq') {
+    var question = (row && row.q) || {};
+    var answer = (row && row.a) || {};
+    var pair = function (key, map, label, multiline) {
+      var out = '';
+      for (var i = 0; i < TG_LANG_CODES.length; i++) {
+        var code = TG_LANG_CODES[i];
+        var dir = code === 'fa' ? 'rtl' : 'ltr';
+        out += '<label class="f"><span>' + tgEsc(label) + ' — ' + tgEsc(TG_LANG_NAMES[i]) + '</span>'
+            + (multiline
+                ? '<textarea data-key="' + key + '_' + code + '" dir="' + dir + '" rows="3">'
+                  + tgEsc(map[code] || '') + '</textarea>'
+                : '<input type="text" data-key="' + key + '_' + code + '" dir="' + dir + '" value="'
+                  + tgEsc(map[code] || '') + '">')
+            + '</label>';
+      }
+      return out;
+    };
+
+    return tgRepShell(kind, index,
+      pair('q', question, TG.t.pgQuestion, false) + pair('a', answer, TG.t.pgAnswer, true));
+  }
+
+  return tgRepShell(kind, index, '');
+}
+
+// The screenshot thumbnail follows the box it belongs to, so a
+// pasted URL that is wrong is visibly wrong before the save
+// rather than after somebody opens the public page.
+function tgRepPreview(input) {
+  var row = input.closest('.rep-row');
+  var image = row ? row.querySelector('.thumb') : null;
+  if (!image) return;
+
+  var url = (input.value || '').trim();
+  if (!url) { image.hidden = true; return; }
+
+  image.hidden = false;
+  image.style.display = '';
+  image.src = url;
+}
+
+
+// ==========================================
+// tgDrawPage
+// ==========================================
+function tgDrawPage(data) {
+  var landing = data.landing || {};
+
+  tgById('tg-page-out').innerHTML =
+    '<div class="card">'
+  +   '<h2 class="sec">🖼️ ' + tgEsc(TG.t.pgHero) + '</h2>'
+  +   '<label class="f"><span>' + tgEsc(TG.t.pgUrl) + '</span>'
+  +     '<input type="text" id="pg-hero" dir="ltr" value="' + tgEsc(landing.hero || '') + '"'
+  +       ' oninput="tgHeroPreview()" placeholder="https://…/banner.jpg">'
+  +     '<span class="hint">' + tgEsc(TG.t.pgHeroHint) + '</span></label>'
+  +   '<img class="thumb" id="pg-hero-preview" alt=""' + (landing.hero ? ' src="' + tgEsc(landing.hero) + '"' : ' hidden')
+  +     ' onerror="this.hidden=true">'
+
+  +   tgLangFields('pg-tagline', TG.t.pgTagline, landing.tagline, false)
+  +   '<div class="hint" style="margin-block-start:-6px">' + tgEsc(TG.t.pgTaglineHint) + '</div>'
+
+  +   tgLangFields('pg-about', TG.t.pgAbout, landing.about, true)
+  +   '<div class="hint" style="margin-block-start:-6px">' + tgEsc(TG.t.pgAboutHint) + '</div>'
+  + '</div>'
+
+  + '<div class="card">'
+  +   '<h2 class="sec">✨ ' + tgEsc(TG.t.pgFeatures) + '</h2>'
+  +   '<div class="hint" style="margin-block-end:12px">' + tgEsc(TG.t.pgFeaturesHint) + '</div>'
+  +   tgRepList('features', landing.features)
+  + '</div>'
+
+  + '<div class="card">'
+  +   '<h2 class="sec">📷 ' + tgEsc(TG.t.pgScreens) + '</h2>'
+  +   '<div class="hint" style="margin-block-end:12px">' + tgEsc(TG.t.pgScreensHint) + '</div>'
+  +   tgRepList('screenshots', landing.screenshots)
+  + '</div>'
+
+  + '<div class="card">'
+  +   '<h2 class="sec">🎬 ' + tgEsc(TG.t.pgVideos) + '</h2>'
+  +   '<div class="hint" style="margin-block-end:12px">' + tgEsc(TG.t.pgVideosHint) + '</div>'
+  +   tgRepList('videos', landing.videos)
+  + '</div>'
+
+  + '<div class="card">'
+  +   '<h2 class="sec">📱 ' + tgEsc(TG.t.pgDevices) + '</h2>'
+  +   '<div class="hint" style="margin-block-end:12px">' + tgEsc(TG.t.pgDevicesHint) + '</div>'
+  +   tgRepList('devices', landing.devices)
+  + '</div>'
+
+  + '<div class="card">'
+  +   '<h2 class="sec">❓ ' + tgEsc(TG.t.pgFaq) + '</h2>'
+  +   '<div class="hint" style="margin-block-end:12px">' + tgEsc(TG.t.pgFaqHint) + '</div>'
+  +   tgRepList('faq', landing.faq)
+  + '</div>'
+
+  + '<div class="card">'
+  +   '<div class="row">'
+  +     '<button type="button" class="btn" id="pg-save" onclick="tgSavePage()">' + tgEsc(TG.t.save) + '</button>'
+  +     '<a class="btn ghost" href="/' + tgEsc(TG.selected) + '" target="_blank" rel="noopener">'
+  +       tgEsc(TG.t.pgOpen) + ' ↗</a>'
+  +   '</div>'
+  +   '<div class="hint" style="margin-block-start:10px">' + tgEsc(TG.t.pgMigration) + '</div>'
+  + '</div>'
+
+  + '<div id="tg-versions"></div>';
+
+  tgDrawVersions(data.versions || []);
+}
+
+function tgHeroPreview() {
+  var image = tgById('pg-hero-preview');
+  var url = (tgById('pg-hero').value || '').trim();
+  if (!image) return;
+
+  if (!url) { image.hidden = true; return; }
+  image.hidden = false;
+  image.src = url;
+}
+
+
+function tgSavePage() {
+  var game = tgSelected();
+  if (!game) return;
+
+  var button = tgById('pg-save');
+  button.disabled = true;
+  button.textContent = TG.t.saving;
+
+  var faq = tgRepRead('faq').map(function (row) {
+    return {
+      q: { fa: row.q_fa, en: row.q_en, ja: row.q_ja },
+      a: { fa: row.a_fa, en: row.a_en, ja: row.a_ja }
+    };
+  });
+
+  tgCall('landing.save', {
+    gameId: game.id,
+    landing: {
+      hero: tgById('pg-hero').value,
+      tagline: tgLangRead('pg-tagline'),
+      about: tgLangRead('pg-about'),
+      features: tgRepRead('features'),
+      screenshots: tgRepRead('screenshots'),
+      videos: tgRepRead('videos'),
+      devices: tgRepRead('devices'),
+      faq: faq
+    }
+  }).then(function (data) {
+    button.disabled = false;
+    button.textContent = TG.t.save;
+    if (!data) return;
+
+    // A save that could only write half its fields says so. The
+    // alternative is "saved" over a FAQ that is not there, and an
+    // evening spent typing it again.
+    if (data.warning) tgToast(data.warning, true);
+    else tgToast(TG.t.saved);
+  });
+}
+
+
+// ==========================================
+// Versions
+// ==========================================
+function tgDrawVersions(versions) {
+  var rows = (versions || []).map(function (release, index) {
+    return '<tr>'
+    + '<td><b class="mono">' + tgEsc(release.version) + '</b>'
+    +   (index === 0 ? ' <span class="chip ok">' + tgEsc(TG.t.vsCurrent) + '</span>' : '') + '</td>'
+    + '<td class="muted" style="font-size:.9em">' + tgEsc(tgDate(release.releasedAt)) + '</td>'
+    + '<td class="muted" style="font-size:.9em">'
+    +   tgEsc(tgFirstLine(release.notes)) + '</td>'
+    + '<td class="row">'
+    +   '<button type="button" class="btn ghost small" onclick="tgEditVersion(\'' + tgEsc(release.version) + '\')">'
+    +     tgEsc(TG.t.vsEdit) + '</button>'
+    +   '<button type="button" class="btn danger small" onclick="tgDeleteVersion(\'' + tgEsc(release.version) + '\')">'
+    +     tgEsc(TG.t.vsDelete) + '</button>'
+    + '</td></tr>';
+  }).join('');
+
+  tgById('tg-versions').innerHTML =
+    '<div class="card">'
+  +   '<h2 class="sec">🏷️ ' + tgEsc(TG.t.vsTitle) + '</h2>'
+  +   '<p class="lede">' + tgEsc(TG.t.vsLede) + '</p>'
+  +   '<div class="grid two">'
+  +     '<label class="f"><span>' + tgEsc(TG.t.vsVersion) + '</span>'
+  +       '<input type="text" id="vs-version" dir="ltr" placeholder="1.4.2"></label>'
+  +     '<label class="f"><span>' + tgEsc(TG.t.vsDate) + '</span>'
+  +       '<input type="date" id="vs-date" dir="ltr"></label>'
+  +   '</div>'
+  +   '<label class="f"><span>' + tgEsc(TG.t.vsDownload) + '</span>'
+  +     '<input type="text" id="vs-download" dir="ltr" placeholder="https://…">'
+  +     '<span class="hint">' + tgEsc(TG.t.vsDownloadHint) + '</span></label>'
+  +   tgLangFields('vs-notes', TG.t.vsNotes, {}, true)
+  +   '<div class="hint" style="margin-block:-6px 12px">' + tgEsc(TG.t.vsNotesHint) + '</div>'
+  +   '<div class="row">'
+  +     '<button type="button" class="btn" onclick="tgSaveVersion()">' + tgEsc(TG.t.vsAdd) + '</button>'
+  +     '<button type="button" class="btn ghost" onclick="tgClearVersion()">' + tgEsc(TG.t.vsClear) + '</button>'
+  +   '</div>'
+
+  +   (rows
+      ? '<div class="scroll" style="margin-block-start:18px"><table class="tbl"><thead><tr>'
+        + '<th>' + tgEsc(TG.t.vsVersion) + '</th><th>' + tgEsc(TG.t.vsDate) + '</th>'
+        + '<th>' + tgEsc(TG.t.vsNotes) + '</th><th></th>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+      : '<div class="empty">' + tgEsc(TG.t.vsNone) + '</div>')
+  + '</div>';
+}
+
+function tgFirstLine(notes) {
+  var text = (notes && (notes[TG.lang] || notes.en || notes.fa || notes.ja)) || '';
+  var first = String(text).split('\n')[0];
+  return first.length > 70 ? first.slice(0, 70) + '…' : first;
+}
+
+function tgClearVersion() {
+  tgById('vs-version').value = '';
+  tgById('vs-date').value = '';
+  tgById('vs-download').value = '';
+  for (var i = 0; i < TG_LANG_CODES.length; i++) tgById('vs-notes-' + TG_LANG_CODES[i]).value = '';
+}
+
+// Editing a release fills the same form that creates one, and
+// saving upserts on (game, version). One form, and no second
+// screen that can drift from it.
+function tgEditVersion(version) {
+  var list = (TG.page && TG.page.versions) || [];
+  var release = null;
+  for (var i = 0; i < list.length; i++) if (list[i].version === version) release = list[i];
+  if (!release) return;
+
+  tgById('vs-version').value = release.version;
+  tgById('vs-date').value = tgDateInput(release.releasedAt);
+  tgById('vs-download').value = release.downloadUrl || '';
+  for (var j = 0; j < TG_LANG_CODES.length; j++) {
+    tgById('vs-notes-' + TG_LANG_CODES[j]).value = (release.notes && release.notes[TG_LANG_CODES[j]]) || '';
+  }
+  tgById('vs-version').focus();
+}
+
+// A <input type="date"> wants YYYY-MM-DD in LOCAL time. Going
+// through toISOString() shifts the date by a day for anybody
+// east of UTC, which is everybody this panel was built for.
+function tgDateInput(ms) {
+  if (!ms) return '';
+  var date = new Date(ms);
+  var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+  return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate());
+}
+
+function tgSaveVersion() {
+  var game = tgSelected();
+  if (!game) return;
+
+  var version = (tgById('vs-version').value || '').trim();
+  if (!/^[0-9A-Za-z][0-9A-Za-z.\-+_]*$/.test(version)) {
+    tgToast(TG.t.vsBadVersion, true);
+    return;
+  }
+
+  var typed = tgById('vs-date').value;
+  // Midday rather than midnight: a date parsed at 00:00 UTC and
+  // read back in a timezone behind UTC is the previous day.
+  var releasedAt = typed ? Date.parse(typed + 'T12:00:00Z') : Date.now();
+
+  tgCall('version.save', {
+    gameId: game.id,
+    version: version,
+    releasedAt: releasedAt,
+    downloadUrl: tgById('vs-download').value,
+    notes: tgLangRead('vs-notes')
+  }).then(function (data) {
+    if (!data) return;
+    if (TG.page) TG.page.versions = data.versions;
+    tgDrawVersions(data.versions);
+    tgToast(TG.t.saved);
+  });
+}
+
+function tgDeleteVersion(version) {
+  var game = tgSelected();
+  if (!game || !window.confirm(TG.t.vsDeleteAsk)) return;
+
+  tgCall('version.delete', { gameId: game.id, version: version }).then(function (data) {
+    if (!data) return;
+    if (TG.page) TG.page.versions = data.versions;
+    tgDrawVersions(data.versions);
+    tgToast(TG.t.saved);
+  });
 }
 
 
@@ -2656,6 +3796,18 @@ function tgCopyValue(id) {
 // Tab: new game
 // ==========================================
 function tgRenderNew() {
+  if (!TG.newPlatform) TG.newPlatform = 'android';
+
+  var platformSeg = [
+    ['android', TG.t.nPlatformAndroid, '🤖'],
+    ['web', TG.t.nPlatformWeb, '🌐'],
+    ['both', TG.t.nPlatformBoth, '🔗']
+  ].map(function (pair) {
+    return '<button type="button" onclick="tgSetPlatform(\'' + pair[0] + '\')" data-platform="' + pair[0] + '"'
+         + ' aria-pressed="' + (TG.newPlatform === pair[0] ? 'true' : 'false') + '">'
+         + pair[2] + ' ' + tgEsc(pair[1]) + '</button>';
+  }).join('');
+
   tgById('panel-new').innerHTML =
     '<p class="lede">' + tgEsc(TG.t.newLede) + '</p>'
   + '<div class="note info">' + tgEsc(TG.t.newWhy) + '</div>'
@@ -2673,36 +3825,42 @@ function tgRenderNew() {
   +       '<input type="color" id="n-color" value="#6c63ff"></label>'
   +   '</div>'
 
-  // Four ways to publish a game, not one. Leave a box empty and
-  // that button simply is not rendered on the card, so a game
-  // sold only on Myket looks exactly as it did - and a game on
-  // Play and Myket with a direct APK gets three buttons without
-  // anybody editing Config.js by hand afterwards.
+  // The question that decides every other question on this form.
+  // Asked first, and asked once: a browser game has no package,
+  // no deep link, no manifest and no Android OAuth client, and
+  // being asked for all four is what made this screen feel like
+  // a form for somebody else's game.
+  +   '<h3 class="sub">' + tgEsc(TG.t.nPlatform) + '</h3>'
+  +   '<div class="seg" role="group" aria-label="' + tgEsc(TG.t.nPlatform) + '"'
+  +     ' style="margin-block-end:10px">' + platformSeg + '</div>'
+  +   '<div class="hint">' + tgEsc(TG.t.nPlatformHint) + '</div>'
+  +   '<div class="note info" id="n-platform-note" style="margin-block-start:12px"></div>'
+
   +   '<h3 class="sub">' + tgEsc(TG.t.nDownloads) + '</h3>'
   +   '<div class="hint" style="margin-block-end:12px">' + tgEsc(TG.t.nDownloadsHint) + '</div>'
-  +   '<div class="grid two">'
-  +     '<label class="f"><span>' + tgEsc(TG.t.nMyket) + '</span>'
-  +       '<input type="text" id="n-myket" dir="ltr" placeholder="https://myket.ir/app/…"></label>'
-  +     '<label class="f"><span>' + tgEsc(TG.t.nGooglePlay) + '</span>'
-  +       '<input type="text" id="n-googleplay" dir="ltr" placeholder="https://play.google.com/store/apps/details?id=…"></label>'
-  +   '</div>'
-  +   '<div class="grid two">'
+
+  +   '<div id="n-android-fields">'
+  +     '<div class="grid two">'
+  +       '<label class="f"><span>' + tgEsc(TG.t.nMyket) + '</span>'
+  +         '<input type="text" id="n-myket" dir="ltr" placeholder="https://myket.ir/app/…"></label>'
+  +       '<label class="f"><span>' + tgEsc(TG.t.nGooglePlay) + '</span>'
+  +         '<input type="text" id="n-googleplay" dir="ltr" placeholder="https://play.google.com/store/apps/details?id=…"></label>'
+  +     '</div>'
   +     '<label class="f"><span>' + tgEsc(TG.t.nApk) + '</span>'
   +       '<input type="text" id="n-apk" dir="ltr" placeholder="https://…/game.apk"></label>'
+  +     '<label class="f"><span>' + tgEsc(TG.t.nPackage) + '</span>'
+  +       '<input type="text" id="n-package" dir="ltr" placeholder="com.AmirColliderGames.PixelRunner"></label>'
+  +   '</div>'
+
+  +   '<div id="n-web-fields">'
   +     '<label class="f"><span>' + tgEsc(TG.t.nWeb) + '</span>'
   +       '<input type="text" id="n-web" dir="ltr" placeholder="https://…"></label>'
   +   '</div>'
-  +   '<label class="f" style="max-width:320px"><span>' + tgEsc(TG.t.nPrimary) + '</span>'
-  +     '<select id="n-primary">'
-  +       '<option value="">' + tgEsc(TG.t.nPrimaryAuto) + '</option>'
-  +       '<option value="myket">' + tgEsc(TG.t.nMyket) + '</option>'
-  +       '<option value="googleplay">' + tgEsc(TG.t.nGooglePlay) + '</option>'
-  +       '<option value="apk">' + tgEsc(TG.t.nApk) + '</option>'
-  +       '<option value="web">' + tgEsc(TG.t.nWeb) + '</option>'
-  +     '</select>'
+
+  +   '<label class="f" style="max-width:340px"><span>' + tgEsc(TG.t.nPrimary) + '</span>'
+  +     '<select id="n-primary"></select>'
   +     '<span class="hint">' + tgEsc(TG.t.nPrimaryHint) + '</span></label>'
-  +   '<label class="f"><span>' + tgEsc(TG.t.nPackage) + '</span>'
-  +     '<input type="text" id="n-package" dir="ltr" placeholder="com.AmirColliderGames.PixelRunner"></label>'
+
   +   '<label class="f"><span>' + tgEsc(TG.t.nDescFa) + '</span>'
   +     '<textarea id="n-desc-fa" dir="rtl"></textarea></label>'
   +   '<div class="grid two">'
@@ -2722,6 +3880,53 @@ function tgRenderNew() {
   +   '<button type="button" class="btn" onclick="tgBuildScaffold()">' + tgEsc(TG.t.nBuild) + '</button>'
   + '</div>'
   + '<div id="tg-new-out"></div>';
+
+  tgSetPlatform(TG.newPlatform);
+}
+
+
+// ==========================================
+// tgSetPlatform
+// Shows the fields this kind of game actually has.
+//
+// The inputs are hidden rather than destroyed, so switching
+// Android → Web → Android does not lose what was typed. The
+// scaffold only ever reads the ones that are visible, which is
+// what keeps a stray Myket URL out of a browser game's entry.
+// ==========================================
+function tgSetPlatform(kind) {
+  TG.newPlatform = kind;
+
+  var buttons = document.querySelectorAll('[data-platform]');
+  for (var i = 0; i < buttons.length; i++) {
+    buttons[i].setAttribute('aria-pressed',
+      buttons[i].getAttribute('data-platform') === kind ? 'true' : 'false');
+  }
+
+  var android = kind !== 'web';
+  var web = kind !== 'android';
+
+  tgById('n-android-fields').hidden = !android;
+  tgById('n-web-fields').hidden = !web;
+
+  tgById('n-platform-note').textContent =
+    kind === 'web' ? TG.t.nWebNote : kind === 'android' ? TG.t.nAndroidNote : TG.t.nBothNote;
+
+  // The primary-method list can only offer methods this game has.
+  var options = [['', TG.t.nPrimaryAuto]];
+  if (android) {
+    options.push(['myket', TG.t.nMyket]);
+    options.push(['googleplay', TG.t.nGooglePlay]);
+    options.push(['apk', TG.t.nApk]);
+  }
+  if (web) options.push(['web', TG.t.nWeb]);
+
+  var select = tgById('n-primary');
+  var chosen = select.value;
+  select.innerHTML = options.map(function (pair) {
+    return '<option value="' + pair[0] + '"' + (pair[0] === chosen ? ' selected' : '') + '>'
+         + tgEsc(pair[1]) + '</option>';
+  }).join('');
 }
 
 function tgCapSwitch(id, label, on) {
@@ -2731,9 +3936,29 @@ function tgCapSwitch(id, label, on) {
 
 function tgBuildScaffold() {
   var id = (tgById('n-id').value || '').trim().toLowerCase();
+  var platform = TG.newPlatform || 'android';
 
   if (!/^[a-z0-9][a-z0-9-]*$/.test(id)) { tgToast(TG.t.nIdBad, true); return; }
   if (tgGame(id)) { tgToast(TG.t.nIdTaken, true); return; }
+
+  var android = platform !== 'web';
+  var web = platform !== 'android';
+  var read = function (elementId) { return (tgById(elementId).value || '').trim(); };
+
+  // Only the links this platform has. Reading the hidden boxes
+  // as well is how a browser game ends up with a Myket button
+  // pointing at a page that does not exist.
+  var links = {
+    myket: android ? read('n-myket') : '',
+    googleplay: android ? read('n-googleplay') : '',
+    apk: android ? read('n-apk') : '',
+    web: web ? read('n-web') : ''
+  };
+
+  if (web && !links.web && !links.myket && !links.googleplay && !links.apk) {
+    tgToast(TG.t.nWebNeeded, true);
+    return;
+  }
 
   tgCall('scaffold', {
     spec: {
@@ -2741,16 +3966,12 @@ function tgBuildScaffold() {
       name: tgById('n-name').value || id,
       icon: tgById('n-icon').value || '🎮',
       color: tgById('n-color').value,
-      package: tgById('n-package').value,
+      platform: platform,
+      package: android ? read('n-package') : '',
       descriptionFa: tgById('n-desc-fa').value,
       descriptionEn: tgById('n-desc-en').value,
       descriptionJa: tgById('n-desc-ja').value,
-      downloadLinks: {
-        myket: (tgById('n-myket').value || '').trim(),
-        googleplay: (tgById('n-googleplay').value || '').trim(),
-        apk: (tgById('n-apk').value || '').trim(),
-        web: (tgById('n-web').value || '').trim()
-      },
+      downloadLinks: links,
       downloadPrimary: tgById('n-primary').value,
       onlinePlay: tgById('n-online').checked,
       login: tgById('n-login').checked,
@@ -2767,6 +3988,8 @@ function tgBuildScaffold() {
 
     tgById('tg-new-out').innerHTML = blocks
       + '<div class="card"><h2 class="sec">📋 ' + tgEsc(TG.t.nSteps) + '</h2>' + tgSteps(data.commands) + '</div>';
+
+    tgById('tg-new-out').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 }
 
@@ -2778,13 +4001,32 @@ function tgRenderUnity() {
   tgById('panel-unity').innerHTML =
     '<p class="lede">' + tgEsc(TG.t.unityLede) + '</p>'
   + '<div class="card">' + tgGamePicker('tgPickGame', TG.t.unityGame) + '</div>'
-  + '<div id="tg-unity-out"><div class="empty">' + tgEsc(TG.t.loading) + '</div></div>';
+  + '<div id="tg-unity-out"><div class="card"><div class="empty">' + tgEsc(TG.t.loading) + '</div></div></div>';
 
   var game = tgSelected();
   if (!game) return;
 
   tgCall('unity', { gameId: game.id, lang: TG.lang }).then(function (data) {
-    if (!data) return;
+    var target = tgById('tg-unity-out');
+    if (!target) return;
+    if (!data) {
+      target.innerHTML = '<div class="card"><div class="empty">' + tgEsc(TG.t.failed) + '</div></div>';
+      return;
+    }
+
+    TG.unity = data;
+
+    var platformNote = data.platform === 'web' ? TG.t.unityPlatformWeb
+                     : data.platform === 'both' ? TG.t.unityPlatformBoth
+                     : TG.t.unityPlatformAndroid;
+
+    // The kit is a list of files with an order, so it opens with
+    // what it contains and what to do first. It used to open with
+    // the network layer, which is the fourth thing anybody needs.
+    var index = data.modules.map(function (module, position) {
+      return '<li><b class="mono">' + tgEsc(module.file) + '</b> — ' + tgEsc(module.title)
+           + (position === 1 ? ' <span class="chip info">1</span>' : '') + '</li>';
+    }).join('');
 
     var blocks = data.modules.map(function (module) {
       var notes = (module.notes || []).map(function (note) {
@@ -2792,16 +4034,53 @@ function tgRenderUnity() {
       }).join('');
 
       return '<div class="card">'
-      + '<h2 class="sec">' + tgEsc(module.icon) + ' ' + tgEsc(module.title) + '</h2>'
+      + '<h2 class="sec"><span aria-hidden="true">' + tgEsc(module.icon) + '</span> ' + tgEsc(module.title) + '</h2>'
       + '<p class="lede">' + tgEsc(module.summary) + '</p>'
-      + (notes ? '<ul style="margin:0 0 16px;padding-inline-start:20px;color:var(--dim);font-size:.85em;line-height:1.85">'
+      + (notes ? '<ul style="margin:0 0 16px;padding-inline-start:20px;color:var(--dim);font-size:.92em;line-height:1.9">'
         + notes + '</ul>' : '')
       + tgCodeBlock(module.file, '', module.code)
       + '</div>';
     }).join('');
 
-    tgById('tg-unity-out').innerHTML = blocks;
+    target.innerHTML =
+      '<div class="card">'
+    +   '<div class="row" style="justify-content:space-between">'
+    +     '<h2 class="sec" style="margin:0">🧩 ' + data.modules.length + ' ' + tgEsc(TG.t.unityCount) + '</h2>'
+    +     '<button type="button" class="btn ghost small" onclick="tgDownloadKit()">'
+    +       tgEsc(TG.t.unityAll) + '</button>'
+    +   '</div>'
+    +   '<div class="note info" style="margin-block-start:12px">' + tgEsc(platformNote) + '</div>'
+    +   '<div class="note ok">' + tgEsc(TG.t.unityOrder) + '</div>'
+    +   '<ol style="margin:0;padding-inline-start:22px;line-height:2;font-size:.92em">' + index + '</ol>'
+    + '</div>'
+    + blocks;
   });
+}
+
+// Every file in one download. Twelve "download file" clicks with
+// a "keep"/"discard" prompt on each is the kind of friction that
+// ends with somebody copying four of them and improvising the
+// rest.
+function tgDownloadKit() {
+  if (!TG.unity || !TG.unity.modules) return;
+
+  var parts = TG.unity.modules.map(function (module) {
+    var rule = '================================================================';
+    return rule + '\n' + module.file + '\n' + rule + '\n\n' + module.code;
+  });
+
+  var header = 'AmirCollider Unity kit — ' + TG.unity.gameId + '\n'
+             + 'Generated ' + new Date().toISOString() + '\n'
+             + 'Each file below is separated by a rule with its filename above it.\n\n';
+
+  var blob = new Blob([header + parts.join('\n\n\n')], { type: 'text/plain;charset=utf-8' });
+  var link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = TG.unity.gameId + '-unity-kit.txt';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(function () { URL.revokeObjectURL(link.href); }, 1000);
 }
 
 
@@ -2870,5 +4149,20 @@ function tgSteps(commands) {
   }).join('') + '</ol>';
 }
 
-tgRenderGames();
+
+// ==========================================
+// Boot
+//
+// The tab in the URL hash, or the first one. A save that reloads
+// the page, a language switch and a shared link all land on the
+// section somebody was actually working in.
+// ==========================================
+(function tgBoot() {
+  tgMarkScale();
+
+  var wanted = String(window.location.hash || '').replace('#', '');
+  var known = (TG.tabs || []).indexOf(wanted) !== -1;
+
+  tgTab(known ? wanted : 'games', { silent: !known });
+})();
 `

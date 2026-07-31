@@ -15,9 +15,25 @@
 // So: anyone reading Config.js learns exactly which games exist.
 // That stays true after this panel has been used, which is the
 // whole point of it working this way.
+//
+// ------------------------------------------------------------
+// PLATFORM
+// ------------------------------------------------------------
+// A browser game and an Android game are not the same object
+// with a different link. One has a package name, a signing key,
+// an Android OAuth client, a deep-link scheme and a manifest;
+// the other has a URL. Asking for all of it and generating all
+// of it either way produced a registry entry full of fields the
+// game does not have and a checklist mostly made of steps to
+// skip.
+//
+// So spec.platform is 'android' | 'web' | 'both', and it decides
+// which fields are asked for, which land in the entry, which
+// files are generated and which commands appear.
 // ==========================================
 
 import { namesFor, slug, gameSchemaSql, setupCommands, wranglerSnippet } from './Sql.js'
+import { constantsSource, androidManifestSource } from '../Content/UnityKit.js'
 
 
 // ==========================================
@@ -38,23 +54,81 @@ function bool(value) {
 
 
 // ==========================================
+// platformOf
+// What kind of game this is, normalised.
+//
+// Trusts the explicit answer when there is one and infers from
+// the links otherwise, so a spec written before this field
+// existed still produces the entry it used to.
+// ==========================================
+export function platformOf(spec) {
+  const asked = String((spec && spec.platform) || '').toLowerCase()
+  if (asked === 'web' || asked === 'android' || asked === 'both') {
+    return { kind: asked, android: asked !== 'web', web: asked !== 'android' }
+  }
+
+  const links = (spec && spec.downloadLinks) || {}
+  const web = Boolean(links.web)
+  const android = Boolean(links.myket || links.googleplay || links.apk || (spec && spec.package))
+
+  const kind = web && android ? 'both' : web ? 'web' : 'android'
+  return { kind, android: kind !== 'web', web: kind !== 'android' }
+}
+
+
+// Only the links that belong to this platform, and only the ones
+// that were filled in. An Android link on a web game is not a
+// button nobody clicks - it is a 404 with the site's name on it.
+function linksFor(spec, platform) {
+  const given = (spec && spec.downloadLinks) || {}
+  const allowed = platform.kind === 'web'
+    ? ['web']
+    : platform.kind === 'android'
+      ? ['myket', 'googleplay', 'apk']
+      : ['myket', 'googleplay', 'apk', 'web']
+
+  const out = {}
+  for (const key of allowed) {
+    const url = String(given[key] || '').trim()
+    if (url) out[key] = url
+  }
+  return out
+}
+
+
+function primaryFor(spec, links, platform) {
+  const asked = String((spec && spec.downloadPrimary) || '').trim()
+  if (asked && links[asked]) return asked
+  return Object.keys(links)[0] || (platform.kind === 'web' ? 'web' : 'myket')
+}
+
+
+// ==========================================
 // registryEntry
 // One GAME_REGISTRY entry, formatted the way the file it is
 // going into is formatted.
 // ==========================================
 export function registryEntry(spec) {
   const names = namesFor(spec.id)
+  const platform = platformOf(spec)
+  const links = linksFor(spec, platform)
+  const primary = primaryFor(spec, links, platform)
+
   const pkg = spec.package || `com.AmirColliderGames.${names.pascal}`
   const scheme = spec.deepLinkScheme || pkg.toLowerCase()
+  const login = spec.login !== false
 
   const tags = (spec.tags || []).length
     ? (spec.tags || []).map(tag =>
         `      { fa: ${js(tag.fa)}, en: ${js(tag.en)}, ja: ${js(tag.ja)} }`
       ).join(',\n')
-    : `      { fa: 'بازی', en: 'Game', ja: 'ゲーム' }`
+    : platform.kind === 'web'
+      ? `      { fa: 'بازی', en: 'Game', ja: 'ゲーム' },\n`
+        + `      { fa: 'مرورگر', en: 'Browser', ja: 'ブラウザー' }`
+      : `      { fa: 'بازی', en: 'Game', ja: 'ゲーム' },\n`
+        + `      { fa: 'اندروید', en: 'Android', ja: 'Android' }`
 
-  const links = Object.entries(spec.downloadLinks || {})
-    .filter(([, url]) => url)
+  const linkLines = Object.entries(links)
     .map(([store, url]) => `        ${/^[a-z][a-z0-9]*$/i.test(store) ? store : js(store)}: ${js(url)}`)
 
   const products = (spec.products || []).length
@@ -62,6 +136,35 @@ export function registryEntry(spec) {
     : `        // No products yet. Add one entry per thing a player can
         // buy; the id is what the shipped build and the
         // entitlements API both use, so it is chosen once.`
+
+  // Android-only fields. Left out entirely rather than written
+  // empty: an empty package name in the registry reads as a
+  // value somebody forgot to fill in, and a deep-link scheme on
+  // a browser game is a promise about a manifest that will
+  // never exist.
+  const androidBlock = platform.android
+    ? `    package: ${js(pkg)},
+    myketUrl: ${js(links.myket || '')},
+    deepLink: { host: 'oauth' },
+
+`
+    : `    // Browser game: no package, no deep link, no manifest. The
+    // OAuth code comes back on the page rather than on a URL
+    // scheme, which is what Games/Registry.js falls back to when
+    // deepLink.scheme is empty.
+
+`
+
+  const envBlock = login
+    ? `    env: {
+${platform.android ? `      android: ${js(names.env.android)},\n` : ''}      web: ${js(names.env.web)},
+      secret: ${js(names.env.secret)}${platform.android ? `,\n      deepLinkScheme: ${js(names.env.deepLinkScheme)}` : ''}
+    }${platform.android ? `,
+    fallback: {
+      deepLinkScheme: ${js(scheme)}
+    }` : ''}`
+    : `    // No sign-in, so no Google client and no secrets to set.
+    env: {}`
 
   return `  '${names.id}': {
     name: ${js(spec.name || names.pascal)},
@@ -79,10 +182,7 @@ export function registryEntry(spec) {
     tags: [
 ${tags}
     ],
-    package: ${js(pkg)},
-    myketUrl: ${js((spec.downloadLinks && spec.downloadLinks.myket) || '')},
-    d1Binding: ${js(names.binding)},
-    deepLink: { host: 'oauth' },
+${androidBlock}    d1Binding: ${js(names.binding)},
 
     // What this game asks the network for. The dashboard card is
     // built from this and nothing else, so a game that plays
@@ -90,16 +190,16 @@ ${tags}
     // here.
     capabilities: {
       onlinePlay: ${bool(spec.onlinePlay)},
-      login: ${bool(spec.login !== false)},
+      login: ${bool(login)},
       cloudSave: ${bool(spec.cloudSave !== false)},
       leaderboard: ${bool(spec.leaderboard !== false)},
       store: ${bool(spec.store !== false)}
     },
 
     download: {
-      primary: ${js(spec.downloadPrimary || Object.keys(spec.downloadLinks || {})[0] || 'myket')},
+      primary: ${js(primary)},
       links: {
-${links.length ? links.join(',\n') : "        // No download link yet — the button stays greyed out."}
+${linkLines.length ? linkLines.join(',\n') : "        // No download link yet — the button stays greyed out."}
       }
     },
 
@@ -111,15 +211,7 @@ ${products}
       ]
     },
 
-    env: {
-      android: ${js(names.env.android)},
-      web: ${js(names.env.web)},
-      secret: ${js(names.env.secret)},
-      deepLinkScheme: ${js(names.env.deepLinkScheme)}
-    },
-    fallback: {
-      deepLinkScheme: ${js(scheme)}
-    }
+${envBlock}
   }`
 }
 
@@ -156,95 +248,61 @@ export function productEntry(spec) {
 
 
 // ==========================================
+// specToGame
+// A scaffold spec in the shape the Unity kit reads.
+//
+// One generator for the constants file, shared by the New game
+// tab and the Unity tab. Two copies of it drifted apart once
+// already: the tab's version knew about the deep-link HOST and
+// this one did not.
+// ==========================================
+function specToGame(spec) {
+  const names = namesFor(spec.id)
+  const platform = platformOf(spec)
+  const pkg = spec.package || `com.AmirColliderGames.${names.pascal}`
+
+  return {
+    id: names.id,
+    name: spec.name || names.pascal,
+    package: platform.android ? pkg : '',
+    deepLink: {
+      scheme: platform.android ? (spec.deepLinkScheme || pkg.toLowerCase()) : '',
+      host: 'oauth'
+    },
+    capabilities: {
+      onlinePlay: Boolean(spec.onlinePlay),
+      login: spec.login !== false,
+      cloudSave: spec.cloudSave !== false,
+      leaderboard: spec.leaderboard !== false,
+      store: spec.store !== false
+    },
+    download: { links: linksFor(spec, platform) },
+    store: { products: spec.products || [] }
+  }
+}
+
+
+// ==========================================
 // unityConstants
 // The C# file that stops a game hard-coding a URL.
 // ==========================================
 export function unityConstants(spec, origin) {
+  const game = specToGame(spec)
   const names = namesFor(spec.id)
-  const base = String(origin || 'https://amircollider.com').replace(/\/+$/, '')
-  const pkg = spec.package || `com.AmirColliderGames.${names.pascal}`
-  const scheme = spec.deepLinkScheme || pkg.toLowerCase()
 
-  return `// ==========================================
-// ${names.pascal}Constants.cs
-// Generated by the AmirCollider TheGod panel.
-//
-// Drop this in Assets/Scripts/AmirCollider/.
-// ==========================================
-
-namespace AmirCollider
-{
-    public static class ${names.pascal}Constants
-    {
-        // The Worker. No trailing slash — every path below starts
-        // with one, and two slashes is a 404 that looks like a
-        // server problem.
-        public const string BaseUrl = "${base}";
-
-        // The game id, as it appears in GAME_REGISTRY in the
-        // Worker's Config.js. It is part of nearly every path, so
-        // a typo here fails everything at once rather than one
-        // feature at a time — which is the better failure.
-        public const string GameId = "${names.id}";
-
-        public const string PackageName = "${pkg}";
-
-        // The scheme Android hands the OAuth code back on. Must
-        // match the intent-filter in this app's manifest and the
-        // deep-link scheme the Worker resolves for this game -
-        // the TheGod panel shows that value, and its Environment
-        // tab says where it came from.
-        public const string DeepLinkScheme = "${scheme}";
-        public const string DeepLinkRedirect = "${scheme}://oauth";
-
-        // ---- sign-in ----
-        public const string OAuthStart    = BaseUrl + "/oauth/auth";
-        public const string OAuthToken    = BaseUrl + "/oauth/token";
-        public const string AuthRefresh   = BaseUrl + "/auth/refresh";
-        public const string AuthValidate  = BaseUrl + "/auth/validate";
-        public const string AuthCheck     = BaseUrl + "/auth/check";
-
-        // ---- the player's own data ----
-        public const string PlayerGet     = BaseUrl + "/database/get/games/" + GameId + "/users/";
-        public const string PlayerSet     = BaseUrl + "/database/set/games/" + GameId + "/users/";
-        public const string PlayerPatch   = BaseUrl + "/database/patch/games/" + GameId + "/users/";
-        public const string Leaderboard   = BaseUrl + "/" + GameId + "/leaderboard";
-
-        // ---- the store ----
-        public const string Manifest      = BaseUrl + "/games/" + GameId + "/manifest";
-        public const string Products      = BaseUrl + "/games/" + GameId + "/products";
-        public const string Entitlements  = BaseUrl + "/games/" + GameId + "/entitlements";
-        public const string Consume       = BaseUrl + "/games/" + GameId + "/entitlements/consume";
-
-        // Opened in the device browser when a player buys on the
-        // web instead of through the store.
-        public const string WebStore      = BaseUrl + "/" + GameId + "/store";
-        public const string WebAccount    = BaseUrl + "/" + GameId + "/account";
-
-        // ---- product ids ----
-        // These match store.products[].id in the Worker's config.
-        // The Play Store sku is the other string on that entry and
-        // is deliberately allowed to differ.
-        public static class Products_
-        {
-${(spec.products || []).map(product =>
-  `            public const string ${csharpName(product.id)} = "${product.id}";`
-).join('\n') || '            // No products defined yet.'}
-        }
-    }
-}
-`
-}
-
-
-// A C# identifier from a product id. Leading digits get a
-// prefix, because "1000Shards" does not compile and a generator
-// that emits code which does not compile is worse than no
-// generator.
-function csharpName(id) {
-  const parts = String(id || 'item').split(/[^a-zA-Z0-9]+/).filter(Boolean)
-  const name = parts.map(part => part[0].toUpperCase() + part.slice(1)).join('')
-  return /^[0-9]/.test(name) ? 'P' + name : (name || 'Item')
+  return constantsSource({
+    id: game.id,
+    name: game.name,
+    pascal: names.pascal,
+    upper: names.upper,
+    package: game.package || `com.AmirColliderGames.${names.pascal}`,
+    scheme: game.deepLink.scheme,
+    host: game.deepLink.host,
+    base: String(origin || 'https://amircollider.com').replace(/\/+$/, ''),
+    capabilities: game.capabilities,
+    products: game.store.products,
+    platforms: platformOf(spec)
+  })
 }
 
 
@@ -254,43 +312,69 @@ function csharpName(id) {
 // ==========================================
 export function scaffold(spec, origin) {
   const names = namesFor(spec.id)
+  const platform = platformOf(spec)
+  const login = spec.login !== false
+
+  const files = [
+    {
+      id: 'registry',
+      name: 'Config.js — GAME_REGISTRY entry',
+      language: 'javascript',
+      hint: 'Paste inside the GAME_REGISTRY object. This is the step that makes the game exist.',
+      body: registryEntry(spec)
+    },
+    {
+      id: 'wrangler',
+      name: 'wrangler.jsonc — d1_databases entry',
+      language: 'jsonc',
+      hint: 'Paste into the d1_databases array, with the id printed by wrangler d1 create.',
+      body: wranglerSnippet(spec.id)
+    },
+    {
+      id: 'sql',
+      name: `migrations/${names.id}.sql`,
+      language: 'sql',
+      hint: 'Save as that file, then apply it with the command in step 3.',
+      body: gameSchemaSql(spec.id, {
+        gameName: spec.name,
+        withPurchases: spec.store !== false,
+        withSessions: Boolean(spec.withSessions)
+      })
+    },
+    {
+      id: 'unity',
+      name: `${names.pascal}Constants.cs`,
+      language: 'csharp',
+      hint: 'Drop into Assets/Scripts/AmirCollider/ in the Unity project. The rest of the C# is in '
+          + 'the Unity tab once the game has been deployed.',
+      body: unityConstants(spec, origin)
+    }
+  ]
+
+  // Only for a game that ships an APK. A browser game handed an
+  // AndroidManifest is a file whose only correct use is deleting
+  // it, and one more thing to wonder about.
+  if (platform.android) {
+    files.push({
+      id: 'manifest',
+      name: 'AndroidManifest.xml',
+      language: 'xml',
+      hint: 'Save as Assets/Plugins/Android/AndroidManifest.xml and tick Player ▸ Publishing Settings ▸ '
+          + 'Custom Main Manifest. Without it, Android has nowhere to deliver the sign-in code.',
+      body: androidManifestSource({
+        ...specToGame(spec),
+        name: spec.name || names.pascal,
+        pascal: names.pascal,
+        scheme: specToGame(spec).deepLink.scheme,
+        host: 'oauth'
+      })
+    })
+  }
 
   return {
     names,
-    files: [
-      {
-        id: 'registry',
-        name: 'config.js — GAME_REGISTRY entry',
-        language: 'javascript',
-        hint: 'Paste inside the GAME_REGISTRY object. This is the step that makes the game exist.',
-        body: registryEntry(spec)
-      },
-      {
-        id: 'wrangler',
-        name: 'wrangler.jsonc — d1_databases entry',
-        language: 'jsonc',
-        hint: 'Paste into the d1_databases array, with the id printed by wrangler d1 create.',
-        body: wranglerSnippet(spec.id)
-      },
-      {
-        id: 'sql',
-        name: `migrations/${names.id}.sql`,
-        language: 'sql',
-        hint: 'Save as that file, then apply it with the command in step 3.',
-        body: gameSchemaSql(spec.id, {
-          gameName: spec.name,
-          withPurchases: spec.store !== false,
-          withSessions: Boolean(spec.withSessions)
-        })
-      },
-      {
-        id: 'unity',
-        name: `${names.pascal}Constants.cs`,
-        language: 'csharp',
-        hint: 'Drop into Assets/Scripts/AmirCollider/ in the Unity project.',
-        body: unityConstants(spec, origin)
-      }
-    ],
-    commands: setupCommands(spec.id)
+    platform: platform.kind,
+    files,
+    commands: setupCommands(spec.id, { android: platform.android, login, origin })
   }
 }
