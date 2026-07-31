@@ -119,7 +119,7 @@ import {
 import { encodeState, decodeState, getStateSecret, readClientStateHint } from './games/oauthState.js'
 import { db as gamesDb } from './games/store.js'
 import { reconcileGameOrders } from './games/purchase.js'
-import { resolveGames } from './games/registry.js'
+import { resolveGames, resolveGame } from './games/registry.js'
 
 export default {
   async fetch(request, env, ctx) {
@@ -634,9 +634,28 @@ function matchRoute(path, method) {
 // override via query.
 // ==========================================
 function buildGoogleAuthUrl(url, game, stateValue, isAndroid, lang) {
-  const clientId = isAndroid
-    ? game.oauth.web
-    : (url.searchParams.get('client_id') || game.oauth.web)
+  // A caller may name which of THIS GAME's clients to use. It may
+  // not name somebody else's.
+  //
+  // The query parameter used to be taken as given, which had two
+  // costs. The small one is that this Worker's callback could be
+  // pointed at an unrelated Google client. The large one is what
+  // it did to the person debugging: an Android client id passed
+  // here produces "Error 400: redirect_uri_mismatch" from Google,
+  // because Android clients have no redirect URIs at all - an
+  // error that reads as "your redirect URI is wrong" when the
+  // redirect URI is fine and the client id is not.
+  //
+  // Anything unrecognised now falls back to the web client,
+  // which is the one the token exchange uses regardless: the
+  // exchange always sends game.oauth.web, so authorising with a
+  // different client could only ever have failed one step later.
+  const requested = url.searchParams.get('client_id')
+  const known = [game.oauth.web, game.oauth.android].filter(Boolean)
+  const clientId = !isAndroid && requested && known.includes(requested)
+    ? requested
+    : game.oauth.web
+
   const scope = url.searchParams.get('scope') || 'openid profile email'
   const responseType = url.searchParams.get('response_type') || 'code'
 
@@ -774,8 +793,19 @@ async function handleOAuthCallback(url, request, gameId, requestId, GAMES, env) 
   logInfo('OAuth callback received', { requestId, gameId: stateData.gameId, platform: stateData.isAndroid ? 'android' : 'web' })
 
   if (stateData.isAndroid) {
-    const deepLink = `${game.deepLink.scheme}://${game.deepLink.host}?code=${encodeURIComponent(code)}`
-    return createHtmlResponse(renderAndroidSuccessPage(deepLink, game, lang, theme))
+    // Resolved through the override layer rather than read off
+    // the frozen registry, because the deep-link scheme stopped
+    // being a deploy-time secret and became something the TheGod
+    // panel can correct. Reading it from GAMES here would mean
+    // the panel showed the new value and the callback kept
+    // sending players to the old one.
+    //
+    // Falls back to `game` on any failure, which is the same
+    // object this line used before: a database that is down
+    // cannot break a sign-in that never needed it.
+    const resolved = (await resolveGame(env, GAMES, stateData.gameId)) || game
+    const deepLink = `${resolved.deepLink.scheme}://${resolved.deepLink.host}?code=${encodeURIComponent(code)}`
+    return createHtmlResponse(renderAndroidSuccessPage(deepLink, resolved, lang, theme))
   }
 
   if (stateData.originalRedirectUri.startsWith('http://localhost')) {

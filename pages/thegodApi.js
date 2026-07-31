@@ -28,19 +28,22 @@
 // ==========================================
 
 import { createJsonResponse, logInfo, logWarning } from '../utils.js'
-import { getGameProduct } from '../config.js'
+import { getGameProduct, getGameEnvNames } from '../config.js'
 import { isTheGodSession } from './thegod.js'
-import { resolveGames, isDownloadable, effectiveProducts } from '../games/registry.js'
+import { resolveGames, isDownloadable, effectiveProducts, schemeText } from '../games/registry.js'
 import { invalidateSettingsCache } from '../games/registry.js'
 import {
-  db, readSettings, saveSettings, resetSettings,
-  saveProductOverride, resetProductOverride,
+  db, readSettings, saveSettings, resetSettings, saveDeepLinkScheme,
+  saveProductOverride, resetProductOverride, purgeGameRows,
   listGameOrders, gameOrderStats, getGameOrder,
   findPlayers, listEntitlementsRaw, listEntitlementEvents,
   revokeEntitlement, GAME_ORDER_STATE
 } from '../games/store.js'
 import { grantForOrder, grantManually } from '../games/purchase.js'
-import { gameSchemaSql, settingsSeedSql, productSeedSql, setupCommands, slug, namesFor } from '../games/sql.js'
+import {
+  gameSchemaSql, settingsSeedSql, productSeedSql, purgeSeedSql,
+  setupCommands, slug, namesFor
+} from '../games/sql.js'
 import { scaffold } from '../games/scaffold.js'
 import { unityModules } from '../content/unityKit.js'
 
@@ -113,6 +116,8 @@ function present(game) {
     downloadable: isDownloadable(game),
     minVersion: game.minVersion || '',
     note: game.note || '',
+    deepLinkScheme: (game.deepLink && game.deepLink.scheme) || '',
+    deepLinkHost: (game.deepLink && game.deepLink.host) || 'oauth',
     overrides: game.overrides || [],
     settingsAt: game.settingsAt || 0,
     products: (game.store.products || []).map(product => ({
@@ -175,6 +180,16 @@ function cleanPatch(patch) {
   if (patch.desc_ja !== undefined) out.desc_ja = text(patch.desc_ja, 400)
   if (patch.min_version !== undefined) out.min_version = text(patch.min_version, 20)
   if (patch.note !== undefined) out.note = text(patch.note, 300)
+
+  // Validated with the same rule the merge layer applies on
+  // read, and dropped rather than corrected when it fails. This
+  // string is concatenated into the URL a signed-in Android
+  // player is redirected to, so a value with a slash or a space
+  // in it is a sign-in that dead-ends on a blank browser tab.
+  if (patch.deeplink_scheme !== undefined) {
+    const scheme = schemeText(patch.deeplink_scheme)
+    if (scheme) out.deeplink_scheme = scheme
+  }
 
   if (patch.accent_color !== undefined) {
     const colour = text(patch.accent_color, 7)
@@ -294,10 +309,50 @@ export async function handleTheGodApi(url, request, gameId, requestId, GAMES, en
 
       const allowed = [
         'display_name', 'logo_url', 'accent_color', 'desc_fa', 'desc_en', 'desc_ja',
-        'tags_json', 'status', 'download_enabled', 'download_json', 'min_version', 'note'
+        'tags_json', 'status', 'download_enabled', 'download_json', 'min_version', 'note',
+        'deeplink_scheme'
       ]
 
-      await saveSettings(database, game.id, cleanPatch(body.patch || {}), cleanClear(body.clear, allowed))
+      const patch = cleanPatch(body.patch || {})
+      const clear = cleanClear(body.clear, allowed)
+
+      // deeplink_scheme is written after the row exists and on
+      // its own, because it is the one column a deployment might
+      // not have yet: it arrived in migration 0004, and naming it
+      // in the main upsert would make a database that stopped at
+      // 0003 fail the whole save. See saveDeepLinkScheme.
+      // The CLEANED value, not the one that arrived: cleanPatch
+      // lower-cases the scheme, so writing body.patch through
+      // would store a spelling that differs from the one every
+      // read normalises to.
+      const cleanScheme = patch.deeplink_scheme
+      const wantsScheme = Object.prototype.hasOwnProperty.call(patch, 'deeplink_scheme')
+      const clearsScheme = clear.includes('deeplink_scheme')
+      delete patch.deeplink_scheme
+
+      await saveSettings(database, game.id, patch, clear.filter(field => field !== 'deeplink_scheme'))
+
+      let schemeWarning = ''
+
+      // Sent, and thrown away by cleanPatch for not being a URL
+      // scheme. The panel checks this before it asks, so this is
+      // the curl path - and answering a rejected field with a
+      // plain "ok" is how somebody ends up debugging a value they
+      // believe they set.
+      if (!wantsScheme && body.patch && body.patch.deeplink_scheme !== undefined && !clearsScheme) {
+        schemeWarning = 'The deep-link scheme was rejected: it must be a URL scheme — a letter followed by '
+                      + 'letters, digits, "+", "-" or ".", with no "://" and no spaces. Nothing else on this '
+                      + 'save was affected.'
+      } else if (wantsScheme || clearsScheme) {
+        const written = await saveDeepLinkScheme(database, game.id, wantsScheme ? cleanScheme : null)
+        if (!written.ok) {
+          schemeWarning = written.reason === 'no_column'
+            ? 'The deep-link scheme was not saved: this database has no game_settings.deeplink_scheme '
+            + 'column yet. Run migrations/0004_deeplink.sql. Everything else on this screen was saved.'
+            : 'The deep-link scheme could not be saved. Everything else on this screen was saved.'
+          logWarning('Deep-link scheme not written', { requestId, gameId: game.id, reason: written.reason })
+        }
+      }
 
       // Every isolate is now holding a stale merge. This one
       // clears its own; the others expire within
@@ -308,7 +363,7 @@ export async function handleTheGodApi(url, request, gameId, requestId, GAMES, en
       const merged = await resolveGames(env, GAMES, { fresh: true })
       logInfo('Game settings saved', { requestId, gameId: game.id })
 
-      return createJsonResponse({ ok: true, game: present(merged[game.id]) })
+      return createJsonResponse({ ok: true, game: present(merged[game.id]), warning: schemeWarning })
     }
 
     case 'game.reset': {
@@ -324,6 +379,45 @@ export async function handleTheGodApi(url, request, gameId, requestId, GAMES, en
       logInfo('Game settings reset', { requestId, gameId: game.id })
 
       return createJsonResponse({ ok: true, game: present(merged[game.id]) })
+    }
+
+    // -----------------------------------------------------------
+    // game.purge — both override tables, for one game
+    //
+    // game.reset above drops the settings row and leaves the
+    // product overrides behind, which is right for the button it
+    // sits under ("put the presentation back") and wrong for the
+    // question this answers: "clear out what the database is
+    // saying about this game so I can build it again".
+    //
+    // Still cannot remove a game, for the reason at the top of
+    // this file: a game is an entry in config.js, and a game with
+    // no rows is a game rendering its coded defaults - which is
+    // the state every game starts in.
+    //
+    // Orders and entitlements are untouched. Withdrawing an
+    // override is not the same as taking back what somebody paid
+    // for.
+    // -----------------------------------------------------------
+    case 'game.purge': {
+      if (!game) return unknownGame()
+
+      const { database, refusal: noDb } = needDatabase(env)
+      if (noDb) return noDb
+
+      const removed = await purgeGameRows(database, game.id)
+      invalidateSettingsCache()
+
+      const merged = await resolveGames(env, GAMES, { fresh: true })
+      logInfo('Game override rows purged', {
+        requestId, gameId: game.id, settings: removed.settings, products: removed.products
+      })
+
+      return createJsonResponse({
+        ok: true,
+        game: present(merged[game.id]),
+        removed
+      })
     }
 
     // -----------------------------------------------------------
@@ -591,7 +685,109 @@ export async function handleTheGodApi(url, request, gameId, requestId, GAMES, en
       return createJsonResponse({
         ok: true,
         settings: settingsSeedSql(game.id, raw || {}),
-        products: productSeedSql(game.id, effectiveProducts(game))
+        products: productSeedSql(game.id, effectiveProducts(game)),
+        purge: purgeSeedSql(game.id)
+      })
+    }
+
+    // -----------------------------------------------------------
+    // env — what this deployment has, and what it is missing
+    //
+    // Reads env and reports on it. What it reports is deliberately
+    // narrow:
+    //
+    //   a secret          -> whether it is set, and its length
+    //   a public value    -> the value
+    //
+    // "Public" means a value that anybody using the site can
+    // already see. A Google web client id travels in the query
+    // string of the authorisation URL every player is redirected
+    // through; a deep-link scheme is in the manifest of every
+    // shipped APK. Masking those would only make this screen less
+    // useful than reading the address bar.
+    //
+    // A client SECRET is never in the response, at any length,
+    // under any flag. The panel needs to know whether one exists,
+    // which is a boolean, and nothing this page can do with the
+    // value justifies putting a credential in a browser.
+    // -----------------------------------------------------------
+    case 'env': {
+      const has = key => Boolean(key && env && env[key])
+      const value = key => String((key && env && env[key]) || '')
+
+      const secret = key => ({
+        key: key || '',
+        set: has(key),
+        // Enough to tell "pasted with a trailing newline" from
+        // "pasted correctly", which is a real failure and one
+        // that is otherwise invisible.
+        length: has(key) ? value(key).length : 0
+      })
+
+      const shown = key => ({
+        key: key || '',
+        set: has(key),
+        value: value(key)
+      })
+
+      const origin = String(url.origin || '').replace(/\/+$/, '')
+
+      const gamesEnv = Object.entries(getGameEnvNames()).map(([id, spec]) => {
+        const merged = games[id]
+        const stored = merged && Array.isArray(merged.overrides) && merged.overrides.includes('deepLinkScheme')
+
+        return {
+          id,
+          name: (merged && merged.name) || spec.name,
+          login: Boolean(spec.capabilities.login),
+
+          // The binding is in wrangler.jsonc, not in the
+          // variables screen, and the difference is worth
+          // showing: a missing binding is a file to edit and a
+          // deploy, not a value to paste.
+          binding: { key: spec.d1Binding, set: Boolean(env && env[spec.d1Binding]), value: '' },
+
+          web: shown(spec.keys.web),
+          android: shown(spec.keys.android),
+          secret: secret(spec.keys.secret),
+
+          deepLink: {
+            key: spec.keys.deepLinkScheme,
+            // Where the value actually came from, which is the
+            // whole point of showing it: three layers resolve
+            // this and only one of them is in the variables
+            // screen.
+            source: stored ? 'panel' : (has(spec.keys.deepLinkScheme) ? 'env' : 'code'),
+            envValue: value(spec.keys.deepLinkScheme),
+            codeValue: spec.deepLinkFallback,
+            effective: (merged && merged.deepLink && merged.deepLink.scheme) || spec.deepLinkFallback,
+            host: (merged && merged.deepLink && merged.deepLink.host) || 'oauth'
+          },
+
+          // Every hostname Google has to be told about, for THIS
+          // request's origin. redirect_uri_mismatch is a check
+          // that happens entirely on Google's side against a list
+          // it keeps, so no amount of correct configuration here
+          // can satisfy it - the only fix is adding the line.
+          redirectUri: `${origin}/oauth/callback`
+        }
+      })
+
+      return createJsonResponse({
+        ok: true,
+        origin,
+        redirectUri: `${origin}/oauth/callback`,
+        games: gamesEnv,
+        shared: {
+          panel: secret('TestSitePassword'),
+          adminToken: secret('DOCSNAP_ADMIN_TOKEN'),
+          stateSecret: secret('STATE_SIGNING_SECRET'),
+          licenseDb: { key: 'LICENSE_DB', set: Boolean(env && env.LICENSE_DB), value: '' },
+          assets: { key: 'ASSETS', set: Boolean(env && env.ASSETS), value: '' },
+          payments: [secret('NOWPAYMENTS_API_KEY'), secret('NOWPAYMENTS_IPN_SECRET')],
+          mail: [secret('BREVO_API_KEY'), secret('RESEND_API_KEY'), shown('DOCSNAP_MAIL_FROM')],
+          licensing: [secret('DOCSNAP_LICENSE_PRIVATE_KEY'), secret('DOCSNAP_KEY_WRAP_SECRET'), secret('DOCSNAP_ORDER_SECRET')]
+        }
       })
     }
 
@@ -648,9 +844,10 @@ export async function handleTheGodApi(url, request, gameId, requestId, GAMES, en
     default:
       return createJsonResponse({
         ok: false, error: 'bad_action',
-        message: 'action must be one of: overview, game.get, game.save, game.reset, '
+        message: 'action must be one of: overview, game.get, game.save, game.reset, game.purge, '
                + 'product.save, product.reset, orders.list, order.grant, players.search, '
-               + 'player.get, player.grant, player.revoke, sql.game, sql.settings, scaffold, unity.'
+               + 'player.get, player.grant, player.revoke, sql.game, sql.settings, env, '
+               + 'scaffold, unity.'
       }, 400)
   }
 }

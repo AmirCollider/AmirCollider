@@ -231,8 +231,10 @@ namespace AmirCollider
         public const string PackageName = "${pkg}";
 
         // The scheme Android hands the OAuth code back on. Must
-        // match the intent-filter in the manifest AND the
-        // ${names.env.deepLinkScheme} secret on the Worker.
+        // match the intent-filter in this app's manifest and the
+        // deep-link scheme the Worker resolves for this game -
+        // the TheGod panel shows that value, and its Environment
+        // tab says where it came from.
         public const string DeepLinkScheme = "${scheme}";
         public const string DeepLinkRedirect = "${scheme}://oauth";
 

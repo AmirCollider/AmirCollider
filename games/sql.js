@@ -9,6 +9,7 @@
 //   gameSchemaSql(gameId, options)    -> the game's own D1 schema
 //   settingsSeedSql(gameId, settings) -> an override row, as SQL
 //   productSeedSql(gameId, products)  -> product overrides, as SQL
+//   purgeSeedSql(gameId)              -> the DELETEs that clear both
 //   wranglerSnippet(gameId)           -> the d1_databases entry
 //   setupCommands(gameId)             -> the wrangler commands, in order
 //
@@ -335,41 +336,109 @@ export function settingsSeedSql(gameId, settings = {}) {
   const id = slug(gameId)
   const at = Date.now()
 
+  const columns = [
+    ['display_name', sqlText(settings.display_name)],
+    ['logo_url', sqlText(settings.logo_url)],
+    ['accent_color', sqlText(settings.accent_color)],
+    ['desc_fa', sqlText(settings.desc_fa)],
+    ['desc_en', sqlText(settings.desc_en)],
+    ['desc_ja', sqlText(settings.desc_ja)],
+    ['tags_json', sqlText(settings.tags_json)],
+    ['status', sqlText(settings.status)],
+    ['download_enabled', settings.download_enabled === null || settings.download_enabled === undefined
+      ? 'NULL'
+      : (Number(settings.download_enabled) ? '1' : '0')],
+    ['download_json', sqlText(settings.download_json)],
+    ['min_version', sqlText(settings.min_version)],
+    ['note', sqlText(settings.note)],
+    ['deeplink_scheme', sqlText(settings.deeplink_scheme)]
+  ]
+
+  // Every value NULL means there is no override to carry
+  // anywhere - the game is running entirely on config.js. An
+  // INSERT of thirteen NULLs is not a useful thing to paste into
+  // another deployment, and reading one is genuinely confusing:
+  // it looks like a row that says something when it says
+  // nothing. So say that instead, and offer the DELETE that
+  // removes the row rather than an INSERT that recreates it
+  // empty.
+  const set = columns.filter(([, value]) => value !== 'NULL')
+
+  if (!set.length) {
+    return `-- '${id}' has no overrides. Every column in its game_settings row\n`
+         + `-- is NULL, which means the site is showing exactly what\n`
+         + `-- GAME_REGISTRY in config.js says - the name, the logo, the\n`
+         + `-- colour, the descriptions, all of it.\n`
+         + `--\n`
+         + `-- There is nothing to copy to another deployment: a row of\n`
+         + `-- NULLs and no row at all render identically. If you want the\n`
+         + `-- empty row gone, this is the statement that does it, and the\n`
+         + `-- panel writes a fresh one the next time you press save.\n`
+         + `--\n`
+         + `-- DELETE FROM game_settings WHERE game_id = ${sqlText(id)};\n`
+  }
+
+  const names = columns.map(([name]) => name)
+
   return `-- Overrides for '${id}', as they stand right now.
 -- Safe to re-run: the ON CONFLICT clause updates in place.
+--
+-- A NULL column is not "empty", it is "no override" - that field
+-- comes from config.js. Only these are actually set here:
+${set.map(([name]) => `--   ${name}`).join('\n')}
 INSERT INTO game_settings
-  (game_id, display_name, logo_url, accent_color, desc_fa, desc_en, desc_ja,
-   tags_json, status, download_enabled, download_json, min_version, note, updated_at)
+  (game_id, ${names.join(', ')}, updated_at)
 VALUES (
   ${sqlText(id)},
-  ${sqlText(settings.display_name)},
-  ${sqlText(settings.logo_url)},
-  ${sqlText(settings.accent_color)},
-  ${sqlText(settings.desc_fa)},
-  ${sqlText(settings.desc_en)},
-  ${sqlText(settings.desc_ja)},
-  ${sqlText(settings.tags_json)},
-  ${sqlText(settings.status)},
-  ${settings.download_enabled === null || settings.download_enabled === undefined ? 'NULL' : Number(settings.download_enabled) ? 1 : 0},
-  ${sqlText(settings.download_json)},
-  ${sqlText(settings.min_version)},
-  ${sqlText(settings.note)},
+${columns.map(([, value]) => `  ${value}`).join(',\n')},
   ${at}
 )
 ON CONFLICT (game_id) DO UPDATE SET
-  display_name = excluded.display_name,
-  logo_url = excluded.logo_url,
-  accent_color = excluded.accent_color,
-  desc_fa = excluded.desc_fa,
-  desc_en = excluded.desc_en,
-  desc_ja = excluded.desc_ja,
-  tags_json = excluded.tags_json,
-  status = excluded.status,
-  download_enabled = excluded.download_enabled,
-  download_json = excluded.download_json,
-  min_version = excluded.min_version,
-  note = excluded.note,
+${names.map(name => `  ${name} = excluded.${name}`).join(',\n')},
   updated_at = excluded.updated_at;
+`
+}
+
+
+// ==========================================
+// purgeSeedSql
+// Delete every override row a game has, so it can be built again
+// from a clean start.
+//
+// The panel has a button that runs these two statements, and
+// this is the same thing as text - for a deployment whose panel
+// cannot reach the database, and for the operator who would
+// rather read the statement than trust a button labelled
+// "delete".
+//
+// Both DELETEs are scoped to one game id. Nothing here can
+// remove a game: games are in config.js, and a game with no rows
+// is a game showing its coded defaults, which is where every
+// game starts.
+// ==========================================
+export function purgeSeedSql(gameId) {
+  const id = slug(gameId)
+
+  return `-- Remove every database override for '${id}'.
+--
+-- After this the game is exactly what config.js says: same name,
+-- same logo, same colour, same descriptions, same prices. The
+-- game itself is untouched - it is defined in code, and these
+-- two tables only ever held changes made on top of it.
+--
+-- Players, purchases and entitlements are NOT in these tables
+-- and are not affected. Those live in game_orders and
+-- game_entitlements, and nothing below names them.
+--
+-- Run both, in this order.
+DELETE FROM game_product_overrides WHERE game_id = ${sqlText(id)};
+DELETE FROM game_settings          WHERE game_id = ${sqlText(id)};
+
+-- To build the rows again: open TheGod, edit the game, press
+-- save. That writes a fresh game_settings row containing only
+-- the fields you actually changed. There is no need to INSERT
+-- anything by hand, and a hand-written row of NULLs is what you
+-- just removed.
 `
 }
 
@@ -469,20 +538,32 @@ export function setupCommands(gameId) {
       command: [
         `npx wrangler secret put ${names.env.web}`,
         `npx wrangler secret put ${names.env.secret}`,
-        `npx wrangler secret put ${names.env.android}`,
-        `npx wrangler secret put ${names.env.deepLinkScheme}`
+        `npx wrangler secret put ${names.env.android}`
       ].join('\n'),
-      note: 'From the Google Cloud console, OAuth 2.0 client IDs. Android may be skipped for a web-only game.'
+      note: 'From the Google Cloud console, OAuth 2.0 client IDs. Android may be skipped for a web-only game. '
+          + `${names.env.deepLinkScheme} is deliberately NOT here: the deep-link scheme is not a secret, `
+          + 'it has a fallback in config.js, and the TheGod panel can change it without a deploy.'
     },
     {
       step: 5,
+      title: 'Authorise the redirect URI in Google',
+      command: 'https://<your-domain>/oauth/callback',
+      note: 'Google Cloud console ▸ Credentials ▸ your Web client ▸ Authorized redirect URIs. '
+          + 'Add one line per hostname this Worker answers on — the custom domain AND the '
+          + '*.workers.dev address. A hostname that is missing here is Error 400: redirect_uri_mismatch, '
+          + 'and no Worker variable can fix it because the check happens on Google\'s side. '
+          + 'The Environment tab of the panel prints the exact lines for this deployment.',
+      isFile: true
+    },
+    {
+      step: 6,
       title: 'Add the game to the code',
       command: `// paste the generated entry into GAME_REGISTRY in config.js`,
       note: 'This is the step that makes the game exist. Nothing before it puts a game on the site.',
       isFile: true
     },
     {
-      step: 6,
+      step: 7,
       title: 'Deploy',
       command: 'npx wrangler deploy',
       note: 'The game appears on the dashboard the moment this finishes.'

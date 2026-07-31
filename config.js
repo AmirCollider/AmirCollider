@@ -524,6 +524,31 @@ const GAME_REGISTRY = {
       ]
     },
 
+    // ------------------------------------------------------------
+    // What has to be a Worker secret, and what does not.
+    //
+    // The two client ids and the client secret do: they come from
+    // the Google Cloud console, they are per-deployment, and the
+    // client secret is a credential.
+    //
+    // deepLinkScheme is none of those things. It is the URL scheme
+    // an Android build registers - the same string that is printed
+    // in the manifest of every shipped APK and visible to anyone
+    // who unzips one. It stayed in `env` only because it arrived
+    // alongside the OAuth values, and being there made it a
+    // deploy-time change that also had to be typed into
+    // "Variables and secrets" for the Worker to boot at all.
+    //
+    // It is now an OPTIONAL override, in this order:
+    //
+    //   game_settings.deeplink_scheme   the TheGod panel
+    //   NEON_KATANA_DEEPLINK_SCHEME     if it is still set
+    //   fallback.deepLinkScheme         below, always present
+    //
+    // Nothing breaks if the variable is deleted, which is the
+    // point of moving it: the fallback is the value the shipped
+    // build already registered.
+    // ------------------------------------------------------------
     env: {
       android: 'NEON_KATANA_GOOGLE_CLIENT_ID_ANDROID',
       web: 'NEON_KATANA_GOOGLE_CLIENT_ID_WEB',
@@ -574,6 +599,9 @@ function buildGame(id, def, env) {
   // privacy and terms pages still read it by that name.
   if (def.myketUrl && !links.myket) links.myket = def.myketUrl
 
+  const envNames = def.env || {}
+  const fallback = def.fallback || {}
+
   return {
     id,
     name: def.name,
@@ -601,15 +629,68 @@ function buildGame(id, def, env) {
     },
 
     oauth: {
-      android: read(def.env.android),
-      web: read(def.env.web),
-      secret: read(def.env.secret)
+      android: read(envNames.android),
+      web: read(envNames.web),
+      secret: read(envNames.secret)
     },
     deepLink: {
-      scheme: read(def.env.deepLinkScheme) || def.fallback.deepLinkScheme,
-      host: def.deepLink.host
+      // The environment still wins over the code fallback, so a
+      // deployment that has the variable set keeps behaving
+      // exactly as it did. games/registry.js layers the panel's
+      // stored value on top of whatever comes out here.
+      scheme: read(envNames.deepLinkScheme) || fallback.deepLinkScheme || '',
+      host: (def.deepLink && def.deepLink.host) || 'oauth'
     }
   }
+}
+
+
+// ==========================================
+// getGameEnvNames
+// Which environment keys each game reads, and which of them the
+// Worker genuinely cannot start without.
+//
+// Exported so the two places that need this list - the boot
+// check in utils.js and the environment screen in the TheGod
+// panel - read it from the registry instead of keeping their own
+// copy. A hard-coded list is a list that is right for one game
+// and silently wrong for the second.
+//
+// Only names are returned. No value is ever read here: the
+// caller decides whether it may look at env, which keeps this
+// safe to call from a page.
+// ==========================================
+export function getGameEnvNames() {
+  const out = {}
+
+  for (const [id, def] of Object.entries(GAME_REGISTRY)) {
+    const env = def.env || {}
+    const capabilities = { ...CAPABILITY_DEFAULTS, ...(def.capabilities || {}) }
+
+    out[id] = {
+      name: def.name,
+      d1Binding: def.d1Binding || '',
+      capabilities,
+
+      // Missing means Google sign-in cannot work for this game,
+      // and there is nothing to fall back to. Everything else in
+      // `keys` below is optional: an Android client id is only
+      // needed by a game that ships an APK, and a deep-link
+      // scheme resolves from the panel or from `fallback`.
+      required: capabilities.login ? [env.web, env.secret].filter(Boolean) : [],
+
+      keys: {
+        web: env.web || '',
+        secret: env.secret || '',
+        android: env.android || '',
+        deepLinkScheme: env.deepLinkScheme || ''
+      },
+
+      deepLinkFallback: (def.fallback && def.fallback.deepLinkScheme) || ''
+    }
+  }
+
+  return out
 }
 
 

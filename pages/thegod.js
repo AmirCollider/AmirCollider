@@ -19,6 +19,7 @@
 //
 //   • its name, logo, colour, description and tags
 //   • whether the download link works        (the offline switch)
+//   • its Android deep-link scheme           (no longer a secret)
 //   • which products are on sale, and for how much
 //   • the purchases people made, through NOWPayments
 //   • what a given player owns, and putting that right
@@ -26,10 +27,17 @@
 //   • the code a new game needs, ready to paste
 //   • the Unity files that talk to all of it
 //
+// And one screen that only reads: the Environment tab, which
+// lists every variable this Worker looks for, says whether it is
+// set, and prints the redirect URI Google has to be told about.
+// It shows no secret's value - a boolean and a length, which is
+// what "is it configured?" actually needs.
+//
 // ------------------------------------------------------------
 // WHAT IT DELIBERATELY CANNOT DO
 // ------------------------------------------------------------
 // Create a game. Delete a game. Rename a product id. Run SQL.
+// Show a secret's value, or change one.
 //
 // Those are not missing features. A game is a D1 binding, four
 // Google secrets, a deep-link scheme, an Android package and a
@@ -258,6 +266,7 @@ const I18N = {
     tabOrders: 'پرداخت‌ها',
     tabPlayers: 'بازیکن‌ها',
     tabSql: 'ساخت SQL',
+    tabEnv: 'متغیرها',
     tabNew: 'بازی جدید',
     tabUnity: 'کد یونیتی',
 
@@ -295,6 +304,20 @@ const I18N = {
     fNote: 'یادداشت داخلی',
     fDownload: 'لینک‌های دانلود',
     fDownloadHint: 'یک خط برای هر فروشگاه، به شکل  نام=آدرس',
+    fDeepLink: 'اسکیم دیپ‌لینک اندروید',
+    fDeepLinkHint: 'همان چیزی که در AndroidManifest بیلد ثبت شده. بعد از ورود با گوگل، بازیکن با '
+                 + 'آدرس «اسکیم://host» به بازی برمی‌گردد. خالی بگذاری، از مقدار داخل config.js استفاده می‌شود.',
+    fDeepLinkPreview: 'لینک برگشت به بازی',
+    fDeepLinkBad: 'اسکیم فقط حروف انگلیسی، عدد و نویسه‌های + - . — بدون فاصله و بدون //:',
+
+    purge: 'پاک کردن ردیف‌های دیتابیس',
+    purgeAsk: 'همه‌ی ردیف‌های این بازی در game_settings و game_product_overrides پاک شود؟\n\n'
+            + 'بازی حذف نمی‌شود (بازی داخل config.js است) و سفارش‌ها و داشته‌های بازیکن‌ها هم دست نمی‌خورد. '
+            + 'فقط تغییرهایی که روی کد اعمال شده بود برداشته می‌شود و بازی دقیقاً همان می‌شود که در کد نوشته شده. '
+            + 'با اولین «ذخیره»، ردیف تازه و تمیز ساخته می‌شود.',
+    purgeDone: 'ردیف‌ها پاک شدند. بازی الان دقیقاً از روی config.js خوانده می‌شود.',
+    purgeHint: 'اگر ردیف تنظیمات پر از NULL شده و می‌خواهی از اول بسازیش، این دکمه پاکش می‌کند. '
+             + 'ساختن دوباره کار جداگانه‌ای ندارد: ویرایش کن و ذخیره بزن.',
 
     stLive: 'منتشر شده',
     stMaintenance: 'دانلود برداشته شده',
@@ -371,10 +394,49 @@ const I18N = {
     sqlSeed: 'یک ردیف نمونه',
     sqlBuild: 'ساختن SQL',
     sqlSettings: 'SQL تنظیمات فعلی',
+    sqlPurge: 'SQL پاک کردن ردیف‌ها',
     sqlNoRun: 'این‌جا هیچ SQL ای اجرا نمی‌شود — فقط ساخته می‌شود. خودت با wrangler اجرایش کن.',
     copy: 'کپی',
     copied: 'کپی شد',
     download: 'دانلود فایل',
+
+    // env tab
+    envLede: 'هر چیزی که این Worker از «Variables and secrets» می‌خواند، و این‌که هر کدام تنظیم شده یا نه. '
+           + 'مقدار secretها این‌جا نشان داده نمی‌شود — فقط این‌که وجود دارند و چند نویسه‌اند.',
+    envReload: 'خواندن دوباره',
+    envSet: 'تنظیم شده',
+    envMissing: 'تنظیم نشده',
+    envChars: 'نویسه',
+    envHidden: 'مقدارش نشان داده نمی‌شود',
+    envPublic: 'این مقدار عمومی است و پنهان کردنش فایده‌ای ندارد.',
+    envBindingTitle: 'اتصال‌ها (wrangler.jsonc)',
+    envBindingHint: 'این‌ها در «Variables and secrets» نیستند؛ در wrangler.jsonc تعریف می‌شوند و با deploy فعال می‌شوند.',
+    envSharedTitle: 'متغیرهای مشترک سایت',
+    envGameTitle: 'متغیرهای این بازی',
+    envOptional: 'اختیاری',
+    envRequired: 'لازم',
+
+    envRedirectTitle: 'آدرس بازگشت گوگل (redirect URI)',
+    envRedirectLede: 'اگر موقع ورود به بازی خطای «Error 400: redirect_uri_mismatch» می‌گیری، مشکل از این Worker '
+                   + 'و از secretها نیست. گوگل آدرس بازگشت را با فهرستی که خودش دارد مقایسه می‌کند، و این آدرس در آن فهرست نیست.',
+    envRedirectFix: 'در Google Cloud Console → APIs & Services → Credentials → همان OAuth client از نوع Web → '
+                  + 'بخش «Authorized redirect URIs» → آدرس زیر را اضافه کن → Save. '
+                  + 'برای هر دامنه‌ای که سایت روی آن بالا می‌آید یک خط جدا لازم است (هم amircollider.com و هم آدرس workers.dev).',
+    envRedirectNow: 'آدرسی که همین حالا برای این دامنه فرستاده می‌شود',
+    envRedirectWait: 'بعد از Save گاهی چند دقیقه طول می‌کشد تا گوگل تغییر را اعمال کند.',
+    envRedirectOrigins: 'یادت باشد این صفحه فقط دامنه‌ای را می‌بیند که الان با آن باز شده. اگر سایت روی چند دامنه جواب می‌دهد، '
+                      + 'هر کدام را جدا باز کن و آدرسش را هم اضافه کن.',
+
+    envDeepTitle: 'اسکیم دیپ‌لینک',
+    envDeepNotSecret: 'اسکیم دیپ‌لینک secret نیست: همین رشته داخل AndroidManifest هر APK منتشرشده هست و هر کسی '
+                    + 'می‌تواند ببیندش. حالا می‌توانی از تب «بازی‌ها» تغییرش بدهی و متغیر NEON_KATANA_DEEPLINK_SCHEME را '
+                    + 'با خیال راحت از Cloudflare پاک کنی — مقدار پشتیبانش داخل config.js همیشه هست.',
+    envDeepEffective: 'مقدار فعلی',
+    envDeepFrom: 'از کجا می‌آید',
+    envDeepFromPanel: 'از پنل (دیتابیس)',
+    envDeepFromEnv: 'از متغیر Cloudflare',
+    envDeepFromCode: 'از config.js',
+    envDeepMigration: 'برای ذخیره‌ی این مقدار در دیتابیس باید migrations/0004_deeplink.sql را اجرا کرده باشی.',
 
     // new game tab
     newLede: 'بازی جدید باید داخل کد اضافه شود، نه دیتابیس. این فرم کدش را می‌نویسد؛ تو paste می‌کنی و deploy.',
@@ -423,6 +485,7 @@ const I18N = {
     tabOrders: 'Payments',
     tabPlayers: 'Players',
     tabSql: 'SQL builder',
+    tabEnv: 'Environment',
     tabNew: 'New game',
     tabUnity: 'Unity code',
 
@@ -458,6 +521,20 @@ const I18N = {
     fNote: 'Internal note',
     fDownload: 'Download links',
     fDownloadHint: 'One per line, as  name=url',
+    fDeepLink: 'Android deep-link scheme',
+    fDeepLinkHint: 'The scheme the build registered in its AndroidManifest. After a Google sign-in the player '
+                 + 'is handed back to the game at "scheme://host". Leave it empty to use the value in config.js.',
+    fDeepLinkPreview: 'Return link',
+    fDeepLinkBad: 'A scheme is letters, digits and + - . — no spaces, no "://".',
+
+    purge: 'Delete the database rows',
+    purgeAsk: 'Delete every row this game has in game_settings and game_product_overrides?\n\n'
+            + 'The game itself is NOT deleted — games live in config.js — and orders and player entitlements '
+            + 'are untouched. This only removes the changes layered on top of the code, so the game becomes '
+            + 'exactly what config.js says. The next save writes a fresh, clean row.',
+    purgeDone: 'Rows deleted. This game now reads straight from config.js.',
+    purgeHint: 'If the settings row has filled up with NULLs and you would rather start again, this removes it. '
+             + 'Rebuilding is not a separate step: edit the fields and press save.',
 
     stLive: 'Live',
     stMaintenance: 'Download withdrawn',
@@ -530,10 +607,49 @@ const I18N = {
     sqlSeed: 'One sample row',
     sqlBuild: 'Build the SQL',
     sqlSettings: 'SQL for the current settings',
+    sqlPurge: 'SQL to delete the rows',
     sqlNoRun: 'Nothing is executed here — only written. You run it with wrangler yourself.',
     copy: 'Copy',
     copied: 'Copied',
     download: 'Download file',
+
+    envLede: 'Everything this Worker reads out of "Variables and secrets", and whether each one is set. '
+           + 'No secret value is shown here — only that it exists and how long it is.',
+    envReload: 'Read again',
+    envSet: 'set',
+    envMissing: 'not set',
+    envChars: 'chars',
+    envHidden: 'value not shown',
+    envPublic: 'This value is public; hiding it would buy nothing.',
+    envBindingTitle: 'Bindings (wrangler.jsonc)',
+    envBindingHint: 'These are not in "Variables and secrets" — they live in wrangler.jsonc and take effect on deploy.',
+    envSharedTitle: 'Site-wide variables',
+    envGameTitle: 'This game’s variables',
+    envOptional: 'optional',
+    envRequired: 'required',
+
+    envRedirectTitle: 'Google redirect URI',
+    envRedirectLede: 'If signing in fails with "Error 400: redirect_uri_mismatch", the problem is not this Worker '
+                   + 'and not a secret. Google compares the redirect address against a list it keeps, and this '
+                   + 'address is not on that list.',
+    envRedirectFix: 'Google Cloud Console → APIs & Services → Credentials → the Web OAuth client → '
+                  + '"Authorized redirect URIs" → add the line below → Save. Every hostname the site answers on '
+                  + 'needs its own line (both amircollider.com and the workers.dev address).',
+    envRedirectNow: 'What this deployment sends for this hostname',
+    envRedirectWait: 'Google can take a few minutes to apply the change after you save.',
+    envRedirectOrigins: 'This screen only sees the hostname you opened it with. If the site answers on more than one, '
+                      + 'open each one and add its address too.',
+
+    envDeepTitle: 'Deep-link scheme',
+    envDeepNotSecret: 'A deep-link scheme is not a secret: the same string is in the AndroidManifest of every '
+                    + 'published APK, where anyone can read it. You can now change it in the Games tab and delete '
+                    + 'NEON_KATANA_DEEPLINK_SCHEME from Cloudflare — the fallback in config.js is always there.',
+    envDeepEffective: 'In use now',
+    envDeepFrom: 'Coming from',
+    envDeepFromPanel: 'the panel (database)',
+    envDeepFromEnv: 'a Cloudflare variable',
+    envDeepFromCode: 'config.js',
+    envDeepMigration: 'Saving this to the database needs migrations/0004_deeplink.sql to have been run.',
 
     newLede: 'A new game has to be added in code, not in the database. This writes that code; you paste it and deploy.',
     newWhy: 'Why in code? Because a game is a D1 binding, four Google secrets, a deep link and an Android package. A row claiming to be a game would draw a card on the dashboard and be unable to sign a single player in.',
@@ -579,6 +695,7 @@ const I18N = {
     tabOrders: '決済',
     tabPlayers: 'プレイヤー',
     tabSql: 'SQL 生成',
+    tabEnv: '環境変数',
     tabNew: '新規ゲーム',
     tabUnity: 'Unity コード',
 
@@ -614,6 +731,19 @@ const I18N = {
     fNote: '内部メモ',
     fDownload: 'ダウンロードリンク',
     fDownloadHint: '1 行につき  名前=URL',
+    fDeepLink: 'Android ディープリンクのスキーム',
+    fDeepLinkHint: 'ビルドが AndroidManifest に登録したスキームです。Google サインイン後、プレイヤーは '
+                 + '「scheme://host」でゲームに戻ります。空欄なら config.js の値が使われます。',
+    fDeepLinkPreview: '復帰リンク',
+    fDeepLinkBad: 'スキームは英字・数字・+ - . のみ。空白や "://" は使えません。',
+
+    purge: 'データベースの行を削除',
+    purgeAsk: 'このゲームの game_settings と game_product_overrides の行をすべて削除しますか？\n\n'
+            + 'ゲーム自体は削除されません（ゲームは config.js にあります）。注文とプレイヤーの所有物にも影響しません。'
+            + 'コードの上に重ねた変更だけが消え、ゲームは config.js のとおりになります。次に保存すると新しい行が作られます。',
+    purgeDone: '行を削除しました。このゲームは config.js をそのまま読んでいます。',
+    purgeHint: '設定行が NULL だらけになって作り直したい場合は、これで削除できます。作り直しは別作業ではありません。'
+             + '編集して保存を押すだけです。',
 
     stLive: '公開中',
     stMaintenance: 'ダウンロード停止',
@@ -686,10 +816,47 @@ const I18N = {
     sqlSeed: 'サンプル行を 1 件',
     sqlBuild: 'SQL を生成',
     sqlSettings: '現在の設定の SQL',
+    sqlPurge: '行を削除する SQL',
     sqlNoRun: 'ここでは実行しません。生成のみです。wrangler でご自身で実行してください。',
     copy: 'コピー',
     copied: 'コピーしました',
     download: 'ファイルを保存',
+
+    envLede: 'この Worker が「Variables and secrets」から読む値と、それぞれ設定済みかどうかの一覧です。'
+           + 'シークレットの中身は表示しません。存在と文字数だけです。',
+    envReload: '再読み込み',
+    envSet: '設定済み',
+    envMissing: '未設定',
+    envChars: '文字',
+    envHidden: '値は表示しません',
+    envPublic: 'この値は公開情報なので、隠しても意味がありません。',
+    envBindingTitle: 'バインディング（wrangler.jsonc）',
+    envBindingHint: 'これらは「Variables and secrets」ではなく wrangler.jsonc で定義し、デプロイで有効になります。',
+    envSharedTitle: 'サイト共通の変数',
+    envGameTitle: 'このゲームの変数',
+    envOptional: '任意',
+    envRequired: '必須',
+
+    envRedirectTitle: 'Google のリダイレクト URI',
+    envRedirectLede: '「Error 400: redirect_uri_mismatch」が出る場合、原因はこの Worker でもシークレットでもありません。'
+                   + 'Google が自分の持つ一覧と照合していて、この URL がその一覧に無いということです。',
+    envRedirectFix: 'Google Cloud Console → APIs & Services → Credentials → Web タイプの OAuth クライアント → '
+                  + '「Authorized redirect URIs」→ 下の 1 行を追加 → 保存。サイトが応答するホスト名ごとに 1 行必要です'
+                  + '（amircollider.com と workers.dev の両方）。',
+    envRedirectNow: 'このホスト名で実際に送信される URL',
+    envRedirectWait: '保存後、Google に反映されるまで数分かかることがあります。',
+    envRedirectOrigins: 'この画面は今開いているホスト名しか見えません。複数のドメインで動く場合は、それぞれ開いて追加してください。',
+
+    envDeepTitle: 'ディープリンクのスキーム',
+    envDeepNotSecret: 'ディープリンクのスキームはシークレットではありません。同じ文字列が公開済み APK の '
+                    + 'AndroidManifest に入っていて誰でも読めます。これからは「ゲーム」タブで変更でき、'
+                    + 'NEON_KATANA_DEEPLINK_SCHEME は Cloudflare から削除して構いません。config.js の既定値が常にあります。',
+    envDeepEffective: '現在の値',
+    envDeepFrom: '取得元',
+    envDeepFromPanel: 'パネル（データベース）',
+    envDeepFromEnv: 'Cloudflare の変数',
+    envDeepFromCode: 'config.js',
+    envDeepMigration: 'この値をデータベースに保存するには migrations/0004_deeplink.sql の実行が必要です。',
 
     newLede: '新しいゲームはデータベースではなくコードに追加します。ここでそのコードを生成しますので、貼り付けてデプロイしてください。',
     newWhy: 'なぜコードなのか。ゲームとは D1 バインディング、4 つの Google シークレット、ディープリンク、Android パッケージだからです。行だけ作ってもカードが表示されるだけで、誰もログインできません。',
@@ -850,9 +1017,17 @@ function panelCss() {
     .gcard:hover{transform:translateY(-3px);border-color:var(--brand)}
     .gcard[aria-selected="true"]{border-color:var(--brand);box-shadow:0 0 0 3px rgba(139,92,246,.18)}
     .gcard-top{display:flex;align-items:center;gap:12px;margin-block-end:12px}
-    .gcard-logo{width:52px;height:52px;border-radius:15px;flex-shrink:0;display:flex;align-items:center;
-      justify-content:center;font-size:1.5em;background:#fff;overflow:hidden;border:2px solid var(--border)}
-    .gcard-logo img{width:100%;height:100%;object-fit:cover}
+    /* The emoji is the fallback UNDER the logo, not a sibling
+       beside it. As flex items the two shared the 52px box, so a
+       game with both showed its emoji next to a squeezed sliver
+       of its logo - which is what "the panel does not show the
+       logos properly" looked like. Taking the image out of flow
+       lets it cover the box, and the emoji is what remains
+       visible when the file 404s and onerror hides it. */
+    .gcard-logo{position:relative;width:52px;height:52px;border-radius:15px;flex-shrink:0;display:flex;
+      align-items:center;justify-content:center;font-size:1.5em;background:#fff;overflow:hidden;
+      border:2px solid var(--border)}
+    .gcard-logo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
     .gcard-name{font-weight:800;font-size:1.02em}
     .gcard-id{font-size:.76em;color:var(--dim);direction:ltr}
     .gcard-chips{display:flex;gap:6px;flex-wrap:wrap}
@@ -994,6 +1169,8 @@ function renderPanel(games, lang, theme, health, origin) {
     downloadable: isDownloadable(game),
     minVersion: game.minVersion || '',
     note: game.note || '',
+    deepLinkScheme: (game.deepLink && game.deepLink.scheme) || '',
+    deepLinkHost: (game.deepLink && game.deepLink.host) || 'oauth',
     overrides: game.overrides || [],
     settingsAt: game.settingsAt || 0,
     products: (game.store.products || []).map(product => ({
@@ -1033,6 +1210,7 @@ function renderPanel(games, lang, theme, health, origin) {
     ['orders', t.tabOrders, '💳'],
     ['players', t.tabPlayers, '👥'],
     ['sql', t.tabSql, '🗄️'],
+    ['env', t.tabEnv, '🔑'],
     ['new', t.tabNew, '✨'],
     ['unity', t.tabUnity, '🧩']
   ].map(([key, label, icon], index) =>
@@ -1079,6 +1257,7 @@ function renderPanel(games, lang, theme, health, origin) {
     <section class="panel" id="panel-orders"></section>
     <section class="panel" id="panel-players"></section>
     <section class="panel" id="panel-sql"></section>
+    <section class="panel" id="panel-env"></section>
     <section class="panel" id="panel-new"></section>
     <section class="panel" id="panel-unity"></section>
   </div>
@@ -1221,6 +1400,7 @@ function tgRender(key) {
   if (key === 'orders') return tgRenderOrders();
   if (key === 'players') return tgRenderPlayers();
   if (key === 'sql') return tgRenderSql();
+  if (key === 'env') return tgRenderEnv();
   if (key === 'new') return tgRenderNew();
   if (key === 'unity') return tgRenderUnity();
 }
@@ -1342,6 +1522,12 @@ function tgRenderEditor() {
   +     '<textarea id="f-links" dir="ltr">' + tgEsc(links) + '</textarea>'
   +     '<span class="hint">' + tgEsc(TG.t.fDownloadHint) + '</span></label>'
 
+  +   '<label class="f"><span>' + tgEsc(TG.t.fDeepLink) + '</span>'
+  +     '<input type="text" id="f-deeplink" dir="ltr" spellcheck="false"'
+  +       ' value="' + tgEsc(game.deepLinkScheme) + '" oninput="tgDeepLinkPreview()">'
+  +     '<span class="hint">' + tgEsc(TG.t.fDeepLinkHint) + '</span>'
+  +     '<span class="hint" dir="ltr" id="f-deeplink-preview">' + tgEsc(tgDeepLinkOf(game)) + '</span></label>'
+
   +   '<div class="grid two">'
   +     '<label class="f"><span>' + tgEsc(TG.t.fMinVersion) + '</span>'
   +       '<input type="text" id="f-minver" dir="ltr" value="' + tgEsc(game.minVersion) + '" placeholder="1.0.0"></label>'
@@ -1360,7 +1546,38 @@ function tgRenderEditor() {
   +       tgEsc(TG.t.open) + ' ↗</a>'
   +     '<span class="muted" style="font-size:.78em">' + tgEsc(TG.t.saved) + ': ' + tgEsc(tgDate(game.settingsAt)) + '</span>'
   +   '</div>'
+
+  +   '<h3 class="sub">' + tgEsc(TG.t.purge) + '</h3>'
+  +   '<div class="note warn">' + tgEsc(TG.t.purgeHint)
+  +     '<div class="row" style="margin-block-start:10px">'
+  +       '<button type="button" class="btn danger small" onclick="tgPurgeGame()">'
+  +         tgEsc(TG.t.purge) + '</button>'
+  +     '</div>'
+  +   '</div>'
   + '</div>';
+}
+
+// The link the OAuth callback builds for an Android player, shown
+// as it is typed. The scheme on its own is an abstraction; the
+// URL is the thing that either opens the game or does not, and
+// seeing it is what catches "https://" pasted into the box.
+function tgDeepLinkOf(game) {
+  return (game.deepLinkScheme || '') + '://' + (game.deepLinkHost || 'oauth') + '?code=…';
+}
+
+function tgDeepLinkPreview() {
+  var game = tgSelected();
+  var box = tgById('f-deeplink-preview');
+  if (!game || !box) return;
+
+  var typed = (tgById('f-deeplink').value || '').trim();
+  var scheme = typed || game.deepLinkScheme;
+  var ok = !typed || /^[a-zA-Z][a-zA-Z0-9+.-]{0,80}$/.test(typed);
+
+  box.textContent = ok
+    ? scheme + '://' + (game.deepLinkHost || 'oauth') + '?code=…'
+    : TG.t.fDeepLinkBad;
+  box.style.color = ok ? '' : 'var(--err)';
 }
 
 function tgToggleDownload(enabled) {
@@ -1392,8 +1609,21 @@ function tgSaveGame() {
   var fields = [
     ['display_name', 'f-name'], ['logo_url', 'f-logo'], ['accent_color', 'f-color-text'],
     ['status', 'f-status'], ['desc_fa', 'f-desc-fa'], ['desc_en', 'f-desc-en'],
-    ['desc_ja', 'f-desc-ja'], ['min_version', 'f-minver'], ['note', 'f-note']
+    ['desc_ja', 'f-desc-ja'], ['min_version', 'f-minver'], ['note', 'f-note'],
+    ['deeplink_scheme', 'f-deeplink']
   ];
+
+  // Refused here as well as on the server, because the server
+  // drops a bad scheme silently - which is right for it and
+  // wrong for the person typing, who would press save, see
+  // "saved", and find the field back to its old value.
+  var scheme = (tgById('f-deeplink').value || '').trim();
+  if (scheme && !/^[a-zA-Z][a-zA-Z0-9+.-]{0,80}$/.test(scheme)) {
+    button.disabled = false;
+    button.textContent = TG.t.save;
+    tgToast(TG.t.fDeepLinkBad, true);
+    return;
+  }
 
   for (var i = 0; i < fields.length; i++) {
     var value = (tgById(fields[i][1]).value || '').trim();
@@ -1419,7 +1649,12 @@ function tgSaveGame() {
     button.textContent = TG.t.save;
     if (!data) return;
     tgApplyGame(data.game);
-    tgToast(TG.t.saved);
+    // A save can succeed and still not have taken one field -
+    // the deep-link scheme, on a database that has not run
+    // 0004. Saying "saved" over that would be a lie about the
+    // one field somebody came here to change.
+    if (data.warning) tgToast(data.warning, true);
+    else tgToast(TG.t.saved);
   });
 }
 
@@ -1431,6 +1666,21 @@ function tgResetGame() {
     if (!data) return;
     tgApplyGame(data.game);
     tgToast(TG.t.saved);
+  });
+}
+
+// Both override tables, for this game, gone. The confirm text
+// spells out what survives - the game, the orders, the
+// entitlements - because a red button next to the word "delete"
+// in an admin panel is otherwise read as "delete the game".
+function tgPurgeGame() {
+  var game = tgSelected();
+  if (!game || !window.confirm(TG.t.purgeAsk)) return;
+
+  tgCall('game.purge', { gameId: game.id }).then(function (data) {
+    if (!data) return;
+    tgApplyGame(data.game);
+    tgToast(TG.t.purgeDone);
   });
 }
 
@@ -1515,7 +1765,14 @@ function tgSaveProduct(productId) {
   var clear = [];
 
   if (price) patch.price_usd = price; else clear.push('price_usd');
-  if (badge) patch.badge = badge; else clear.push('badge');
+
+  // "No ribbon" is a choice, not an empty field, so it is SAVED
+  // as an empty string rather than cleared to NULL. Clearing it
+  // would mean "no override", which puts back whatever ribbon
+  // config.js gives the product - the opposite of what the person
+  // who just picked "No ribbon" asked for. The per-product reset
+  // button is how you get back to the coded value.
+  patch.badge = badge || '';
 
   tgCall('product.save', { gameId: game.id, productId: productId, patch: patch, clear: clear })
     .then(function (data) {
@@ -1805,6 +2062,7 @@ function tgRenderSql() {
   +   '<div class="row">'
   +     '<button type="button" class="btn" onclick="tgBuildSql()">' + tgEsc(TG.t.sqlBuild) + '</button>'
   +     '<button type="button" class="btn ghost" onclick="tgBuildSettingsSql()">' + tgEsc(TG.t.sqlSettings) + '</button>'
+  +     '<button type="button" class="btn ghost" onclick="tgBuildPurgeSql()">' + tgEsc(TG.t.sqlPurge) + '</button>'
   +   '</div>'
   + '</div>'
   + '<div id="tg-sql-out"></div>';
@@ -1837,6 +2095,182 @@ function tgBuildSettingsSql() {
     + tgCodeBlock('game_product_overrides — ' + game.id, '', data.products);
   });
 }
+
+function tgBuildPurgeSql() {
+  var game = tgSelected();
+  if (!game) return;
+
+  tgCall('sql.settings', { gameId: game.id }).then(function (data) {
+    if (!data) return;
+    tgById('tg-sql-out').innerHTML =
+      tgCodeBlock('delete — ' + game.id, TG.t.purgeHint, data.purge);
+  });
+}
+
+// ==========================================
+// Tab: environment
+//
+// What this Worker reads out of "Variables and secrets", and
+// whether it is there. It exists because the alternative is
+// reading a list of key names in the Cloudflare dashboard and
+// guessing which ones this deployment actually wants - and
+// because the single most common way sign-in breaks has nothing
+// to do with any of them.
+//
+// That is the redirect URI, which is first on the screen for
+// that reason. Google refuses with redirect_uri_mismatch when
+// the address the Worker sends is not on a list held in the
+// Google Cloud console. No Cloudflare variable can change that
+// outcome, so a panel that only listed variables would send
+// somebody to re-paste three correct secrets.
+//
+// A secret's VALUE is never rendered here. The API sends a
+// boolean and a length; the length is what tells a pasted
+// trailing newline apart from a clean paste, which is a real
+// failure with no other symptom.
+// ==========================================
+function tgRenderEnv() {
+  tgById('panel-env').innerHTML =
+    '<p class="lede">' + tgEsc(TG.t.envLede) + '</p>'
+  + '<div class="card"><div class="empty">' + tgEsc(TG.t.loading) + '</div></div>';
+
+  tgLoadEnv();
+}
+
+function tgLoadEnv() {
+  tgCall('env', {}).then(function (data) {
+    if (!data) {
+      tgById('panel-env').innerHTML = '<div class="card"><div class="empty">' + tgEsc(TG.t.failed) + '</div></div>';
+      return;
+    }
+    tgById('panel-env').innerHTML =
+      '<p class="lede">' + tgEsc(TG.t.envLede) + '</p>'
+    + tgEnvRedirect(data)
+    + data.games.map(tgEnvGame).join('')
+    + tgEnvShared(data.shared)
+    + '<div class="row"><button type="button" class="btn ghost" onclick="tgLoadEnv()">'
+    +   tgEsc(TG.t.envReload) + '</button></div>';
+  });
+}
+
+// One row: the key, whether it is set, and either its value or
+// the reason there is no value to show.
+function tgEnvRow(entry, options) {
+  var opts = options || {};
+  var chip = entry.set
+    ? '<span class="chip ok">✓ ' + tgEsc(TG.t.envSet) + '</span>'
+    : '<span class="chip ' + (opts.optional ? 'warn' : 'err') + '">' + tgEsc(TG.t.envMissing) + '</span>';
+
+  var need = '<span class="chip">' + tgEsc(opts.optional ? TG.t.envOptional : TG.t.envRequired) + '</span>';
+
+  // Three shapes arrive here and each says something different:
+  // a public value prints itself, a secret prints its length and
+  // never its value, and a binding has no value at all - it is
+  // either wired up or it is not, which the chip already said.
+  var shown;
+  if (!entry.set) shown = '<span class="muted">—</span>';
+  else if (entry.value) shown = '<code>' + tgEsc(entry.value) + '</code>';
+  else if (entry.length) {
+    shown = '<span class="muted">' + tgEsc(TG.t.envHidden) + ' · ' + entry.length + ' ' + tgEsc(TG.t.envChars) + '</span>';
+  } else shown = '<span class="muted">—</span>';
+
+  return '<tr><td><code>' + tgEsc(entry.key) + '</code></td>'
+       + '<td>' + chip + ' ' + need + '</td>'
+       + '<td style="word-break:break-all">' + shown + '</td></tr>';
+}
+
+function tgEnvTable(rows) {
+  return '<div class="scroll"><table class="tbl"><tbody>' + rows.join('') + '</tbody></table></div>';
+}
+
+function tgEnvRedirect(data) {
+  return '<div class="card">'
+    +   '<h2 class="sec">🔗 ' + tgEsc(TG.t.envRedirectTitle) + '</h2>'
+    +   '<div class="note err">' + tgEsc(TG.t.envRedirectLede) + '</div>'
+    +   '<p class="lede">' + tgEsc(TG.t.envRedirectFix) + '</p>'
+    +   '<label class="f"><span>' + tgEsc(TG.t.envRedirectNow) + '</span>'
+    +     '<input type="text" id="env-redirect" dir="ltr" readonly value="' + tgEsc(data.redirectUri) + '"></label>'
+    +   '<div class="row">'
+    +     '<button type="button" class="btn small" onclick="tgCopyValue(\'env-redirect\')">'
+    +       tgEsc(TG.t.copy) + '</button>'
+    +   '</div>'
+    +   '<div class="hint" style="margin-block-start:10px">' + tgEsc(TG.t.envRedirectOrigins) + '</div>'
+    +   '<div class="hint">' + tgEsc(TG.t.envRedirectWait) + '</div>'
+    + '</div>';
+}
+
+function tgEnvGame(game) {
+  var source = game.deepLink.source === 'panel' ? TG.t.envDeepFromPanel
+             : game.deepLink.source === 'env' ? TG.t.envDeepFromEnv
+             : TG.t.envDeepFromCode;
+
+  var rows = [
+    tgEnvRow(game.web, { optional: !game.login }),
+    tgEnvRow(game.secret, { optional: !game.login }),
+    tgEnvRow(game.android, { optional: true }),
+    tgEnvRow(game.deepLink.key ? { key: game.deepLink.key, set: Boolean(game.deepLink.envValue), value: game.deepLink.envValue } : { key: '—', set: false }, { optional: true })
+  ];
+
+  return '<div class="card">'
+    +   '<h2 class="sec">🎮 ' + tgEsc(game.name) + ' <span class="chip">' + tgEsc(game.id) + '</span></h2>'
+    +   '<h3 class="sub">' + tgEsc(TG.t.envGameTitle) + '</h3>'
+    +   tgEnvTable(rows)
+    +   '<div class="hint" style="margin-block-start:8px">' + tgEsc(TG.t.envPublic) + '</div>'
+
+    +   '<h3 class="sub">' + tgEsc(TG.t.envBindingTitle) + '</h3>'
+    +   tgEnvTable([tgEnvRow(game.binding, { optional: false })])
+    +   '<div class="hint" style="margin-block-start:8px">' + tgEsc(TG.t.envBindingHint) + '</div>'
+
+    +   '<h3 class="sub">' + tgEsc(TG.t.envDeepTitle) + '</h3>'
+    +   '<div class="note info">' + tgEsc(TG.t.envDeepNotSecret) + '</div>'
+    +   '<div class="scroll"><table class="tbl"><tbody>'
+    +     '<tr><td>' + tgEsc(TG.t.envDeepEffective) + '</td>'
+    +       '<td colspan="2"><code>' + tgEsc(game.deepLink.effective) + '://' + tgEsc(game.deepLink.host) + '</code></td></tr>'
+    +     '<tr><td>' + tgEsc(TG.t.envDeepFrom) + '</td>'
+    +       '<td colspan="2"><span class="chip info">' + tgEsc(source) + '</span></td></tr>'
+    +     '<tr><td>' + tgEsc(TG.t.envDeepFromCode) + '</td>'
+    +       '<td colspan="2"><code>' + tgEsc(game.deepLink.codeValue) + '</code></td></tr>'
+    +   '</tbody></table></div>'
+    +   '<div class="hint" style="margin-block-start:8px">' + tgEsc(TG.t.envDeepMigration) + '</div>'
+    + '</div>';
+}
+
+function tgEnvShared(shared) {
+  var rows = [
+    tgEnvRow(shared.panel, { optional: false }),
+    tgEnvRow(shared.adminToken, { optional: true }),
+    tgEnvRow(shared.stateSecret, { optional: true })
+  ]
+    .concat(shared.payments.map(function (entry) { return tgEnvRow(entry, { optional: true }); }))
+    .concat(shared.mail.map(function (entry) { return tgEnvRow(entry, { optional: true }); }))
+    .concat(shared.licensing.map(function (entry) { return tgEnvRow(entry, { optional: true }); }));
+
+  return '<div class="card">'
+    +   '<h2 class="sec">🔑 ' + tgEsc(TG.t.envSharedTitle) + '</h2>'
+    +   tgEnvTable(rows)
+    +   '<h3 class="sub">' + tgEsc(TG.t.envBindingTitle) + '</h3>'
+    +   tgEnvTable([
+          tgEnvRow(shared.licenseDb, { optional: false }),
+          tgEnvRow(shared.assets, { optional: true })
+        ])
+    +   '<div class="hint" style="margin-block-start:8px">' + tgEsc(TG.t.envBindingHint) + '</div>'
+    + '</div>';
+}
+
+// Copies an <input>'s value. Separate from tgCopy, which reads a
+// <pre> by id and is used by the code blocks.
+function tgCopyValue(id) {
+  var field = tgById(id);
+  if (!field) return;
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(field.value).then(function () { tgToast(TG.t.copied); });
+    return;
+  }
+  field.select();
+  try { document.execCommand('copy'); tgToast(TG.t.copied); } catch (e) { tgToast(TG.t.failed, true); }
+}
+
 
 // ==========================================
 // Tab: new game

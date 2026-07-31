@@ -11,6 +11,7 @@
 //   isDownloadable(game) / isPlayable(game)
 //   downloadUrl(game)
 //   gameManifest(game, origin)           -> the JSON a client reads
+//   schemeText(value)                    -> a valid URL scheme, or null
 //   invalidateSettingsCache()
 //
 // ------------------------------------------------------------
@@ -100,6 +101,16 @@ function hexColor(value) {
   return out && /^#[0-9a-fA-F]{6}$/.test(out) ? out : null
 }
 
+// A URL scheme, by the rule in RFC 3986: a letter, then letters,
+// digits, '+', '-' and '.'. Anything else is treated as unset,
+// because this string is concatenated into the deep link a
+// signed-in Android player is sent to, and a value with a slash
+// or a space in it produces a link that silently opens nothing.
+export function schemeText(value) {
+  const out = text(value)
+  return out && /^[a-zA-Z][a-zA-Z0-9+.-]{0,80}$/.test(out) ? out.toLowerCase() : null
+}
+
 function bool(value, fallback) {
   if (value === null || value === undefined) return fallback
   return Number(value) === 1 || value === true
@@ -138,13 +149,21 @@ function price(value, fallback) {
 // when that last happened.
 //
 // Fields the database is not allowed anywhere near - the D1
-// binding, the OAuth secrets, the deep-link scheme, the
-// package name, the product ids - are copied straight through
-// and never consulted for an override. That is not an
-// oversight to be fixed later: those are the fields a shipped
+// binding, the OAuth client id and secret, the package name,
+// the product ids - are copied straight through and never
+// consulted for an override. That is not an oversight to be
+// fixed later: those are credentials, or fields a shipped
 // client has already hard-coded, and a row that could change
 // one of them is a row that can break every install in the
 // wild.
+//
+// The deep-link scheme is the deliberate exception, added when
+// it stopped being a Worker secret. It is public by
+// construction - it is in the manifest of every APK - and
+// getting it wrong breaks Android sign-in until somebody
+// redeploys, which is exactly the kind of thing this layer
+// exists to make fixable in thirty seconds. It is validated as
+// a URL scheme on the way in and on the way out.
 // ==========================================
 function mergeGame(game, row, productRows) {
   const overrides = []
@@ -160,6 +179,17 @@ function mergeGame(game, row, productRows) {
   const status = take('status', GAME_STATUS.ALL.includes(text(row && row.status)) ? text(row.status) : null)
   const tags = take('tags', Array.isArray(json(row && row.tags_json, null)) ? json(row.tags_json, null) : null)
   const minVersion = take('minVersion', text(row && row.min_version))
+
+  // The one field below that a shipped client also holds, and
+  // therefore the one to be careful with. It is here rather than
+  // in the "never overridden" list because it is not a
+  // credential and not a binding - it is the URL scheme the APK
+  // registered, which an operator can read off the manifest and
+  // may need to correct without a deploy.
+  //
+  // Reads as undefined on a database that has not run 0004,
+  // which text() turns into null and the merge treats as unset.
+  const deepLinkScheme = take('deepLinkScheme', schemeText(row && row.deeplink_scheme))
 
   const descriptions = {
     fa: text(row && row.desc_fa),
@@ -211,6 +241,11 @@ function mergeGame(game, row, productRows) {
 
     minVersion: minVersion || '',
 
+    deepLink: {
+      ...game.deepLink,
+      scheme: deepLinkScheme || game.deepLink.scheme
+    },
+
     store: {
       ...game.store,
       products: applyProductOverrides(game, productRows)
@@ -243,8 +278,23 @@ function applyProductOverrides(game, productRows) {
     const priceUsd = price(row && row.price_usd, null)
     if (priceUsd) overrides.push('priceUsd')
 
-    const badge = text(row && row.badge)
-    if (badge !== null && row && row.badge !== null && row.badge !== undefined) overrides.push('badge')
+    // A ribbon has THREE states, not two, and conflating the last
+    // two was a bug you could see on the store page: NULL means
+    // "no override, use the catalogue", and an empty string means
+    // "the operator chose No ribbon". Reading the column through
+    // text() collapsed '' to null, so taking the "best value"
+    // ribbon off shards-large in the panel appeared to save and
+    // then came straight back from config.js on the next render.
+    //
+    // So the presence of the column decides whether it is an
+    // override, and the value decides what the override says.
+    const badgeSet = Boolean(row) && row.badge !== null && row.badge !== undefined
+    const badgeValue = badgeSet ? String(row.badge).trim() : ''
+    // Same guard the status field gets, for the same reason: a
+    // row written by something other than the panel should not be
+    // able to put arbitrary text on a product card.
+    const badge = badgeSet && ['', 'best', 'new', 'sale'].includes(badgeValue) ? badgeValue : null
+    if (badge !== null) overrides.push('badge')
 
     const enabled = bool(row && row.enabled, true)
     if (row && row.enabled !== null && row.enabled !== undefined) overrides.push('enabled')

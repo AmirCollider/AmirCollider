@@ -18,7 +18,7 @@ existing game is presented and sold.**
 That is not a limitation that was worked around — it is the property the
 whole design protects.
 
-A game is a D1 binding, four Google OAuth secrets, a deep-link scheme, an
+A game is a D1 binding, three Google OAuth secrets, a deep-link scheme, an
 Android package name and a product catalogue that a shipped build already
 hard-codes. None of that can be conjured by an `INSERT`. A row claiming
 to be a game would draw a card on the dashboard and be unable to sign a
@@ -32,12 +32,13 @@ So:
 | which games exist | `GAME_REGISTRY` in `config.js` | a deploy |
 | capabilities (login, cloud save, leaderboard, store) | `config.js` | a deploy |
 | product ids, skus, what a product grants | `config.js` | a deploy |
-| D1 binding, OAuth env var names, package, deep link | `config.js` | a deploy |
+| D1 binding, OAuth env var names, package | `config.js` | a deploy |
 | display name, logo, colour, description, tags | `game_settings` | the panel |
 | status (live / maintenance / soon) | `game_settings` | the panel |
 | **whether the download link works** | `game_settings` | the panel |
 | download links themselves | `game_settings` | the panel |
 | minimum client version | `game_settings` | the panel |
+| the Android deep-link scheme | `game_settings` | the panel |
 | a product's price, ribbon, order, on-sale flag | `game_product_overrides` | the panel |
 
 Reading `config.js` therefore still tells you exactly which games this
@@ -57,13 +58,16 @@ game; it only returns that game to its coded defaults.
 with its own cookie scoped `Path=/thegod` so a browser will not send one
 panel's session to the other.
 
-Seven tabs:
+Eight tabs:
 
 **Games** — every game from the registry, with its overrides. Change the
 name, logo, accent colour, status, the description in all three
-languages, the download links, the minimum client version. One switch
-takes the download offline. "Back to the coded values" drops the whole
-override row.
+languages, the download links, the minimum client version, the Android
+deep-link scheme. One switch takes the download offline. "Back to the
+coded values" drops the settings row; "Delete the database rows" drops
+that **and** the product overrides, putting the game back to exactly
+what `config.js` says. Neither can delete the game, and neither touches
+orders or entitlements.
 
 **Storefront** — the catalogue for one game. Re-price a product, take it
 off sale, give it a ribbon, change the order. It cannot create one: a
@@ -83,8 +87,18 @@ indistinguishable from a bug.
 
 **SQL builder** — writes the migration for a game's own D1 database, with
 the exact columns `worker.js` reads by name, plus the wrangler commands
-in the order they have to be run. It generates; it never executes. See
-below.
+in the order they have to be run. Also prints the game's current
+overrides as portable SQL, and the two `DELETE`s that clear them. It
+generates; it never executes. See below.
+
+**Environment** — read-only. Every variable this Worker looks for,
+whether it is set, and — first on the screen, because it is the most
+common way sign-in breaks — the exact redirect URI to register with
+Google. No secret's value is ever rendered: the API sends a boolean and
+a character count, which is what "is it configured?" needs and is also
+enough to tell a clean paste from one with a trailing newline. Public
+values (a Google client id, a deep-link scheme) are shown in full,
+because they already travel in a URL or ship inside the APK.
 
 **New game** — writes the `GAME_REGISTRY` entry, the `wrangler.jsonc`
 binding, the SQL and the Unity constants file. You paste them and deploy.
@@ -94,7 +108,8 @@ selected game's real id, endpoints and product ids already in it.
 
 ### What the panel deliberately cannot do
 
-Create a game. Delete a game. Rename a product id. **Run SQL.**
+Create a game. Delete a game. Rename a product id. **Run SQL.** Show a
+secret's value, or change one.
 
 The last one is worth stating plainly: a panel that could execute
 generated SQL against a bound database is one stolen session cookie away
@@ -315,12 +330,17 @@ npx wrangler d1 execute pixel-runner-db --remote --file=./migrations/pixel-runne
 npx wrangler secret put PIXEL_RUNNER_GOOGLE_CLIENT_ID_WEB
 npx wrangler secret put PIXEL_RUNNER_GOOGLE_CLIENT_SECRET
 npx wrangler secret put PIXEL_RUNNER_GOOGLE_CLIENT_ID_ANDROID
-npx wrangler secret put PIXEL_RUNNER_DEEPLINK_SCHEME
+#    PIXEL_RUNNER_DEEPLINK_SCHEME is deliberately NOT here — see
+#    "The deep-link scheme is not a secret" below.
 
-# 5. the game itself — paste the generated entry into GAME_REGISTRY
+# 5. authorise the redirect URI in the Google Cloud console:
+#    https://<every hostname this Worker answers on>/oauth/callback
+#    Credentials ▸ the Web OAuth client ▸ Authorized redirect URIs.
+
+# 6. the game itself — paste the generated entry into GAME_REGISTRY
 #    in config.js. THIS is the step that makes the game exist.
 
-# 6. ship it
+# 7. ship it
 npx wrangler deploy
 ```
 
@@ -334,10 +354,84 @@ migration comment are the same string because they are computed once.
 
 ```bash
 npx wrangler d1 execute amircollider-licenses --remote --file=./migrations/0003_games.sql
+npx wrangler d1 execute amircollider-licenses --remote --file=./migrations/0004_deeplink.sql
 ```
 
-That is the whole migration. Nothing else is required: with no rows, the
-site renders exactly what `config.js` says, which is a correct site.
+`0003` is the whole game-management schema. Nothing else is required:
+with no rows, the site renders exactly what `config.js` says, which is a
+correct site.
+
+`0004` adds one column, `game_settings.deeplink_scheme`, and is what
+lets the panel set a deep-link scheme. SQLite has no
+`ADD COLUMN IF NOT EXISTS`, so running it a second time fails with
+`duplicate column name: deeplink_scheme` — which means it already ran
+and there is nothing to do.
+
+---
+
+## The deep-link scheme is not a secret
+
+`NEON_KATANA_DEEPLINK_SCHEME` used to be a required Worker variable. It
+should never have been one. The value is the URL scheme the Android
+build registers, and the same string sits in the `AndroidManifest.xml`
+of every APK anybody has ever downloaded — there is nothing to hide, and
+making it a deploy-time secret meant a typo in it could only be
+corrected by a redeploy.
+
+Worse, it was on the boot check's required list, so deleting the
+variable took down every page on the site, including the panels you
+would open to find out why.
+
+It now resolves in three layers, first match wins:
+
+| | set in | changed by |
+|---|---|---|
+| 1 | `game_settings.deeplink_scheme` | the panel, Games tab |
+| 2 | `NEON_KATANA_DEEPLINK_SCHEME` | a Cloudflare variable, if it still exists |
+| 3 | `fallback.deepLinkScheme` in `config.js` | a deploy |
+
+Layer 3 is always present, which is what makes deleting the variable
+safe. The panel's **Environment** tab shows the value in use and which
+of the three layers it came from.
+
+Anything that is not a URL scheme — a letter followed by letters,
+digits, `+`, `-` or `.` — is refused on write and ignored on read, and
+the resolution falls through to the next layer. A value with `://` in it
+would produce a deep link that silently opens nothing.
+
+---
+
+## `Error 400: redirect_uri_mismatch`
+
+This one is worth spelling out because nothing in Cloudflare can fix it.
+
+The Worker sends Google a redirect URI of `<origin>/oauth/callback`,
+where the origin is whatever hostname the player arrived on. Google
+compares that string against a list kept in the Google Cloud console and
+refuses if it is not there, character for character.
+
+So a deployment reachable at both `amircollider.com` and
+`amircollider.n95pluss.workers.dev` needs **both** lines registered:
+
+```
+https://amircollider.com/oauth/callback
+https://amircollider.n95pluss.workers.dev/oauth/callback
+```
+
+Google Cloud console ▸ APIs & Services ▸ Credentials ▸ the **Web**
+OAuth client ▸ Authorized redirect URIs. Changes can take a few minutes
+to apply.
+
+Two things that look like causes and are not: the OAuth secrets being
+set in Cloudflare (they are checked at a later step, not this one), and
+an **Android** OAuth client id. Android clients have no redirect URIs at
+all, so passing one produces this exact error with a message pointing at
+the redirect URI. `/oauth/auth` now ignores a `client_id` query
+parameter that is not one of the game's own configured clients, so that
+particular confusion cannot start here any more.
+
+The panel's Environment tab prints the exact line to paste for whichever
+hostname you opened it with.
 
 The storefront additionally needs what the licence checkout already
 needs — `NOWPAYMENTS_API_KEY` and `NOWPAYMENTS_IPN_SECRET`. Without them
@@ -374,5 +468,6 @@ pages/gameStore.js          the storefront and the payment callback
 pages/gameChrome.js         the frame those three pages share
 pages/GamesCards.js         the dashboard card
 migrations/0003_games.sql   settings, products, orders, entitlements
+migrations/0004_deeplink.sql  one column: game_settings.deeplink_scheme
 migrations/neon-katana.sql  a game's own database, as the builder writes it
 ```

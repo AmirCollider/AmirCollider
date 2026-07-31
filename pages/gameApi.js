@@ -342,10 +342,12 @@ function renderUnavailable(game, lang, origin) {
       background:radial-gradient(900px 480px at 70% -10%,color-mix(in srgb,var(--accent) 20%,transparent),transparent 60%),var(--bg)}
     .card{max-width:520px;width:100%;padding:36px 30px;border-radius:22px;text-align:center;
       background:var(--surface);border:1px solid var(--border);backdrop-filter:blur(10px)}
-    .logo{width:88px;height:88px;margin:0 auto 18px;border-radius:24px;display:flex;align-items:center;
-      justify-content:center;font-size:2.4em;background:#fff;color:#1a1c24;overflow:hidden;
+    .logo{position:relative;width:88px;height:88px;margin:0 auto 18px;border-radius:24px;display:flex;
+      align-items:center;justify-content:center;font-size:2.4em;background:#fff;color:#1a1c24;overflow:hidden;
       border:2px solid color-mix(in srgb,var(--accent) 55%,transparent)}
-    .logo img{width:100%;height:100%;object-fit:cover}
+    /* Out of flow, so the emoji underneath is a fallback rather
+       than a second flex item sharing the box with the image. */
+    .logo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
     h1{font-size:1.35em;margin-bottom:10px}
     .name{font-size:.9em;color:var(--dim);margin-bottom:20px}
     p{line-height:1.7;color:var(--dim);font-size:.95em}

@@ -35,6 +35,13 @@ import { createHtmlResponse } from '../utils.js'
 const AUTH_COOKIE = 'amir_testsite_auth'
 const COOKIE_MAX_AGE = 60 * 60 * 2
 
+// Whose panel this is. The test panel exercises the whole site -
+// the licence server, the checkout, every registered game - so it
+// is branded as the site and not as whichever game happens to be
+// first in the registry.
+const PANEL_BRAND = 'AmirCollider'
+const PANEL_ACCENT = '#2f6df6'
+
 const LANGS = ['fa', 'en', 'ja']
 const DEFAULT_LANG = 'fa'
 
@@ -951,7 +958,7 @@ function topbarHtml(prefix, amirLogo, brandName, lang) {
 function renderLogin(baseUrl, lang, theme, failed) {
   const dict = I18N[lang] || I18N[DEFAULT_LANG]
   const meta = LANG_META[lang] || LANG_META[DEFAULT_LANG]
-  const accent = '#2f6df6'
+  const accent = PANEL_ACCENT
   const accentRgb = hexToRgb(accent)
   const amirLogo = CONFIG.AMIR_LOGO
   const themeAttr = theme === 'light' || theme === 'dark' ? ` data-theme="${theme}"` : ''
@@ -1052,7 +1059,7 @@ function renderLogin(baseUrl, lang, theme, failed) {
 </head>
 <body>
   <div class="lg-bg" aria-hidden="true"></div>
-  ${topbarHtml('lg', amirLogo, 'AmirCollider', lang)}
+  ${topbarHtml('lg', amirLogo, PANEL_BRAND, lang)}
 
   <div class="lg-wrap">
     <div class="lg-card">
@@ -1167,8 +1174,17 @@ function renderDashboard(GAMES, baseUrl, lang, theme) {
   const amirLogo = CONFIG.AMIR_LOGO
 
   const gameIds = Object.keys(GAMES)
-  const firstGame = GAMES[gameIds[0]] || { color: '#2f6df6', name: 'AmirCollider Games' }
-  const accent = firstGame.color || '#2f6df6'
+
+  // The panel's own brand, not the first registered game's.
+  //
+  // It used to take both the name and the accent colour from
+  // GAMES[gameIds[0]], which meant the site-wide test panel
+  // introduced itself as "Neon Katana" in orange - a page that
+  // checks the licence server, the checkout and every game
+  // wearing one game's identity, and getting more wrong with
+  // every game added. This panel belongs to the site, so it
+  // says so, and it uses the same accent as its own login page.
+  const accent = PANEL_ACCENT
   const accentRgb = hexToRgb(accent)
   const themeAttr = theme === 'light' || theme === 'dark' ? ` data-theme="${theme}"` : ''
 
@@ -1205,7 +1221,7 @@ function renderDashboard(GAMES, baseUrl, lang, theme) {
   <div class="ts-bg" aria-hidden="true"></div>
 
   <main class="ts-shell">
-    ${topbarHtml('ts', amirLogo, esc(firstGame.name), lang)}
+    ${topbarHtml('ts', amirLogo, PANEL_BRAND, lang)}
 
     <section class="ts-hero">
       <span class="ts-badge"><span class="ts-ic">${ICONS.flask}</span>v${esc(CONFIG.VERSION)}</span>

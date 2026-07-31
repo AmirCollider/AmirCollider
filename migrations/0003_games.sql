@@ -99,6 +99,22 @@ CREATE TABLE IF NOT EXISTS game_settings (
   -- Free text for whoever comes back to this in six months.
   note             TEXT,
 
+  -- The URL scheme an Android build registered, e.g.
+  -- 'com.amircollidergames.neonkatana'. It is what the OAuth
+  -- callback concatenates into the deep link that hands a
+  -- signed-in player back to the game.
+  --
+  -- Here rather than in "Variables and secrets" because it is
+  -- not a secret: the same string is in the manifest of every
+  -- shipped APK. NULL means "use NEON_KATANA_DEEPLINK_SCHEME if
+  -- it is still set, otherwise the fallback in config.js" - so a
+  -- deployment that never touches this column behaves exactly as
+  -- it did before the column existed.
+  --
+  -- Added by 0004 for databases that already ran this file. It
+  -- is here too so a fresh database gets it in one step.
+  deeplink_scheme  TEXT,
+
   updated_at       INTEGER NOT NULL
 );
 

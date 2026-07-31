@@ -159,10 +159,13 @@ export function chromeCss(accent) {
     /* ---------- top bar ---------- */
     .gtop{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-block-end:26px}
     .gbrand{display:flex;align-items:center;gap:13px;min-width:0;text-decoration:none;color:var(--text)}
-    .gbrand-logo{width:50px;height:50px;border-radius:15px;flex-shrink:0;display:flex;align-items:center;
-      justify-content:center;font-size:1.5em;background:#fff;color:#1a1c24;overflow:hidden;
+    /* The image covers the box; the emoji sits underneath as the
+       fallback for a logo that 404s. Both as flex items would
+       split the 50px between them and show half of each. */
+    .gbrand-logo{position:relative;width:50px;height:50px;border-radius:15px;flex-shrink:0;display:flex;
+      align-items:center;justify-content:center;font-size:1.5em;background:#fff;color:#1a1c24;overflow:hidden;
       border:2px solid color-mix(in srgb,var(--accent) 50%,transparent)}
-    .gbrand-logo img{width:100%;height:100%;object-fit:cover;display:block}
+    .gbrand-logo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
     .gbrand-name{font-weight:800;font-size:1.02em;line-height:1.2}
     .gbrand-sub{font-size:.78em;color:var(--dim)}
 

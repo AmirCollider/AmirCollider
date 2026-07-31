@@ -1,0 +1,50 @@
+-- ==========================================
+-- 0004_deeplink.sql
+-- One column: game_settings.deeplink_scheme.
+--
+-- Apply with:
+--   npx wrangler d1 execute amircollider-licenses --remote \
+--       --file=./migrations/0004_deeplink.sql
+--
+-- Or from the dashboard: D1 ▸ amircollider-licenses ▸ Console
+-- ▸ paste this file ▸ run.
+--
+-- ------------------------------------------------------------
+-- WHAT THIS IS FOR
+-- ------------------------------------------------------------
+-- The Android deep-link scheme used to be a Worker secret
+-- (NEON_KATANA_DEEPLINK_SCHEME), and a required one: the boot
+-- check in utils.js refused to serve a single request without
+-- it. That was the wrong shape for the value. A deep-link
+-- scheme is not a credential - it is the URL scheme the APK
+-- registers, printed in the manifest of every copy of the game
+-- anybody has ever downloaded. Nothing about it needs hiding,
+-- and making it a deploy-time secret meant a typo in it could
+-- only be corrected by a redeploy.
+--
+-- After this migration the scheme resolves in this order:
+--
+--   1. game_settings.deeplink_scheme   set in the TheGod panel
+--   2. NEON_KATANA_DEEPLINK_SCHEME     if the variable still exists
+--   3. GAME_REGISTRY fallback          config.js, always present
+--
+-- So this migration changes nothing on its own. It only makes
+-- step 1 possible. Deleting the variable afterwards is safe
+-- BECAUSE of step 3, which is a value that has always been in
+-- the code.
+--
+-- ------------------------------------------------------------
+-- RUNNING IT TWICE
+-- ------------------------------------------------------------
+-- SQLite has no "ADD COLUMN IF NOT EXISTS", so a second run
+-- fails with:
+--
+--   duplicate column name: deeplink_scheme
+--
+-- That error means the column is already there and there is
+-- nothing to do. It is safe to ignore - unlike the rest of the
+-- migrations in this folder, which are re-runnable, this one
+-- tells you it already ran by refusing.
+-- ==========================================
+
+ALTER TABLE game_settings ADD COLUMN deeplink_scheme TEXT;

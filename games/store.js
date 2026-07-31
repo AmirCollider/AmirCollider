@@ -18,7 +18,9 @@
 //
 //   -- settings (overrides to the code registry) --
 //   readAllSettings / readSettings / saveSettings / resetSettings
+//   saveDeepLinkScheme
 //   readProductOverrides / saveProductOverride / resetProductOverride
+//   resetAllProductOverrides / purgeGameRows
 //
 //   -- the storefront's orders --
 //   GAME_ORDER_STATE / newGameOrderId / createGameOrder / getGameOrder
@@ -225,6 +227,40 @@ export async function resetSettings(database, gameId) {
 
 
 // ==========================================
+// saveDeepLinkScheme
+// The one settings column that is written on its own.
+//
+// It is separate from saveSettings deliberately. deeplink_scheme
+// arrived after 0003, so a deployment that ran that migration
+// and not 0004 has a game_settings table without the column -
+// and naming it in the big upsert would turn "no such column"
+// into a save that loses the operator's name, colour and
+// description too. Here, that failure costs exactly the field
+// that caused it, and says which migration fixes it.
+//
+// Assumes the row exists: every caller runs saveSettings first,
+// which upserts it.
+//
+// Null clears the override and the resolution falls back to the
+// environment variable, then to the registry's own fallback.
+// ==========================================
+export async function saveDeepLinkScheme(database, gameId, scheme) {
+  if (!database || !gameId) return { ok: false, reason: 'no_database' }
+
+  try {
+    await database
+      .prepare('UPDATE game_settings SET deeplink_scheme = ?, updated_at = ? WHERE game_id = ?')
+      .bind(scheme || null, now(), gameId)
+      .run()
+    return { ok: true, reason: '' }
+  } catch (error) {
+    // Almost always "no such column: deeplink_scheme".
+    return { ok: false, reason: /no such column/i.test(String(error && error.message)) ? 'no_column' : 'failed' }
+  }
+}
+
+
+// ==========================================
 // readProductOverrides
 // Product overrides for one game (or all of them), keyed by
 // product id.
@@ -281,6 +317,40 @@ export async function resetProductOverride(database, gameId, productId) {
     'DELETE FROM game_product_overrides WHERE game_id = ? AND product_id = ?'
   ).bind(gameId, productId).run()
   return changed(result)
+}
+
+
+export async function resetAllProductOverrides(database, gameId) {
+  const result = await database.prepare(
+    'DELETE FROM game_product_overrides WHERE game_id = ?'
+  ).bind(gameId).run()
+  return (result && result.meta && result.meta.changes) || 0
+}
+
+
+// ==========================================
+// purgeGameRows
+// Every override row this game has, gone.
+//
+// The panel's per-screen resets each undo one thing: the game's
+// settings row, or one product's price. Neither answers "put
+// this game back to exactly what the code says", which is the
+// question somebody asks when a half-filled row of NULLs has
+// accumulated and they want to start again.
+//
+// Two DELETEs and nothing else. It cannot remove the game -
+// that lives in config.js - so the worst case is a game that
+// renders from its coded defaults, which is the state a fresh
+// deployment is in. The next save in the panel writes a clean
+// row.
+// ==========================================
+export async function purgeGameRows(database, gameId) {
+  if (!database || !gameId) return { settings: false, products: 0 }
+
+  const products = await resetAllProductOverrides(database, gameId)
+  const settings = await resetSettings(database, gameId)
+
+  return { settings, products }
 }
 
 

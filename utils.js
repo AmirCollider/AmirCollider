@@ -21,7 +21,7 @@
 // stays structured and greppable. Do not call console.* directly elsewhere.
 // ==========================================
 
-import { SECURITY, CONFIG, CORS_HEADERS, LANGUAGES } from './config.js'
+import { SECURITY, CONFIG, CORS_HEADERS, LANGUAGES, getGameEnvNames } from './config.js'
 import { getSharedCSS, getPageHead } from './shared-styles.js'
 
 
@@ -54,15 +54,31 @@ export function generateRequestId() {
 // ==========================================
 // Environment Validation
 // Fails fast at startup when a required secret is missing.
+//
+// The list is DERIVED from the game registry rather than typed
+// out here. It used to be three literals naming neon-katana,
+// which had two costs: a second game's secrets were never
+// checked at all, and the list could not tell a credential apart
+// from a convenience.
+//
+// Only what genuinely has no fallback is required - the Google
+// web client id and client secret of a game that claims
+// `login`. A deep-link scheme is not on that list: the registry
+// carries a fallback for it and the panel can override it, so a
+// missing variable is a value resolved from somewhere else, not
+// a broken deployment. Requiring it meant deleting the variable
+// took down every page on the site, including the panels you
+// would use to find out why.
 // ==========================================
 export function validateEnvironmentVariables(env) {
-  const required = [
-    'NEON_KATANA_GOOGLE_CLIENT_ID_WEB',
-    'NEON_KATANA_GOOGLE_CLIENT_SECRET',
-    'NEON_KATANA_DEEPLINK_SCHEME'
-  ]
+  const missing = []
 
-  const missing = required.filter(key => !env[key])
+  for (const game of Object.values(getGameEnvNames())) {
+    for (const key of game.required) {
+      if (!env || !env[key]) missing.push(key)
+    }
+  }
+
   if (missing.length > 0) {
     throw new Error(`Missing required environment variables: ${missing.join(', ')}`)
   }
