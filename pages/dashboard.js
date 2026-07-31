@@ -36,6 +36,7 @@ import { getPageHead } from '../shared-styles.js'
 import { createHtmlResponse } from '../utils.js'
 import { createGamesCardsHTML } from './GamesCards.js'
 import { toolsFor } from '../content/toolsCatalog.js'
+import { resolveGames } from '../games/registry.js'
 
 const DEFAULT_LANG = 'fa'
 const LANG_COOKIE_MAX_AGE = 60 * 60 * 24 * 365
@@ -1044,8 +1045,15 @@ function createDashboardPage(GAMES, baseUrl, routesCount, lang, theme) {
 // Handler: Dashboard
 // routesCount comes from worker.js (availableEndpoints) to keep this
 // page decoupled from the route table.
+//
+// The games are merged with their database overrides before the
+// cards are drawn, so a game renamed or taken offline in the
+// /thegod panel is renamed and offline here without a deploy.
+// The merge falls back to the coded registry on any failure -
+// an unreachable database changes how a game is described, never
+// whether it appears.
 // ==========================================
-export async function handleDashboard(url, request, gameId, requestId, GAMES, _env, availableEndpoints = []) {
+export async function handleDashboard(url, request, gameId, requestId, GAMES, env, availableEndpoints = []) {
   const cookies = parseCookies(request)
   const lang = resolveRequestLang(url, request, cookies)
   const theme = resolveRequestTheme(cookies)
@@ -1057,8 +1065,10 @@ export async function handleDashboard(url, request, gameId, requestId, GAMES, _e
     headers['Set-Cookie'] = `lang=${requestedLang}; Path=/; Max-Age=${LANG_COOKIE_MAX_AGE}; SameSite=Lax`
   }
 
+  const games = await resolveGames(env, GAMES)
+
   return createHtmlResponse(
-    createDashboardPage(GAMES, url.origin, availableEndpoints.length, lang, theme),
+    createDashboardPage(games, url.origin, availableEndpoints.length, lang, theme),
     200,
     headers
   )

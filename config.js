@@ -11,10 +11,14 @@
 //   CONFIG          -> runtime constants         (worker.js, utils.js, pages/*)
 //   LANGUAGES       -> supported UI languages     (i18n / RTL-LTR source of truth)
 //   THEME           -> light / dark / auto config (theming source of truth)
-//   getGamesConfig(env) -> map keyed by game id   (worker.js, utils.js, pages/*)
+//   GAME_STATUS     -> live | maintenance | soon  (games/*, pages/*)
+//   PRODUCT_KIND    -> consumable | nonconsumable | pass
+//   getGamesConfig(env)          -> map keyed by game id  (worker.js, pages/*)
+//   getGameProduct(game, id)     -> one catalogue product, or null
 //
 // Adding a game:      add one entry to GAME_REGISTRY below.
 // Translating a game: fill i18n.description[fa|en|ja] and tags[].
+// Adding a product:   add one entry to that game's store.products[].
 // ==========================================
 
 
@@ -188,6 +192,42 @@ export const CONFIG = deepFreeze({
     ORDER_RATE_WINDOW_MS: 60 * 60 * 1000
   },
 
+  // The games' own storefront.
+  //
+  // Separate from COMMERCE above even though both ride the
+  // same payment provider, because they are two different
+  // shops with two different customers: COMMERCE sells a Unity
+  // editor extension to a developer by email, this sells a
+  // thousand shards to a signed-in player. Sharing one set of
+  // numbers would mean a limit tuned for one silently
+  // governing the other.
+  GAMESTORE: {
+    // How long a player's site session lasts. Long enough that
+    // buying something on a phone and coming back that evening
+    // does not mean signing in again; short enough that a
+    // borrowed browser is not a permanent account.
+    SESSION_MAX_AGE_MS: 7 * 24 * 60 * 60 * 1000,
+
+    // Same shape as COMMERCE's invoice window and for the same
+    // reason - somebody funding a wallet to buy a skin is not
+    // faster than somebody funding one to buy a licence.
+    INVOICE_TTL_MS: 24 * 60 * 60 * 1000,
+
+    // Purchases one IP may start per hour. Lower than the
+    // licence checkout's because a game store has more products
+    // and therefore more ways to open invoices in a loop.
+    ORDER_RATE_LIMIT: 10,
+    ORDER_RATE_WINDOW_MS: 60 * 60 * 1000,
+
+    // How long a merged games map is reused inside one isolate
+    // before the settings are read from D1 again. The overrides
+    // change when an operator presses save - a handful of times
+    // a month - so paying for a database read on every page view
+    // buys nothing. The panel reads fresh on every load, so the
+    // person making the change never sees a stale screen.
+    SETTINGS_CACHE_MS: 30 * 1000
+  },
+
   STATE_EXPIRY_MS: 30 * 60 * 1000,
   REDIRECT_TIMEOUT_MS: 1000,
   PING_TIMEOUT_MS: 5000,
@@ -232,9 +272,86 @@ export const THEME = deepFreeze({
 
 
 // ==========================================
+// Game Status
+// The three states a game can be in, and what each one means
+// for a visitor. The database can move a game between them
+// (see games/store.js); it can never invent a fourth.
+//
+//   live         playable, downloadable, buyable
+//   maintenance  on the site, download withheld
+//   soon         announced, nothing to download yet
+//
+// `maintenance` is the one that earns its keep. Pulling a
+// build is not the same as deleting a game: the store page,
+// the leaderboard, the privacy policy and every link anybody
+// has ever shared must keep working, or taking a broken APK
+// down for an afternoon costs more than leaving it up.
+// ==========================================
+export const GAME_STATUS = deepFreeze({
+  LIVE: 'live',
+  MAINTENANCE: 'maintenance',
+  SOON: 'soon',
+  ALL: ['live', 'maintenance', 'soon']
+})
+
+
+// ==========================================
+// Product Kinds
+// What buying one of a game's products actually does.
+//
+//   consumable     spent and bought again (currency, refills)
+//   nonconsumable  owned once, forever (a skin, an ad removal)
+//   pass           owned once and time-boxed (a season)
+//
+// The kind decides whether the entitlements API lets a game
+// CONSUME the thing. A consumable that cannot be spent is a
+// player who paid for a thousand shards and can never use
+// them; a non-consumable that can be is a skin that vanishes
+// after one game.
+// ==========================================
+export const PRODUCT_KIND = deepFreeze({
+  CONSUMABLE: 'consumable',
+  NONCONSUMABLE: 'nonconsumable',
+  PASS: 'pass',
+  ALL: ['consumable', 'nonconsumable', 'pass']
+})
+
+
+// ==========================================
 // Game Registry
 // Static, environment-independent definition of each game.
-// One entry per game; secrets are injected from env in getGamesConfig().
+//
+// THIS FILE IS THE ONLY PLACE A GAME CAN COME INTO EXISTENCE.
+//
+// That is a deliberate constraint rather than an accident of
+// how it grew. A game is not a row: it is a D1 binding, a set
+// of Google OAuth secrets, a deep-link scheme, an Android
+// package name and a store catalogue - none of which a form
+// on a web page can conjure. A panel that "added a game" by
+// writing a row would produce something that looks like a
+// game on the dashboard and cannot log a single player in.
+//
+// So the split is:
+//
+//   here        which games exist, and everything about them
+//               that a deploy has to know: bindings, secrets,
+//               packages, the product catalogue.
+//
+//   database    what an operator may change afterwards without
+//               a deploy: the display name, the logo, the
+//               description, whether the download link is live,
+//               which products are on sale and at what price.
+//               Overrides only - see games/registry.js.
+//
+// Reading this file therefore tells you exactly which games
+// this Worker serves, which is the property the /thegod panel
+// is built to preserve rather than to work around: its "add a
+// game" screen GENERATES the entry below, the wrangler binding
+// and the SQL, and then asks you to paste and deploy them.
+//
+// Adding a game:      add one entry here (or let /thegod write it).
+// Translating a game: fill i18n.description[fa|en|ja] and tags[].
+// Adding a product:   add one entry to store.products[] here.
 // ==========================================
 const GAME_REGISTRY = {
   'neon-katana': {
@@ -258,6 +375,155 @@ const GAME_REGISTRY = {
     myketUrl: 'https://myket.ir/app/com.AmirColliderGames.NeonKatana',
     d1Binding: 'NEON_KATANA_DB',
     deepLink: { host: 'oauth' },
+
+    // ------------------------------------------------------------
+    // What this game asks the network for.
+    //
+    // The card on the dashboard is built from this and nothing
+    // else, which is the point. A game that plays offline and
+    // only reaches the internet to sign in should not be
+    // advertising a ping test and a metrics button - those are
+    // answers to questions nobody playing it has.
+    //
+    //   onlinePlay  gameplay itself needs the network
+    //   login       Google sign-in through this proxy
+    //   cloudSave   profile / progress stored in D1
+    //   leaderboard public score table
+    //   store       in-app purchases, in-game and on the site
+    // ------------------------------------------------------------
+    capabilities: {
+      onlinePlay: false,
+      login: true,
+      cloudSave: true,
+      leaderboard: true,
+      store: true
+    },
+
+    // ------------------------------------------------------------
+    // Where somebody gets the game.
+    //
+    // `primary` names which link the download button uses; the
+    // rest are listed underneath. Whether the button works at
+    // all is a database setting (downloadEnabled), because
+    // pulling a build is an afternoon's decision and not a
+    // deploy's.
+    // ------------------------------------------------------------
+    download: {
+      primary: 'myket',
+      links: {
+        myket: 'https://myket.ir/app/com.AmirColliderGames.NeonKatana'
+      }
+    },
+
+    status: GAME_STATUS.LIVE,
+
+    // ------------------------------------------------------------
+    // The store catalogue.
+    //
+    // In code, next to the game, for the same reason the game
+    // is: a product id is a string the shipped Unity build
+    // hard-codes, so inventing one from a web form produces an
+    // id no client has ever heard of. The database may switch a
+    // product off, re-price it or re-order it - it may not
+    // create one.
+    //
+    // `sku` is what the game asks Google Play for; `id` is what
+    // this Worker and its entitlements API use. They are
+    // allowed to differ, and usually do, because Play skus are
+    // per-application and ours are not.
+    //
+    // `grant` is what the game hands the player when the
+    // purchase lands. It is passed through verbatim to the
+    // entitlements API - nothing here interprets it, so a game
+    // can invent whatever shape suits it.
+    // ------------------------------------------------------------
+    store: {
+      products: [
+        {
+          id: 'shards-small',
+          sku: 'neon_shards_1000',
+          kind: PRODUCT_KIND.CONSUMABLE,
+          priceUsd: '1.99',
+          icon: '💎',
+          grant: { type: 'currency', code: 'shards', amount: 1000 },
+          i18n: {
+            name: { fa: '۱۰۰۰ شارد نئون', en: '1,000 Neon Shards', ja: 'ネオンシャード 1,000' },
+            description: {
+              fa: 'یک مشت شارد برای باز کردن قدم بعدی.',
+              en: 'A handful of shards to unlock the next step.',
+              ja: '次の一歩を解放するためのシャード。'
+            }
+          }
+        },
+        {
+          id: 'shards-large',
+          sku: 'neon_shards_6500',
+          kind: PRODUCT_KIND.CONSUMABLE,
+          priceUsd: '8.99',
+          icon: '💠',
+          badge: 'best',
+          grant: { type: 'currency', code: 'shards', amount: 6500 },
+          i18n: {
+            name: { fa: '۶۵۰۰ شارد نئون', en: '6,500 Neon Shards', ja: 'ネオンシャード 6,500' },
+            description: {
+              fa: 'بهترین ارزش — تقریباً سه برابر بسته‌ی کوچک به ازای هر دلار.',
+              en: 'Best value — nearly three times the small pack per dollar.',
+              ja: '最もお得 — 1ドルあたり小パックの約3倍。'
+            }
+          }
+        },
+        {
+          id: 'skin-oni',
+          sku: 'neon_skin_oni',
+          kind: PRODUCT_KIND.NONCONSUMABLE,
+          priceUsd: '4.99',
+          icon: '👺',
+          grant: { type: 'cosmetic', code: 'katana_oni' },
+          i18n: {
+            name: { fa: 'کاتانای اونی', en: 'Oni Katana', ja: '鬼の刀' },
+            description: {
+              fa: 'پوسته‌ی تیغه‌ی اونی. یک‌بار خرید، برای همیشه.',
+              en: 'The Oni blade skin. Bought once, kept forever.',
+              ja: '鬼の刃スキン。一度購入すれば永久に。'
+            }
+          }
+        },
+        {
+          id: 'no-ads',
+          sku: 'neon_no_ads',
+          kind: PRODUCT_KIND.NONCONSUMABLE,
+          priceUsd: '2.99',
+          icon: '🚫',
+          grant: { type: 'flag', code: 'ads_removed' },
+          i18n: {
+            name: { fa: 'حذف تبلیغات', en: 'Remove ads', ja: '広告を削除' },
+            description: {
+              fa: 'تبلیغات بین مرحله‌ها برای همیشه خاموش می‌شود.',
+              en: 'Turns off between-run ads for good.',
+              ja: 'ラン間の広告を永久にオフにします。'
+            }
+          }
+        },
+        {
+          id: 'season-pass',
+          sku: 'neon_season_pass',
+          kind: PRODUCT_KIND.PASS,
+          priceUsd: '9.99',
+          icon: '🎫',
+          durationDays: 90,
+          grant: { type: 'pass', code: 'season', tier: 'gold' },
+          i18n: {
+            name: { fa: 'پاس فصل', en: 'Season pass', ja: 'シーズンパス' },
+            description: {
+              fa: 'سه ماه دسترسی به مسیر جایزه‌ی فصل.',
+              en: 'Three months of the season reward track.',
+              ja: 'シーズン報酬トラックに3か月アクセス。'
+            }
+          }
+        }
+      ]
+    },
+
     env: {
       android: 'NEON_KATANA_GOOGLE_CLIENT_ID_ANDROID',
       web: 'NEON_KATANA_GOOGLE_CLIENT_ID_WEB',
@@ -272,12 +538,41 @@ const GAME_REGISTRY = {
 
 
 // ==========================================
+// Defaults for an entry that leaves something out
+//
+// Every field the rest of the Worker reads has to exist on
+// every game, or one older registry entry becomes a crash on
+// a page that was written after it. Filled in here rather
+// than guarded at forty call sites.
+// ==========================================
+const CAPABILITY_DEFAULTS = deepFreeze({
+  onlinePlay: false,
+  login: true,
+  cloudSave: false,
+  leaderboard: false,
+  store: false
+})
+
+
+// ==========================================
 // Game Builder
 // Merges a registry entry with per-environment secrets into the
 // runtime shape consumed by the rest of the proxy.
+//
+// Secrets are read through `read` rather than spread from env,
+// so a game whose secrets have not been set yet is a game with
+// empty strings in those slots - not a crash, and not a game
+// that silently borrows another one's client id.
 // ==========================================
 function buildGame(id, def, env) {
   const read = key => (key && env ? env[key] : undefined)
+
+  const download = def.download || {}
+  const links = { ...(download.links || {}) }
+  // Kept in step for entries written before `download` existed:
+  // myketUrl was the only store link a game could have, and the
+  // privacy and terms pages still read it by that name.
+  if (def.myketUrl && !links.myket) links.myket = def.myketUrl
 
   return {
     id,
@@ -289,8 +584,22 @@ function buildGame(id, def, env) {
     i18n: def.i18n,
     tags: def.tags,
     package: def.package,
-    myketUrl: def.myketUrl,
+    myketUrl: def.myketUrl || links[download.primary] || '',
     d1Binding: def.d1Binding,
+
+    status: GAME_STATUS.ALL.includes(def.status) ? def.status : GAME_STATUS.LIVE,
+    capabilities: { ...CAPABILITY_DEFAULTS, ...(def.capabilities || {}) },
+    download: {
+      primary: download.primary || Object.keys(links)[0] || '',
+      links
+    },
+    store: {
+      products: ((def.store && def.store.products) || []).map(product => ({
+        kind: PRODUCT_KIND.ALL.includes(product.kind) ? product.kind : PRODUCT_KIND.NONCONSUMABLE,
+        ...product
+      }))
+    },
+
     oauth: {
       android: read(def.env.android),
       web: read(def.env.web),
@@ -307,6 +616,12 @@ function buildGame(id, def, env) {
 // ==========================================
 // getGamesConfig
 // Returns the games map keyed by id, with secrets resolved from env.
+//
+// Frozen, and deliberately so: this is the code-defined truth
+// about which games exist. Database overrides are applied by
+// games/registry.js, which copies rather than mutates - so the
+// worst a bad row can do is change how a game is described,
+// never which games there are.
 // ==========================================
 export function getGamesConfig(env) {
   const games = {}
@@ -314,4 +629,19 @@ export function getGamesConfig(env) {
     games[id] = buildGame(id, def, env || {})
   }
   return deepFreeze(games)
+}
+
+
+// ==========================================
+// getGameProduct
+// One product from a game's code catalogue, or null.
+//
+// Every purchase path goes through this. A product id that
+// arrives in a request body is never trusted to name anything
+// - if it is not in the catalogue above, there is nothing to
+// sell and no price to charge.
+// ==========================================
+export function getGameProduct(game, productId) {
+  const products = (game && game.store && game.store.products) || []
+  return products.find(product => product.id === productId) || null
 }

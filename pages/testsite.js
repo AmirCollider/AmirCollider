@@ -1229,6 +1229,15 @@ function renderDashboard(GAMES, baseUrl, lang, theme) {
       </button>
       <button class="ts-btn" id="ts-reset"><span class="ts-ic">${ICONS.reset}</span><span data-i18n="reset">${esc(dict.reset)}</span></button>
       <button class="ts-btn" id="ts-export"><span class="ts-ic">${ICONS.download}</span><span data-i18n="exportReport">${esc(dict.exportReport)}</span></button>
+
+      <!-- The games panel opens with this same password (its own
+           cookie, scoped Path=/thegod). Linked from here because
+           it is the only place a developer would think to look for
+           it, and an unlinked panel is a panel nobody uses. -->
+      <a class="ts-btn" href="${esc(baseUrl)}/thegod" target="_blank" rel="noopener">
+        <span class="ts-ic">${ICONS.game}</span><span>TheGod</span>
+      </a>
+
       <form method="POST" action="${esc(baseUrl)}/testsite/logout" class="ts-logout-form">
         <button type="submit" class="ts-btn ts-btn-danger"><span class="ts-ic">${ICONS.logout}</span><span data-i18n="logout">${esc(dict.logout)}</span></button>
       </form>

@@ -1,0 +1,511 @@
+// ==========================================
+// games/sql.js
+// The SQL a new game needs, written by the site rather than by
+// hand.
+//
+// Public exports:
+//   slug(value)                       -> a safe game id
+//   namesFor(gameId)                  -> binding / database / env names
+//   gameSchemaSql(gameId, options)    -> the game's own D1 schema
+//   settingsSeedSql(gameId, settings) -> an override row, as SQL
+//   productSeedSql(gameId, products)  -> product overrides, as SQL
+//   wranglerSnippet(gameId)           -> the d1_databases entry
+//   setupCommands(gameId)             -> the wrangler commands, in order
+//
+// ------------------------------------------------------------
+// WHY THIS EXISTS
+// ------------------------------------------------------------
+// Every game on this Worker needs the same players table, with
+// the same column names, because worker.js reads those columns
+// by name: player_id, high_score, purchased_colors and the rest
+// are not conventions, they are the contract in
+// handleDatabaseGet/Set/Patch.
+//
+// Writing that table by hand for the second game means getting
+// eleven column names right from memory, and the failure mode
+// is not an error - it is a game that signs players in and then
+// cannot save anything, discovered by a player.
+//
+// So the panel generates it. What comes out is a complete,
+// idempotent migration for one game, plus the wrangler binding
+// and the commands to apply it, in the order they have to be
+// run.
+//
+// ------------------------------------------------------------
+// WHAT IT DOES NOT DO
+// ------------------------------------------------------------
+// It does not execute anything. Not against D1, not against
+// anything. The output is text on a page with a copy button.
+//
+// That is a deliberate refusal rather than a missing feature: a
+// panel that could run generated SQL against a bound database
+// is a panel where one XSS, one stolen session cookie or one
+// bad afternoon drops the players table of a live game. The
+// cost of copying and pasting into `wrangler d1 execute` is
+// about four seconds, and it buys a step where a human reads
+// what is about to happen.
+// ==========================================
+
+import { PRODUCT_KIND } from '../config.js'
+
+
+// ==========================================
+// slug
+// A game id that is safe everywhere it has to appear.
+//
+// It becomes a URL path segment, a D1 binding name, a database
+// name and an environment variable prefix, so the intersection
+// of what all four allow is narrow: lowercase, digits and
+// single hyphens.
+// ==========================================
+export function slug(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40)
+}
+
+
+// ==========================================
+// namesFor
+// Every name derived from one game id.
+//
+// Derived rather than asked for, because the four have to agree
+// and a form with four fields is four chances for them not to.
+// The shapes match what 'neon-katana' already produces, so the
+// game that exists and the game being added are described the
+// same way.
+// ==========================================
+export function namesFor(gameId) {
+  const id = slug(gameId)
+  const upper = id.replace(/-/g, '_').toUpperCase()
+
+  return {
+    id,
+    upper,
+    binding: `${upper}_DB`,
+    database: `${id}-db`,
+    // The Pascal-case form used for a Unity namespace and for
+    // the default package name.
+    pascal: id.split('-').filter(Boolean).map(part => part[0].toUpperCase() + part.slice(1)).join(''),
+    env: {
+      android: `${upper}_GOOGLE_CLIENT_ID_ANDROID`,
+      web: `${upper}_GOOGLE_CLIENT_ID_WEB`,
+      secret: `${upper}_GOOGLE_CLIENT_SECRET`,
+      deepLinkScheme: `${upper}_DEEPLINK_SCHEME`
+    }
+  }
+}
+
+
+// ==========================================
+// gameSchemaSql
+// One game's own database, complete.
+//
+// The players table is not negotiable: worker.js reads these
+// column names directly, so a game whose table differs is a
+// game whose cloud save silently does nothing. It is generated
+// rather than documented for exactly that reason.
+//
+// The two optional tables are: a purchase mirror, so a game can
+// keep its own record of what a player bought without calling
+// out to this Worker mid-run, and a sessions table for playtime
+// accounting. Both are off by default - an unused table is a
+// migration somebody has to read past forever.
+// ==========================================
+export function gameSchemaSql(gameId, {
+  gameName = '',
+  withPurchases = true,
+  withSessions = false,
+  withSeed = false
+} = {}) {
+  const names = namesFor(gameId)
+  const title = gameName || names.pascal
+  const at = new Date().toISOString().slice(0, 10)
+
+  const head = `-- ==========================================
+-- ${names.database}
+-- The player database for ${title}.
+--
+-- Generated by the TheGod panel on ${at}.
+-- Review it before you run it. Nothing on the site executes
+-- this file - that is on purpose, and this comment is the
+-- moment it buys you.
+--
+-- Apply with:
+--   npx wrangler d1 create ${names.database}
+--   (copy the printed database_id into wrangler.jsonc)
+--   npx wrangler d1 execute ${names.database} --remote --file=./migrations/${names.id}.sql
+--
+-- Every statement is CREATE ... IF NOT EXISTS, so running it
+-- twice is a no-op rather than an error.
+--
+-- Bound in wrangler.jsonc as "${names.binding}", which is the
+-- name GAME_REGISTRY['${names.id}'].d1Binding must contain. If
+-- those two strings ever disagree, every data endpoint for this
+-- game answers "db_not_bound" and nothing else breaks - which
+-- is a confusing hour, so they are worth checking first.
+-- ==========================================
+
+
+-- ==========================================
+-- players
+-- One row per person who has signed in.
+--
+-- THE COLUMN NAMES BELOW ARE A CONTRACT. worker.js reads them
+-- by name in handleDatabaseGet, handleDatabaseSet and
+-- handleDatabasePatch, and pages/leaderboard.js reads
+-- username / high_score / profile_pic_url. Renaming one here
+-- does not produce an error anywhere - it produces a game whose
+-- saves quietly stop working.
+--
+-- The row is created at first sign-in and updated from then on.
+-- Nothing deletes it: a player who uninstalls and comes back
+-- next year still owns their score.
+-- ==========================================
+CREATE TABLE IF NOT EXISTS players (
+  -- The local part of the Google address, lowercased and cut to
+  -- fifteen characters - the same derivation the Worker makes
+  -- in playerIdFromEmail(). Short, stable, and readable in a
+  -- support thread, which a Google subject id is not.
+  player_id       TEXT PRIMARY KEY,
+
+  email           TEXT NOT NULL,
+
+  -- 3-12 characters, English letters and digits only, checked
+  -- against a profanity blocklist by validateUsername() in
+  -- worker.js before it ever reaches this column.
+  username        TEXT,
+
+  profile_pic_url TEXT,
+
+  -- The leaderboard's sort key. Only ever moves up: the write
+  -- path refuses a score that is not higher than the one
+  -- already here, so a replayed or tampered submission cannot
+  -- lower somebody's record.
+  high_score      INTEGER NOT NULL DEFAULT 0,
+
+  games_played    INTEGER NOT NULL DEFAULT 0,
+  total_play_time INTEGER NOT NULL DEFAULT 0,
+
+  -- Cosmetics the game owns the meaning of. selected_color is a
+  -- bare hex string ('FFFFFF'); the two purchased_* columns are
+  -- JSON, read with a fallback so a malformed value is an empty
+  -- inventory rather than a 500.
+  selected_color  TEXT NOT NULL DEFAULT 'FFFFFF',
+  purchased_colors TEXT NOT NULL DEFAULT '["FFFFFF"]',
+  purchased_items  TEXT NOT NULL DEFAULT '{}',
+
+  created_at      INTEGER NOT NULL,
+  last_login      INTEGER
+);
+
+-- The leaderboard query, which is the only hot read in this
+-- database: ORDER BY high_score DESC LIMIT n, run on every
+-- board view.
+CREATE INDEX IF NOT EXISTS idx_players_score ON players (high_score DESC);
+CREATE INDEX IF NOT EXISTS idx_players_email ON players (email);`
+
+  const purchases = `
+
+
+-- ==========================================
+-- player_purchases
+-- This game's own copy of what a player owns.
+--
+-- The authoritative record lives in the licence database's
+-- game_entitlements table, which is what
+-- GET /games/${names.id}/entitlements reads. This table is a
+-- mirror, and it exists for one reason: a game that has to make
+-- a network call before it can draw the shop is a game that
+-- shows a spinner on a train.
+--
+-- Written when the client syncs, read freely, and never trusted
+-- over the entitlements API when the two disagree - the API is
+-- the side that saw the money.
+-- ==========================================
+CREATE TABLE IF NOT EXISTS player_purchases (
+  player_id   TEXT NOT NULL,
+
+  -- The catalogue id from GAME_REGISTRY['${names.id}'].store,
+  -- not the Google Play sku. The two are allowed to differ and
+  -- usually do.
+  product_id  TEXT NOT NULL,
+
+  -- 'consumable' | 'nonconsumable' | 'pass'
+  kind        TEXT NOT NULL DEFAULT 'nonconsumable',
+
+  -- Unspent balance for a consumable; 1 for anything owned
+  -- outright.
+  quantity    INTEGER NOT NULL DEFAULT 0,
+
+  -- 'web' (bought on the site), 'in-app' (bought in the store),
+  -- 'grant' (given by an operator).
+  source      TEXT NOT NULL DEFAULT 'web',
+
+  expires_at  INTEGER,
+  synced_at   INTEGER NOT NULL,
+
+  PRIMARY KEY (player_id, product_id),
+  FOREIGN KEY (player_id) REFERENCES players (player_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_purchases_player ON player_purchases (player_id);`
+
+  const sessions = `
+
+
+-- ==========================================
+-- play_sessions
+-- One row per run, for playtime and retention.
+--
+-- Optional, and genuinely optional: nothing in the Worker reads
+-- it. It is here because total_play_time on the players table
+-- is a single number that can only ever answer "how long", and
+-- the questions that follow the first week are all "when" and
+-- "how often".
+--
+-- Rows are cheap and numerous. Prune them on a schedule if this
+-- game gets busy - the aggregate on players survives the prune.
+-- ==========================================
+CREATE TABLE IF NOT EXISTS play_sessions (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  player_id  TEXT NOT NULL,
+  started_at INTEGER NOT NULL,
+  ended_at   INTEGER,
+  duration   INTEGER NOT NULL DEFAULT 0,
+  score      INTEGER NOT NULL DEFAULT 0,
+  app_version TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_player ON play_sessions (player_id, started_at);`
+
+  const seed = `
+
+
+-- ==========================================
+-- A row to prove the table works.
+--
+-- Delete it once you have seen it on the leaderboard. It is
+-- here because "did the migration run?" is otherwise answered
+-- by an empty table, which looks exactly like a migration that
+-- did not.
+-- ==========================================
+INSERT OR IGNORE INTO players
+  (player_id, email, username, high_score, games_played, created_at, last_login)
+VALUES
+  ('demo', 'demo@example.com', 'DemoPlayer', 1, 1, ${Date.now()}, ${Date.now()});`
+
+  return head
+    + (withPurchases ? purchases : '')
+    + (withSessions ? sessions : '')
+    + (withSeed ? seed : '')
+    + '\n'
+}
+
+
+// ==========================================
+// sqlText
+// A string literal SQLite will accept.
+//
+// Single quotes doubled, which is the whole escape rule in
+// SQLite - there is no backslash escaping to get wrong. NULL
+// for anything empty, so an unset field generates a NULL rather
+// than an empty string that would override a registry default
+// with nothing.
+// ==========================================
+function sqlText(value) {
+  if (value === null || value === undefined || value === '') return 'NULL'
+  return "'" + String(value).replace(/'/g, "''") + "'"
+}
+
+
+// ==========================================
+// settingsSeedSql
+// The current overrides, as a statement somebody can run on
+// another deployment.
+//
+// The point is a staging site and a live one that look the
+// same. Without this, matching them means retyping every field
+// into a second panel and hoping.
+// ==========================================
+export function settingsSeedSql(gameId, settings = {}) {
+  const id = slug(gameId)
+  const at = Date.now()
+
+  return `-- Overrides for '${id}', as they stand right now.
+-- Safe to re-run: the ON CONFLICT clause updates in place.
+INSERT INTO game_settings
+  (game_id, display_name, logo_url, accent_color, desc_fa, desc_en, desc_ja,
+   tags_json, status, download_enabled, download_json, min_version, note, updated_at)
+VALUES (
+  ${sqlText(id)},
+  ${sqlText(settings.display_name)},
+  ${sqlText(settings.logo_url)},
+  ${sqlText(settings.accent_color)},
+  ${sqlText(settings.desc_fa)},
+  ${sqlText(settings.desc_en)},
+  ${sqlText(settings.desc_ja)},
+  ${sqlText(settings.tags_json)},
+  ${sqlText(settings.status)},
+  ${settings.download_enabled === null || settings.download_enabled === undefined ? 'NULL' : Number(settings.download_enabled) ? 1 : 0},
+  ${sqlText(settings.download_json)},
+  ${sqlText(settings.min_version)},
+  ${sqlText(settings.note)},
+  ${at}
+)
+ON CONFLICT (game_id) DO UPDATE SET
+  display_name = excluded.display_name,
+  logo_url = excluded.logo_url,
+  accent_color = excluded.accent_color,
+  desc_fa = excluded.desc_fa,
+  desc_en = excluded.desc_en,
+  desc_ja = excluded.desc_ja,
+  tags_json = excluded.tags_json,
+  status = excluded.status,
+  download_enabled = excluded.download_enabled,
+  download_json = excluded.download_json,
+  min_version = excluded.min_version,
+  note = excluded.note,
+  updated_at = excluded.updated_at;
+`
+}
+
+
+// ==========================================
+// productSeedSql
+// Price and availability overrides, as SQL.
+//
+// Only products that actually have an override are written. A
+// row that says "enabled, catalogue price" is a row that stops
+// a later change in code from taking effect, which is the exact
+// opposite of what an override is for.
+// ==========================================
+export function productSeedSql(gameId, products = []) {
+  const id = slug(gameId)
+  const at = Date.now()
+
+  const rows = products
+    .filter(product => Array.isArray(product.overrides) && product.overrides.length > 0)
+    .map(product => `INSERT INTO game_product_overrides
+  (game_id, product_id, enabled, price_usd, sort_order, badge, updated_at)
+VALUES (${sqlText(id)}, ${sqlText(product.id)}, ${product.enabled === false ? 0 : 1}, ${sqlText(product.priceUsd)}, ${Number(product.sortOrder) || 0}, ${sqlText(product.badge)}, ${at})
+ON CONFLICT (game_id, product_id) DO UPDATE SET
+  enabled = excluded.enabled,
+  price_usd = excluded.price_usd,
+  sort_order = excluded.sort_order,
+  badge = excluded.badge,
+  updated_at = excluded.updated_at;`)
+
+  if (!rows.length) {
+    return `-- No product overrides are set for '${id}'.\n`
+         + `-- Everything is being sold at the price in config.js, which is\n`
+         + `-- the state you want unless there is a reason not to.\n`
+  }
+
+  return `-- Product overrides for '${id}'.\n` + rows.join('\n\n') + '\n'
+}
+
+
+// ==========================================
+// wranglerSnippet
+// The binding entry, ready to paste.
+//
+// database_id is left as a placeholder because only
+// `wrangler d1 create` knows it, and printing a made-up UUID
+// here would produce a config that deploys and then cannot find
+// its database.
+// ==========================================
+export function wranglerSnippet(gameId) {
+  const names = namesFor(gameId)
+
+  return `    {
+      "binding": "${names.binding}",
+      "database_name": "${names.database}",
+      "database_id": "PASTE_THE_ID_FROM_WRANGLER_D1_CREATE"
+    }`
+}
+
+
+// ==========================================
+// setupCommands
+// Everything to run, in the order it has to be run in.
+//
+// The order is not cosmetic: the database has to exist before
+// the schema can be applied to it, the binding has to be in
+// wrangler.jsonc before a deploy can see it, and the secrets
+// have to be set before the first player tries to sign in - a
+// game deployed without them is a game whose login button
+// returns configuration_error.
+// ==========================================
+export function setupCommands(gameId) {
+  const names = namesFor(gameId)
+
+  return [
+    {
+      step: 1,
+      title: 'Create the database',
+      command: `npx wrangler d1 create ${names.database}`,
+      note: 'Prints a database_id. Copy it — the next step needs it.'
+    },
+    {
+      step: 2,
+      title: 'Add the binding',
+      command: wranglerSnippet(gameId),
+      note: `Paste into the "d1_databases" array in wrangler.jsonc, with the id from step 1.`,
+      isFile: true
+    },
+    {
+      step: 3,
+      title: 'Create the tables',
+      command: `npx wrangler d1 execute ${names.database} --remote --file=./migrations/${names.id}.sql`,
+      note: 'Save the generated SQL as that file first.'
+    },
+    {
+      step: 4,
+      title: 'Set the OAuth secrets',
+      command: [
+        `npx wrangler secret put ${names.env.web}`,
+        `npx wrangler secret put ${names.env.secret}`,
+        `npx wrangler secret put ${names.env.android}`,
+        `npx wrangler secret put ${names.env.deepLinkScheme}`
+      ].join('\n'),
+      note: 'From the Google Cloud console, OAuth 2.0 client IDs. Android may be skipped for a web-only game.'
+    },
+    {
+      step: 5,
+      title: 'Add the game to the code',
+      command: `// paste the generated entry into GAME_REGISTRY in config.js`,
+      note: 'This is the step that makes the game exist. Nothing before it puts a game on the site.',
+      isFile: true
+    },
+    {
+      step: 6,
+      title: 'Deploy',
+      command: 'npx wrangler deploy',
+      note: 'The game appears on the dashboard the moment this finishes.'
+    }
+  ]
+}
+
+
+// ==========================================
+// productKindHint
+// One line explaining what a kind means, for the panel.
+//
+// Here rather than in the page because the page is a view and
+// this is a rule about the data - and because the same sentence
+// is wanted in the SQL builder and in the catalogue editor.
+// ==========================================
+export function productKindHint(kind) {
+  switch (kind) {
+    case PRODUCT_KIND.CONSUMABLE:
+      return 'Spent and bought again. The balance goes up on purchase and down when the game consumes it.'
+    case PRODUCT_KIND.PASS:
+      return 'Owned for a while. Buying again while one is running extends it rather than restarting it.'
+    default:
+      return 'Owned once, forever. Buying it twice changes nothing, which is why a double grant is harmless.'
+  }
+}

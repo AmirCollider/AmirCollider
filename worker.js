@@ -17,6 +17,16 @@
 // Data surface (per-game, token-guarded where it mutates):
 //   GET  /database/get/...      POST|PUT /database/set/...      PATCH|POST /database/patch/...
 //
+// Game surface (see GAMES.md):
+//   GET  /games/{id}/manifest       -> what state this game is in
+//   GET  /games/{id}/products       -> the catalogue, priced
+//   GET  /games/{id}/entitlements   -> what a player owns
+//   POST /games/{id}/entitlements/consume
+//   POST /games/webhook             -> the storefront's payment callback
+//   GET  /{id}/download             -> the download link, behind the offline switch
+//   GET  /{id}/account   /{id}/store
+//   /thegod                         -> the panel that runs all of it
+//
 // Design notes:
 //   - Every page is theme-aware (light/dark/auto) and tri-lingual (fa/en/ja)
 //     with correct RTL/LTR, rendered through the shared design system.
@@ -79,6 +89,37 @@ import {
   handleTestSiteLoginPost,
   handleTestSiteLogout
 } from './pages/testsite.js'
+import {
+  handleTheGod,
+  handleTheGodLogin,
+  handleTheGodLoginPost,
+  handleTheGodLogout
+} from './pages/thegod.js'
+import { handleTheGodApi } from './pages/thegodApi.js'
+import {
+  handleGameManifest,
+  handleGameProducts,
+  handleGameEntitlements,
+  handleGameConsume,
+  handleGameDownload
+} from './pages/gameApi.js'
+import {
+  handleGameAccount,
+  handleGameAccountSignIn,
+  handleGameAccountLogout,
+  completeSiteSignIn
+} from './pages/gameAccount.js'
+import {
+  handleGameStore,
+  handleGameStoreBuy,
+  handleGameStoreOrder,
+  handleGameStoreStatus,
+  handleGameWebhook
+} from './pages/gameStore.js'
+import { encodeState, decodeState, getStateSecret, readClientStateHint } from './games/oauthState.js'
+import { db as gamesDb } from './games/store.js'
+import { reconcileGameOrders } from './games/purchase.js'
+import { resolveGames } from './games/registry.js'
 
 export default {
   async fetch(request, env, ctx) {
@@ -123,6 +164,21 @@ async function runScheduled(env) {
     logInfo('Cron finished', summary)
   } catch (error) {
     logError('Cron failed', { error: error.message })
+  }
+
+  // The game storefront's own safety net, in its own try/catch.
+  //
+  // Separate from the licence reconciler above rather than
+  // folded into it, and separately guarded, because the two
+  // shops fail independently: a NOWPayments outage that breaks
+  // one should not stop the other's paid orders from being
+  // delivered on this tick.
+  try {
+    const games = await resolveGames(env, getGamesConfig(env), { fresh: true })
+    const summary = await reconcileGameOrders(env, gamesDb(env), games)
+    logInfo('Game store cron finished', summary)
+  } catch (error) {
+    logError('Game store cron failed', { error: error.message })
   }
 }
 
@@ -258,76 +314,13 @@ function jsString(value) {
 // The Google-facing state is HMAC-SHA256 signed with a worker-wide secret and
 // carries an issue timestamp. Forged or modified state fails verification, so
 // callback delivery and the carried redirect target cannot be spoofed.
+//
+// The implementation moved to games/oauthState.js when a second caller
+// appeared: the website's own player sign-in starts the same Google flow and
+// comes back to the same callback below, so both sides have to produce and
+// verify the state identically. Two copies of "HMAC the payload, compare in
+// constant time" stay right for exactly as long as nobody edits one of them.
 // ==========================================
-const TEXT_ENCODER = new TextEncoder()
-const TEXT_DECODER = new TextDecoder()
-
-function base64UrlFromBytes(bytes) {
-  let binary = ''
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
-function bytesFromBase64Url(value) {
-  const padded = value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (value.length % 4)) % 4)
-  const binary = atob(padded)
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-  return bytes
-}
-
-function constantTimeEqual(a, b) {
-  if (a.length !== b.length) return false
-  let diff = 0
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
-  return diff === 0
-}
-
-function getStateSecret(GAMES, env) {
-  if (env && env.STATE_SIGNING_SECRET) return env.STATE_SIGNING_SECRET
-  const first = GAMES[Object.keys(GAMES)[0]]
-  return (first && first.oauth && first.oauth.secret) || ''
-}
-
-async function hmacSign(payload, secret) {
-  const key = await crypto.subtle.importKey(
-    'raw', TEXT_ENCODER.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
-  )
-  const signature = await crypto.subtle.sign('HMAC', key, TEXT_ENCODER.encode(payload))
-  return base64UrlFromBytes(new Uint8Array(signature))
-}
-
-async function encodeState(data, secret) {
-  const payload = base64UrlFromBytes(TEXT_ENCODER.encode(JSON.stringify(data)))
-  const signature = await hmacSign(payload, secret)
-  return `${payload}.${signature}`
-}
-
-async function decodeState(state, secret) {
-  if (typeof state !== 'string' || state.indexOf('.') === -1) return { valid: false, data: null }
-  const [payload, signature] = state.split('.')
-  if (!payload || !signature) return { valid: false, data: null }
-
-  const expected = await hmacSign(payload, secret)
-  if (!constantTimeEqual(expected, signature)) return { valid: false, data: null }
-
-  try {
-    return { valid: true, data: JSON.parse(TEXT_DECODER.decode(bytesFromBase64Url(payload))) }
-  } catch {
-    return { valid: false, data: null }
-  }
-}
-
-// Best-effort read of the client-supplied state (unsigned, used only as a hint
-// for platform detection). Never trusted for security decisions.
-function readClientStateHint(state) {
-  if (!state) return null
-  try {
-    return JSON.parse(atob(state))
-  } catch {
-    return null
-  }
-}
 
 
 // ==========================================
@@ -515,6 +508,44 @@ const ROUTES = [
   // have for a licence you want to revoke.
   { path: '/testsite/licenses', method: 'POST', handler: handleLicenseAdminPanel },
 
+  // ---- TheGod: running the games ----
+  //
+  // Behind the same password as /testsite, with its own cookie
+  // scoped Path=/thegod - so signing into one panel does not
+  // silently hand the other one to whatever borrowed the tab.
+  //
+  // One API endpoint with an action field rather than twenty
+  // routes, because every action needs the same authorisation
+  // check and a single door cannot be forgotten on the
+  // twenty-first.
+  { path: '/thegod', method: 'GET', handler: handleTheGod },
+  { path: '/thegod/login', method: 'GET', handler: handleTheGodLogin },
+  { path: '/thegod/login', method: 'POST', handler: handleTheGodLoginPost },
+  { path: '/thegod/logout', method: 'POST', handler: handleTheGodLogout },
+  { path: '/thegod/api', method: 'POST', handler: handleTheGodApi },
+
+  // ---- The games' own API, for shipped clients ----
+  //
+  // /manifest is the one a build calls at boot to find out that
+  // its download was withdrawn, a product left the shelf, or it
+  // is older than this Worker now expects - none of which it can
+  // learn from a page it never opens.
+  //
+  // /entitlements is the authoritative answer to "what does this
+  // player own?", and takes either a Google id_token (a game) or
+  // the site session cookie (a browser).
+  //
+  // /games/webhook is the storefront's payment callback. Its own
+  // path rather than the licence checkout's, because both shops
+  // ride one provider account and a game purchase looked up in
+  // the licence table is money arriving against nothing.
+  { path: '/games/webhook', method: 'POST', handler: handleGameWebhook },
+  { path: '/games/:gameId/manifest', method: 'GET', handler: handleGameManifest, dynamic: true },
+  { path: '/games/:gameId/products', method: 'GET', handler: handleGameProducts, dynamic: true },
+  { path: '/games/:gameId/entitlements', method: 'GET', handler: handleGameEntitlements, dynamic: true },
+  { path: '/games/:gameId/entitlements/consume', method: 'POST', handler: handleGameConsume, dynamic: true },
+
+
   // ---- Unity DocSnap: demo clips ----
   //
   // Registered for HEAD as well as GET. A <video> element
@@ -531,6 +562,27 @@ const ROUTES = [
   { path: '/:gameId/terms', method: 'GET', handler: handleTermsWithGame, dynamic: true },
   { path: '/:gameId/leaderboard', method: 'GET', handler: handleLeaderboardUnified, dynamic: true },
   { path: '/:gameId/leaderboard/:limit', method: 'GET', handler: handleLeaderboardUnified, dynamic: true },
+
+  // ---- A game's player-facing pages ----
+  //
+  // /download is the only address any download link on this site
+  // points at, so withdrawing a build withdraws it everywhere at
+  // once - including from links people have already shared. A
+  // link straight to the store would keep working, which is the
+  // whole thing the switch exists to prevent.
+  //
+  // /account/signin starts a Google sign-in whose state says
+  // purpose:'site'. It comes back to /oauth/callback, which is
+  // already a registered redirect URI - so this page works
+  // without anybody editing the Google Cloud console.
+  { path: '/:gameId/download', method: 'GET', handler: handleGameDownload, dynamic: true },
+  { path: '/:gameId/account', method: 'GET', handler: handleGameAccount, dynamic: true },
+  { path: '/:gameId/account/signin', method: 'GET', handler: handleGameAccountSignIn, dynamic: true },
+  { path: '/:gameId/account/logout', method: 'POST', handler: handleGameAccountLogout, dynamic: true },
+  { path: '/:gameId/store', method: 'GET', handler: handleGameStore, dynamic: true },
+  { path: '/:gameId/store/buy', method: 'POST', handler: handleGameStoreBuy, dynamic: true },
+  { path: '/:gameId/store/order', method: 'GET', handler: handleGameStoreOrder, dynamic: true },
+  { path: '/:gameId/store/status', method: 'GET', handler: handleGameStoreStatus, dynamic: true },
   { path: '/oauth/auth', method: 'GET', handler: handleOAuthAuth },
   { path: '/oauth/callback', method: 'GET', handler: handleOAuthCallback },
   { path: '/oauth/token', method: 'POST', handler: handleTokenExchange },
@@ -659,6 +711,16 @@ async function handleOAuthAuth(url, request, gameId, requestId, GAMES, env) {
 // OAuth: Callback
 // Verifies the signed state, then delivers the authorization code to the
 // caller by platform: android deep link, desktop loopback, or copy page.
+//
+// Since the website gained its own player sign-in, this callback serves two
+// flows. They are told apart by one field in the SIGNED state - purpose ===
+// 'site' - which matters: the branch decides whether a session cookie gets
+// minted and where the browser is sent afterwards, and a caller who could
+// choose that from the query string could have a cookie minted on a redirect
+// to their own page.
+//
+// A state without a purpose is a game asking for a code, which is what every
+// client shipped before this existed sends. That path is untouched.
 // ==========================================
 async function handleOAuthCallback(url, request, gameId, requestId, GAMES, env) {
   const code = url.searchParams.get('code')
@@ -681,6 +743,19 @@ async function handleOAuthCallback(url, request, gameId, requestId, GAMES, env) 
   if (stateData.timestamp && (Date.now() - stateData.timestamp) > CONFIG.STATE_EXPIRY_MS) {
     logWarning('State expired', { requestId, gameId: stateData.gameId })
     return createHtmlResponse(renderExpiredPage(lang, theme))
+  }
+
+  // The website's own sign-in. Handled before the error and
+  // redirect checks below because it has neither: there is no
+  // client redirect_uri to deliver a code to, and a refusal at
+  // Google should land the player back on the button rather than
+  // on an error document.
+  if (stateData.purpose === 'site') {
+    if (oauthError || !code) {
+      logWarning('Site sign-in returned without a code', { requestId, error: oauthError || 'no_code' })
+      return Response.redirect(`${url.origin}/${encodeURIComponent(stateData.gameId || '')}/account?error=1`, 302)
+    }
+    return completeSiteSignIn(url, request, stateData, code, GAMES, env)
   }
 
   if (oauthError) {

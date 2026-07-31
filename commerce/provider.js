@@ -244,7 +244,24 @@ function safeCode(body) {
 // point - the invoice is meant to offer every coin the
 // provider supports and let the customer choose.
 // ==========================================
-export async function createInvoice(env, { orderId, statusToken, tier, priceUsd, lang, description, siteUrl }) {
+// ------------------------------------------------------------
+// The three paths are parameters with the licence checkout's
+// own values as defaults, because there are now two shops on
+// this Worker riding one provider account.
+//
+// The callback path in particular has to be per-shop: both
+// callbacks are verified with the same IPN secret, and a game
+// purchase delivered to the licence checkout's webhook would be
+// looked up in the wrong table and answered as an unknown
+// order - money arriving against nothing, on the one path built
+// to make that impossible.
+// ------------------------------------------------------------
+export async function createInvoice(env, {
+  orderId, statusToken, tier, priceUsd, lang, description, siteUrl,
+  webhookPath = '/checkout/webhook',
+  successPath = '/checkout/pay',
+  cancelUrl = null
+}) {
   const result = await call(env, '/invoice', {
     method: 'POST',
     body: {
@@ -252,13 +269,13 @@ export async function createInvoice(env, { orderId, statusToken, tier, priceUsd,
       price_currency: CONFIG.COMMERCE.PRICE_CURRENCY,
       order_id: orderId,
       order_description: description,
-      ipn_callback_url: `${siteUrl}/checkout/webhook`,
+      ipn_callback_url: `${siteUrl}${webhookPath}`,
       // The signed token, not the bare order id. This URL ends up
       // in the customer's browser history and in the payment
       // provider's own records, and the token is the form of the
       // handle that is safe to have in both.
-      success_url: `${siteUrl}/checkout/pay?o=${encodeURIComponent(statusToken)}&lang=${encodeURIComponent(lang)}`,
-      cancel_url: `${siteUrl}/checkout?tier=${encodeURIComponent(tier)}&lang=${encodeURIComponent(lang)}`
+      success_url: `${siteUrl}${successPath}?o=${encodeURIComponent(statusToken)}&lang=${encodeURIComponent(lang)}`,
+      cancel_url: cancelUrl || `${siteUrl}/checkout?tier=${encodeURIComponent(tier)}&lang=${encodeURIComponent(lang)}`
     }
   })
 
