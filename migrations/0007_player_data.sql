@@ -14,7 +14,7 @@
 -- ------------------------------------------------------------
 -- Every field a game could save used to be a column, and every
 -- column had to be known in three places: the players table
--- here, mapPlayer/buildProfileUpdate in worker.js, and the
+-- here, mapPlayer/buildProfileUpdate in Games/PlayerRecord.js, and the
 -- PlayerProfile struct in the Unity kit.
 --
 -- That is fine for the fields every game has - a score, a play

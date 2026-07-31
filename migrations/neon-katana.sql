@@ -7,9 +7,9 @@
 -- repository can see the schema without opening the panel.
 --
 -- This is the shape every game's database has to have: the
--- column names below are read BY NAME in worker.js
+-- column names below are read BY NAME in Games/PlayerRecord.js
 -- (handleDatabaseGet / Set / Patch) and in
--- pages/leaderboard.js. Renaming one produces no error
+-- Pages/Leaderboard.js. Renaming one produces no error
 -- anywhere - it produces a game whose saves quietly stop
 -- working.
 --
@@ -37,9 +37,9 @@
 -- players
 -- One row per person who has signed in.
 --
--- THE COLUMN NAMES BELOW ARE A CONTRACT. worker.js reads them
+-- THE COLUMN NAMES BELOW ARE A CONTRACT. Games/PlayerRecord.js reads them
 -- by name in handleDatabaseGet, handleDatabaseSet and
--- handleDatabasePatch, and pages/leaderboard.js reads
+-- handleDatabasePatch, and Pages/Leaderboard.js reads
 -- username / high_score / profile_pic_url. Renaming one here
 -- does not produce an error anywhere - it produces a game whose
 -- saves quietly stop working.
@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS players (
 
   -- 3-12 characters, English letters and digits only, checked
   -- against a profanity blocklist by validateUsername() in
-  -- worker.js before it ever reaches this column.
+  -- Games/PlayerRecord.js before it ever reaches this column.
   username        TEXT,
 
   profile_pic_url TEXT,

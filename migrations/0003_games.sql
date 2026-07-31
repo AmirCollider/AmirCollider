@@ -28,7 +28,7 @@
 -- something that renders on the dashboard and cannot log a
 -- single player in.
 --
--- Games live in GAME_REGISTRY in config.js. This file holds
+-- Games live in GAME_REGISTRY in Config.js. This file holds
 -- OVERRIDES to them, keyed by the id that already exists in
 -- code. A settings row for a game that is not in the registry
 -- is ignored on read - it cannot bring a game into being, and
@@ -54,7 +54,7 @@
 CREATE TABLE IF NOT EXISTS game_settings (
   -- The registry id ('neon-katana'). Not generated here: a row
   -- whose id is not in GAME_REGISTRY is dead weight that the
-  -- merge in games/registry.js drops on sight.
+  -- merge in Games/Registry.js drops on sight.
   game_id          TEXT PRIMARY KEY,
 
   display_name     TEXT,
@@ -107,7 +107,7 @@ CREATE TABLE IF NOT EXISTS game_settings (
   -- Here rather than in "Variables and secrets" because it is
   -- not a secret: the same string is in the manifest of every
   -- shipped APK. NULL means "use NEON_KATANA_DEEPLINK_SCHEME if
-  -- it is still set, otherwise the fallback in config.js" - so a
+  -- it is still set, otherwise the fallback in Config.js" - so a
   -- deployment that never touches this column behaves exactly as
   -- it did before the column existed.
   --
@@ -138,7 +138,7 @@ CREATE TABLE IF NOT EXISTS game_settings (
 CREATE TABLE IF NOT EXISTS game_product_overrides (
   game_id     TEXT NOT NULL,
 
-  -- The catalogue id from config.js. A row for an id that is
+  -- The catalogue id from Config.js. A row for an id that is
   -- not in the catalogue is ignored - it cannot create a
   -- product, because no shipped client has ever heard of it.
   product_id  TEXT NOT NULL,

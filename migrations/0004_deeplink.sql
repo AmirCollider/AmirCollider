@@ -26,7 +26,7 @@
 --
 --   1. game_settings.deeplink_scheme   set in the TheGod panel
 --   2. NEON_KATANA_DEEPLINK_SCHEME     if the variable still exists
---   3. GAME_REGISTRY fallback          config.js, always present
+--   3. GAME_REGISTRY fallback          Config.js, always present
 --
 -- So this migration changes nothing on its own. It only makes
 -- step 1 possible. Deleting the variable afterwards is safe

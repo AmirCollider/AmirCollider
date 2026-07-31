@@ -45,7 +45,7 @@
 --               a name that has to go. It expires on its own.
 --
 -- Neither is a status column, deliberately. The state is derived
--- from these timestamps in games/players.js, so a restriction
+-- from these timestamps in Games/Players.js, so a restriction
 -- that has run out is simply over - there is no scheduled job
 -- that has to remember to clear a flag, and no way for a flag
 -- and its timestamp to disagree.

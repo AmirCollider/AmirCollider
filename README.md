@@ -1,177 +1,151 @@
-<!-- ==========================================
-     AmirCollider — GitHub Profile README
-     Trilingual: English / فارسی / 日本語
-     Images are served from this repo's /assets folder
-     (raw.githubusercontent.com) so they never break.
-     ========================================== -->
-
-<a id="top"></a>
-
 <div align="center">
 
-<!-- HERO BANNER — replace assets/banner.png with your 1280x320 image -->
 <img src="https://raw.githubusercontent.com/AmirCollider/AmirCollider/main/assets/banner.png" alt="AmirCollider" width="100%" />
 
-<h1>AmirCollider</h1>
+# AmirCollider
 
-<b>Indie Game Developer · Edge & Backend Engineer · Full-Stack Web</b>
+**Indie game developer · Edge & backend engineer**
 
-<sub>Unity / Android games · Serverless infrastructure on Cloudflare · Trilingual, accessible web platforms</sub>
+Unity / Android games, and the serverless platform that runs behind them.
 
-<br/><br/>
-
-<!-- LANGUAGE SWITCHER -->
-<a href="#english"><img src="https://img.shields.io/badge/English-2563EB?style=for-the-badge" alt="English" /></a>
-<a href="#persian"><img src="https://img.shields.io/badge/فارسی-16A34A?style=for-the-badge" alt="فارسی" /></a>
-<a href="#japanese"><img src="https://img.shields.io/badge/日本語-DC2626?style=for-the-badge" alt="日本語" /></a>
-
-<br/><br/>
-
-<a href="https://amircollider.n95pluss.workers.dev/"><img src="https://img.shields.io/badge/Website-amircollider-667EEA?style=for-the-badge&logo=cloudflare&logoColor=white" alt="Website" /></a>
-<a href="https://www.instagram.com/amir.collider/"><img src="https://img.shields.io/badge/Instagram-@amir.collider-E4405F?style=for-the-badge&logo=instagram&logoColor=white" alt="Instagram" /></a>
+[amircollider.com](https://amircollider.com/) · [@amir.collider](https://www.instagram.com/amir.collider/)
 
 </div>
 
 ---
 
-<a id="english"></a>
+## What this repository is
 
-## 🇬🇧 English
+The source of [amircollider.com](https://amircollider.com/) — a single
+Cloudflare Worker with no origin server. It is the whole platform behind the
+games and the Unity tools:
 
-<div align="center">
-<sub><a href="#top">↑ top</a> · <a href="#persian">فارسی ↓</a> · <a href="#japanese">日本語 ↓</a></sub>
-</div>
+- **Google OAuth proxy** for web, desktop and Android clients
+- **Player data API** — profiles, cloud saves, leaderboards, moderation
+- **A game storefront** — catalogue, crypto checkout, entitlements
+- **A licence server** for the paid Unity editor extension
+- **Server-rendered pages**, every one of them in Persian, English and
+  Japanese, with light / dark / auto theming and correct RTL–LTR layout
+- **Two operator panels** — `/testsite` for the checkout, `/thegod` for the
+  games
 
-### 👋 About me
-
-I'm **AmirCollider** — an indie developer building games and the infrastructure that runs behind them. My work spans the whole stack: from **Unity / Android** game clients, to **serverless edge backends** on Cloudflare Workers, to **trilingual, accessible web interfaces** with light/dark theming and correct RTL/LTR layout.
-
-I care about clean architecture, security by default, and polished details that most people never notice — until they're missing.
-
-### 🛠️ What I build
-
-- 🎮 **Games** — Unity-powered titles published for Android.
-- 🔐 **Authentication infrastructure** — production OAuth flows (Google sign-in for web, desktop and Android) running at the edge.
-- ⚡ **Serverless platforms** — Cloudflare Workers + D1 (SQLite) + R2 object storage, no origin server.
-- 🌐 **Multilingual web** — every page in Persian, English and Japanese, theme-aware and accessibility-conscious.
-
-### 🚀 Featured project — AmirCollider Platform
-
-A secure, edge-native backend powering my games: Google OAuth proxy, player profiles, leaderboards and a live status dashboard.
-
-- HMAC-signed, expiry-checked OAuth state — tamper-proof in transit
-- Trilingual (FA / EN / JA) server-rendered pages with light / dark / auto themes
-- Static assets served from Cloudflare R2; data on D1; structured, redacted logging
-- Built-in test panel, metrics and release notes
-
-🔗 **Explore my games & live demos on the website:** **[amircollider.n95pluss.workers.dev](https://amircollider.n95pluss.workers.dev/)**
-
-### 🧰 Tech stack
-
-<div align="center">
-
-![Unity](https://img.shields.io/badge/Unity-000000?style=for-the-badge&logo=unity&logoColor=white)
-![C#](https://img.shields.io/badge/C%23-512BD4?style=for-the-badge&logo=csharp&logoColor=white)
-![Android](https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white)
-![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
-![Cloudflare Workers](https://img.shields.io/badge/Cloudflare%20Workers-F38020?style=for-the-badge&logo=cloudflare&logoColor=white)
-![SQLite](https://img.shields.io/badge/D1%20SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
-![Google OAuth](https://img.shields.io/badge/Google%20OAuth-4285F4?style=for-the-badge&logo=google&logoColor=white)
-![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)
-![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white)
-![Git](https://img.shields.io/badge/Git-F05032?style=for-the-badge&logo=git&logoColor=white)
-
-</div>
-
-### 📫 Connect
-
-- 🌐 Website: **[amircollider.n95pluss.workers.dev](https://amircollider.n95pluss.workers.dev/)**
-- 📸 Instagram: **[@amir.collider](https://www.instagram.com/amir.collider/)**
+Everything is rendered at the edge. There is no build step, no bundler and no
+client framework: the Worker ships plain ES modules and the pages ship the
+small amount of JavaScript they actually need.
 
 ---
 
-<a id="persian"></a>
+## Layout
 
-## 🇮🇷 فارسی
+```
+Worker.js               entry point: routing, headers, the cron
+Config.js               the only place a game, a price or a constant is defined
 
-<div align="center">
-<sub><a href="#top">↑ بالا</a> · <a href="#english">English ↑</a> · <a href="#japanese">日本語 ↓</a></sub>
-</div>
+Core/                   what every module shares
+  DesignSystem.js         the stylesheet and <head> for every page
+  Html.js                 escaping for markup, script and style contexts
+  Http.js                 response builders, client IP, constant-time compare
+  Logging.js              structured JSON logs and request ids
+  ErrorPage.js            the localized failure page
+  RequestContext.js       language and theme resolution
+  PageChrome.js           the theme-boot and chrome scripts
+  GoogleOAuth.js          every call this Worker makes to Google
 
-<div dir="rtl" align="right">
+Api/                    machine-facing endpoints
+  OAuthApi.js             sign-in, callback, token exchange, refresh
+  AuthApi.js              token validation, player existence
+  PlayerDataApi.js        /database/get | set | patch
+  GameApi.js              manifest, products, entitlements, download
+  TheGodApi.js            the operator panel's single endpoint
+  AssetApi.js             R2 objects
 
-### 👋 درباره‌ی من
+Pages/                  everything a browser renders
+Games/                  the game platform: registry, store, sessions, purchases
+Commerce/               the licence checkout: orders, provider, fulfilment, mail
+Licensing/              licence keys, offline tokens, activation records
+Content/                authored data: catalogues, templates, the Unity kit
 
-من **AmirCollider** هستم؛ یک توسعه‌دهنده‌ی مستقل که هم بازی می‌سازد و هم زیرساختی که پشت آن بازی‌ها اجرا می‌شود. کارم کل مسیر را در بر می‌گیرد: از کلاینت بازی روی **Unity / اندروید**، تا **بک‌اند سرورلس روی لبه‌ی شبکه** با Cloudflare Workers، تا **رابط‌های وب چندزبانه و دسترس‌پذیر** با تم روشن/تاریک و چیدمان درست راست‌چین/چپ‌چین.
+Docs/                   Games.md · Checkout.md · Licensing.md
+migrations/             D1 schema, applied with wrangler
+assets/                 images served from this repository
+Scripts/                one-off operator scripts
+```
 
-معماری تمیز، امنیت پیش‌فرض و جزئیاتی که تا وقتی نباشند کسی متوجه‌شان نمی‌شود، برایم مهم است.
-
-### 🛠️ چه چیزهایی می‌سازم
-
-- 🎮 **بازی‌ها** — عناوین ساخته‌شده با Unity و منتشرشده برای اندروید.
-- 🔐 **زیرساخت احراز هویت** — جریان‌های OAuth واقعی (ورود با گوگل برای وب، دسکتاپ و اندروید) اجراشده روی لبه‌ی شبکه.
-- ⚡ **پلتفرم‌های سرورلس** — Cloudflare Workers به‌همراه D1 (SQLite) و فضای ذخیره‌سازی R2، بدون سرور مبدأ.
-- 🌐 **وب چندزبانه** — هر صفحه به فارسی، انگلیسی و ژاپنی، تم‌آگاه و با توجه به دسترس‌پذیری.
-
-### 🚀 پروژه‌ی شاخص — پلتفرم AmirCollider
-
-یک بک‌اند امن و لبه‌محور که بازی‌هایم را اجرا می‌کند: پروکسی OAuth گوگل، پروفایل بازیکنان، جدول امتیازات و داشبورد وضعیت زنده.
-
-- وضعیت OAuth با امضای HMAC و بررسی انقضا — غیرقابل دستکاری در مسیر انتقال
-- صفحات سه‌زبانه (فارسی/انگلیسی/ژاپنی) با رندر سمت سرور و تم روشن/تاریک/خودکار
-- میزبانی فایل‌های استاتیک روی Cloudflare R2؛ داده‌ها روی D1؛ لاگ‌گیری ساختاریافته و پاک‌سازی‌شده
-- پنل تست، متریک‌ها و یادداشت‌های انتشار به‌صورت داخلی
-
-🔗 **بازی‌ها و دموهای زنده را در وب‌سایت ببینید:** **[amircollider.n95pluss.workers.dev](https://amircollider.n95pluss.workers.dev/)**
-
-### 📫 ارتباط
-
-- 🌐 وب‌سایت: **[amircollider.n95pluss.workers.dev](https://amircollider.n95pluss.workers.dev/)**
-- 📸 اینستاگرام: **[@amir.collider](https://www.instagram.com/amir.collider/)**
-
-</div>
+Two directories keep their lowercase names on purpose. `migrations/` follows
+Cloudflare's numbered-migration convention and D1 tracks those filenames, so
+renaming them would re-run applied migrations. `assets/` is linked from
+outside this repository by raw URL.
 
 ---
 
-<a id="japanese"></a>
+## Routes
 
-## 🇯🇵 日本語
+| Path | What it is |
+| --- | --- |
+| `/` | the dashboard: games, tools, live status |
+| `/{game}` `/{game}/versions` | a game's landing page and release history |
+| `/{game}/account` `/{game}/store` | the player's account and the storefront |
+| `/{game}/leaderboard` `/{game}/health` `/{game}/ping` | public game surfaces |
+| `/{game}/privacy` `/{game}/terms` | policies, per game |
+| `/oauth/auth` `/oauth/callback` `/oauth/token` `/auth/*` | the sign-in contract |
+| `/database/get|set|patch/...` | the player data API |
+| `/games/{id}/manifest|products|entitlements` | what a shipped build calls |
+| `/tools` `/unity-docsnap` `/unity-directtmp` | the Unity extensions |
+| `/checkout` `/license` `/order` | buying and activating a licence |
+| `/metrics` `/release-notes` | status and changelog |
+| `/testsite` `/thegod` | the operator panels |
 
-<div align="center">
-<sub><a href="#top">↑ トップ</a> · <a href="#english">English ↑</a> · <a href="#persian">فارسی ↑</a></sub>
-</div>
+The full table is `ROUTES` in [`Worker.js`](Worker.js).
 
-### 👋 自己紹介
+---
 
-**AmirCollider** です。ゲームと、その裏側で動くインフラの両方を作るインディー開発者です。**Unity / Android** のゲームクライアントから、Cloudflare Workers 上の**サーバーレス・エッジバックエンド**、ライト/ダークテーマと正しい RTL/LTR レイアウトを備えた**多言語・アクセシブルな Web インターフェース**まで、スタック全体を手がけています。
+## Running it
 
-クリーンなアーキテクチャ、デフォルトでのセキュリティ、そして無くなって初めて気づくような細部を大切にしています。
+```bash
+npm install -g wrangler
+wrangler dev            # http://localhost:8787
+wrangler deploy
+```
 
-### 🛠️ 作っているもの
+Bindings live in [`wrangler.jsonc`](wrangler.jsonc): two D1 databases and one
+R2 bucket. Schema:
 
-- 🎮 **ゲーム** — Unity で開発し、Android 向けに公開したタイトル。
-- 🔐 **認証インフラ** — エッジで動作する実運用の OAuth フロー（Web・デスクトップ・Android 向け Google サインイン）。
-- ⚡ **サーバーレス基盤** — Cloudflare Workers + D1 (SQLite) + R2 ストレージ、オリジンサーバー不要。
-- 🌐 **多言語 Web** — すべてのページをペルシャ語・英語・日本語で、テーマ対応かつアクセシビリティに配慮。
+```bash
+wrangler d1 execute amircollider-licenses --remote --file=migrations/0001_licenses.sql
+wrangler d1 execute neon-katana-db        --remote --file=migrations/neon-katana.sql
+```
 
-### 🚀 注目プロジェクト — AmirCollider Platform
+Secrets are set with `wrangler secret put`. The Worker refuses to start
+without the Google web client id and client secret of any game that claims
+the `login` capability — see `validateEnvironment` in
+[`Config.js`](Config.js). Everything else degrades rather than crashes: a
+missing payment key disables the checkout, a missing mail key disables
+delivery, and the pages keep working.
 
-私のゲームを支える、安全でエッジネイティブなバックエンド。Google OAuth プロキシ、プレイヤープロフィール、リーダーボード、ライブステータスダッシュボードを提供します。
+---
 
-- HMAC 署名・有効期限チェック付きの OAuth state — 転送中の改ざんを防止
-- 三言語（FA / EN / JA）のサーバーレンダリングページ、ライト/ダーク/自動テーマ
-- 静的アセットは Cloudflare R2 から配信、データは D1、ログは構造化・秘匿化
-- テストパネル・メトリクス・リリースノートを内蔵
+## Adding a game
 
-🔗 **ゲームとライブデモは Web サイトでご覧ください：** **[amircollider.n95pluss.workers.dev](https://amircollider.n95pluss.workers.dev/)**
+One entry in `GAME_REGISTRY` in [`Config.js`](Config.js), a D1 binding in
+`wrangler.jsonc`, and the schema. The `/thegod` panel generates all three for
+you and asks you to paste and deploy them. Everything an operator changes
+afterwards — name, logo, description, download switch, prices — is a database
+override applied on top, so no deploy is needed for it.
 
-### 📫 連絡先
+Full walkthrough: [`Docs/Games.md`](Docs/Games.md).
 
-- 🌐 ウェブサイト：**[amircollider.n95pluss.workers.dev](https://amircollider.n95pluss.workers.dev/)**
-- 📸 Instagram：**[@amir.collider](https://www.instagram.com/amir.collider/)**
+---
+
+## Documentation
+
+| Document | Covers |
+| --- | --- |
+| [`Docs/Games.md`](Docs/Games.md) | the game platform, storefront and panel |
+| [`Docs/Checkout.md`](Docs/Checkout.md) | the crypto checkout, end to end |
+| [`Docs/Licensing.md`](Docs/Licensing.md) | key format, activation, seats |
 
 ---
 
 <div align="center">
-<sub>© AmirCollider · Built with Unity, Cloudflare Workers & a lot of attention to detail.</sub>
+<sub>© AmirCollider · Unity, Cloudflare Workers, and a lot of attention to detail.</sub>
 </div>
