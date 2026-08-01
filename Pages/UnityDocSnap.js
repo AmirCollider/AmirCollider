@@ -30,6 +30,13 @@
 //     common question about a paid dev tool is whether it is
 //     a subscription.
 //
+//   • The page wears the tool's own Cozy skin rather than the
+//     site's default violet. Somebody who has seen an export
+//     recognises the cream, the blush pink and the boba cup
+//     before they read a word, and somebody who has not gets
+//     shown what the thing they are buying looks like instead
+//     of being told about it.
+//
 // Trilingual and theme-aware like every other page here:
 // language resolves ?lang= -> cookie -> Accept-Language, and
 // switching reloads so RTL/LTR is always correct.
@@ -44,11 +51,45 @@ import {
 import { otherTools } from '../Content/ToolsCatalog.js'
 
 import { escapeHtml } from '../Core/Html.js'
-import { langCookieHeader, parseCookies, resolveRequestLang } from '../Core/RequestContext.js'
+import { chromeScript, themeBootScript } from '../Core/PageChrome.js'
+import { langCookieHeader, parseCookies, resolveRequestLang, resolveRequestTheme } from '../Core/RequestContext.js'
 
 const PLUS = CONFIG.DOCSNAP.TIERS.plus
 const PRO = CONFIG.DOCSNAP.TIERS.pro
 const REPO_URL = CONFIG.DOCSNAP.REPO_URL
+const VERSION = CONFIG.DOCSNAP.VERSION
+
+
+// ==========================================
+// The Cozy palette
+//
+// Lifted from the skin the tool actually ships
+// (Editor/UnityDocSnap/Site~/style.css, :root[data-skin=cozy])
+// so the page somebody buys from and the site the exporter
+// writes are recognisably the same product, rather than two
+// unrelated shades of purple.
+//
+// The warmth lives in the surfaces, the borders and the
+// accents — never in the ink. That is the one rule the skin
+// itself had to learn: pastel body text is a page you squint
+// at, so the text stays dark plum and only the paper is sweet.
+// ==========================================
+const LAV = '#7a52b8'          // the violet accent
+const LAV_SOFT = '#9c78d8'
+const LAV_LIGHT = '#c9b8f0'    // the same accent, for dark rooms
+const CORAL = '#ff7593'        // the pink the mascot is drawn in
+const CORAL_SOFT = '#ff9fb4'
+const CORAL_LIGHT = '#ff9db0'
+const HONEY = '#ffd166'        // the straw topper
+const MINT = '#2b7a3c'
+const MINT_LIGHT = '#8fd98c'
+
+const CREAM = '#fffaf3'
+const PEACH = '#fff3e6'
+const BLUSH = '#ffe6f1'
+const INK = '#2b1d35'          // the darkest thing on a cozy page
+const NIGHT = '#1c1922'
+const COCOA = '#4a2f38'        // the pearls
 
 
 // ==========================================
@@ -136,6 +177,9 @@ const I18N = {
        'یونیتی ۲۰۲۱.۳ به بالا، شامل Unity 6. بدون هیچ وابستگی جانبی، و کاملاً Editor-only — نه چیزی به بیلدت اضافه می‌کند نه هزینه‌ی رانتایم دارد.']
     ],
 
+    themeToLight: 'حالت روشن',
+    themeToDark: 'حالت تاریک',
+    mascotAlt: 'ماسکوت بوبای Unity DocSnap',
     footerBack: 'بازگشت به AmirCollider'
   },
 
@@ -217,6 +261,9 @@ const I18N = {
        'Unity 2021.3 LTS and newer, including Unity 6. No third-party dependencies, and entirely Editor-only — it adds nothing to your build and costs nothing at runtime.']
     ],
 
+    themeToLight: 'Light mode',
+    themeToDark: 'Dark mode',
+    mascotAlt: 'The Unity DocSnap boba mascot',
     footerBack: 'Back to AmirCollider'
   },
 
@@ -298,6 +345,9 @@ const I18N = {
        'Unity 2021.3 LTS 以降(Unity 6 を含む)。サードパーティ依存はなく、完全に Editor 専用なので、ビルドサイズもランタイムコストも増えません。']
     ],
 
+    themeToLight: 'ライトモード',
+    themeToDark: 'ダークモード',
+    mascotAlt: 'Unity DocSnap のボバマスコット',
     footerBack: 'AmirCollider に戻る'
   }
 }
@@ -468,8 +518,66 @@ const WHAT = [
 ]
 
 
-function resolveTheme(cookies) {
-  return cookies.theme === 'light' || cookies.theme === 'dark' ? cookies.theme : null
+// ==========================================
+// The mascot
+//
+// The same cup the exported site draws in its sidebar, down
+// to the pearls and the sparkle - traced from
+// Editor/UnityDocSnap/Site~/logo.svg rather than approximated,
+// because a mascot that is nearly right is worse than no
+// mascot at all.
+//
+// Inline rather than an <img> so it inherits the page's
+// colours, and so the three moving parts (the cup, the pearls
+// drifting inside it, the sparkle) are addressable by CSS
+// instead of being baked into a file.
+// ==========================================
+function boba(size, alt) {
+  return `
+  <span class="mascot">
+    <svg class="ds-logo" width="${size}" height="${size}" viewBox="0 0 100 100"
+         role="img" aria-label="${escapeHtml(alt)}">
+      <polygon points="62,10 84,32 68,30 66,15" fill="${HONEY}" stroke="#33223f" stroke-width="2.5" stroke-linejoin="round"/>
+      <line x1="59" y1="34" x2="72" y2="12" stroke="#33223f" stroke-width="4.5" stroke-linecap="round"/>
+      <line x1="59" y1="34" x2="72" y2="12" stroke="#ff6f90" stroke-width="3" stroke-linecap="round"/>
+      <rect x="53" y="30" width="7" height="7" rx="2" transform="rotate(45 56.5 33.5)" fill="#fff"/>
+      <polygon points="30,38 70,38 62,86 38,86" fill="#ffcfe2" stroke="#33223f" stroke-width="3.2" stroke-linejoin="round"/>
+      <g class="ds-boba">
+        <circle cx="42" cy="74" r="4" fill="${COCOA}" stroke="#33223f" stroke-width="1.4"/>
+        <circle cx="52" cy="78" r="4.4" fill="${COCOA}" stroke="#33223f" stroke-width="1.4"/>
+        <circle cx="61" cy="73" r="3.8" fill="${COCOA}" stroke="#33223f" stroke-width="1.4"/>
+      </g>
+      <rect x="26" y="26" width="48" height="14" rx="7" fill="#ff9fb8" stroke="#33223f" stroke-width="3.2"/>
+      <ellipse cx="50" cy="32" rx="4" ry="3" fill="#33223f"/>
+      <circle cx="39" cy="52" r="3.6" fill="#33223f"/>
+      <circle cx="61" cy="52" r="3.6" fill="#33223f"/>
+      <circle cx="37.5" cy="50.5" r="1.2" fill="#fff"/>
+      <circle cx="59.5" cy="50.5" r="1.2" fill="#fff"/>
+      <ellipse cx="33" cy="58" rx="4.5" ry="3.2" fill="#ff6f90" opacity=".7"/>
+      <ellipse cx="67" cy="58" rx="4.5" ry="3.2" fill="#ff6f90" opacity=".7"/>
+      <path d="M45 58 Q50 63 55 58" stroke="#33223f" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+      <polygon class="ds-sparkle" points="16,64 19,71 26,72 19,76 18,83 13,78 6,79 10,72 8,65 15,68"
+               fill="#a07be0" stroke="#33223f" stroke-width="1.6" stroke-linejoin="round"/>
+      <polygon class="ds-sparkle ds-sparkle-2" points="86,52 88,57 93,58 88,61 87,66 84,62 79,63 82,58 81,53 85,55"
+               fill="${CORAL}" stroke="#33223f" stroke-width="1.4" stroke-linejoin="round"/>
+    </svg>
+  </span>`
+}
+
+
+// ==========================================
+// SVG icon set
+// ==========================================
+const ICONS = {
+  contrast: '<circle cx="12" cy="12" r="9"/><path d="M12 3v18a9 9 0 0 0 0-18z" fill="currentColor" stroke="none"/>',
+  download: '<path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M4 20h16"/>',
+  tag: '<path d="M3 11V5a2 2 0 0 1 2-2h6l10 10-8 8z"/><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor" stroke="none"/>'
+}
+
+function icon(name) {
+  return '<svg class="d-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
+    + ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+    + (ICONS[name] || '') + '</svg>'
 }
 
 
@@ -477,8 +585,9 @@ function resolveTheme(cookies) {
 // Partials
 // ==========================================
 function renderTopbar(lang) {
+  const p = I18N[lang]
   const buttons = Object.keys(I18N).map(code =>
-    '<button type="button" onclick="dsLang(\'' + code + '\')" lang="' + code + '"'
+    '<button type="button" onclick="acSetLang(\'' + code + '\')" lang="' + code + '"'
     + ' aria-pressed="' + (code === lang ? 'true' : 'false') + '">'
     + escapeHtml(I18N[code].langName) + '</button>'
   ).join('')
@@ -487,11 +596,17 @@ function renderTopbar(lang) {
     <div class="topbar">
       <a class="brand" href="/">
         <img src="${escapeHtml(CONFIG.AMIR_LOGO)}" alt="" onerror="this.style.display='none'">
-        <span>AmirCollider</span>
+        <span class="brand-text">
+          <span class="brand-name">AmirCollider</span>
+          <span class="brand-sub">Unity DocSnap v${escapeHtml(VERSION)}</span>
+        </span>
       </a>
       <div class="controls">
         <div class="seg" role="group">${buttons}</div>
-        <button type="button" class="icon-btn" onclick="dsTheme()" aria-label="Theme">◐</button>
+        <button type="button" id="themeBtn" class="icon-btn" onclick="acToggleTheme()"
+                data-to-light="${escapeHtml(p.themeToLight)}"
+                data-to-dark="${escapeHtml(p.themeToDark)}"
+                aria-label="${escapeHtml(p.themeToDark)}">${icon('contrast')}</button>
       </div>
     </div>`
 }
@@ -505,29 +620,31 @@ function renderTopbar(lang) {
 function renderHero(p) {
   return `
     <header class="hero">
-      <div class="logo">🧋</div>
+      ${boba(132, p.mascotAlt)}
       <h1>${escapeHtml(p.title)}</h1>
       <p class="tagline">${escapeHtml(p.tagline)}</p>
       <p class="lede">${escapeHtml(p.lede)}</p>
       <div class="cta">
-        <a class="btn" href="${escapeHtml(REPO_URL)}" rel="noopener">${escapeHtml(p.ctaFree)}</a>
-        <a class="btn ghost" href="#pricing">${escapeHtml(p.ctaPrices)}</a>
+        <a class="btn" href="${escapeHtml(REPO_URL)}" rel="noopener">${icon('download')}<span>${escapeHtml(p.ctaFree)}</span></a>
+        <a class="btn ghost" href="#pricing">${icon('tag')}<span>${escapeHtml(p.ctaPrices)}</span></a>
       </div>
       <p class="fine">${escapeHtml(p.priceNote)}</p>
     </header>`
 }
 
 function renderWhat(p, lang) {
-  const cards = WHAT.map(item => `
-    <div class="card">
+  const cards = WHAT.map((item, index) => `
+    <div class="card lift" style="--i:${index}">
       <div class="card-ic">${item.icon}</div>
       <h3>${escapeHtml(item.title[lang])}</h3>
       <p>${escapeHtml(item.body[lang])}</p>
     </div>`).join('')
 
   return `
-    <h2 class="section">${escapeHtml(p.sectionWhat)}</h2>
-    <div class="grid">${cards}</div>`
+    <section class="sec reveal">
+      <h2 class="section">${escapeHtml(p.sectionWhat)}</h2>
+      <div class="grid stagger">${cards}</div>
+    </section>`
 }
 
 
@@ -564,37 +681,39 @@ function renderVideos(p, lang) {
   const first = clips[0]
 
   return `
-    <h2 class="section" id="videos">${escapeHtml(p.sectionVideos)}</h2>
+    <section class="sec reveal">
+      <h2 class="section" id="videos">${escapeHtml(p.sectionVideos)}</h2>
 
-    <div class="vhead">
-      <p class="vlede" id="vLede">${escapeHtml(p.videoLede(clips.length, formatDuration(totalSecondsFor(startLang))))}</p>
-      <div class="vlang">
-        <span class="vlang-label">${escapeHtml(p.videoLangLabel)}</span>
-        <div class="seg" role="group" aria-label="${escapeHtml(p.videoLangLabel)}">${langButtons}</div>
-      </div>
-    </div>
-
-    <div class="vplayer">
-      <div class="vstage">
-        <video id="vEl" controls preload="none" playsinline
-               src="/video/${startLang}/${first.id}"
-               aria-describedby="vTitle">
-          <p>${escapeHtml(p.videoNoSupport)}
-             <a id="vDl" href="/video/${startLang}/${first.id}">${escapeHtml(p.videoDownload)}</a></p>
-        </video>
-        <div class="vnow">
-          <b id="vTitle">${escapeHtml(first.title[lang])}</b>
-          <small id="vBlurb">${escapeHtml(first.blurb[lang])}</small>
-          <span class="vcount" id="vCount">${escapeHtml(p.videoOf(1, clips.length))}</span>
+      <div class="vhead">
+        <p class="vlede" id="vLede">${escapeHtml(p.videoLede(clips.length, formatDuration(totalSecondsFor(startLang))))}</p>
+        <div class="vlang">
+          <span class="vlang-label">${escapeHtml(p.videoLangLabel)}</span>
+          <div class="seg" role="group" aria-label="${escapeHtml(p.videoLangLabel)}">${langButtons}</div>
         </div>
       </div>
-      <ol class="vlist" id="vList">${items}</ol>
-    </div>
 
-    <div class="card vnote">
-      <h3>${escapeHtml(p.videoNoteTitle)}</h3>
-      <p>${escapeHtml(p.videoNoteBody)}</p>
-    </div>`
+      <div class="vplayer">
+        <div class="vstage">
+          <video id="vEl" controls preload="none" playsinline
+                 src="/video/${startLang}/${first.id}"
+                 aria-describedby="vTitle">
+            <p>${escapeHtml(p.videoNoSupport)}
+               <a id="vDl" href="/video/${startLang}/${first.id}">${escapeHtml(p.videoDownload)}</a></p>
+          </video>
+          <div class="vnow">
+            <b id="vTitle">${escapeHtml(first.title[lang])}</b>
+            <small id="vBlurb">${escapeHtml(first.blurb[lang])}</small>
+            <span class="vcount" id="vCount">${escapeHtml(p.videoOf(1, clips.length))}</span>
+          </div>
+        </div>
+        <ol class="vlist" id="vList">${items}</ol>
+      </div>
+
+      <div class="card vnote">
+        <h3>${escapeHtml(p.videoNoteTitle)}</h3>
+        <p>${escapeHtml(p.videoNoteBody)}</p>
+      </div>
+    </section>`
 }
 
 
@@ -646,24 +765,26 @@ function renderCompare(p, lang) {
     </tr>`).join('')
 
   return `
-    <h2 class="section">${escapeHtml(p.sectionCompare)}</h2>
-    <div class="table-scroll">
-      <table class="compare">
-        <thead>
-          <tr>
-            <th scope="col">${escapeHtml(p.colFeature)}</th>
-            <th scope="col">${escapeHtml(p.colFree)}<span class="th-price">$0</span></th>
-            <th scope="col" class="col-plus">${escapeHtml(p.tierPlusName)}<span class="th-price">$${escapeHtml(PLUS.price)}</span></th>
-            <th scope="col">${escapeHtml(p.tierProName)}<span class="th-price">$${escapeHtml(PRO.price)}</span></th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>
-    <div class="card free-note">
-      <h3>${escapeHtml(p.freeHeading)}</h3>
-      <p>${escapeHtml(p.freeBody)}</p>
-    </div>`
+    <section class="sec reveal">
+      <h2 class="section">${escapeHtml(p.sectionCompare)}</h2>
+      <div class="table-scroll">
+        <table class="compare">
+          <thead>
+            <tr>
+              <th scope="col">${escapeHtml(p.colFeature)}</th>
+              <th scope="col">${escapeHtml(p.colFree)}<span class="th-price">$0</span></th>
+              <th scope="col" class="col-plus">${escapeHtml(p.tierPlusName)}<span class="th-price">$${escapeHtml(PLUS.price)}</span></th>
+              <th scope="col">${escapeHtml(p.tierProName)}<span class="th-price">$${escapeHtml(PRO.price)}</span></th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <div class="card free-note">
+        <h3>${escapeHtml(p.freeHeading)}</h3>
+        <p>${escapeHtml(p.freeBody)}</p>
+      </div>
+    </section>`
 }
 
 
@@ -674,20 +795,22 @@ function renderCompare(p, lang) {
 // ==========================================
 function renderSpotlight(p) {
   return `
-    <h2 class="section">${escapeHtml(p.sectionSpotlight)}</h2>
-    <div class="spotlight">
-      <div>
-        <h3>${escapeHtml(p.spotlightTitle)}</h3>
-        <p>${escapeHtml(p.spotlightBody)}</p>
-        <p class="spot-tier">${escapeHtml(p.spotlightTier)}</p>
-      </div>
-      <pre class="tree" dir="ltr"><code>summary/
+    <section class="sec reveal">
+      <h2 class="section">${escapeHtml(p.sectionSpotlight)}</h2>
+      <div class="spotlight">
+        <div>
+          <h3>${escapeHtml(p.spotlightTitle)}</h3>
+          <p>${escapeHtml(p.spotlightBody)}</p>
+          <p class="spot-tier">${escapeHtml(p.spotlightTier)}</p>
+        </div>
+        <pre class="tree" dir="ltr"><code>summary/
 ├── ai-bundle.md          <span class="c">← everything below, in one paste</span>
 ├── scene-MainMenu.md
 ├── scene-MainMenu.json
 ├── folder-Art_Textures.md
 └── folder-Art_Textures.json</code></pre>
-    </div>`
+      </div>
+    </section>`
 }
 
 
@@ -704,41 +827,43 @@ function renderPricing(p, lang) {
   const proAdds = listFor(r => r.plus !== true && r.pro === true)
 
   return `
-    <h2 class="section" id="pricing">${escapeHtml(p.sectionPricing)}</h2>
-    <div class="tiers">
+    <section class="sec reveal">
+      <h2 class="section" id="pricing">${escapeHtml(p.sectionPricing)}</h2>
+      <div class="tiers stagger">
 
-      <div class="tier">
-        <h3>${escapeHtml(p.tierFreeName)}</h3>
-        <div class="price"><span class="cur">$</span>0</div>
-        <p class="tier-pitch">${escapeHtml(p.tierFreePitch)}</p>
-        <a class="btn ghost wide" href="${escapeHtml(REPO_URL)}" rel="noopener">${escapeHtml(p.tierFreeCta)}</a>
-        <p class="tier-for">${escapeHtml(p.freeBody)}</p>
+        <div class="tier lift" style="--i:0">
+          <h3>${escapeHtml(p.tierFreeName)}</h3>
+          <div class="price"><span class="cur">$</span>0</div>
+          <p class="tier-pitch">${escapeHtml(p.tierFreePitch)}</p>
+          <a class="btn ghost wide" href="${escapeHtml(REPO_URL)}" rel="noopener">${escapeHtml(p.tierFreeCta)}</a>
+          <p class="tier-for">${escapeHtml(p.freeBody)}</p>
+        </div>
+
+        <div class="tier is-featured lift" style="--i:1">
+          <span class="ribbon">${escapeHtml(p.popular)}</span>
+          <h3>${escapeHtml(p.tierPlusName)}</h3>
+          <div class="price"><span class="cur">$</span>${escapeHtml(PLUS.price)}</div>
+          <p class="tier-pitch">${escapeHtml(p.tierPlusPitch)}</p>
+          <p class="plus-label">${escapeHtml(p.everythingInFree)}</p>
+          <ul class="incl">${plusAdds}</ul>
+          <a class="btn wide" href="${escapeHtml(PLUS.buyUrl)}" rel="noopener">${escapeHtml(p.buyCta)} — $${escapeHtml(PLUS.price)}</a>
+          <p class="tier-for">${escapeHtml(p.tierPlusFor)}</p>
+        </div>
+
+        <div class="tier lift" style="--i:2">
+          <h3>${escapeHtml(p.tierProName)}</h3>
+          <div class="price"><span class="cur">$</span>${escapeHtml(PRO.price)}</div>
+          <p class="tier-pitch">${escapeHtml(p.tierProPitch)}</p>
+          <p class="plus-label">${escapeHtml(p.everythingInPlus)}</p>
+          <ul class="incl">${proAdds}</ul>
+          <a class="btn wide" href="${escapeHtml(PRO.buyUrl)}" rel="noopener">${escapeHtml(p.buyCta)} — $${escapeHtml(PRO.price)}</a>
+          <p class="tier-for">${escapeHtml(p.tierProFor)}</p>
+        </div>
+
       </div>
-
-      <div class="tier is-featured">
-        <span class="ribbon">${escapeHtml(p.popular)}</span>
-        <h3>${escapeHtml(p.tierPlusName)}</h3>
-        <div class="price"><span class="cur">$</span>${escapeHtml(PLUS.price)}</div>
-        <p class="tier-pitch">${escapeHtml(p.tierPlusPitch)}</p>
-        <p class="plus-label">${escapeHtml(p.everythingInFree)}</p>
-        <ul class="incl">${plusAdds}</ul>
-        <a class="btn wide" href="${escapeHtml(PLUS.buyUrl)}" rel="noopener">${escapeHtml(p.buyCta)} — $${escapeHtml(PLUS.price)}</a>
-        <p class="tier-for">${escapeHtml(p.tierPlusFor)}</p>
-      </div>
-
-      <div class="tier">
-        <h3>${escapeHtml(p.tierProName)}</h3>
-        <div class="price"><span class="cur">$</span>${escapeHtml(PRO.price)}</div>
-        <p class="tier-pitch">${escapeHtml(p.tierProPitch)}</p>
-        <p class="plus-label">${escapeHtml(p.everythingInPlus)}</p>
-        <ul class="incl">${proAdds}</ul>
-        <a class="btn wide" href="${escapeHtml(PRO.buyUrl)}" rel="noopener">${escapeHtml(p.buyCta)} — $${escapeHtml(PRO.price)}</a>
-        <p class="tier-for">${escapeHtml(p.tierProFor)}</p>
-      </div>
-
-    </div>
-    <p class="fine center">${escapeHtml(p.buyFine)}</p>
-    <p class="center"><a class="quiet" href="/license">${escapeHtml(p.haveKey)} →</a></p>`
+      <p class="fine center">${escapeHtml(p.buyFine)}</p>
+      <p class="center"><a class="quiet" href="/license">${escapeHtml(p.haveKey)} →</a></p>
+    </section>`
 }
 
 function renderFaq(p) {
@@ -749,8 +874,10 @@ function renderFaq(p) {
     </details>`).join('')
 
   return `
-    <h2 class="section">${escapeHtml(p.sectionFaq)}</h2>
-    ${items}`
+    <section class="sec reveal">
+      <h2 class="section">${escapeHtml(p.sectionFaq)}</h2>
+      ${items}
+    </section>`
 }
 
 
@@ -771,7 +898,7 @@ function renderShelf(lang) {
     const tagline = tool.i18n.tagline[lang] || tool.i18n.tagline.en
     const cta = tool.i18n.cta[lang] || tool.i18n.cta.en
     return `
-      <a class="shelf-item" href="${escapeHtml(tool.href)}">
+      <a class="shelf-item lift" href="${escapeHtml(tool.href)}">
         <span class="shelf-mark" aria-hidden="true">${tool.mark}</span>
         <span class="shelf-body">
           <b>${escapeHtml(tool.name)}</b><br>
@@ -782,8 +909,10 @@ function renderShelf(lang) {
   }).join('')
 
   return `
-    <h2 class="section">${escapeHtml(heading[lang] || heading.en)}</h2>
-    <div class="shelf">${cards}</div>`
+    <section class="sec reveal">
+      <h2 class="section">${escapeHtml(heading[lang] || heading.en)}</h2>
+      <div class="shelf">${cards}</div>
+    </section>`
 }
 
 
@@ -803,20 +932,27 @@ function renderPage(lang, theme) {
     description: escapeHtml(p.lede)
   })}
   <link rel="canonical" href="${CONFIG.SITE_URL}/unity-docsnap">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="${escapeHtml(p.title)}">
+  <meta property="og:description" content="${escapeHtml(p.tagline)}">
+  <meta property="og:url" content="${CONFIG.SITE_URL}/unity-docsnap">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <script>
-    (function () {
-      try {
-        var t = localStorage.getItem('ac_theme');
-        if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
-      } catch (e) {}
-    })();
-  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Quicksand:wght@400;500;600;700&family=Space+Mono&family=Vazirmatn:wght@400;600;700;800&display=swap" rel="stylesheet">
+  ${themeBootScript()}
+  <script>document.documentElement.classList.add('js');</script>
   <style>${css()}</style>
 </head>
 <body>
+  <div class="pearls" aria-hidden="true">
+    <span style="--x:8%;  --s:16px; --d:26s; --t:0s"></span>
+    <span style="--x:22%; --s:10px; --d:34s; --t:-6s"></span>
+    <span style="--x:38%; --s:13px; --d:29s; --t:-14s"></span>
+    <span style="--x:57%; --s:9px;  --d:38s; --t:-3s"></span>
+    <span style="--x:71%; --s:15px; --d:31s; --t:-19s"></span>
+    <span style="--x:86%; --s:11px; --d:27s; --t:-11s"></span>
+    <span style="--x:94%; --s:8px;  --d:36s; --t:-23s"></span>
+  </div>
   <div class="wrap">
     ${renderTopbar(lang)}
     ${renderHero(p)}
@@ -827,7 +963,7 @@ function renderPage(lang, theme) {
     ${renderPricing(p, lang)}
     ${renderFaq(p)}
     ${renderShelf(lang)}
-    <footer>
+    <footer class="reveal">
       <a href="/">${escapeHtml(p.footerBack)}</a>
       <span>·</span>
       <a href="${escapeHtml(REPO_URL)}" rel="noopener">GitHub</a>
@@ -837,140 +973,313 @@ function renderPage(lang, theme) {
       <a href="/order">${escapeHtml(p.orderHelp)}</a>
     </footer>
   </div>
+  ${chromeScript()}
   <script>${script(lang, p)}</script>
 </body>
 </html>`
 }
 
 
+// ==========================================
+// css
+//
+// The Cozy skin, ported from the exporter to the page that
+// sells it. Three things carry the identity: cream and blush
+// surfaces with dark plum ink, the rounded display face, and
+// motion that never stops entirely — the cup bobs, the pearls
+// drift, the sections arrive as you reach them.
+//
+// Every animation here is transform and opacity only, so the
+// whole page is a compositor job and nothing below triggers
+// layout. All of it is behind prefers-reduced-motion, and the
+// reveal-on-scroll layer is additionally behind an `html.js`
+// class, so a visitor without JavaScript gets the page with
+// everything already visible rather than a blank column.
+// ==========================================
 function css() {
   return `
-    /* ---------- the rest of the shelf ---------- */
-    .shelf { display: grid; gap: 12px; margin-block-end: 30px; }
-    .shelf-item {
-      display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-      padding: 18px; border-radius: var(--radius); text-decoration: none; color: var(--text);
-      background: var(--surface); border: 1px solid var(--border);
-      transition: transform 0.18s ease, border-color 0.18s ease;
-    }
-    .shelf-item:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--brand) 42%, var(--border)); }
-    .shelf-mark { font-size: 1.8em; line-height: 1; }
-    .shelf-body { flex: 1 1 240px; min-width: 0; }
-    .shelf-desc { font-size: 0.88em; color: var(--text-dim); }
-    .shelf-cta { font-weight: 700; font-size: 0.9em; color: color-mix(in srgb, var(--brand) 58%, var(--text)); }
-
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     html { scrollbar-width: none; -ms-overflow-style: none; scroll-behavior: smooth; }
     html::-webkit-scrollbar { width: 0; height: 0; display: none; }
 
+    /* ==========================================
+       Tokens
+       The values are the cozy skin's own, lifted from
+       :root[data-skin=cozy] in the exporter's stylesheet.
+       Dark is the default, as on every page of this site;
+       the OS preference decides only while the visitor has
+       made no choice, and data-theme always wins.
+       ========================================== */
     :root {
-      --brand: #6c63ff; --brand-2: #a78bfa;
-      --ok: #4caf50; --gold: #ffb703;
-      --radius: 18px; --maxw: 1040px;
-      --bg-1: #0b0e16; --bg-2: #141a2e;
-      --surface: rgba(255,255,255,0.05);
-      --surface-2: rgba(255,255,255,0.09);
-      --border: rgba(255,255,255,0.12);
-      --text: rgba(255,255,255,0.92);
-      --text-dim: rgba(255,255,255,0.58);
+      --lav: ${LAV_LIGHT};
+      --coral: ${CORAL_LIGHT};
+      --gold: ${HONEY};
+      --ok: ${MINT_LIGHT};
+
+      --radius: 20px;
+      --radius-sm: 14px;
+      --maxw: 1040px;
+
+      --bg-1: ${NIGHT};
+      --bg-2: #241f2d;
+      --surface: #241f2d;
+      --surface-2: #2a2533;
+      --surface-3: #362e42;
+      --border: #38313f;
+      --border-strong: #4b4155;
+      --text: #f4f0f9;
+      --text-dim: #c0b5cf;
+
+      --shadow: 0 4px 14px rgba(0, 0, 0, .4);
+      --shadow-pop: 0 14px 34px rgba(0, 0, 0, .55);
+
+      /* The rounded display face is most of what makes this
+         skin read as itself, so it is loaded first and used
+         on every heading rather than on two of them. */
+      --font-body: 'Quicksand', 'Vazirmatn', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      --font-display: 'Baloo 2', 'Vazirmatn', 'Quicksand', system-ui, sans-serif;
+      --font-mono: 'Space Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
       color-scheme: dark;
     }
+
+    /* Quicksand has no Persian and no kana. Rather than let
+       the browser fall through to whatever it likes, each
+       language names the rounded face it actually has. */
+    :root:lang(fa) {
+      --font-body: 'Vazirmatn', 'Quicksand', system-ui, sans-serif;
+      --font-display: 'Vazirmatn', 'Baloo 2', system-ui, sans-serif;
+    }
+    :root:lang(ja) {
+      --font-body: 'Hiragino Maru Gothic ProN', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'Meiryo', 'Quicksand', system-ui, sans-serif;
+      --font-display: 'Hiragino Maru Gothic ProN', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'Meiryo', 'Baloo 2', system-ui, sans-serif;
+    }
+
+    /* The pastel half of the skin. The warmth stays in the
+       surfaces, the borders and the accents; the ink is the
+       darkest thing on the page, which is the one lesson the
+       skin itself had to learn. */
     @media (prefers-color-scheme: light) {
       :root:not([data-theme]) {
-        --bg-1: #f4f6fb; --bg-2: #e7ecf7;
-        --surface: rgba(255,255,255,0.72); --surface-2: #ffffff;
-        --border: rgba(20,22,33,0.12);
-        --text: rgba(22,24,33,0.92); --text-dim: rgba(22,24,33,0.58);
+        --lav: ${LAV};
+        --coral: ${CORAL};
+        --ok: ${MINT};
+        --bg-1: ${CREAM};
+        --bg-2: ${BLUSH};
+        --surface: #ffffff;
+        --surface-2: ${PEACH};
+        --surface-3: ${BLUSH};
+        --border: #f3e2ea;
+        --border-strong: #f0c8dc;
+        --text: ${INK};
+        --text-dim: #5f4c6c;
+        --shadow: 0 4px 14px rgba(177, 156, 217, .18);
+        --shadow-pop: 0 14px 34px rgba(255, 143, 163, .28);
         color-scheme: light;
       }
     }
     :root[data-theme="light"] {
-      --bg-1: #f4f6fb; --bg-2: #e7ecf7;
-      --surface: rgba(255,255,255,0.72); --surface-2: #ffffff;
-      --border: rgba(20,22,33,0.12);
-      --text: rgba(22,24,33,0.92); --text-dim: rgba(22,24,33,0.58);
+      --lav: ${LAV};
+      --coral: ${CORAL};
+      --ok: ${MINT};
+      --bg-1: ${CREAM};
+      --bg-2: ${BLUSH};
+      --surface: #ffffff;
+      --surface-2: ${PEACH};
+      --surface-3: ${BLUSH};
+      --border: #f3e2ea;
+      --border-strong: #f0c8dc;
+      --text: ${INK};
+      --text-dim: #5f4c6c;
+      --shadow: 0 4px 14px rgba(177, 156, 217, .18);
+      --shadow-pop: 0 14px 34px rgba(255, 143, 163, .28);
       color-scheme: light;
     }
     :root[data-theme="dark"] {
-      --bg-1: #0b0e16; --bg-2: #141a2e;
-      --surface: rgba(255,255,255,0.05); --surface-2: rgba(255,255,255,0.09);
-      --border: rgba(255,255,255,0.12);
-      --text: rgba(255,255,255,0.92); --text-dim: rgba(255,255,255,0.58);
+      --lav: ${LAV_LIGHT};
+      --coral: ${CORAL_LIGHT};
+      --ok: ${MINT_LIGHT};
+      --bg-1: ${NIGHT};
+      --bg-2: #241f2d;
+      --surface: #241f2d;
+      --surface-2: #2a2533;
+      --surface-3: #362e42;
+      --border: #38313f;
+      --border-strong: #4b4155;
+      --text: #f4f0f9;
+      --text-dim: #c0b5cf;
+      --shadow: 0 4px 14px rgba(0, 0, 0, .4);
+      --shadow-pop: 0 14px 34px rgba(0, 0, 0, .55);
       color-scheme: dark;
     }
 
     body {
-      font-family: 'Vazirmatn', 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', Tahoma, Arial, sans-serif;
-      min-height: 100vh; padding: 24px 20px 60px; color: var(--text); line-height: 1.75;
-      background:
-        radial-gradient(1100px 520px at 78% -8%, color-mix(in srgb, var(--brand) 22%, transparent), transparent 60%),
-        radial-gradient(900px 480px at 8% 6%, color-mix(in srgb, var(--brand-2) 16%, transparent), transparent 60%),
-        linear-gradient(160deg, var(--bg-1), var(--bg-2));
+      font-family: var(--font-body);
+      min-height: 100vh; padding: 24px 20px 60px;
+      color: var(--text); line-height: 1.75;
+      background: linear-gradient(168deg, var(--bg-1), var(--bg-2));
       background-attachment: fixed;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
     }
+
+    /* The wash lives on its own fixed layer rather than on the
+       body's background, so it can drift for the whole visit
+       without repainting a single word of text. */
+    body::before {
+      content: ''; position: fixed; inset: -22vmax; z-index: -2; pointer-events: none;
+      background:
+        radial-gradient(42vmax 30vmax at 76% 10%, color-mix(in srgb, var(--coral) 34%, transparent), transparent 62%),
+        radial-gradient(38vmax 28vmax at 12% 2%, color-mix(in srgb, var(--lav) 32%, transparent), transparent 60%),
+        radial-gradient(36vmax 26vmax at 52% 98%, color-mix(in srgb, var(--gold) 16%, transparent), transparent 62%);
+    }
+
+    /* Pearls, rising the way they settle in the cup. Seven of
+       them, transform-only, and invisible until the animation
+       runs — so under reduced motion they simply are not there
+       rather than sitting frozen mid-air. */
+    .pearls { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+    .pearls span {
+      position: absolute; inset-block-end: -14vh; inset-inline-start: var(--x);
+      width: var(--s); height: var(--s); border-radius: 50%; opacity: 0;
+      background: radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--coral) 78%, #fff), ${COCOA});
+    }
+
     .wrap { max-width: var(--maxw); margin-inline: auto; }
 
     /* ---------- top bar ---------- */
     .topbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
-    .brand { display: flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none; font-weight: 800; }
-    .brand img { width: 34px; height: 34px; border-radius: 10px; object-fit: cover; }
-    .controls { display: flex; gap: 10px; align-items: center; }
-    .seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); }
-    .seg button {
-      border: 0; cursor: pointer; padding: 6px 11px; border-radius: 9px; font: inherit;
-      font-size: 0.82em; font-weight: 600; color: var(--text-dim); background: transparent;
+    .brand { display: flex; align-items: center; gap: 11px; color: var(--text); text-decoration: none; }
+    .brand img {
+      width: 38px; height: 38px; border-radius: 13px; object-fit: cover;
+      box-shadow: var(--shadow); transition: transform .22s cubic-bezier(.34,1.56,.64,1);
     }
+    .brand:hover img { transform: rotate(-6deg) scale(1.06); }
+    .brand-text { display: grid; line-height: 1.32; min-width: 0; }
+    .brand-name { font-family: var(--font-display); font-weight: 800; }
+    .brand-sub { font-size: 0.76em; font-weight: 600; color: var(--text-dim); }
+
+    .controls { display: flex; gap: 10px; align-items: center; }
+
+    /* Pills, everywhere. The cozy skin has no square control. */
+    .seg {
+      display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px;
+      background: var(--surface); border: 1px solid var(--border-strong);
+    }
+    .seg button {
+      border: 0; cursor: pointer; padding: 6px 13px; border-radius: 999px; font: inherit;
+      font-size: 0.82em; font-weight: 700; color: var(--text-dim); background: transparent;
+      transition: color .16s ease, background .16s ease;
+    }
+    .seg button:hover { color: var(--text); }
+    /* Filled, not merely a paler shade of the bar it sits in.
+       Coral is the language answer in the tool too, so the
+       control a reader already knows behaves the same here. */
     .seg button[aria-pressed="true"] {
-      color: #fff; background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      color: #fff; background: linear-gradient(135deg, ${CORAL}, ${CORAL_SOFT});
+      box-shadow: 0 3px 10px rgba(255, 117, 147, .4);
     }
     .icon-btn {
-      width: 36px; height: 36px; border-radius: 11px; cursor: pointer; font-size: 1.1em;
-      color: var(--text); background: var(--surface); border: 1px solid var(--border);
+      width: 38px; height: 38px; display: grid; place-items: center; border-radius: 999px;
+      cursor: pointer; color: var(--text); background: var(--surface); border: 1px solid var(--border-strong);
+      transition: transform .22s cubic-bezier(.34,1.56,.64,1), box-shadow .18s ease;
     }
+    .icon-btn:hover { transform: rotate(-14deg) scale(1.08); box-shadow: var(--shadow-pop); }
+    .icon-btn svg { width: 19px; height: 19px; }
+    .d-ic { width: 18px; height: 18px; flex: none; }
 
     /* ---------- hero ---------- */
-    .hero { text-align: center; padding-block: 44px 30px; }
-    .hero .logo { font-size: 3.2em; line-height: 1; }
+    .hero { text-align: center; padding-block: 34px 26px; }
+    .mascot { position: relative; display: inline-block; }
+    .mascot::before {
+      content: ''; position: absolute; inset: -16%; border-radius: 50%; z-index: -1;
+      background: radial-gradient(circle, color-mix(in srgb, var(--coral) 36%, transparent), transparent 68%);
+    }
+    .ds-logo { display: block; }
+
     .hero h1 {
-      font-size: clamp(2.1em, 6vw, 3.2em); font-weight: 800; margin-block: 10px 6px;
-      background: linear-gradient(135deg, var(--text), color-mix(in srgb, var(--brand) 60%, var(--text)));
+      font-family: var(--font-display);
+      font-size: clamp(2.1em, 6vw, 3.3em); font-weight: 800; letter-spacing: -0.01em;
+      margin-block: 8px 4px;
+      background: linear-gradient(110deg, var(--lav), var(--coral) 46%, var(--lav) 86%);
+      background-size: 240% 100%;
       -webkit-background-clip: text; background-clip: text; color: transparent;
     }
-    .tagline { font-size: 1.12em; font-weight: 600; }
+    .tagline {
+      font-family: var(--font-display); font-size: 1.14em; font-weight: 700;
+      color: color-mix(in srgb, var(--lav) 52%, var(--text));
+    }
     .lede { color: var(--text-dim); max-width: 640px; margin: 12px auto 0; }
     .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-block-start: 24px; }
     .fine { color: var(--text-dim); font-size: 0.85em; margin-block-start: 12px; }
     .center { text-align: center; }
 
+    /* ---------- buttons ---------- */
+    /* The violet fill is fixed rather than themed: it is the
+       tool's ink, it carries white text at both ends of the
+       day, and a button that changes colour with the room is
+       one more thing to check. */
     .btn {
-      display: inline-flex; align-items: center; gap: 8px; text-decoration: none;
-      padding: 14px 28px; border-radius: 13px; font-weight: 700; color: #fff;
-      background: linear-gradient(135deg, var(--brand), var(--brand-2));
-      box-shadow: 0 8px 24px color-mix(in srgb, var(--brand) 34%, transparent);
-      transition: transform 0.18s ease, box-shadow 0.18s ease;
+      position: relative; overflow: hidden;
+      display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+      text-decoration: none; padding: 13px 26px; border-radius: 999px;
+      font-family: var(--font-display); font-weight: 700; color: #fff;
+      background: linear-gradient(135deg, ${LAV}, ${LAV_SOFT});
+      border: 1px solid transparent;
+      box-shadow: 0 8px 22px rgba(122, 82, 184, .34);
+      transition: transform .18s ease, box-shadow .18s ease;
     }
-    .btn:hover { transform: translateY(-3px); box-shadow: 0 14px 34px color-mix(in srgb, var(--brand) 44%, transparent); }
+    .btn:hover { transform: translateY(-3px); box-shadow: 0 14px 32px rgba(122, 82, 184, .44); }
+    .btn:active { transform: translateY(-1px) scale(0.985); }
     .btn.ghost {
-      background: var(--surface); color: var(--text); border: 1px solid var(--border); box-shadow: none;
+      background: var(--surface); color: var(--text);
+      border-color: var(--border-strong); box-shadow: var(--shadow);
     }
-    .btn.wide { width: 100%; justify-content: center; margin-block: 10px; }
+    .btn.ghost:hover { box-shadow: var(--shadow-pop); }
+    .btn.wide { width: 100%; margin-block: 10px; }
+    /* A single pass of light across the fill on hover. One
+       pseudo-element, transform only, and it runs once rather
+       than looping - a button that shimmers forever reads as
+       a broken GIF. */
+    .btn::after {
+      content: ''; position: absolute; inset-block: -50%; inset-inline-start: -60%; width: 42%;
+      background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .42), transparent);
+      transform: translateX(-140%) skewX(-16deg); opacity: 0; pointer-events: none;
+    }
 
     /* ---------- sections ---------- */
     .section {
+      font-family: var(--font-display);
       display: flex; align-items: center; gap: 12px;
-      font-size: 1.35em; font-weight: 800; margin-block: 46px 20px; scroll-margin-top: 20px;
+      font-size: 1.42em; font-weight: 700; margin-block: 48px 20px; scroll-margin-top: 20px;
     }
-    .section::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--border), transparent); }
-    [dir="rtl"] .section::after { background: linear-gradient(270deg, var(--border), transparent); }
+    .section::after {
+      content: ''; flex: 1; height: 2px; border-radius: 2px;
+      background: linear-gradient(90deg, var(--border-strong), transparent);
+      transform-origin: 0 50%;
+    }
+    [dir="rtl"] .section::after {
+      background: linear-gradient(270deg, var(--border-strong), transparent);
+      transform-origin: 100% 50%;
+    }
 
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
     .card {
       background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 22px;
+      border-radius: var(--radius); padding: 22px; box-shadow: var(--shadow);
     }
-    .card-ic { font-size: 1.7em; line-height: 1; margin-block-end: 10px; }
-    .card h3 { font-size: 1.05em; font-weight: 700; margin-block-end: 6px; }
+    .card-ic {
+      font-size: 1.8em; line-height: 1; margin-block-end: 10px; display: inline-block;
+      transition: transform .3s cubic-bezier(.34,1.56,.64,1);
+    }
+    .card:hover .card-ic { transform: rotate(-9deg) scale(1.14); }
+    .card h3 { font-family: var(--font-display); font-size: 1.06em; font-weight: 700; margin-block-end: 6px; }
     .card p { font-size: 0.93em; color: var(--text-dim); }
+
+    /* Lift on hover, confined to the handful of things a
+       reader points at deliberately. */
+    .lift { transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+    .lift:hover { transform: translateY(-4px); box-shadow: var(--shadow-pop); border-color: var(--border-strong); }
 
     /* ---------- videos ---------- */
     .vhead {
@@ -979,7 +1288,7 @@ function css() {
     }
     .vlede { color: var(--text-dim); font-size: 0.94em; }
     .vlang { display: flex; align-items: center; gap: 10px; }
-    .vlang-label { font-size: 0.8em; color: var(--text-dim); font-weight: 600; }
+    .vlang-label { font-size: 0.8em; color: var(--text-dim); font-weight: 700; }
 
     /* Player left, playlist right on a desktop; stacked on a
        phone, where a side-by-side split would leave the video
@@ -989,14 +1298,12 @@ function css() {
 
     .vstage {
       background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius); overflow: hidden;
+      border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow);
     }
-    .vstage video {
-      display: block; width: 100%; aspect-ratio: 16 / 9; background: #05070d;
-    }
+    .vstage video { display: block; width: 100%; aspect-ratio: 16 / 9; background: #05070d; }
     .vstage video p { color: var(--text-dim); padding: 20px; font-size: 0.9em; }
     .vnow { padding: 14px 16px; }
-    .vnow b { display: block; font-size: 1em; font-weight: 700; }
+    .vnow b { display: block; font-family: var(--font-display); font-size: 1.02em; font-weight: 700; }
     .vnow small { display: block; color: var(--text-dim); font-size: 0.87em; margin-block-start: 3px; }
     .vcount { display: block; font-size: 0.76em; color: var(--text-dim); margin-block-start: 8px; }
 
@@ -1005,33 +1312,35 @@ function css() {
     .vlist {
       list-style: none; max-height: 420px; overflow-y: auto;
       border: 1px solid var(--border); border-radius: var(--radius);
-      background: var(--surface); padding: 6px;
+      background: var(--surface); padding: 6px; box-shadow: var(--shadow);
       scrollbar-width: thin;
     }
     @media (max-width: 820px) { .vlist { max-height: 320px; } }
 
     .vitem {
       display: flex; align-items: center; gap: 11px; width: 100%; text-align: start;
-      padding: 9px 10px; border: 0; border-radius: 12px; cursor: pointer;
+      padding: 9px 10px; border: 0; border-radius: 999px; cursor: pointer;
       font: inherit; color: var(--text); background: transparent;
-      transition: background 0.15s ease;
+      transition: background .15s ease, transform .15s ease;
     }
-    .vitem:hover { background: var(--surface-2); }
-    .vitem.is-on { background: color-mix(in srgb, var(--brand) 16%, transparent); }
+    .vitem:hover { background: var(--surface-2); transform: translateX(2px); }
+    [dir="rtl"] .vitem:hover { transform: translateX(-2px); }
+    .vitem.is-on { background: color-mix(in srgb, var(--lav) 18%, transparent); }
 
     .vnum {
-      flex: 0 0 26px; width: 26px; height: 26px; border-radius: 8px;
+      flex: 0 0 26px; width: 26px; height: 26px; border-radius: 50%;
       display: grid; place-items: center; font-size: 0.72em; font-weight: 800;
       color: var(--text-dim); background: var(--surface-2); border: 1px solid var(--border);
     }
     .vitem.is-on .vnum {
       color: #fff; border-color: transparent;
-      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      background: linear-gradient(135deg, ${CORAL}, ${CORAL_SOFT});
+      box-shadow: 0 3px 10px rgba(255, 117, 147, .38);
     }
     .vtext { flex: 1 1 auto; min-width: 0; }
     .vtext b { display: block; font-size: 0.88em; font-weight: 700; line-height: 1.45; }
     .vtext small {
-      display: block; color: var(--text-dim); font-size: 0.78em; line-height: 1.5;
+      color: var(--text-dim); font-size: 0.78em; line-height: 1.5;
       /* Two lines, then an ellipsis. A blurb that wraps to four
          turns the playlist into a wall and hides the clips
          below it. */
@@ -1044,29 +1353,39 @@ function css() {
        to somebody who has watched something, and above the
        player it reads as an apology before the pitch. */
     .vnote { margin-block-start: 16px; border-inline-start: 4px solid var(--gold); }
-    .vnote h3 { font-size: 1em; font-weight: 700; margin-block-end: 6px; }
 
     /* ---------- comparison ---------- */
     /* The table scrolls inside its own box so a long feature
        label can never make the page itself scroll sideways. */
-    .table-scroll { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); }
+    .table-scroll {
+      overflow-x: auto; border-radius: var(--radius);
+      border: 1px solid var(--border); box-shadow: var(--shadow);
+    }
     .compare { width: 100%; border-collapse: collapse; background: var(--surface); min-width: 620px; }
-    .compare th, .compare td { padding: 13px 14px; text-align: start; border-bottom: 1px solid var(--border); }
-    .compare thead th { font-size: 0.85em; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; }
-    .compare thead th .th-price { display: block; font-size: 0.95em; text-transform: none; color: var(--text); font-weight: 800; }
+    .compare th, .compare td { padding: 13px 14px; text-align: start; border-bottom: 1px dashed var(--border-strong); }
+    .compare thead th {
+      font-family: var(--font-display); font-size: 0.85em; color: var(--text-dim);
+      text-transform: uppercase; letter-spacing: 0.04em;
+      background: linear-gradient(120deg, var(--surface-3), var(--surface-2));
+    }
+    .compare thead th .th-price {
+      display: block; font-size: 1.05em; text-transform: none; color: var(--text); font-weight: 800;
+    }
     .compare tbody th { font-weight: 600; font-size: 0.95em; }
+    .compare tbody tr { transition: background .15s ease; }
+    .compare tbody tr:hover { background: color-mix(in srgb, var(--lav) 8%, transparent); }
     .compare td { text-align: center; width: 96px; font-weight: 700; }
     .compare tr:last-child th, .compare tr:last-child td { border-bottom: 0; }
     .compare .yes { color: var(--ok); }
     .compare .no { color: var(--text-dim); }
     .compare .partial { color: var(--text-dim); font-size: 0.82em; font-weight: 600; }
-    .compare tr.star { background: color-mix(in srgb, var(--gold) 10%, transparent); }
+    .compare tr.star { background: color-mix(in srgb, var(--gold) 14%, transparent); }
     .compare tr.star th { font-weight: 800; }
     /* The Plus column is tinted the whole way down so the eye can
        follow it. Without it, a middle column in a three-column
        table is the one nobody reads. */
     .compare .col-plus,
-    .compare thead th.col-plus { background: color-mix(in srgb, var(--brand) 9%, transparent); }
+    .compare thead th.col-plus { background: color-mix(in srgb, var(--lav) 12%, transparent); }
 
     .free-note { margin-block-start: 16px; border-inline-start: 4px solid var(--ok); }
 
@@ -1074,18 +1393,18 @@ function css() {
     .spotlight {
       display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: center;
       background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 26px;
+      border-radius: var(--radius); padding: 26px; box-shadow: var(--shadow);
     }
-    .spotlight h3 { font-size: 1.15em; margin-block-end: 8px; }
+    .spotlight h3 { font-family: var(--font-display); font-size: 1.18em; font-weight: 700; margin-block-end: 8px; }
     .spotlight p { color: var(--text-dim); font-size: 0.95em; }
     .spot-tier {
       margin-block-start: 12px; font-weight: 700;
-      color: color-mix(in srgb, var(--brand) 55%, var(--text)) !important;
+      color: color-mix(in srgb, var(--lav) 62%, var(--text));
     }
     .tree {
-      background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px;
+      background: var(--surface-2); border: 1px dashed var(--border-strong); border-radius: var(--radius-sm);
       padding: 16px; overflow-x: auto; font-size: 0.82em; line-height: 1.7;
-      font-family: 'JetBrains Mono', 'Cascadia Code', 'Courier New', monospace;
+      font-family: var(--font-mono);
     }
     .tree .c { color: var(--text-dim); }
     @media (max-width: 720px) { .spotlight { grid-template-columns: 1fr; } }
@@ -1098,20 +1417,23 @@ function css() {
       position: relative; text-align: center;
       background: var(--surface); border: 1px solid var(--border);
       border-radius: calc(var(--radius) + 4px); padding: 26px 22px;
+      box-shadow: var(--shadow);
     }
     .tier.is-featured {
-      border-color: color-mix(in srgb, var(--brand) 50%, var(--border));
-      box-shadow: 0 20px 60px color-mix(in srgb, var(--brand) 16%, transparent);
+      border-color: color-mix(in srgb, var(--lav) 55%, var(--border));
+      box-shadow: 0 20px 60px color-mix(in srgb, var(--lav) 20%, transparent);
     }
     .ribbon {
-      position: absolute; inset-block-start: -11px; inset-inline-start: 50%;
+      position: absolute; inset-block-start: -12px; inset-inline-start: 50%;
       transform: translateX(-50%); white-space: nowrap;
-      padding: 3px 14px; border-radius: 999px; font-size: 0.75em; font-weight: 800; color: #fff;
-      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      padding: 4px 15px; border-radius: 999px; font-size: 0.75em; font-weight: 800; color: #fff;
+      font-family: var(--font-display);
+      background: linear-gradient(135deg, ${CORAL}, ${CORAL_SOFT});
+      box-shadow: 0 4px 14px rgba(255, 117, 147, .42);
     }
     [dir="rtl"] .ribbon { transform: translateX(50%); }
-    .tier h3 { font-size: 1.15em; font-weight: 800; }
-    .tier .price { font-size: 2.7em; font-weight: 800; line-height: 1.1; margin-block: 4px; }
+    .tier h3 { font-family: var(--font-display); font-size: 1.2em; font-weight: 800; }
+    .tier .price { font-family: var(--font-display); font-size: 2.8em; font-weight: 800; line-height: 1.1; margin-block: 4px; }
     .tier .price .cur { font-size: 0.42em; vertical-align: super; opacity: 0.7; }
     .tier-pitch { font-size: 0.92em; color: var(--text-dim); min-height: 3em; }
     .plus-label { font-weight: 700; font-size: 0.86em; margin-block: 14px 8px; text-align: start; }
@@ -1125,24 +1447,155 @@ function css() {
     /* ---------- faq ---------- */
     .faq {
       background: var(--surface); border: 1px solid var(--border);
-      border-radius: 14px; padding: 14px 18px; margin-block-end: 10px;
+      border-radius: var(--radius-sm); padding: 14px 18px; margin-block-end: 10px;
+      box-shadow: var(--shadow);
+      transition: border-color .18s ease, box-shadow .18s ease;
     }
-    .faq summary { cursor: pointer; font-weight: 700; list-style: none; }
+    .faq:hover { border-color: var(--border-strong); box-shadow: var(--shadow-pop); }
+    .faq summary {
+      cursor: pointer; font-family: var(--font-display); font-weight: 700; list-style: none;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    }
     .faq summary::-webkit-details-marker { display: none; }
-    .faq summary::after { content: '＋'; float: inline-end; color: var(--text-dim); }
-    .faq[open] summary::after { content: '−'; }
+    .faq summary::after {
+      content: '＋'; color: var(--coral); font-weight: 800;
+      transition: transform .25s cubic-bezier(.34,1.56,.64,1);
+    }
+    .faq[open] summary::after { content: '−'; transform: rotate(180deg); }
     .faq p { color: var(--text-dim); font-size: 0.94em; margin-block-start: 10px; }
 
+    /* ---------- the rest of the shelf ---------- */
+    .shelf { display: grid; gap: 12px; margin-block-end: 30px; }
+    .shelf-item {
+      display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+      padding: 18px; border-radius: var(--radius); text-decoration: none; color: var(--text);
+      background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow);
+    }
+    .shelf-mark { font-size: 1.8em; line-height: 1; transition: transform .3s cubic-bezier(.34,1.56,.64,1); }
+    .shelf-item:hover .shelf-mark { transform: rotate(-9deg) scale(1.14); }
+    .shelf-body { flex: 1 1 240px; min-width: 0; }
+    .shelf-body b { font-family: var(--font-display); }
+    .shelf-desc { font-size: 0.88em; color: var(--text-dim); }
+    .shelf-cta { font-weight: 700; font-size: 0.9em; color: color-mix(in srgb, var(--lav) 62%, var(--text)); }
+
+    /* ---------- footer ---------- */
+    /* Dashed, which is how the original skin separated things
+       that are only loosely related. */
     footer {
       display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
       margin-block-start: 48px; padding-block-start: 24px;
-      border-top: 1px solid var(--border); color: var(--text-dim); font-size: 0.9em;
+      border-top: 2px dashed var(--border-strong); color: var(--text-dim); font-size: 0.9em;
     }
-    footer a { color: var(--text-dim); text-decoration: none; }
-    footer a:hover { color: var(--text); }
+    footer a { color: var(--text-dim); text-decoration: none; transition: color .15s ease; }
+    footer a:hover { color: var(--coral); }
 
     a:focus-visible, button:focus-visible, summary:focus-visible {
-      outline: 2px solid var(--brand); outline-offset: 3px; border-radius: 6px;
+      outline: 2px solid var(--coral); outline-offset: 3px; border-radius: 999px;
+    }
+
+    /* ==========================================
+       Motion
+       All of it lives in one block behind
+       prefers-reduced-motion, so "less motion" is a single
+       switch rather than a property somebody has to remember
+       to override in twelve places.
+       ========================================== */
+    @keyframes ds-bob {
+      0%, 100% { transform: translateY(0) rotate(-1.5deg); }
+      50%      { transform: translateY(-4px) rotate(1.5deg); }
+    }
+    @keyframes ds-boba-drift {
+      0%, 100% { transform: translateY(0); }
+      50%      { transform: translateY(-2.5px); }
+    }
+    @keyframes ds-twinkle {
+      0%, 100% { opacity: .45; transform: scale(.9) rotate(0deg); }
+      50%      { opacity: 1;   transform: scale(1.12) rotate(18deg); }
+    }
+    @keyframes ds-halo {
+      0%, 100% { opacity: .55; transform: scale(1); }
+      50%      { opacity: .9;  transform: scale(1.09); }
+    }
+    @keyframes ds-rise {
+      from { opacity: 0; transform: translateY(18px); }
+      to   { opacity: 1; transform: none; }
+    }
+    @keyframes ds-pop {
+      from { opacity: 0; transform: translateY(16px) scale(.985); }
+      to   { opacity: 1; transform: none; }
+    }
+    @keyframes ds-rule {
+      from { transform: scaleX(0); }
+      to   { transform: scaleX(1); }
+    }
+    @keyframes ds-shimmer {
+      0%, 100% { background-position: 0% 50%; }
+      50%      { background-position: 100% 50%; }
+    }
+    @keyframes ds-sheen {
+      0%   { transform: translateX(-140%) skewX(-16deg); opacity: .9; }
+      100% { transform: translateX(420%) skewX(-16deg); opacity: 0; }
+    }
+    @keyframes ds-wash {
+      0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+      50%      { transform: translate3d(-2.5%, 2%, 0) scale(1.06); }
+    }
+    @keyframes ds-pearl {
+      0%   { opacity: 0; transform: translate3d(0, 0, 0); }
+      12%  { opacity: .5; }
+      88%  { opacity: .45; }
+      100% { opacity: 0; transform: translate3d(14px, -118vh, 0); }
+    }
+    @keyframes ds-featured {
+      0%, 100% { box-shadow: 0 18px 46px color-mix(in srgb, var(--lav) 18%, transparent); }
+      50%      { box-shadow: 0 26px 64px color-mix(in srgb, var(--coral) 28%, transparent); }
+    }
+    @keyframes ds-faq {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      body::before { animation: ds-wash 26s ease-in-out infinite; will-change: transform; }
+      .pearls span { animation: ds-pearl var(--d, 30s) linear var(--t, 0s) infinite; will-change: transform; }
+
+      /* The mascot: a slow bob, the pearls drifting inside the
+         cup, and two sparkles twinkling off each other's beat.
+         One element each, transform and opacity only. */
+      .ds-logo { animation: ds-bob 4.5s ease-in-out infinite; transform-origin: 50% 70%; will-change: transform; }
+      .ds-logo .ds-boba { animation: ds-boba-drift 3.2s ease-in-out infinite; transform-origin: 50% 78%; }
+      .ds-logo .ds-sparkle { animation: ds-twinkle 2.6s ease-in-out infinite; transform-origin: 16px 74px; }
+      .ds-logo .ds-sparkle-2 { animation-duration: 3.4s; animation-delay: -1.1s; transform-origin: 86px 59px; }
+      .mascot::before { animation: ds-halo 5.5s ease-in-out infinite; }
+
+      /* The hero arrives in one wave rather than all at once. */
+      .hero .mascot  { animation: ds-rise .6s cubic-bezier(.16,1,.3,1) both; }
+      .hero h1       { animation: ds-rise .6s cubic-bezier(.16,1,.3,1) .06s both, ds-shimmer 11s ease-in-out 1.2s infinite; }
+      .hero .tagline { animation: ds-rise .6s cubic-bezier(.16,1,.3,1) .12s both; }
+      .hero .lede    { animation: ds-rise .6s cubic-bezier(.16,1,.3,1) .18s both; }
+      .hero .cta     { animation: ds-rise .6s cubic-bezier(.16,1,.3,1) .24s both; }
+      .hero .fine    { animation: ds-rise .6s cubic-bezier(.16,1,.3,1) .30s both; }
+
+      .btn:hover::after { animation: ds-sheen .75s ease; }
+      .tier.is-featured { animation: ds-featured 6s ease-in-out infinite; }
+      .faq[open] p { animation: ds-faq .3s ease both; }
+
+      /* Reveal on scroll.
+         Behind an html.js class as well as behind this query: the
+         class is set by an inline script in <head>, so a
+         visitor with JavaScript off never gets the hidden
+         state that only JavaScript can undo. */
+      html.js .reveal { opacity: 0; transform: translateY(24px); }
+      html.js .reveal.is-in {
+        opacity: 1; transform: none;
+        transition: opacity .55s cubic-bezier(.16,1,.3,1), transform .55s cubic-bezier(.16,1,.3,1);
+      }
+      html.js .sec.is-in .section::after { animation: ds-rule .8s cubic-bezier(.16,1,.3,1) both; }
+      html.js .stagger > * { opacity: 0; }
+      html.js .sec.is-in .stagger > * {
+        animation: ds-pop .55s cubic-bezier(.16,1,.3,1) both;
+        animation-delay: calc(var(--i, 0) * 90ms + 100ms);
+      }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -1155,24 +1608,67 @@ function css() {
 
 // ==========================================
 // script
-// Language and theme switching, plus the video player.
+// The reveal-on-scroll pass and the video player. Language
+// and theme switching come from the shared chrome, so this
+// page toggles them exactly the way every other page does.
 // ==========================================
 function script(lang, p) {
   const data = videoData(lang)
 
   return `
-    function dsLang(code) {
-      try { localStorage.setItem('ac_lang', code); } catch (e) {}
-      document.cookie = 'lang=' + code + ';path=/;max-age=31536000;samesite=lax';
-      window.location.search = '?lang=' + encodeURIComponent(code);
-    }
-    function dsTheme() {
-      var dark = getComputedStyle(document.documentElement).colorScheme.indexOf('dark') !== -1;
-      var next = dark ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', next);
-      try { localStorage.setItem('ac_theme', next); } catch (e) {}
-      document.cookie = 'theme=' + next + ';path=/;max-age=31536000;samesite=lax';
-    }
+    // ==========================================
+    // Reveal on scroll
+    //
+    // Sections arrive as the reader reaches them, once each -
+    // the observer stops watching an element the moment it has
+    // landed, so scrolling back up does not replay the page.
+    //
+    // Everything is revealed outright when IntersectionObserver
+    // is missing: the hidden state is a CSS rule only JavaScript
+    // can undo, and a page that stays blank is worse than a page
+    // that never animates.
+    // ==========================================
+    (function () {
+      var targets = Array.prototype.slice.call(document.querySelectorAll('.reveal'));
+      if (!targets.length) return;
+
+      var show = function (el) { el.classList.add('is-in'); };
+      var flush = function () { targets.forEach(show); targets = []; };
+
+      if (!('IntersectionObserver' in window)) { flush(); return; }
+
+      var observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          show(entry.target);
+          observer.unobserve(entry.target);
+        });
+      }, { rootMargin: '0px 0px -56px 0px', threshold: 0 });
+
+      targets.forEach(function (el) {
+        // Anything already on screen at load - on a short window
+        // that is the first section - is shown without waiting for
+        // a scroll that may never come.
+        if (el.getBoundingClientRect().top < (window.innerHeight || 0)) show(el);
+        else observer.observe(el);
+      });
+
+      // The last element on the page can be shorter than the
+      // observer's bottom margin, which leaves it sitting in a band
+      // the root never covers - the footer was invisible for
+      // exactly that reason. Reaching the end of the document is an
+      // unambiguous "you can see it now", so it reveals whatever is
+      // left and the listener retires.
+      var onScroll = function () {
+        var atEnd = window.innerHeight + window.pageYOffset
+          >= document.documentElement.scrollHeight - 4;
+        if (!atEnd) return;
+        flush();
+        observer.disconnect();
+        window.removeEventListener('scroll', onScroll);
+      };
+      window.addEventListener('scroll', onScroll, { passive: true });
+    })();
 
     (function () {
       var BY_LANG = ${JSON.stringify(data.byLang)};
@@ -1309,7 +1805,7 @@ function script(lang, p) {
 export async function handleUnityDocSnap(url, request) {
   const cookies = parseCookies(request)
   const lang = resolveRequestLang(url, request, cookies)
-  const theme = resolveTheme(cookies)
+  const theme = resolveRequestTheme(cookies)
 
   const headers = langCookieHeader(url, lang)
 
