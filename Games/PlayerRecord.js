@@ -10,20 +10,20 @@
 
 import { createJsonResponse } from '../Core/Http.js'
 import { logWarning } from '../Core/Logging.js'
+import { playerIdFromEmail } from '../Core/PlayerIdentity.js'
 
 /**
- * The identifier a game's own database uses for a person.
+ * Re-exported from Core/PlayerIdentity.js rather than written out
+ * again here.
  *
- * Deliberately identical to the rule in Games/Session.js, and that
- * identity is load-bearing: an entitlement granted on the site is
- * looked up by the game against the player row it already has, and
+ * The rule is load-bearing: an entitlement granted on the site is
+ * looked up by the game against the player row it already has, so
  * two derivations would mean a player who bought something the
- * game cannot find. If the rule changes it changes in both places
- * in the same commit or not at all.
+ * game cannot find. This file and Games/Session.js each used to
+ * carry their own copy with a comment asking whoever edited one to
+ * remember the other. There is one copy now.
  */
-export function playerIdFromEmail(email) {
-  return String(email || '').split('@')[0].toLowerCase().substring(0, 15)
-}
+export { playerIdFromEmail }
 
 
 // ==========================================

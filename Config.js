@@ -518,6 +518,25 @@ export function getGamesConfig(env) {
 
 
 /**
+ * The Google client ids an id_token for THIS game may name in its
+ * `aud` (or `azp`) claim.
+ *
+ * Both clients, because the two platforms differ: a browser gets a
+ * token minted for the web client, and an Android build authorises
+ * with its own client id even though the code is exchanged with the
+ * web one. Anything else is a token issued to somebody else's
+ * application, and Core/GoogleOAuth.js refuses it.
+ *
+ * Empty when a game has no OAuth configured, which is what makes
+ * verification on such a game fail closed rather than open.
+ */
+export function getGameAudiences(game) {
+  const oauth = (game && game.oauth) || {}
+  return [oauth.web, oauth.android].filter(Boolean)
+}
+
+
+/**
  * One product from a game's code catalogue, or null. Every purchase
  * path goes through this: a product id arriving in a request body
  * never names anything that is not in the catalogue.
@@ -551,6 +570,15 @@ export function validateGameId(gameId, games) {
  * scheme is not on the list - requiring it meant deleting one
  * variable took down every page on the site, including the panels
  * you would use to find out why.
+ *
+ * STATE_SIGNING_SECRET is on the list, and it is the one entry
+ * that is here for a reason other than "nothing works without it".
+ * It signs OAuth state and player session cookies, and it used to
+ * fall back to the Google client secret when unset. That fallback
+ * was the bug: it made an OAuth credential double as an HMAC key,
+ * so rotating one silently invalidated every session signed with
+ * the other, and a leak of either compromised both. Requiring the
+ * variable is what lets the fallback be gone.
  */
 export function validateEnvironment(env) {
   const missing = []
@@ -559,6 +587,14 @@ export function validateEnvironment(env) {
     for (const key of game.required) {
       if (!env || !env[key]) missing.push(key)
     }
+  }
+
+  // Only when something actually signs sessions. A deployment with
+  // no login-capable game issues no cookies and no OAuth state, and
+  // has nothing to sign them with either.
+  const signsSessions = Object.values(getGameEnvNames()).some(game => game.capabilities.login)
+  if (signsSessions && (!env || !env.STATE_SIGNING_SECRET)) {
+    missing.push('STATE_SIGNING_SECRET')
   }
 
   if (missing.length > 0) {

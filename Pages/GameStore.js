@@ -17,7 +17,9 @@ import { verifyIpnSignature } from '../Commerce/Seal.js'
 import { claimWebhook } from '../Commerce/Orders.js'
 import { normalizeStatus } from '../Commerce/Provider.js'
 import { resolveGame, resolveGames, effectiveProducts, isDownloadable } from '../Games/Registry.js'
-import { db, getGameOrder, getGameOrderByInvoice, GAME_ORDER_STATE, listEntitlements } from '../Games/Store.js'
+import {
+  db, getGameOrder, getGameOrderByInvoice, GAME_ORDER_STATE, listEntitlements, claimPlayerIdentity
+} from '../Games/Store.js'
 import { startPurchase, applyGamePayment, storeReady, readGameToken } from '../Games/Purchase.js'
 import { readPlayerSession } from '../Games/Session.js'
 import { page, chromeTheme, langHeader, localeFor, gameAccent } from './GameChrome.js'
@@ -63,6 +65,7 @@ const I18N = {
     errProvider: 'الان نتوانستیم صورتحساب بسازیم. چند لحظه بعد دوباره امتحان کن — پولی از حسابت کم نشده.',
     errGone: 'این محصول دیگر برای فروش نیست.',
     errAuth: 'جلسه‌ات تمام شده. دوباره وارد شو.',
+    errConflict: 'این شناسه‌ی بازیکن به حساب گوگل دیگری تعلق دارد. با پشتیبانی تماس بگیر.',
 
     howTitle: 'چطور کار می‌کند',
     how: [
@@ -126,6 +129,7 @@ const I18N = {
     errProvider: 'We could not open an invoice just now. Try again in a moment — you have not been charged.',
     errGone: 'That product is no longer on sale.',
     errAuth: 'Your session has expired. Please sign in again.',
+    errConflict: 'This player id already belongs to a different Google account. Please contact support.',
 
     howTitle: 'How it works',
     how: [
@@ -188,6 +192,7 @@ const I18N = {
     errProvider: '請求書を作成できませんでした。少し後にお試しください。課金はされていません。',
     errGone: 'その商品は販売終了しました。',
     errAuth: 'セッションが切れました。再度サインインしてください。',
+    errConflict: 'このプレイヤーIDは別のGoogleアカウントのものです。サポートにご連絡ください。',
 
     howTitle: 'ご利用の流れ',
     how: [
@@ -283,6 +288,22 @@ export async function handleGameStoreBuy(url, request, gameId, requestId, GAMES,
   const player = await readPlayerSession(env, GAMES, request)
   if (!player) {
     return createJsonResponse({ ok: false, error: 'unauthorized', message: t.errAuth }, 401)
+  }
+
+  // Checked before the invoice is opened, not after it is paid.
+  // A player id can be derived from two different addresses, and
+  // the moment to discover that is while the customer still has
+  // their money.
+  const claim = await claimPlayerIdentity(database, game.id, player.playerId, player.email, player.sub)
+  if (!claim.ok) {
+    logWarning('Purchase refused: player id belongs to another account', {
+      requestId, gameId: game.id, playerId: player.playerId
+    })
+    return createJsonResponse({
+      ok: false,
+      error: 'player_id_conflict',
+      message: t.errConflict
+    }, 403)
   }
 
   let body

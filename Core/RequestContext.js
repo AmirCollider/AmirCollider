@@ -100,3 +100,19 @@ export function matchRequestLang(url, request) {
 export function themeAttribute(theme) {
   return theme === 'light' || theme === 'dark' ? ` data-theme="${theme}"` : ''
 }
+
+
+/**
+ * The visitor's explicit theme straight off the request, or null
+ * for auto.
+ *
+ * resolveRequestTheme() takes cookies that have already been
+ * parsed; this takes the request. The panels and the status pages
+ * each carried their own copy of exactly this - three identical
+ * four-line functions - so it lives here now.
+ */
+export function themeFromCookie(request) {
+  const header = (request && request.headers && request.headers.get('Cookie')) || ''
+  const match = header.match(/(?:^|;\s*)theme=([^;]+)/)
+  return match && (match[1] === 'light' || match[1] === 'dark') ? match[1] : null
+}

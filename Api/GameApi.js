@@ -16,8 +16,9 @@ import { logInfo, logWarning } from '../Core/Logging.js'
 import { getPageHead } from '../Core/DesignSystem.js'
 import { CONFIG, getGameProduct } from '../Config.js'
 import { resolveGame, gameManifest, isDownloadable, downloadUrl } from '../Games/Registry.js'
-import { db, listEntitlements, consumeEntitlement } from '../Games/Store.js'
+import { db, listEntitlements, consumeEntitlement, claimPlayerIdentity } from '../Games/Store.js'
 import { requirePlayer } from '../Games/Session.js'
+import { playerIdConflict } from '../Core/PlayerIdentity.js'
 import { escapeHtml } from '../Core/Html.js'
 
 const LANGS = ['fa', 'en', 'ja']
@@ -109,13 +110,19 @@ export async function handleGameEntitlements(url, request, gameId, requestId, GA
     return createJsonResponse({ ok: false, error: 'not_configured' }, 503)
   }
 
-  const player = await requirePlayer(env, GAMES, request)
+  const player = await requirePlayer(env, GAMES, request, game)
   if (!player) {
     return createJsonResponse({
       ok: false, error: 'unauthorized',
       message: 'Send Authorization: Bearer <google id_token>, or sign in at /' + game.id + '/account.'
     }, 401)
   }
+
+  // Entitlements are keyed by player id alone, and a player id is
+  // not unique to a person. The claim decides which of two
+  // colliding addresses this balance actually belongs to.
+  const claim = await claimPlayerIdentity(database, game.id, player.playerId, player.email, player.sub)
+  if (!claim.ok) return playerIdConflict(requestId, { gameId: game.id, playerId: player.playerId })
 
   const rows = await listEntitlements(database, game.id, player.playerId)
 
@@ -157,7 +164,7 @@ export async function handleGameConsume(url, request, gameId, requestId, GAMES, 
   const database = db(env)
   if (!database) return createJsonResponse({ ok: false, error: 'not_configured' }, 503)
 
-  const player = await requirePlayer(env, GAMES, request)
+  const player = await requirePlayer(env, GAMES, request, game)
   if (!player) {
     return createJsonResponse({ ok: false, error: 'unauthorized' }, 401)
   }
@@ -182,6 +189,9 @@ export async function handleGameConsume(url, request, gameId, requestId, GAMES, 
       message: 'Only a consumable can be spent. This one is owned outright.'
     }, 409)
   }
+
+  const claim = await claimPlayerIdentity(database, game.id, player.playerId, player.email, player.sub)
+  if (!claim.ok) return playerIdConflict(requestId, { gameId: game.id, playerId: player.playerId })
 
   const result = await consumeEntitlement(database, game.id, player.playerId, productId, amount)
   if (!result.ok) {

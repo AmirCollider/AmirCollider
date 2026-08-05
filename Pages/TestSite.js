@@ -31,12 +31,20 @@
 
 import { CONFIG } from '../Config.js'
 import { getPageHead } from '../Core/DesignSystem.js'
-import { createHtmlResponse, timingSafeEqual } from '../Core/Http.js'
+import { createHtmlResponse, clientIp, timingSafeEqual } from '../Core/Http.js'
+import { logWarning } from '../Core/Logging.js'
 import { escapeHtml, hexToRgb } from '../Core/Html.js'
 import { themeBootScript } from '../Core/PageChrome.js'
-import { langCookieHeader, matchRequestLang } from '../Core/RequestContext.js'
+import { langCookieHeader, matchRequestLang, themeFromCookie } from '../Core/RequestContext.js'
+import {
+  panelPassword, issuePanelCookie, clearPanelCookie, readPanelSession,
+  isRateLimited, recordAttempt, clearAttempts
+} from '../Core/PanelSession.js'
+import { db } from '../Games/Store.js'
+
 const AUTH_COOKIE = 'amir_testsite_auth'
-const COOKIE_MAX_AGE = 60 * 60 * 2
+const COOKIE_PATH = '/testsite'
+const SESSION_MAX_AGE_MS = 2 * 60 * 60 * 1000
 
 // Whose panel this is. The test panel exercises the whole site -
 // the licence server, the checkout, every registered game - so it
@@ -57,18 +65,15 @@ const LANG_META = {
 
 // ==========================================
 // Cookie Signing - HMAC-SHA256
-// Signs the random session token so a tampered cookie cannot pass auth.
+// Cookie signing lives in Core/PanelSession.js now - this panel
+// and /thegod each carried their own copy of it, and both copies
+// signed a random token with no issue time in it. That left the
+// expiry entirely to Max-Age, which is an instruction to a
+// browser rather than a rule the server enforces, so a stolen
+// cookie outlived every window it was supposed to have.
 // ==========================================
-async function signToken(token, secret) {
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  )
-  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(token))
-  return Array.from(new Uint8Array(sig), b => b.toString(16).padStart(2, '0')).join('')
+function testSitePassword(env) {
+  return panelPassword(env, 'testsite')
 }
 
 
@@ -78,16 +83,8 @@ async function signToken(token, secret) {
 // ==========================================
 export { isAuthenticated as isTestSiteSession }
 
-async function isAuthenticated(request, env) {
-  if (!env.TestSitePassword) return false
-  const cookies = request.headers.get('Cookie') || ''
-  const match = cookies.match(new RegExp(`${AUTH_COOKIE}=([^;]+)`))
-  if (!match) return false
-  const parts = match[1].split('__')
-  if (parts.length !== 2) return false
-  const [token, signature] = parts
-  const expected = await signToken(token, env.TestSitePassword)
-  return timingSafeEqual(signature, expected)
+function isAuthenticated(request, env) {
+  return readPanelSession(request, AUTH_COOKIE, testSitePassword(env), SESSION_MAX_AGE_MS)
 }
 
 
@@ -112,11 +109,11 @@ export async function handleTestSiteLogin(url, request, gameId, requestId, GAMES
   if (await isAuthenticated(request, env)) {
     return Response.redirect(`${url.origin}/testsite`, 302)
   }
-  const failed = url.searchParams.get('error') === '1'
+  const error = url.searchParams.get('error')
   const lang = matchRequestLang(url, request)
   const theme = themeFromCookie(request)
   const headers = langCookieHeader(url, lang)
-  return createHtmlResponse(renderLogin(url.origin, lang, theme, failed), 200, headers)
+  return createHtmlResponse(renderLogin(url.origin, lang, theme, error), 200, headers)
 }
 
 
@@ -124,29 +121,37 @@ export async function handleTestSiteLogin(url, request, gameId, requestId, GAMES
 // Handler: Login (POST)
 // ==========================================
 export async function handleTestSiteLoginPost(url, request, gameId, requestId, GAMES, env) {
+  const secret = testSitePassword(env)
+  const database = db(env)
+  const ip = clientIp(request)
+
+  if (await isRateLimited(database, 'testsite', ip)) {
+    logWarning('TestSite login rate limited', { requestId })
+    return Response.redirect(`${url.origin}/testsite/login?error=2`, 302)
+  }
+
   let password = ''
   try {
     const params = new URLSearchParams(await request.text())
     password = params.get('password') || ''
   } catch {
+    await recordAttempt(database, 'testsite', ip)
     return Response.redirect(`${url.origin}/testsite/login?error=1`, 302)
   }
 
-  if (!env.TestSitePassword || password !== env.TestSitePassword) {
+  if (!secret || !timingSafeEqual(password, secret)) {
+    await recordAttempt(database, 'testsite', ip)
+    logWarning('TestSite login refused', { requestId })
     return Response.redirect(`${url.origin}/testsite/login?error=1`, 302)
   }
 
-  const sessionToken = Array.from(
-    crypto.getRandomValues(new Uint8Array(32)),
-    b => b.toString(16).padStart(2, '0')
-  ).join('')
-  const signature = await signToken(sessionToken, env.TestSitePassword)
+  await clearAttempts(database, 'testsite', ip)
 
   return new Response(null, {
     status: 302,
     headers: {
       'Location': `${url.origin}/testsite`,
-      'Set-Cookie': `${AUTH_COOKIE}=${sessionToken}__${signature}; Path=/testsite; HttpOnly; Secure; SameSite=Strict; Max-Age=${COOKIE_MAX_AGE}`
+      'Set-Cookie': await issuePanelCookie(AUTH_COOKIE, COOKIE_PATH, secret, SESSION_MAX_AGE_MS)
     }
   })
 }
@@ -160,7 +165,7 @@ export async function handleTestSiteLogout(url, request, gameId, requestId, GAME
     status: 302,
     headers: {
       'Location': `${url.origin}/testsite/login`,
-      'Set-Cookie': `${AUTH_COOKIE}=; Path=/testsite; HttpOnly; Secure; SameSite=Strict; Max-Age=0`
+      'Set-Cookie': clearPanelCookie(AUTH_COOKIE, COOKIE_PATH)
     }
   })
 }
@@ -168,14 +173,7 @@ export async function handleTestSiteLogout(url, request, gameId, requestId, GAME
 
 
 
-// ==========================================
-// Theme From Cookie ('light' | 'dark' | null = follow OS)
-// ==========================================
-function themeFromCookie(request) {
-  const cookie = request.headers.get('Cookie') || ''
-  const match = cookie.match(/(?:^|;\s*)theme=([^;]+)/)
-  return match && (match[1] === 'light' || match[1] === 'dark') ? match[1] : null
-}
+
 
 
 
@@ -309,6 +307,7 @@ const I18N = {
     loginButton: 'ورود',
     loginLoading: 'در حال ورود…',
     loginError: 'رمز عبور اشتباه است',
+    loginBlocked: 'تلاش‌های ناموفق زیاد بوده. یک ربع دیگر دوباره امتحان کن.',
     showPassword: 'نمایش رمز عبور',
     // chrome
     panelTitle: 'پنل تست',
@@ -478,6 +477,7 @@ const I18N = {
     loginButton: 'Sign in',
     loginLoading: 'Signing in…',
     loginError: 'Incorrect password',
+    loginBlocked: 'Too many failed attempts. Try again in fifteen minutes.',
     showPassword: 'Show password',
     panelTitle: 'Test panel',
     panelSub: 'Live proxy & database health checks',
@@ -640,6 +640,7 @@ const I18N = {
     loginButton: 'サインイン',
     loginLoading: 'サインイン中…',
     loginError: 'パスワードが正しくありません',
+    loginBlocked: 'ログインの失敗が多すぎます。15分後にもう一度お試しください。',
     showPassword: 'パスワードを表示',
     panelTitle: 'テストパネル',
     panelSub: 'プロキシとデータベースのライブ診断',
@@ -874,7 +875,12 @@ function topbarHtml(prefix, amirLogo, brandName, lang) {
 // ==========================================
 // Page: Login
 // ==========================================
-function renderLogin(baseUrl, lang, theme, failed) {
+function renderLogin(baseUrl, lang, theme, error) {
+  // '1' is a wrong password, '2' is too many tries. The banner is
+  // one element either way - only its text changes - so the CSS
+  // below still asks a single question: is there anything to show?
+  const failed = error === '1' || error === '2'
+  const blocked = error === '2'
   const dict = I18N[lang] || I18N[DEFAULT_LANG]
   const meta = LANG_META[lang] || LANG_META[DEFAULT_LANG]
   const accent = PANEL_ACCENT
@@ -988,7 +994,7 @@ function renderLogin(baseUrl, lang, theme, failed) {
         <p data-i18n="loginSub">${escapeHtml(dict.loginSub)}</p>
       </div>
 
-      <div class="lg-error" role="alert">${ICONS.shield}<span data-i18n="loginError">${escapeHtml(dict.loginError)}</span></div>
+      <div class="lg-error" role="alert">${ICONS.shield}<span${blocked ? '' : ' data-i18n="loginError"'}>${escapeHtml(blocked ? dict.loginBlocked : dict.loginError)}</span></div>
 
       <form method="POST" action="${escapeHtml(baseUrl)}/testsite/login" id="lg-form">
         <label class="lg-label" for="lg-pw" data-i18n="loginPassword">${escapeHtml(dict.loginPassword)}</label>

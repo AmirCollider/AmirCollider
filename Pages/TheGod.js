@@ -30,16 +30,23 @@
 
 import { CONFIG } from '../Config.js'
 import { getPageHead } from '../Core/DesignSystem.js'
-import { createHtmlResponse, timingSafeEqual } from '../Core/Http.js'
+import { createHtmlResponse, clientIp, timingSafeEqual } from '../Core/Http.js'
+import { logWarning } from '../Core/Logging.js'
 import { resolveGames, isDownloadable } from '../Games/Registry.js'
 import { db } from '../Games/Store.js'
 import { storeReady } from '../Games/Purchase.js'
 import { isConfigured as providerConfigured, isSandbox } from '../Commerce/Provider.js'
 
-import { langCookieHeader, matchRequestLang } from '../Core/RequestContext.js'
+import { langCookieHeader, matchRequestLang, themeFromCookie } from '../Core/RequestContext.js'
+import {
+  panelPassword, issuePanelCookie, clearPanelCookie, readPanelSession,
+  isRateLimited, recordAttempt, clearAttempts
+} from '../Core/PanelSession.js'
 import { escapeHtml } from '../Core/Html.js'
+
 const AUTH_COOKIE = 'amir_thegod_auth'
-const COOKIE_MAX_AGE = 60 * 60 * 4
+const COOKIE_PATH = '/thegod'
+const SESSION_MAX_AGE_MS = 4 * 60 * 60 * 1000
 
 const LANGS = ['fa', 'en', 'ja']
 const DEFAULT_LANG = 'fa'
@@ -51,36 +58,30 @@ const META = {
 
 
 // ==========================================
-// Cookie signing - HMAC-SHA256
-// Signs a random session token so a tampered cookie cannot pass
-// auth. Identical in shape to the test panel's, deliberately:
-// it is the same operator, the same password and the same job,
-// and two different rules for that would be two chances to get
-// one of them wrong.
+// The session
+//
+// Cookie signing lives in Core/PanelSession.js now. It used to be
+// written out here and again in Pages/TestSite.js - the same
+// function twice, with the same flaw in both: the signature
+// covered a random token and nothing else, so a cookie's expiry
+// was Max-Age alone. Max-Age is advice to a browser, and whoever
+// steals a cookie is not using that browser. The issue time is
+// inside the signed payload now and checked server-side.
+//
+// This panel also has its own password. It shared TestSitePassword
+// with the rehearsal panel, which put the credential you hand
+// somebody to try a checkout in front of the screens that set
+// prices and ban players.
 // ==========================================
-async function signToken(token, secret) {
-  const key = await crypto.subtle.importKey(
-    'raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
-  )
-  const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(token))
-  return Array.from(new Uint8Array(signature), b => b.toString(16).padStart(2, '0')).join('')
+function theGodPassword(env) {
+  return panelPassword(env, 'thegod')
 }
 
 
 export { isAuthenticated as isTheGodSession }
 
-async function isAuthenticated(request, env) {
-  if (!env || !env.TestSitePassword) return false
-
-  const cookies = request.headers.get('Cookie') || ''
-  const match = cookies.match(new RegExp(`${AUTH_COOKIE}=([^;]+)`))
-  if (!match) return false
-
-  const parts = match[1].split('__')
-  if (parts.length !== 2) return false
-
-  const expected = await signToken(parts[0], env.TestSitePassword)
-  return timingSafeEqual(parts[1], expected)
+function isAuthenticated(request, env) {
+  return readPanelSession(request, AUTH_COOKIE, theGodPassword(env), SESSION_MAX_AGE_MS)
 }
 
 
@@ -119,33 +120,51 @@ export async function handleTheGodLogin(url, request, gameId, requestId, GAMES, 
 
   const lang = matchRequestLang(url, request)
   const theme = themeFromCookie(request)
-  const failed = url.searchParams.get('error') === '1'
+  const error = url.searchParams.get('error')
 
-  return createHtmlResponse(renderLogin(lang, theme, failed), 200, langCookieHeader(url, lang))
+  return createHtmlResponse(renderLogin(lang, theme, error), 200, langCookieHeader(url, lang))
 }
 
 
 export async function handleTheGodLoginPost(url, request, gameId, requestId, GAMES, env) {
+  const secret = theGodPassword(env)
+  const database = db(env)
+  const ip = clientIp(request)
+
+  // Counted before the password is looked at, so a guess costs an
+  // attempt whether or not it was close. One password stands
+  // between this endpoint and every game, price and player record
+  // on the deployment, and until now nothing stopped anyone from
+  // asking as fast as the edge could answer.
+  if (await isRateLimited(database, 'thegod', ip)) {
+    logWarning('TheGod login rate limited', { requestId })
+    return Response.redirect(`${url.origin}/thegod/login?error=2`, 302)
+  }
+
   let password = ''
   try {
     const params = new URLSearchParams(await request.text())
     password = params.get('password') || ''
   } catch {
+    await recordAttempt(database, 'thegod', ip)
     return Response.redirect(`${url.origin}/thegod/login?error=1`, 302)
   }
 
-  if (!env.TestSitePassword || password !== env.TestSitePassword) {
+  // timingSafeEqual rather than !==, for the same reason the
+  // cookie check has always used it.
+  if (!secret || !timingSafeEqual(password, secret)) {
+    await recordAttempt(database, 'thegod', ip)
+    logWarning('TheGod login refused', { requestId })
     return Response.redirect(`${url.origin}/thegod/login?error=1`, 302)
   }
 
-  const token = Array.from(crypto.getRandomValues(new Uint8Array(32)), b => b.toString(16).padStart(2, '0')).join('')
-  const signature = await signToken(token, env.TestSitePassword)
+  await clearAttempts(database, 'thegod', ip)
 
   return new Response(null, {
     status: 302,
     headers: {
       'Location': `${url.origin}/thegod`,
-      'Set-Cookie': `${AUTH_COOKIE}=${token}__${signature}; Path=/thegod; HttpOnly; Secure; SameSite=Strict; Max-Age=${COOKIE_MAX_AGE}`
+      'Set-Cookie': await issuePanelCookie(AUTH_COOKIE, COOKIE_PATH, secret, SESSION_MAX_AGE_MS)
     }
   })
 }
@@ -156,16 +175,9 @@ export async function handleTheGodLogout(url, request, gameId, requestId, GAMES,
     status: 302,
     headers: {
       'Location': `${url.origin}/thegod/login`,
-      'Set-Cookie': `${AUTH_COOKIE}=; Path=/thegod; HttpOnly; Secure; SameSite=Strict; Max-Age=0`
+      'Set-Cookie': clearPanelCookie(AUTH_COOKIE, COOKIE_PATH)
     }
   })
-}
-
-
-
-function themeFromCookie(request) {
-  const cookie = (request.headers.get('Cookie') || '').match(/(?:^|;\s*)theme=([^;]+)/)
-  return cookie && (cookie[1] === 'light' || cookie[1] === 'dark') ? cookie[1] : null
 }
 
 
@@ -250,6 +262,7 @@ const I18N = {
     loginPlaceholder: 'رمز عبور را وارد کن',
     loginButton: 'ورود',
     loginError: 'رمز عبور اشتباه است',
+    loginBlocked: 'تلاش‌های ناموفق زیاد بوده. یک ربع دیگر دوباره امتحان کن.',
     showPassword: 'نمایش رمز',
     logout: 'خروج',
 
@@ -610,6 +623,7 @@ const I18N = {
     loginPlaceholder: 'Enter your password',
     loginButton: 'Sign in',
     loginError: 'Incorrect password',
+    loginBlocked: 'Too many failed attempts. Try again in fifteen minutes.',
     showPassword: 'Show password',
     logout: 'Log out',
 
@@ -957,6 +971,7 @@ const I18N = {
     loginPlaceholder: 'パスワードを入力',
     loginButton: 'サインイン',
     loginError: 'パスワードが正しくありません',
+    loginBlocked: 'ログインの失敗が多すぎます。15分後にもう一度お試しください。',
     showPassword: 'パスワードを表示',
     logout: 'ログアウト',
 
@@ -1705,7 +1720,7 @@ function themeBoot() {
 // ==========================================
 // Login page
 // ==========================================
-function renderLogin(lang, theme, failed) {
+function renderLogin(lang, theme, error) {
   const t = localizedDict(lang)
   const themeAttr = theme === 'light' || theme === 'dark' ? ` data-theme="${theme}"` : ''
 
@@ -1727,7 +1742,8 @@ function renderLogin(lang, theme, failed) {
       <h1 style="font-size:1.3em;font-weight:800;margin-block-end:6px">${escapeHtml(t.loginTitle)}</h1>
       <p class="muted" style="font-size:.92em;margin-block-end:22px">${escapeHtml(t.loginSub)}</p>
 
-      ${failed ? `<div class="note err" style="text-align:start" role="alert">${escapeHtml(t.loginError)}</div>` : ''}
+      ${error === '2' ? `<div class="note err" style="text-align:start" role="alert">${escapeHtml(t.loginBlocked)}</div>` : ''}
+      ${error === '1' ? `<div class="note err" style="text-align:start" role="alert">${escapeHtml(t.loginError)}</div>` : ''}
 
       <form method="POST" action="/thegod/login">
         <label class="f" style="text-align:start">

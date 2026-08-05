@@ -196,6 +196,8 @@ without it. See `Docs/Licensing.md`.
 | `DOCSNAP_LICENSE_PRIVATE_KEY` | yes | Keys are delivered but cannot be activated |
 | `DOCSNAP_ADMIN_TOKEN` | for tooling | `/license/admin` and `/testsite/checkout` from a terminal |
 | `TestSitePassword` | for tooling | The `/testsite` panel and its checkout simulator |
+| `TheGodPassword` | for tooling | The `/thegod` panel. Falls back to `TestSitePassword` when unset |
+| `STATE_SIGNING_SECRET` | **required** | Signs OAuth state and player sessions. No fallback — the Worker refuses to start without it |
 | `NOWPAYMENTS_API_BASE` | no | Set only to point at the sandbox; delete to go back to live |
 
 ### 6. Deploy

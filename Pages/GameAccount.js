@@ -459,7 +459,7 @@ export async function completeSiteSignIn(url, request, stateData, code, GAMES, e
   // arrived over a channel we trust, but "the bytes parsed" and
   // "Google says this is current" are different claims, and the
   // session about to be minted lasts a week.
-  const player = await verifyGoogleIdToken(tokens && tokens.id_token)
+  const player = await verifyGoogleIdToken(tokens && tokens.id_token, game)
   if (!player) {
     logWarning('Site sign-in produced no usable identity', { gameId })
     return Response.redirect(`${url.origin}/${gameId}/account?error=1`, 302)

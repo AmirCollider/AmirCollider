@@ -11,10 +11,11 @@
 // resolves to.
 // ==========================================
 
-import { validateGameId } from '../Config.js'
+import { validateGameId, getGameAudiences } from '../Config.js'
 import { createJsonResponse } from '../Core/Http.js'
 import { logInfo, logError } from '../Core/Logging.js'
-import { fetchTokenInfo } from '../Core/GoogleOAuth.js'
+import { verifyIdToken } from '../Core/GoogleOAuth.js'
+import { emailMatchesRow, playerIdConflict } from '../Core/PlayerIdentity.js'
 import {
   mapPlayer,
   playerIdFromEmail,
@@ -25,7 +26,36 @@ import {
   refuseIfBanned
 } from '../Games/PlayerRecord.js'
 
-const PUBLIC_READ_PATHS = ['topScores', 'globalTopScores', 'leaderboard']
+// ==========================================
+// What may be read without proving anything
+//
+// Anchored patterns, not substrings. This was a list of words
+// tested with dbPath.includes(), which is a different question
+// from the one it was meant to ask: any path with "leaderboard"
+// ANYWHERE in it counted as public, so
+//
+//   /database/get/games/leaderboard/users/ali
+//
+// skipped the token check entirely and then matched the
+// user-record branch below - handing out a player's email address
+// to anybody who typed it. Player ids are the local part of an
+// address, so guessing one is not the hard part either.
+//
+// A regex per public shape means a path is public because it IS a
+// leaderboard, not because it contains the word.
+// ==========================================
+const PUBLIC_READ_PATTERNS = [
+  /^games\/[^/]+\/leaderboard$/,
+  /^games\/[^/]+\/topScores$/,
+  /^games\/[^/]+\/globalTopScores$/,
+  /^leaderboard$/,
+  /^topScores$/,
+  /^globalTopScores$/
+]
+
+function isPublicRead(dbPath) {
+  return PUBLIC_READ_PATTERNS.some(pattern => pattern.test(dbPath))
+}
 
 function bearerToken(request) {
   return request.headers.get('Authorization')?.replace('Bearer ', '')
@@ -44,27 +74,73 @@ function database(env, game, requestId) {
 }
 
 /**
- * Resolves the caller and checks they own the record the path
- * names. Returns { playerId } or a refusal Response.
+ * The caller's verified identity, or a refusal Response.
+ *
+ * `game` supplies the audience the token has to name, so a token
+ * minted for somebody else's Google client is refused here rather
+ * than accepted as whoever it happens to describe.
  */
-async function authorizeOwner(request, dbPath, requestId) {
+async function authenticate(request, game, requestId) {
   const token = bearerToken(request)
   if (!token) {
     return { refusal: createJsonResponse({ error: 'unauthorized', message: 'Authorization token required', requestId }, 401) }
   }
 
-  const tokenInfo = await fetchTokenInfo(token)
-  if (!tokenInfo) {
+  const identity = await verifyIdToken(token, getGameAudiences(game))
+  if (!identity) {
     return { refusal: createJsonResponse({ error: 'invalid_token', message: 'Token is invalid or expired', requestId }, 401) }
   }
 
-  const tokenPlayerId = playerIdFromEmail(tokenInfo.email)
+  return { identity, tokenPlayerId: playerIdFromEmail(identity.email) }
+}
+
+
+/**
+ * Resolves the caller and checks they own the record the path
+ * names. Returns { identity, tokenPlayerId, ownerMatch } or a
+ * refusal Response.
+ */
+async function authorizeOwner(request, game, dbPath, requestId) {
+  const auth = await authenticate(request, game, requestId)
+  if (auth.refusal) return auth
+
   const ownerMatch = dbPath.match(/^games\/[^/]+\/users\/([^/]+)/)
-  if (ownerMatch && ownerMatch[1] !== tokenPlayerId) {
+  if (ownerMatch && ownerMatch[1] !== auth.tokenPlayerId) {
     return { refusal: createJsonResponse({ error: 'forbidden', message: 'You can only modify your own data', requestId }, 403) }
   }
 
-  return { tokenPlayerId, ownerMatch }
+  return { ...auth, ownerMatch }
+}
+
+
+/**
+ * Whether the row this caller is about to touch is actually theirs.
+ *
+ * Deriving a player id from an address is not injective - fifteen
+ * characters of the local part means ali@gmail.com and
+ * ali@yahoo.com are both "ali" - so "the id matches" and "the
+ * record is yours" stopped being the same statement the moment a
+ * second person with a colliding address signed in. The row itself
+ * settles it: whoever's address is in the `email` column owns it.
+ *
+ * Returns a refusal Response, or null when the caller may proceed.
+ * A row that does not exist yet is nobody's, so it passes.
+ */
+async function refuseIfSomebodyElses(db, playerId, email, requestId) {
+  let row
+  try {
+    row = await db.prepare('SELECT email FROM players WHERE player_id = ? LIMIT 1')
+      .bind(playerId).first()
+  } catch {
+    // A read that failed is not evidence of ownership either way.
+    // Refusing here would take the data API down with the database
+    // it could not reach, and the write below is going to fail on
+    // its own if the table is genuinely gone.
+    return null
+  }
+
+  if (emailMatchesRow(row, email)) return null
+  return playerIdConflict(requestId, { playerId })
 }
 
 function parseJsonBody(body, requestId) {
@@ -90,13 +166,21 @@ export async function handleDatabaseGet(url, request, gameId, requestId, GAMES, 
   }
 
   const dbPath = url.pathname.replace('/database/get/', '')
-  const isPublicPath = PUBLIC_READ_PATHS.some(path => dbPath.includes(path))
+  const isPublicPath = isPublicRead(dbPath)
 
-  if (!isPublicPath && !bearerToken(request)) {
-    return createJsonResponse({ error: 'unauthorized', message: 'Authorization token required', requestId }, 401)
-  }
   if (!game.d1Binding) {
     return createJsonResponse({ error: 'unsupported_game', message: 'This game does not support GET operations', requestId }, 400)
+  }
+
+  // Anything that is not a public board is authenticated for real
+  // now. The old check asked only whether an Authorization header
+  // existed - "Bearer x" satisfied it - which made every read
+  // below unauthenticated in everything but name.
+  let caller = null
+  if (!isPublicPath) {
+    const auth = await authenticate(request, game, requestId)
+    if (auth.refusal) return auth.refusal
+    caller = auth
   }
 
   logInfo('Database GET', { requestId, gameId, public: isPublicPath })
@@ -107,14 +191,31 @@ export async function handleDatabaseGet(url, request, gameId, requestId, GAMES, 
   try {
     const userMatch = dbPath.match(/^games\/[^/]+\/users\/([^/]+)$/)
     if (userMatch) {
+      // The full record carries an email address, so it is the
+      // owner's alone. A score is a different matter - see below.
+      if (userMatch[1] !== caller.tokenPlayerId) {
+        return createJsonResponse({
+          error: 'forbidden',
+          message: 'You can only read your own record',
+          requestId
+        }, 403)
+      }
+
       const player = await db.prepare('SELECT * FROM players WHERE player_id = ? LIMIT 1')
         .bind(userMatch[1]).first().catch(() => null)
       if (!player) {
         return createJsonResponse({ error: 'not_found', message: 'User not found', requestId }, 404)
       }
+      if (!emailMatchesRow(player, caller.identity.email)) {
+        return playerIdConflict(requestId, { playerId: userMatch[1] })
+      }
       return createJsonResponse(mapPlayer(player), 200)
     }
 
+    // Somebody else's high score stays readable to a signed-in
+    // caller: it is one integer, it is already on the public
+    // leaderboard, and the game shows a rival's best beside your
+    // own. Nothing identifying comes back with it.
     const scoreMatch = dbPath.match(/^games\/[^/]+\/users\/([^/]+)\/highScore$/)
     if (scoreMatch) {
       const player = await db.prepare('SELECT high_score FROM players WHERE player_id = ? LIMIT 1')
@@ -122,7 +223,7 @@ export async function handleDatabaseGet(url, request, gameId, requestId, GAMES, 
       return createJsonResponse(player ? player.high_score : 0, 200)
     }
 
-    if (dbPath.includes('leaderboard')) {
+    if (isPublicPath) {
       const moderated = await hasModerationColumns(db)
       const { results } = await db.prepare(`
         SELECT username, username AS displayName, high_score AS highScore,
@@ -161,7 +262,7 @@ export async function handleDatabaseSet(url, request, gameId, requestId, GAMES, 
   }
 
   const dbPath = url.pathname.replace('/database/set/', '')
-  const auth = await authorizeOwner(request, dbPath, requestId)
+  const auth = await authorizeOwner(request, game, dbPath, requestId)
   if (auth.refusal) return auth.refusal
 
   const body = await request.text()
@@ -177,11 +278,15 @@ export async function handleDatabaseSet(url, request, gameId, requestId, GAMES, 
   try {
     const highScoreMatch = dbPath.match(/^games\/([^/]+)\/users\/([^/]+)\/highScore$/)
     if (highScoreMatch) {
+      const conflict = await refuseIfSomebodyElses(db, highScoreMatch[2], auth.identity.email, requestId)
+      if (conflict) return conflict
       return writeHighScore(db, highScoreMatch[2], body, gameId, requestId)
     }
 
     const userMatch = dbPath.match(/^games\/([^/]+)\/users\/([^/]+)$/)
     if (userMatch) {
+      const conflict = await refuseIfSomebodyElses(db, userMatch[2], auth.identity.email, requestId)
+      if (conflict) return conflict
       return writeProfile(db, userMatch[2], body, gameId, requestId, false)
     }
 
@@ -275,7 +380,7 @@ export async function handleDatabasePatch(url, request, gameId, requestId, GAMES
   }
 
   const dbPath = url.pathname.replace('/database/patch/', '')
-  const auth = await authorizeOwner(request, dbPath, requestId)
+  const auth = await authorizeOwner(request, game, dbPath, requestId)
   if (auth.refusal) return auth.refusal
 
   const body = await request.text()
@@ -290,6 +395,8 @@ export async function handleDatabasePatch(url, request, gameId, requestId, GAMES
   if (!auth.ownerMatch) return unknownPath(requestId)
 
   try {
+    const conflict = await refuseIfSomebodyElses(db, auth.ownerMatch[1], auth.identity.email, requestId)
+    if (conflict) return conflict
     return await writeProfile(db, auth.ownerMatch[1], body, gameId, requestId, true)
   } catch (error) {
     logError('Database PATCH error', { requestId, gameId, error: error.message })

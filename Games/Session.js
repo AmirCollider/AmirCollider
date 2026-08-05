@@ -19,9 +19,12 @@
 // later.
 // ==========================================
 
-import { CONFIG } from '../Config.js'
+import { CONFIG, getGameAudiences } from '../Config.js'
 
 import { timingSafeEqual } from '../Core/Http.js'
+import { verifyIdToken } from '../Core/GoogleOAuth.js'
+import { playerIdFromEmail } from '../Core/PlayerIdentity.js'
+
 const COOKIE_NAME = 'ac_player'
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
@@ -29,62 +32,42 @@ const decoder = new TextDecoder()
 
 // ==========================================
 // playerIdFromEmail
-// The identifier a game's own database uses for a person.
+// Re-exported, not redefined.
 //
-// If that rule ever changes, it changes in both places in the
-// same commit or not at all.
+// It lives in Core/PlayerIdentity.js now. It used to be written
+// out here AND in Games/PlayerRecord.js, each with a comment
+// saying the two must never disagree - which is a promise, where
+// one function is a guarantee.
 // ==========================================
-export function playerIdFromEmail(email) {
-  return String(email || '').split('@')[0].toLowerCase().substring(0, 15)
-}
+export { playerIdFromEmail }
 
 
 // ==========================================
 // verifyGoogleIdToken
-// Google's own opinion of a token, or null.
+// Google's opinion of a token, checked against ours, or null.
 //
-// Null for every failure - network, non-200, malformed body,
-// an error field - because every caller wants the same thing
-// from all four: treat this request as unauthenticated.
+// `game` is required: it names the Google client ids this token
+// is allowed to have been issued for. Without it there is no
+// audience to check against and Core/GoogleOAuth.js refuses
+// everything - see the long note there for why that is the right
+// way round.
 // ==========================================
-export async function verifyGoogleIdToken(idToken) {
-  if (!idToken) return null
-
-  try {
-    const response = await fetch(
-      'https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(idToken)
-    )
-    if (!response.ok) return null
-
-    const info = await response.json().catch(() => null)
-    if (!info || info.error_description || !info.email) return null
-
-    // An unverified address is one somebody typed into a Google
-    // account and never proved. Accepting it would let a person
-    // claim another player's id simply by putting their address
-    // on a fresh account.
-    if (info.email_verified === false || info.email_verified === 'false') return null
-
-    return {
-      sub: String(info.sub || ''),
-      email: String(info.email || ''),
-      name: String(info.name || ''),
-      picture: String(info.picture || ''),
-      playerId: playerIdFromEmail(info.email)
-    }
-  } catch {
-    return null
-  }
+export function verifyGoogleIdToken(idToken, game) {
+  return verifyIdToken(idToken, getGameAudiences(game))
 }
 
 
 // ==========================================
 // Cookie signing - HMAC-SHA256
+//
+// One secret, and no fallback. This used to drop back to the
+// first game's Google client secret when STATE_SIGNING_SECRET was
+// unset, which quietly made an OAuth credential the key that
+// signs every player's session. Config.js requires the variable
+// now, so the fallback has nothing left to do.
 // ==========================================
-function sessionSecret(env, GAMES) {
-  if (env && env.STATE_SIGNING_SECRET) return env.STATE_SIGNING_SECRET
-  const first = GAMES && GAMES[Object.keys(GAMES)[0]]
-  return (first && first.oauth && first.oauth.secret) || ''
+function sessionSecret(env) {
+  return (env && env.STATE_SIGNING_SECRET) || ''
 }
 
 
@@ -121,7 +104,7 @@ async function sign(payload, secret) {
 // pages all need it, and they do not share a prefix.
 // ==========================================
 export async function issuePlayerSession(env, GAMES, player) {
-  const secret = sessionSecret(env, GAMES)
+  const secret = sessionSecret(env)
   if (!secret) return null
 
   const body = {
@@ -152,7 +135,7 @@ export function clearPlayerSession() {
 // The signed-in player, or null.
 // ==========================================
 export async function readPlayerSession(env, GAMES, request) {
-  const secret = sessionSecret(env, GAMES)
+  const secret = sessionSecret(env)
   if (!secret) return null
 
   const header = (request && request.headers && request.headers.get('Cookie')) || ''
@@ -185,8 +168,10 @@ export async function readPlayerSession(env, GAMES, request) {
 // ==========================================
 // playerFromBearer
 // The player a game client is calling as, or null.
+//
+// `game` names the audience the token must have been issued for.
 // ==========================================
-export async function playerFromBearer(request) {
+export async function playerFromBearer(request, game) {
   const header = (request && request.headers && request.headers.get('Authorization')) || ''
   const token = header.replace(/^Bearer\s+/i, '').trim()
   if (!token || token === header.trim()) {
@@ -195,18 +180,23 @@ export async function playerFromBearer(request) {
     // bug, and accepting it teaches the bug to stay.
     if (!/^Bearer\s+/i.test(header)) return null
   }
-  return verifyGoogleIdToken(token)
+  return verifyGoogleIdToken(token, game)
 }
 
 
 // ==========================================
 // requirePlayer
 // Either proof, whichever the caller brought.
+//
+// `game` is the game whose OAuth clients a bearer token must name.
+// A caller that arrives with a session cookie does not need it -
+// the cookie was signed by this Worker, and the audience was
+// already checked when it was issued.
 // ==========================================
-export async function requirePlayer(env, GAMES, request) {
+export async function requirePlayer(env, GAMES, request, game) {
   const header = (request && request.headers && request.headers.get('Authorization')) || ''
   if (/^Bearer\s+/i.test(header)) {
-    const fromToken = await playerFromBearer(request)
+    const fromToken = await playerFromBearer(request, game)
     if (fromToken) return { ...fromToken, via: 'token' }
     return null
   }

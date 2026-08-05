@@ -29,6 +29,7 @@ import {
   setStatus, deleteLicense, licenseStats
 } from '../Licensing/Store.js'
 import { TOKEN_LIFETIME } from '../Licensing/Tokens.js'
+import { panelPassword } from '../Core/PanelSession.js'
 
 
 // ==========================================
@@ -37,7 +38,11 @@ import { TOKEN_LIFETIME } from '../Licensing/Tokens.js'
 // ==========================================
 async function authorize(request, env) {
   const token = env && env.DOCSNAP_ADMIN_TOKEN
-  const password = env && env.TestSitePassword
+  // The rehearsal panel's own secret, not TheGod's. This endpoint
+  // is reached from /testsite and is gated by that panel's
+  // session, so it resolves the password the same way that panel
+  // does rather than reading the variable directly.
+  const password = panelPassword(env, 'testsite')
 
   if (!token && !password) {
     return createJsonResponse({

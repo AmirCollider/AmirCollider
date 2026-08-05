@@ -54,9 +54,20 @@ game; it only returns that game to its coded defaults.
 
 ## TheGod
 
-`/thegod`, behind `TestSitePassword` — the same password as `/testsite`,
-with its own cookie scoped `Path=/thegod` so a browser will not send one
-panel's session to the other.
+`/thegod`, behind `TheGodPassword`, with its own cookie scoped
+`Path=/thegod` so a browser will not send one panel's session to the other.
+
+It used to share `TestSitePassword` with `/testsite`, which put the
+credential you hand somebody to try a checkout in front of the screens
+that set prices and ban players. `TheGodPassword` is its own secret now;
+if it is unset the panel falls back to `TestSitePassword`, so a
+deployment that has not set it yet is not locked out of the tool it would
+use to set it.
+
+Both login endpoints are rate limited — twelve failures per address per
+fifteen minutes, in `panel_attempts` — and both session cookies carry
+their issue time *inside* the signature, so an expiry is something this
+Worker enforces rather than something the browser is asked to.
 
 Nine tabs:
 
@@ -482,7 +493,7 @@ needs — `NOWPAYMENTS_API_KEY` and `NOWPAYMENTS_IPN_SECRET`. Without them
 the buy buttons render disabled and say so, rather than collecting a
 click and failing.
 
-`/thegod` needs `TestSitePassword`, which is already set if `/testsite`
+`/thegod` needs `TheGodPassword` (or `TestSitePassword`, which is already set if `/testsite`
 works.
 
 Point the NOWPayments IPN callback for game invoices at
