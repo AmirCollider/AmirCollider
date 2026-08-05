@@ -191,7 +191,7 @@ export function createNotFoundPage({ lang, theme, path = '', games = [] }) {
 
   const links = [
     { href: '/', label: p.home },
-    { href: '/#games', label: p.games },
+    { href: '/games', label: p.games },
     { href: '/tools', label: p.tools },
     { href: '/release-notes', label: p.notes }
   ].map(link =>

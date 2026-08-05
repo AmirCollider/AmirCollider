@@ -207,33 +207,56 @@ function mergeGame(game, row, productRows) {
       scheme: deepLinkScheme || game.deepLink.scheme
     },
 
-    // The landing page's own content. Entirely database-driven:
+    // The landing page's own content: the database over whatever
+    // the registry entry brought with it.
+    //
+    // It used to be database-ONLY, and the reasoning was sound -
     // Config.js has no opinion about trailers, and a game with no
-    // row here gets a landing page built from what the card
-    // already knows - which is a correct page, just a shorter one.
+    // row still got a correct page, just a shorter one. What that
+    // missed is how short. Every block on a landing page was a
+    // database field, so a game whose row had not been filled in
+    // rendered a logo, one line of description and a download
+    // button: a page that does not read as being about a game.
+    // Search engines and the assistants reading them came away
+    // from this domain concluding that AmirCollider ships tools
+    // and no games, which is not a ranking problem - it is the
+    // page having failed to say the one thing it exists to say.
+    //
+    // So the registry may now carry a baseline for any of these,
+    // and the panel still wins over it field by field. Empty
+    // database, real page; edited database, edited page.
     //
     // Everything from 0008 reads as undefined on a database that
     // stopped at 0005, which text() and jsonArray() both turn
-    // into "nothing to show" rather than an error. So the page
-    // degrades one section at a time instead of all at once.
-    landing: {
-      hero: text(row && row.hero_url) || '',
-      videos: jsonArray(row && row.videos_json),
-      devices: jsonArray(row && row.devices_json),
-      about: {
-        fa: text(row && row.about_fa) || '',
-        en: text(row && row.about_en) || '',
-        ja: text(row && row.about_ja) || ''
-      },
-      tagline: {
-        fa: text(row && row.tagline_fa) || '',
-        en: text(row && row.tagline_en) || '',
-        ja: text(row && row.tagline_ja) || ''
-      },
-      features: jsonArray(row && row.features_json),
-      screenshots: jsonArray(row && row.screenshots_json),
-      faq: jsonArray(row && row.faq_json)
-    },
+    // into "nothing here" rather than an error - and "nothing
+    // here" now falls through to the baseline instead of to a
+    // blank section.
+    landing: (() => {
+      const base = game.landing || {}
+      const pick = (value, fallback) => (value && value.length ? value : (fallback || []))
+      const lang3 = (fa, en, ja, fallback = {}) => ({
+        fa: fa || fallback.fa || '',
+        en: en || fallback.en || '',
+        ja: ja || fallback.ja || ''
+      })
+
+      return {
+        hero: text(row && row.hero_url) || base.hero || '',
+        videos: pick(jsonArray(row && row.videos_json), base.videos),
+        devices: pick(jsonArray(row && row.devices_json), base.devices),
+        about: lang3(
+          text(row && row.about_fa), text(row && row.about_en), text(row && row.about_ja),
+          base.about
+        ),
+        tagline: lang3(
+          text(row && row.tagline_fa), text(row && row.tagline_en), text(row && row.tagline_ja),
+          base.tagline
+        ),
+        features: pick(jsonArray(row && row.features_json), base.features),
+        screenshots: pick(jsonArray(row && row.screenshots_json), base.screenshots),
+        faq: pick(jsonArray(row && row.faq_json), base.faq)
+      }
+    })(),
 
     store: {
       ...game.store,

@@ -164,7 +164,7 @@ function primaryItems(lang) {
   const p = pack(lang)
   return [
     { key: 'home', href: '/', label: p.home },
-    { key: 'games', href: '/#games', label: p.games },
+    { key: 'games', href: '/games', label: p.games },
     { key: 'tools', href: '/tools', label: p.tools },
     { key: 'docsnap', href: '/unity-docsnap', label: p.docsnap },
     { key: 'directtmp', href: '/unity-directtmp', label: p.directtmp }
@@ -551,7 +551,7 @@ export function siteFooter({ lang, games = [] } = {}) {
       links: [
         { href: '/', label: p.home },
         { href: '/about', label: p.about },
-        { href: '/#games', label: p.games },
+        { href: '/games', label: p.games },
         { href: '/tools', label: p.tools },
         { href: '/release-notes', label: p.releaseNotes },
         { href: '/metrics', label: p.metrics }

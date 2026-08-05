@@ -138,6 +138,7 @@ const I18N = {
 
     purposeHead: 'این برنامه چیست',
     platformNoun: { android: 'اندرویدی', web: 'تحت‌وب', both: 'اندرویدی و تحت‌وب' },
+    titleKind: { android: 'بازی اندرویدی', web: 'بازی تحت‌وب', both: 'بازی اندرویدی و تحت‌وب' },
     appIs: (name, kind) => `«${name}» یک بازی ${kind} است که AmirCollider آن را ساخته و منتشر می‌کند.`,
     googleHead: 'ورود با گوگل در این بازی برای چیست',
     googleLede: 'بازی بدون ورود هم کامل کار می‌کند. اگر وارد شوی، فقط این سه چیز از حساب گوگلت خوانده می‌شود: نام، نشانی ایمیل و تصویر پروفایل — یعنی همان scopeهای openid، profile و email. هیچ دسترسی دیگری به حساب گوگلت خواسته نمی‌شود.',
@@ -186,6 +187,7 @@ const I18N = {
 
     purposeHead: 'What this app is',
     platformNoun: { android: 'an Android', web: 'a browser', both: 'an Android and browser' },
+    titleKind: { android: 'Android game', web: 'browser game', both: 'Android and browser game' },
     appIs: (name, kind) => `${name} is ${kind} game built and published by AmirCollider.`,
     googleHead: 'What Google sign-in is used for here',
     googleLede: 'The game works fully without signing in. If you do sign in, exactly three things are read from your Google account: your name, your email address and your profile picture — the openid, profile and email scopes. No other access to your Google account is requested.',
@@ -234,6 +236,7 @@ const I18N = {
 
     purposeHead: 'このアプリについて',
     platformNoun: { android: 'Android 向け', web: 'ブラウザ', both: 'Android およびブラウザ向け' },
+    titleKind: { android: 'Android ゲーム', web: 'ブラウザゲーム', both: 'Android・ブラウザゲーム' },
     appIs: (name, kind) => `${name} は、AmirCollider が開発・公開している${kind}ゲームです。`,
     googleHead: 'Google サインインの用途',
     googleLede: 'サインインしなくてもゲームはすべて遊べます。サインインした場合に Google アカウントから読み取るのは、お名前・メールアドレス・プロフィール画像の 3 つだけです(openid・profile・email スコープ)。それ以外のアクセス権は一切要求しません。',
@@ -773,6 +776,34 @@ function productsBlock(game, lang) {
 }
 
 
+// ==========================================
+// faqLd
+// The same questions the FAQ block renders, as structured data.
+//
+// Built from the same array the section is built from, so the two
+// cannot say different things - which is the one kind of FAQ
+// markup a search engine treats as a violation rather than as
+// noise.
+// ==========================================
+function faqLd(game, lang) {
+  const items = rows(game.landing.faq, 12)
+    .map(entry => ({ q: pickLang(entry.q, lang), a: pickLang(entry.a, lang) }))
+    .filter(entry => entry.q && entry.a)
+
+  if (!items.length) return null
+
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: items.map(entry => ({
+      '@type': 'Question',
+      name: entry.q,
+      acceptedAnswer: { '@type': 'Answer', text: entry.a }
+    }))
+  }
+}
+
+
 function faqBlock(game, lang) {
   const d = dict(lang)
   const items = rows(game.landing.faq, 12).map(entry => {
@@ -908,12 +939,24 @@ export async function handleGameLanding(url, request, gameId, requestId, GAMES, 
     ${productsBlock(game, lang)}
     ${faqBlock(game, lang)}`
 
+  // "Neon Katana — Android game by AmirCollider" rather than
+  // "Neon Katana — AmirCollider". The title is the first thing a
+  // person reads in a result and the first string a review reads
+  // off the page, and both of them want the same two facts from
+  // it: which application this is, and what kind of thing it is.
+  const kind = d.titleKind[gamePlatforms(game).kind] || d.titleKind.android
+  const title = `${game.name} — ${kind} · AmirCollider`
+
   return createHtmlResponse(page({
     game, lang, theme,
-    title: `${game.name} — AmirCollider`,
+    title,
     description,
     head: gameHead(game),
-    seoGraph: [gameLd(game, lang, url.origin, description, current)],
+    siteName: game.name,
+    seoGraph: [
+      gameLd(game, lang, url.origin, description, current),
+      faqLd(game, lang)
+    ],
     ogImage: game.landing.hero || game.logo || CONFIG.DEFAULT_GAME_LOGO,
     active: 'landing',
     downloadable: isDownloadable(game),

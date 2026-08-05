@@ -59,6 +59,7 @@ export function indexablePaths(games = {}) {
   const paths = [
     { loc: '/', priority: '1.0', changefreq: 'weekly' },
     { loc: '/about', priority: '0.8', changefreq: 'monthly' },
+    { loc: '/games', priority: '0.9', changefreq: 'weekly' },
     { loc: '/tools', priority: '0.9', changefreq: 'weekly' },
     { loc: '/unity-docsnap', priority: '0.9', changefreq: 'weekly' },
     { loc: '/unity-directtmp', priority: '0.9', changefreq: 'weekly' },

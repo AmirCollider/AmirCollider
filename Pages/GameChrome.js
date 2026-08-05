@@ -398,7 +398,8 @@ export function chromeScript() {
 export function page({
   game, lang, theme, title, description = '', active, body,
   script = '', head = '', downloadable = true, skipLabel = '',
-  path = '', games = [], seoGraph = [], noindex = false, ogImage = ''
+  path = '', games = [], seoGraph = [], noindex = false, ogImage = '',
+  siteName = ''
 }) {
   const themeAttr = theme === 'light' || theme === 'dark' ? ` data-theme="${theme}"` : ''
   const nav = NAV[lang] || NAV.fa
@@ -410,7 +411,7 @@ export function page({
   // repeat the entry before it.
   const trail = [
     { href: '/', label: site.home },
-    { href: '/#games', label: site.games },
+    { href: '/games', label: site.games },
     { href: `/${game.id}`, label: game.name }
   ]
   if (active && active !== 'landing') {
@@ -426,6 +427,10 @@ export function page({
     type: 'website',
     noindex,
     image: ogImage || game.logo || CONFIG.AMIR_LOGO,
+    // Only the landing page passes this, and only because an OAuth
+    // review reads that page as the application's home page. Every
+    // other page here is a section of the site and says so.
+    ...(siteName ? { siteName } : {}),
     graph: [breadcrumbLd(trail), ...(seoGraph || [])]
   })
 

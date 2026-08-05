@@ -285,6 +285,9 @@ export function videoGameLd({ name, description, path, image, platform = 'Androi
 //   noindex     true for panels, checkout steps and status pages
 //   alternates  false to skip hreflang (a page with no ?lang= form)
 //   graph       extra JSON-LD nodes, appended after the site nodes
+//   siteName    what og:site_name says. Defaults to the brand, and
+//               a game's landing page overrides it with the game -
+//               see the note on that tag below.
 // ==========================================
 export function seoHead({
   path = '/',
@@ -296,6 +299,7 @@ export function seoHead({
   noindex = false,
   alternates = true,
   siteNodes = true,
+  siteName = 'AmirCollider',
   graph = []
 } = {}) {
   const code = resolveLang(lang)
@@ -326,7 +330,18 @@ export function seoHead({
   <link rel="canonical" href="${escapeHtml(canonical)}">
   ${hreflang}
   <meta property="og:type" content="${escapeHtml(type)}">
-  <meta property="og:site_name" content="AmirCollider">
+  <!--
+    og:site_name is normally the brand, and on every page here it
+    is. A game's landing page is the exception, and the reason is
+    not OpenGraph: that page is what an OAuth consent screen
+    configures as the application's HOME PAGE, and a verification
+    review compares the app name on the consent screen with the
+    name the home page gives for itself. Machine-readably, that
+    name was "AmirCollider" - the publisher - on a page whose
+    subject is one game, and the review came back saying the two
+    did not match. It says the game now.
+  -->
+  <meta property="og:site_name" content="${escapeHtml(siteName)}">
   <meta property="og:title" content="${escapeHtml(title)}">
   ${description ? `<meta property="og:description" content="${escapeHtml(description)}">` : ''}
   <meta property="og:url" content="${escapeHtml(canonical)}">

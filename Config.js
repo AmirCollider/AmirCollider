@@ -331,6 +331,124 @@ const GAME_REGISTRY = {
       { fa: 'اکشن', en: 'Action', ja: 'アクション' },
       { fa: 'اندروید', en: 'Android', ja: 'Android' }
     ],
+    // The landing page's baseline content.
+    //
+    // Every one of these fields is overridable from the /thegod
+    // panel and none of them has to be here - which is exactly
+    // why they were not, and why the page said almost nothing for
+    // as long as nobody filled the panel in. A tagline, four
+    // features, the devices it runs on and five questions is the
+    // least a page has to carry before a reader, a crawler or an
+    // assistant reading the site can tell that a game exists.
+    //
+    // Write only what is true of the shipped build. This is the
+    // text a store listing and a search result are quoted from,
+    // and the panel can correct it without a deploy - but it
+    // cannot un-publish a claim that was never accurate.
+    landing: {
+      tagline: {
+        fa: 'یک کاتانا، مسیری از دشمن‌های نئونی، و هر بار یک تلاش دیگر برای رفتن جلوتر.',
+        en: 'One katana, a corridor of neon enemies, and one more run to get further than the last.',
+        ja: '一振りのカタナ、ネオンの敵が並ぶ道、そして前回より先へ進むためのもう一度の挑戦。'
+      },
+      about: {
+        fa: 'Neon Katana یک بازی اکشن تک‌نفره برای اندروید است. با یک کاتانا مسیرت را باز می‌کنی، هر ضربه را به‌موقع می‌زنی، و هر بار که می‌بازی از اول شروع می‌کنی تا از دفعه‌ی قبل جلوتر بروی.\n\nبازی کاملاً آفلاین اجرا می‌شود؛ برای شروع لازم نیست حسابی بسازی یا وارد شوی. اگر با گوگل وارد شوی، پیشرفتت روی سرور ذخیره می‌شود، امتیازت به جدول عمومی می‌رود و خریدهایت روی دستگاه بعدی برمی‌گردند.',
+        en: 'Neon Katana is a single-player action game for Android. You cut your way forward with a katana, time every strike, and start over each time you fall — to get further than the run before.\n\nIt plays entirely offline; you do not need an account to start. Sign in with Google and your progress is kept on the server, your score joins the public leaderboard, and your purchases follow you to your next device.',
+        ja: 'Neon Katana は Android 向けのシングルプレイ・アクションゲームです。カタナで道を切り開き、一撃ごとにタイミングを合わせ、倒れるたびに最初から——前回より先へ進むために。\n\nゲームは完全にオフラインで動作し、始めるのにアカウントは不要です。Google でサインインすれば、進行状況はサーバーに保存され、スコアは公開ランキングに載り、購入内容は次の端末にも引き継がれます。'
+      },
+      features: [
+        {
+          icon: '⚔️',
+          fa: 'مبارزه‌ی نزدیک با یک کاتانا — ضربه، دفع و جاخالی، همه با یک انگشت.',
+          en: 'Close-quarters katana combat — strike, parry and dodge, all with one thumb.',
+          ja: 'カタナによる近接戦闘 — 斬る・受ける・かわす、すべて指一本で。'
+        },
+        {
+          icon: '📴',
+          fa: 'بدون نیاز به اینترنت. بازی کامل آفلاین اجرا می‌شود.',
+          en: 'No connection needed. The whole game runs offline.',
+          ja: '通信不要。ゲーム全体がオフラインで動作します。'
+        },
+        {
+          icon: '☁️',
+          fa: 'ذخیره‌ی ابری اختیاری — با ورود به حساب گوگل، روی گوشی بعدی از همان‌جا ادامه بده.',
+          en: 'Optional cloud save — sign in with Google and carry on from the same place on your next phone.',
+          ja: '任意のクラウドセーブ — Google でサインインすれば、次の端末でも同じ場所から続けられます。'
+        },
+        {
+          icon: '🏆',
+          fa: 'جدول امتیازات عمومی، با حذف خودکار حساب‌های مسدودشده.',
+          en: 'A public leaderboard, with banned accounts filtered out automatically.',
+          ja: '公開ランキング。BAN されたアカウントは自動的に除外されます。'
+        }
+      ],
+      devices: [
+        { kind: 'android', label: 'Android 8.0+' }
+      ],
+      faq: [
+        {
+          q: {
+            fa: 'بازی رایگان است؟',
+            en: 'Is the game free?',
+            ja: 'ゲームは無料ですか?'
+          },
+          a: {
+            fa: 'بله. دانلود و بازی کردنش رایگان است. یک فروشگاه درون‌بازی هم هست که خرید از آن کاملاً اختیاری است.',
+            en: 'Yes. It is free to download and play. There is an in-game store as well, and buying anything from it is entirely optional.',
+            ja: 'はい。ダウンロードもプレイも無料です。ゲーム内ストアもありますが、購入は完全に任意です。'
+          }
+        },
+        {
+          q: {
+            fa: 'برای بازی کردن باید وارد حساب شوم؟',
+            en: 'Do I need an account to play?',
+            ja: 'プレイするのにアカウントは必要ですか?'
+          },
+          a: {
+            fa: 'نه. بازی بدون ورود کامل کار می‌کند. ورود با گوگل فقط برای ذخیره‌ی ابری، جدول امتیازات و برگرداندن خریدها لازم است.',
+            en: 'No. The game works fully without signing in. Google sign-in is only needed for cloud saves, the leaderboard and restoring purchases.',
+            ja: 'いいえ。サインインしなくてもすべて遊べます。Google サインインが必要なのは、クラウドセーブ・ランキング・購入の復元のときだけです。'
+          }
+        },
+        {
+          q: {
+            fa: 'اینترنت لازم دارد؟',
+            en: 'Does it need an internet connection?',
+            ja: 'インターネット接続は必要ですか?'
+          },
+          a: {
+            fa: 'برای بازی کردن نه. فقط همگام‌سازی ذخیره‌ی ابری، ثبت امتیاز و خرید به اینترنت نیاز دارند.',
+            en: 'Not to play. Only syncing a cloud save, submitting a score and making a purchase need one.',
+            ja: 'プレイには不要です。クラウドセーブの同期、スコア送信、購入のときだけ必要になります。'
+          }
+        },
+        {
+          q: {
+            fa: 'از کجا دانلودش کنم؟',
+            en: 'Where do I download it?',
+            ja: 'どこでダウンロードできますか?'
+          },
+          a: {
+            fa: 'از مایکت. لینکش بالای همین صفحه است و همیشه به آخرین نسخه اشاره می‌کند.',
+            en: 'From Myket. The link is at the top of this page and always points at the current build.',
+            ja: 'Myket からです。リンクはこのページの上部にあり、常に最新のビルドを指しています。'
+          }
+        },
+        {
+          q: {
+            fa: 'چطور حسابم و داده‌هایم را پاک کنم؟',
+            en: 'How do I delete my account and my data?',
+            ja: 'アカウントとデータはどう削除しますか?'
+          },
+          a: {
+            fa: 'از صفحه‌ی حساب بازیکن روی همین سایت. دسترسی این برنامه به حساب گوگلت را هم می‌توانی از myaccount.google.com/permissions پس بگیری.',
+            en: 'From the player account page on this site. You can also withdraw this app’s access to your Google account at myaccount.google.com/permissions.',
+            ja: 'このサイトのプレイヤーアカウントページから行えます。Google アカウントへのアクセスは myaccount.google.com/permissions でも取り消せます。'
+          }
+        }
+      ]
+    },
+
     package: 'com.AmirColliderGames.NeonKatana',
     myketUrl: 'https://myket.ir/app/com.AmirColliderGames.NeonKatana',
     d1Binding: 'NEON_KATANA_DB',
@@ -527,6 +645,13 @@ function buildGame(id, def, env) {
 
     status: GAME_STATUS.ALL.includes(def.status) ? def.status : GAME_STATUS.LIVE,
     capabilities: { ...CAPABILITY_DEFAULTS, ...(def.capabilities || {}) },
+
+    // The baseline the landing page falls back to, field by field,
+    // when the panel has not overridden it. Games/Registry.js does
+    // the merging; this only has to be present so that a game with
+    // no `landing` in its entry is an empty object rather than
+    // undefined.
+    landing: def.landing || {},
     download: {
       primary: download.primary || Object.keys(links)[0] || '',
       links

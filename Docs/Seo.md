@@ -72,9 +72,10 @@ SVG line at all.
 | `Person` | `/` and `/about`, under one shared `@id` |
 | `ProfilePage`, `FAQPage` | `/about` |
 | `BreadcrumbList` | every page with breadcrumbs |
-| `VideoGame` | landing page (one per game), each game's pages |
+| `VideoGame` | landing page, `/games`, each game's pages |
 | `SoftwareApplication` | landing page, `/tools`, each tool's page |
-| `ItemList` | `/tools`, each leaderboard |
+| `ItemList` | `/games`, `/tools`, each leaderboard |
+| `FAQPage` | `/about`, each game's landing page |
 
 `Organization.founder` points at the `Person` node by `@id`, and the
 `Person` node is emitted on the front page as well as on `/about` —
@@ -98,6 +99,39 @@ added in `Config.js` appears in the sitemap on the next deploy.
 Disallowed for crawlers: `/thegod`, `/testsite`, `/checkout`, `/order`,
 `/license`, `/oauth/`, `/auth/`, `/database/`, `/profile/`, `/games/`,
 `/video/`.
+
+### Games have an address, not an anchor
+
+`/games` (`Pages/Games.js`) is a catalogue page whose whole subject is
+the games, listed from `GAME_REGISTRY`. It exists because `/tools` did
+and nothing answered to it: the games were reachable at `/#games`, an
+anchor on the dashboard, and an anchor cannot be submitted to a
+sitemap, cannot be linked to as a subject and cannot rank.
+
+That imbalance had a visible cost. This domain carried six pages about
+Unity tools and none about games, and search engines — and the
+assistants built on them — reported accordingly that AmirCollider
+makes Unity tools and has never released a game. It was not a ranking
+problem. The site was being read correctly.
+
+It sits at `/games` with no trailing slash. The machine-facing routes
+are `/games/{id}/manifest` and friends, which always carry a second
+segment; `matchRoute` tries every static route before any dynamic one,
+and `robots.txt` disallows `/games/` **with** the slash — so the API
+stays out of the index and the page stays in it.
+
+### A game's landing page carries its own content
+
+Every block on a game landing page used to be a database field, so a
+game whose `/thegod` row had not been filled in rendered a logo, one
+line and a download button. `GAME_REGISTRY` may now carry a baseline
+for the tagline, the about text, the features, the devices and the
+FAQ; `Games/Registry.js` merges the database over it field by field,
+so the panel still wins wherever it has an opinion.
+
+That is what makes a game page substantial with an empty database —
+and substance is the actual fix for a crawler that could not tell the
+site had games on it.
 
 ### noindex pages
 
@@ -123,8 +157,8 @@ Domain verification is already in place: `getPageHead()` emits the
    meta tag verifies it with no further work.
 3. **Sitemaps** → submit `sitemap.xml`.
 4. **URL Inspection** → paste `https://amircollider.com/` → *Request
-   indexing*. Repeat for `/about`, `/tools`, `/unity-docsnap`,
-   `/unity-directtmp`, `/neon-katana`.
+   indexing*. Repeat for `/games`, `/about`, `/tools`,
+   `/unity-docsnap`, `/unity-directtmp`, `/neon-katana`.
 5. Come back after a week and read **Pages** for anything reported as
    *Duplicate, Google chose a different canonical* — that is the one
    error class this setup is designed to prevent, and it is worth
@@ -178,10 +212,19 @@ choice for a client that is not about one particular game.
 ### What the reviewer checks, and where it is
 
 - **The page names the same application as the consent screen.** The
-  `<h1>`, the `<title>`, the `application-name` meta tag and the first
-  line of the *What this app is* section all carry the game's name
-  exactly as `GAME_REGISTRY` spells it — which is also what the
-  consent screen has to say.
+  `<h1>`, the `<title>` (`Neon Katana — Android game · AmirCollider`),
+  the `application-name` meta tag, `og:site_name` and the first line
+  of the *What this app is* section all carry the game's name exactly
+  as `GAME_REGISTRY` spells it — which is also what the consent screen
+  has to say.
+
+  `og:site_name` is the odd one there, and deliberately so. On every
+  other page of this site it is the brand, because that is what the
+  tag means. On a game's landing page it is the game: that page is
+  what the consent screen configures as the application's *home page*,
+  and the only machine-readable name it gave for itself used to be
+  "AmirCollider" — the publisher — on a page whose subject is one
+  game.
 - **The home page explains what the app is for.** `purposeBlock()` in
   `Pages/GameLanding.js`, rendered from `i18n.purpose` in
   `Config.js`. It is the one section of a landing page that is **not**
@@ -240,6 +283,7 @@ choice for a client that is not about one particular game.
 |---|---|
 | The canonical domain | `CONFIG.SITE_URL` |
 | What a game says it is for | `i18n.purpose` in `GAME_REGISTRY` |
+| A game page's baseline content | `landing` in `GAME_REGISTRY` |
 | The biography on `/about` | `Content/AboutMe.js` |
 | The accounts in `sameAs` | `CONFIG.SOCIAL` |
 | The favicon's safe area | `SAFE` in `Pages/Icon.js` |

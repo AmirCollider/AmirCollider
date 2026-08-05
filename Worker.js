@@ -43,6 +43,7 @@ import { handleNotFound } from './Pages/NotFound.js'
 import { handleRobots, handleSitemap } from './Pages/Sitemap.js'
 import { handleSiteIcon } from './Pages/Icon.js'
 import { handleAbout } from './Pages/About.js'
+import { handleGamesIndex } from './Pages/Games.js'
 import { handleUserProfile } from './Pages/PlayerProfile.js'
 import { handleDashboard } from './Pages/Dashboard.js'
 import { handleHealthWithUI } from './Pages/Health.js'
@@ -156,10 +157,19 @@ const ROUTES = [
   { path: '/metrics', method: 'GET', handler: handleMetrics },
   { path: '/release-notes', method: 'GET', handler: handleReleaseNotes },
 
-  // Who is behind all of this. Linked from the header and the
-  // footer of every page, and the one page a search engine can
-  // attach a biography to.
+  // Who is behind all of this. Linked from the footer of every
+  // page, and the one page a search engine can attach a
+  // biography to.
   { path: '/about', method: 'GET', handler: handleAbout },
+
+  // The games catalogue, and the answer to /tools. It has to be
+  // registered before the /games/:gameId/* API routes read like a
+  // conflict - they are not one: those all carry a second path
+  // segment, and matchRoute tries every static route before any
+  // dynamic one regardless. robots.txt disallows "/games/" with
+  // the trailing slash, so the API stays out of the index and
+  // this page stays in it.
+  { path: '/games', method: 'GET', handler: handleGamesIndex },
 
   // What a crawler asks for first, and what Search Console asks
   // for when a property is added.

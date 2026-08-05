@@ -246,6 +246,7 @@ Everything at **[amircollider.com](https://amircollider.com/)** runs from this r
 |---|---|
 | `/` | 🏠 the dashboard: games, tools, live status |
 | `/about` | 👋 who is behind all of this |
+| `/games` | 🎮 the games catalogue |
 | `/{game}` · `/{game}/versions` | 🎮 a game's landing page and release history |
 | `/{game}/account` · `/{game}/store` | 👤 the player's account and the storefront |
 | `/{game}/leaderboard` · `/health` · `/ping` | 🏆 public game surfaces |
