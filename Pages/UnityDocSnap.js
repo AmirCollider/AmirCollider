@@ -164,7 +164,7 @@ const I18N = {
       ['اشتراک ماهانه است؟',
        'نه. یک بار می‌خری و مال خودت است. بروزرسانی‌های ۱.x رایگان است.'],
       ['فرق Plus و Pro دقیقاً چیست؟',
-       'نسخه‌ی Plus دو تا قابلیت دارد: خروجی آماده‌ی هوش مصنوعی و صفحه‌ی تغییرات. نسخه‌ی Pro علاوه بر این‌ها تاریخچه‌ی نامحدود نسخه‌ها، بروزرسانی افزایشی، اتوماسیون CI، کپی فایل‌ها، بک‌آپ کل پروژه و لوگوی اختصاصی را هم دارد. اگر فقط آن دو تا را می‌خواهی، Plus دقیقاً برای تو ساخته شده.'],
+       'نسخه‌ی Plus دو تا قابلیت دارد: خروجی آماده‌ی هوش مصنوعی و صفحه‌ی تغییرات. نسخه‌ی Pro علاوه بر این‌ها تاریخچه‌ی نامحدود نسخه‌ها، بروزرسانی افزایشی، اتوماسیون CI، کپی فایل‌ها، بک‌آپ کل پروژه، مدیریت و حذف اسنپ‌شات‌ها و لوگوی اختصاصی را هم دارد. اگر فقط آن دو تا را می‌خواهی، Plus دقیقاً برای تو ساخته شده.'],
       ['بعداً می‌توانم از Plus به Pro ارتقا بدهم؟',
        'بله — کد Pro را جدا می‌خری و همان را توی یونیتی وارد می‌کنی. کد Plus قبلی‌ات را هم می‌توانی روی سیستم دیگری نگه داری.'],
       ['روی چند سیستم کار می‌کند؟',
@@ -173,6 +173,8 @@ const I18N = {
        'بعد از یک بار فعال‌سازی، ۴۵ روز کاملاً آفلاین کار می‌کند و هر وقت آنلاین شدی خودش بی‌صدا تمدید می‌شود. هیچ چک لایسنسی سر راه اکسپورت نیست.'],
       ['نسخه‌ی رایگان چیزی از پروژه‌ام را جایی می‌فرستد؟',
        'نه. نسخه‌ی رایگان اصلاً به اینترنت وصل نمی‌شود. نسخه‌های پولی هم فقط موقع فعال‌سازی و تمدید یک درخواست می‌فرستند که فقط شامل کد لایسنس، یک شناسه‌ی هش‌شده‌ی سیستم و شماره‌ی نسخه است — هیچ‌چیزی از پروژه‌ات.'],
+      ['می‌توانم خروجی‌های قدیمی را پاک کنم؟',
+       'در نسخه‌ی رایگان و Plus نه. سقف اسنپ‌شات‌ها (۳ و ۵ تا) در یک رجیستری شمرده می‌شود، و پاک‌کردن دستی پوشه‌ی خروجی آن شمارش را صفر نمی‌کند — وگرنه سقف فقط یک دست‌انداز بود، نه یک محدودیت. نسخه‌ی Pro اصلاً سقف ندارد، پس داخل پنجره‌ی Export بخش «Manage snapshots» را دارد: هر نسخه را جداگانه و با یک تأیید که اسمش را می‌گوید حذف می‌کنی، و وقتی هیچ اسنپ‌شاتی نماند می‌شود کش خروجی را هم پاک کرد — فقط چیزهایی که خود DocSnap آن‌جا نوشته؛ خود پوشه و هر چیز دیگری که داخلش باشد دست‌نخورده می‌ماند.'],
       ['روی CI کار می‌کند؟',
        'بله، با نسخه‌ی Pro: هم DocSnapAPI از C# و هم ‎-executeMethod از خط فرمان، با خروجی غیرصفر وقتی اکسپورت شکست بخورد.'],
       ['چه نسخه‌ای از یونیتی؟',
@@ -248,7 +250,7 @@ const I18N = {
       ['Is it a subscription?',
        'No. Buy once, keep it. All 1.x updates are included.'],
       ['What exactly is the difference between Plus and Pro?',
-       'Plus is two features: the AI-ready summaries and the Changes page. Pro adds unlimited version history, incremental updates, CI automation, file copies, whole-project backups and a custom logo on top. If those two are all you want, Plus is built for exactly you.'],
+       'Plus is two features: the AI-ready summaries and the Changes page. Pro adds unlimited version history, incremental updates, CI automation, file copies, whole-project backups, snapshot management and a custom logo on top. If those two are all you want, Plus is built for exactly you.'],
       ['Can I upgrade from Plus to Pro later?',
        'Yes — buy a Pro key and enter it in Unity. Your Plus key is unaffected and can stay on another machine.'],
       ['How many machines?',
@@ -257,6 +259,8 @@ const I18N = {
        'After one activation it works fully offline for 45 days and renews itself quietly whenever you happen to be online. There is never a licence check in front of an export.'],
       ['Does anything leave my project?',
        'No. The free edition never touches the network at all. The paid editions send one request when activating or renewing, containing only the licence key, a hashed machine identifier and the package version — nothing about your project.'],
+      ['Can I delete old exports?',
+       'Not on Free or Plus. The snapshot caps (3 and 5) are counted in a registry, and emptying the output folder by hand does not reset that count — otherwise the cap would be a speed bump rather than a limit. Pro has no cap at all, so it gets a Manage snapshots section in the Export window: delete any version one at a time, with a confirmation naming it, and once no snapshots are left you can clear the output cache too — only what DocSnap wrote there. The folder itself, and anything else inside it, is left alone.'],
       ['Does it run in CI?',
        'Yes, with Pro: DocSnapAPI from C# and -executeMethod from a command line, with a non-zero exit when an export fails.'],
       ['Which Unity versions?',
@@ -332,7 +336,7 @@ const I18N = {
       ['サブスクリプションですか?',
        'いいえ。買い切りです。1.x のアップデートはすべて含まれます。'],
       ['Plus と Pro の違いは何ですか?',
-       'Plus は 2 つの機能です。AI 向けサマリーと変更ページ。Pro はそれに加えて、無制限のバージョン履歴、差分更新、CI 自動化、ファイル本体のコピー、プロジェクト全体のバックアップ、自社ロゴが利用できます。前者の 2 つだけをお求めなら Plus が最適です。'],
+       'Plus は 2 つの機能です。AI 向けサマリーと変更ページ。Pro はそれに加えて、無制限のバージョン履歴、差分更新、CI 自動化、ファイル本体のコピー、プロジェクト全体のバックアップ、スナップショット管理、自社ロゴが利用できます。前者の 2 つだけをお求めなら Plus が最適です。'],
       ['あとから Plus を Pro にアップグレードできますか?',
        'はい。Pro のキーを購入して Unity に入力してください。Plus のキーはそのまま残り、別のマシンで使い続けられます。'],
       ['何台まで使えますか?',
@@ -341,6 +345,8 @@ const I18N = {
        '一度有効化すれば 45 日間完全にオフラインで動作し、オンラインになったタイミングで自動的に更新されます。エクスポートの前にライセンス確認が入ることはありません。'],
       ['プロジェクトの情報は送信されますか?',
        'いいえ。無料版はネットワークに一切接続しません。有料版も有効化と更新のときにライセンスキー、ハッシュ化されたマシン識別子、パッケージのバージョンだけを送信します。プロジェクトの情報は一切含まれません。'],
+      ['古いエクスポートを削除できますか?',
+       '無料版と Plus ではできません。スナップショットの上限(3 件・5 件)はレジストリで数えているため、出力フォルダを手動で空にしてもカウントは戻りません。戻ってしまうと上限が上限でなくなるからです。Pro には上限がないので、Export ウィンドウに「Manage snapshots」が追加されます。バージョン名を示す確認つきで 1 件ずつ削除でき、スナップショットがなくなれば出力キャッシュも消去できます。消えるのは DocSnap が書き込んだものだけで、フォルダ自体とその中の他のファイルはそのまま残ります。'],
       ['CI で使えますか?',
        'はい、Pro でご利用いただけます。C# からの DocSnapAPI と、コマンドラインからの -executeMethod に対応し、失敗時は非ゼロで終了します。'],
       ['対応する Unity のバージョンは?',
@@ -461,6 +467,22 @@ const ROWS = [
       fa: '📦 بک‌آپ ‎.unitypackage از کل پروژه',
       en: '📦 Whole-project .unitypackage backup',
       ja: '📦 プロジェクト全体の .unitypackage バックアップ'
+    }
+  },
+  {
+    // Pro only, and the reason is the cap rather than the deleting.
+    // Free and Plus count their snapshots in a registry, so
+    // emptying the output folder by hand does not reset the count -
+    // otherwise the cap would be a speed bump rather than a limit.
+    // Pro has no cap, so there is nothing there for a delete button
+    // to undermine, and it becomes what it should be: house-keeping
+    // for the edition that accumulates enough exports to want some
+    // gone.
+    free: false, plus: false, pro: true,
+    label: {
+      fa: '🧹 مدیریت اسنپ‌شات‌ها — حذف نسخه و پاک‌کردن کش خروجی',
+      en: '🧹 Manage snapshots — delete a version, clear the output cache',
+      ja: '🧹 スナップショット管理 — バージョンの削除と出力キャッシュの消去'
     }
   },
   {
@@ -651,6 +673,30 @@ function renderWhat(p, lang) {
 
 
 // ==========================================
+// The poster frame
+//
+// A <video> with nothing loaded paints its background - which on
+// a card that is otherwise cream and blush is a flat grey
+// rectangle where the picture should be, on every clip, until
+// somebody presses play. It reads as a broken embed rather than
+// as a video.
+//
+// There is no poster image to point at: the clips live in R2 as
+// bare MP4s and nothing generates a thumbnail for them. So the
+// frame is taken from the clip itself. A media fragment asks the
+// browser to seek to that timestamp, and `preload="metadata"`
+// gives it permission to fetch the little it needs to decode
+// there - which is a range request over a file that already
+// serves them, not the whole clip.
+//
+// A tenth of a second rather than zero: some encoders put a
+// black or near-black frame at exactly 0, and Safari treats a
+// bare "#t=0" as "no fragment at all" and paints nothing.
+// ==========================================
+const POSTER_FRAGMENT = '#t=0.1'
+
+
+// ==========================================
 // renderVideos
 // The demo clips, as a player with a playlist beside it.
 // ==========================================
@@ -696,8 +742,8 @@ function renderVideos(p, lang) {
 
       <div class="vplayer">
         <div class="vstage">
-          <video id="vEl" controls preload="none" playsinline
-                 src="/video/${startLang}/${first.id}"
+          <video id="vEl" controls preload="metadata" playsinline
+                 src="/video/${startLang}/${first.id}${POSTER_FRAGMENT}"
                  aria-describedby="vTitle">
             <p>${escapeHtml(p.videoNoSupport)}
                <a id="vDl" href="/video/${startLang}/${first.id}">${escapeHtml(p.videoDownload)}</a></p>
@@ -1738,7 +1784,10 @@ function script(lang, p) {
         current = id;
         var meta = META[id];
 
-        video.src = '/video/' + vlang + '/' + id;
+        // The same media fragment the server-rendered element
+        // carries, so a clip switched into the player shows a frame
+        // rather than a grey box while it waits to be played.
+        video.src = '/video/' + vlang + '/' + id + ${JSON.stringify(POSTER_FRAGMENT)};
         video.load();
         if (autoplay) {
           var playing = video.play();

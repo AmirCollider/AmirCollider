@@ -530,6 +530,13 @@ export function getLogosHTML(amirLogo, gameLogo, gameName) {
 // getPageHead
 // Document <head> fragment: charset, viewport, theme metadata, title and
 // icons. Native UI follows the active theme via color-scheme / theme-color.
+//
+// Two icons, one logo. The PNG is the object itself; /icon.svg is the
+// same object with a safe area drawn around it, which is what stops a
+// round crop - Google's mobile results, a share sheet - taking the
+// corners off a mark that fills its own square. A browser that
+// understands SVG favicons takes the SVG whichever order they appear
+// in; one that does not never sees that line. See Pages/Icon.js.
 // ==========================================
 export function getPageHead({ title, amirLogo, description = '' }) {
   return `
@@ -542,6 +549,7 @@ export function getPageHead({ title, amirLogo, description = '' }) {
   <meta name="google-site-verification" content="uFvaRQchIco-iyGmdsNknLK7mL5Asxg47GjaOQmhf0Q" />
   <title>${title}</title>
   <link rel="icon" href="${amirLogo}" type="image/png">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
   <link rel="shortcut icon" href="${amirLogo}" type="image/png">
   <link rel="apple-touch-icon" href="${amirLogo}">
   ${description ? `<meta name="description" content="${description}">` : ''}

@@ -39,15 +39,51 @@ export function dirFor(code) {
   return LANGUAGES.meta[resolveLang(code)].dir
 }
 
-function langFromAcceptHeader(request) {
+/**
+ * The languages this request asked for, best first.
+ *
+ * Sorted by q-value, and within an equal q by the order the header
+ * lists them - which is the order RFC 9110 gives them. Region
+ * subtags are dropped ("en-GB" -> "en"), anything this site does
+ * not speak is discarded, and q=0 means "not this one" rather than
+ * "this one, weakly".
+ *
+ * Both language resolvers below go through this, because the two
+ * that existed before disagreed. One walked the header; the other
+ * walked LANGUAGES.supported and asked whether the header
+ * CONTAINED each code, which answers "fa" for a browser that sent
+ * `en-US,en;q=0.9,fa;q=0.5` - it never reaches the second entry
+ * because the first one it tries is the one it prefers, not the
+ * one the visitor does. That is how an English-speaking reader of
+ * a game's landing page got a Persian one, and a Google OAuth
+ * reviewer with it is a review that comes back saying the home
+ * page does not explain the application.
+ */
+function acceptedLangs(request) {
   const header = request && request.headers ? request.headers.get('Accept-Language') : ''
-  if (!header) return null
+  if (!header) return []
 
-  for (const piece of header.toLowerCase().split(',')) {
-    const code = piece.split(';')[0].trim().slice(0, 2)
-    if (LANGUAGES.supported.includes(code)) return code
-  }
-  return null
+  return String(header).toLowerCase().split(',')
+    .map((piece, index) => {
+      const parts = piece.trim().split(';')
+      const quality = parts.slice(1)
+        .map(part => part.trim())
+        .find(part => part.startsWith('q='))
+      const weight = quality === undefined ? 1 : Number(quality.slice(2))
+
+      return {
+        code: parts[0].trim().slice(0, 2),
+        weight: Number.isFinite(weight) ? weight : 0,
+        index
+      }
+    })
+    .filter(entry => entry.weight > 0 && LANGUAGES.supported.includes(entry.code))
+    .sort((a, b) => (b.weight - a.weight) || (a.index - b.index))
+    .map(entry => entry.code)
+}
+
+function langFromAcceptHeader(request) {
+  return acceptedLangs(request)[0] || null
 }
 
 export function resolveRequestLang(url, request, cookies = {}) {
@@ -73,14 +109,14 @@ export function langCookieHeader(url, lang) {
 }
 
 /**
- * The older language rule the panels and status pages use:
- * ?lang -> cookie -> the first supported code that appears anywhere
- * in Accept-Language.
+ * The same rule as resolveRequestLang, for callers that have the
+ * request but have not parsed its cookies: ?lang -> cookie ->
+ * Accept-Language -> the default.
  *
- * Kept separate from resolveRequestLang because that last step picks
- * by LANGUAGES.supported order rather than by the browser's own
- * ordering. Folding the two together would move some visitors to a
- * different language than the one they get today.
+ * Kept as its own export because that is the shape the game pages,
+ * the panels and the status pages call it in. The two used to
+ * differ in how they read Accept-Language, which is documented on
+ * acceptedLangs() above; they no longer do.
  */
 export function matchRequestLang(url, request) {
   const query = ((url && url.searchParams && url.searchParams.get('lang')) || '').toLowerCase()
@@ -90,9 +126,7 @@ export function matchRequestLang(url, request) {
     .match(/(?:^|;\s*)lang=([^;]+)/)
   if (cookie && LANGUAGES.supported.includes(cookie[1])) return cookie[1]
 
-  const accept = ((request && request.headers && request.headers.get('Accept-Language')) || '').toLowerCase()
-  for (const code of LANGUAGES.supported) if (accept.includes(code)) return code
-  return LANGUAGES.default
+  return langFromAcceptHeader(request) || LANGUAGES.default
 }
 
 

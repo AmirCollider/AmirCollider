@@ -89,9 +89,115 @@ const RN_I18N = {
 // ==========================================
 const RELEASES = [
   {
-    version: '6.7.4',
+    version: '6.8.0',
     date: '2026-08-05',
     tag: 'latest',
+    summary: {
+      fa: 'یک صفحه‌ی «درباره‌ی من»، صفحه‌ی هر بازی حالا می‌گوید آن بازی چیست و ورود با گوگل در آن برای چیست، فاویکون دیگر گوشه‌هایش را در قاب گرد گوگل از دست نمی‌دهد، و ویدیوهای Unity DocSnap قبل از پخش یک فریم واقعی نشان می‌دهند.',
+      en: 'An About page, a game page that now says what the game is and what Google sign-in is used for in it, a favicon that no longer loses its corners to Google’s round frame, and Unity DocSnap clips that show a real frame before you press play.',
+      ja: '自己紹介ページを追加。ゲームページはそのゲームが何であり Google サインインを何に使うのかを明記するようになりました。ファビコンは Google の丸い枠で角を失わなくなり、Unity DocSnap の動画は再生前に実際のフレームを表示します。'
+    },
+    groups: [
+      {
+        title: { fa: 'صفحه‌ی درباره‌ی من', en: 'The About page', ja: '自己紹介ページ' },
+        items: {
+          fa: [
+            'صفحه‌ی /about اضافه شد: یک بایوگرافی دوستانه به هر سه زبان — از کجا شروع شد، چه چیزهایی از دست رفت، و جواب سؤال‌هایی که منطقی‌اند.',
+            'صفحه با یک خواهش شروع می‌شود: اسم و سن و محل زندگی خصوصی بماند. هیچ‌کدام از این‌ها در متن، در تگ‌ها یا در داده‌ی ساختاریافته‌ی صفحه نیست.',
+            '«درباره‌ی من» به هدر و فوتر همه‌ی صفحه‌ها و به نقشه‌ی سایت اضافه شد.',
+            'داده‌ی ساختاریافته‌ی Person و ProfilePage و FAQPage روی این صفحه؛ سؤال‌ها از همان فهرستی ساخته می‌شوند که خود صفحه را می‌سازد، پس چیزی که گوگل می‌خواند نمی‌تواند با چیزی که خواننده می‌بیند فرق کند.'
+          ],
+          en: [
+            'A new /about page: a friendly biography in all three languages — where it started, what got lost along the way, and answers to the questions people fairly ask.',
+            'It opens with a request: keep the name, the age and the location private. None of the three appears in the prose, in a meta tag or in the page’s structured data.',
+            'About was added to the header and footer of every page, and to the sitemap.',
+            'Person, ProfilePage and FAQPage structured data on that page, with the questions built from the same list the page itself renders from - so what Google reads cannot differ from what a reader sees.'
+          ],
+          ja: [
+            '/about ページを追加しました。3 言語のやわらかい自己紹介です。どう始まったか、何を失ったか、よく聞かれる質問への答え。',
+            'ページはひとつのお願いから始まります。名前・年齢・居住地は伏せさせてください。その 3 つは本文にも meta タグにも構造化データにも含まれていません。',
+            '全ページのヘッダーとフッター、そしてサイトマップに「自己紹介」を追加しました。',
+            'このページに Person・ProfilePage・FAQPage の構造化データを追加。質問はページ本体と同じ一覧から生成されるため、Google が読む内容と読者が見る内容がずれることはありません。'
+          ]
+        }
+      },
+      {
+        title: { fa: 'صفحه‌ی بازی و تأیید Google OAuth', en: 'The game page and Google OAuth review', ja: 'ゲームページと Google OAuth 審査' },
+        items: {
+          fa: [
+            'بخش «این برنامه چیست» به صفحه‌ی هر بازی اضافه شد و تنها بخشی است که از پنل خالی نمی‌شود: نام برنامه، اینکه چه بازی‌ای است و روی چه چیزی اجرا می‌شود.',
+            'زیرش، بخش «ورود با گوگل برای چیست»: دقیقاً همان سه چیزی که خوانده می‌شود (نام، ایمیل، تصویر پروفایل)، هر کاری که با آن‌ها انجام می‌شود، و لینک حریم خصوصی و شرایط استفاده. فهرست کارها از همان قابلیت‌هایی ساخته می‌شود که تصمیم می‌گیرند صفحه‌های حساب و فروشگاه و جدول امتیازات اصلاً وجود داشته باشند.',
+            'روی صفحه‌ای که به زبان انگلیسی نیست، یک پاراگراف انگلیسی هم می‌آید — برای خواننده‌ای (یا بررسی‌کننده‌ای) که زبان صفحه را نمی‌خواند.',
+            'انتخاب زبان از روی Accept-Language درست شد. قبلاً ترتیب زبان‌های خود سایت را می‌گشت، نه ترتیب مرورگر را؛ یعنی مرورگری که «en-US,en;q=0.9,fa;q=0.5» می‌فرستاد صفحه‌ی فارسی می‌گرفت.',
+            'تگ application-name با نام بازی، تا نام روی صفحه و نام روی صفحه‌ی رضایت گوگل یکی خوانده شود.',
+            'هر صفحه‌ی بازی فقط یک canonical و یک دست تگ OpenGraph دارد. پیش از این دو تا داشت — و کراولری که دو canonical ببیند حق دارد هر دو را نادیده بگیرد.'
+          ],
+          en: [
+            'A "What this app is" section on every game page, and the one section an operator cannot empty: the application’s name, what kind of game it is and what it runs on.',
+            'Under it, "What Google sign-in is used for here": the exact three things that are read (name, email address, profile picture), everything they are used for, and links to the privacy policy and terms. The list of uses is built from the same capability flags that decide whether the account, store and leaderboard pages exist at all.',
+            'On a page that is not in English, an English paragraph is included as well - for the reader (or reviewer) who does not read the page’s language.',
+            'Accept-Language is honoured properly now. It used to be searched in the site’s own order of languages rather than the browser’s, so a browser sending "en-US,en;q=0.9,fa;q=0.5" was served the Persian page.',
+            'An application-name tag carrying the game’s name, so the name on the page and the name on Google’s consent screen read as the same one.',
+            'Each game page now carries one canonical link and one set of OpenGraph tags. It used to carry two - and a crawler that finds a second canonical is entitled to ignore both.'
+          ],
+          ja: [
+            '各ゲームページに「このアプリについて」を追加しました。運用者が空にできない唯一のセクションで、アプリ名、どんなゲームか、どこで動くのかを示します。',
+            'その下に「Google サインインの用途」。読み取る 3 つ（名前・メールアドレス・プロフィール画像）、その用途、プライバシーポリシーと利用規約へのリンク。用途の一覧は、アカウント・ストア・ランキングの各ページを存在させるかどうかを決めるのと同じ capability から生成されます。',
+            '英語以外のページには英語の段落も併記します。ページの言語を読まない読者(や審査担当者)のためです。',
+            'Accept-Language を正しく解釈するようになりました。従来はブラウザーの順ではなくサイト側の言語順で探していたため、「en-US,en;q=0.9,fa;q=0.5」を送るブラウザーにペルシャ語のページを返していました。',
+            'ゲーム名を持つ application-name タグを追加。ページ上の名前と Google の同意画面の名前が同一だと読み取れるようになります。',
+            '各ゲームページの canonical と OpenGraph タグはそれぞれ 1 組になりました。以前は 2 組あり、canonical が 2 つあるページはどちらも無視されうる状態でした。'
+          ]
+        }
+      },
+      {
+        title: { fa: 'لوگو، برند و جست‌وجو', en: 'The logo, the brand and search', ja: 'ロゴ・ブランド・検索' },
+        items: {
+          fa: [
+            'فاویکون تازه‌ای در ‎/icon.svg‎ که همان لوگوی موجود را با حاشیه دور خودش سرو می‌کند. هر جایی که آیکون را داخل دایره نشان می‌دهد — نتایج گوگل روی موبایل، بعضی نوارهای نشانک — گوشه‌های یک لوگوی مربعی را می‌برد؛ حالا چیزی که بریده می‌شود حاشیه است. تولید می‌شود، پس هیچ فایل دومی نیست که یادت برود عوضش کنی.',
+            'گره‌ی Organization حالا لوگو را به‌صورت ImageObject، توضیح سایت، و لینک به همه‌ی حساب‌های دیگر (گیت‌هاب، اینستاگرام) دارد.',
+            'نام‌های جایگزین «Amir Collider» (با فاصله) و «amircollider» به Organization و WebSite اضافه شدند — چون نصف آدم‌ها اسم را دوکلمه‌ای تایپ می‌کنند و موتور جست‌وجو خودش کلمه را نمی‌شکند.',
+            'صفحه‌ی اصلی یک پاراگراف واقعی گرفت. قبلاً یک عنوان و یک شعار داشت، و گوگل که چیزی برای نقل‌قول پیدا نمی‌کرد، چیپ‌های روی کارت بازی را به‌عنوان توضیح سایت منتشر می‌کرد.'
+          ],
+          en: [
+            'A new favicon at /icon.svg that serves the existing logo with room around it. Anywhere the icon is shown in a circle - Google’s mobile results, some bookmark bars - a square logo loses its corners; now what gets cropped is padding. It is generated, so there is no second file to forget to update.',
+            'The Organization node now carries the logo as an ImageObject, a description of the site, and links to every other account (GitHub, Instagram).',
+            'The alternate names "Amir Collider" (spaced) and "amircollider" were added to the Organization and WebSite nodes - half the people looking for the name type it as two words, and a search engine will not split a compound word on your behalf.',
+            'The front page got a real paragraph. It used to be a heading and a tagline, so Google, finding nothing to quote, published the capability chips off a game card as the site’s description.'
+          ],
+          ja: [
+            '/icon.svg に新しいファビコンを追加しました。既存のロゴに余白を付けて配信します。アイコンを円形で表示する場所(Google のモバイル検索結果、一部のブックマークバー)では四角いロゴの角が切られますが、これからは余白が切られます。生成されるので、更新を忘れる 2 つ目のファイルは存在しません。',
+            'Organization ノードにロゴを ImageObject として、サイトの説明、そして他アカウント(GitHub・Instagram)へのリンクを追加しました。',
+            'Organization と WebSite に別名「Amir Collider」(スペースあり)と「amircollider」を追加。名前を 2 語で入力する人が半数おり、検索エンジンは複合語を勝手に分割してくれないためです。',
+            'トップページに本文の段落を追加しました。従来は見出しと 1 行のタグラインだけで、引用できるものが無い Google はゲームカードの機能チップをサイトの説明として掲載していました。'
+          ]
+        }
+      },
+      {
+        title: { fa: 'ابزارهای یونیتی', en: 'The Unity tools', ja: 'Unity ツール' },
+        items: {
+          fa: [
+            'شماره‌ی نسخه‌ها روی ۱.۰.۰ گیر کرده بود: Unity DocSnap حالا ۱.۰.۲ و Unity DirectTMP حالا ۱.۲.۲ نشان داده می‌شود — همان چیزی که در package.json خود پکیج‌ها نوشته است.',
+            'قابلیت «مدیریت اسنپ‌شات‌ها» به جدول مقایسه‌ی Unity DocSnap اضافه شد (فقط Pro): حذف یک نسخه، و پاک‌کردن کش خروجی وقتی چیزی نمانده. یک پرسش‌وپاسخ هم توضیح می‌دهد چرا در رایگان و Plus نیست: سقف اسنپ‌شات‌ها در یک رجیستری شمرده می‌شود، پس پاک‌کردن دستی پوشه آن را صفر نمی‌کند.',
+            'ویدیوهای صفحه‌ی Unity DocSnap قبل از پخش یک فریم واقعی از خود کلیپ را نشان می‌دهند، نه یک مستطیل خاکستری.'
+          ],
+          en: [
+            'The version numbers were stuck at 1.0.0: Unity DocSnap now reads 1.0.2 and Unity DirectTMP 1.2.2 - what each package’s own package.json says.',
+            'A "Manage snapshots" row was added to the Unity DocSnap comparison table (Pro only): delete a version, and clear the output cache once none are left. A new question explains why Free and Plus do not have it - the snapshot cap is counted in a registry, so emptying the folder by hand does not reset it.',
+            'The clips on the Unity DocSnap page show a real frame from the video before you press play, instead of a grey rectangle.'
+          ],
+          ja: [
+            'バージョン番号が 1.0.0 のままでした。Unity DocSnap は 1.0.2、Unity DirectTMP は 1.2.2 と表示されます。各パッケージの package.json のとおりです。',
+            'Unity DocSnap の比較表に「スナップショット管理」を追加しました(Pro のみ)。バージョンの削除と、残りが無くなったあとの出力キャッシュの消去です。無料版と Plus にない理由も Q&A に追加しました。スナップショットの上限はレジストリで数えるため、フォルダを手で空にしてもカウントは戻りません。',
+            'Unity DocSnap ページの動画は、再生前に灰色の矩形ではなく実際のフレームを表示します。'
+          ]
+        }
+      }
+    ]
+  },
+  {
+    version: '6.7.4',
+    date: '2026-08-05',
     summary: {
       fa: 'سایت از چند صفحه‌ی جدا به یک سایت واحد تبدیل شد: هدر و فوتر مشترک روی همه‌ی صفحه‌ها، جدول امتیازات به بازی خودش وصل شد، صفحه‌ی ۴۰۴ واقعی، و آماده‌سازی کامل برای Google Search Console و Google Cloud Console.',
       en: 'The site stopped being a set of separate pages: one shared header and footer everywhere, the leaderboard reconnected to its game, a real 404 page, and a full SEO pass for Google Search Console and Google Cloud Console.',

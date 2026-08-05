@@ -20,7 +20,7 @@
 
 <a href="https://amircollider.com/"><img src="https://img.shields.io/badge/Website-amircollider.com-667EEA?style=for-the-badge&logo=cloudflare&logoColor=white" alt="Website" /></a>
 <a href="https://www.instagram.com/amir.collider/"><img src="https://img.shields.io/badge/Instagram-@amir.collider-E4405F?style=for-the-badge&logo=instagram&logoColor=white" alt="Instagram" /></a>
-<img src="https://img.shields.io/badge/version-6.7.3-4CAF50?style=for-the-badge" alt="v6.7.3" />
+<img src="https://img.shields.io/badge/version-6.8.0-4CAF50?style=for-the-badge" alt="v6.8.0" />
 
 </div>
 
@@ -56,6 +56,7 @@ Everything at **[amircollider.com](https://amircollider.com/)** runs from this r
 | 🎛️ | **Two operator panels** | `/thegod` runs the games, `/testsite` rehearses the whole checkout without money moving |
 | 🌍 | **Three languages, always** | Every page in fa / en / ja with correct RTL–LTR — not a translation layer, a design constraint |
 | 🌗 | **Light / dark / auto** | Theme resolved before first paint, so there is never a wrong-colour flash |
+| 🔎 | **Findable on purpose** | Canonicals, hreflang, a sitemap and a structured-data graph — plus a favicon with room for a round crop |
 | 📊 | **Live status** | Health checks, ping tests, metrics and release notes, built in |
 
 ### 🎮 Games
@@ -68,8 +69,8 @@ Everything at **[amircollider.com](https://amircollider.com/)** runs from this r
 
 | Tool | Price | What it does |
 |---|---|---|
-| 📸 **[Unity DocSnap](https://amircollider.com/unity-docsnap)** | Free · Plus · Pro | Editor extension that turns your project into readable, AI-ready documentation |
-| ✏️ **[Unity DirectTMP](https://amircollider.com/unity-directtmp)** | Free · MIT | Drop-in TextMeshPro workflow helper — install and forget |
+| 📸 **[Unity DocSnap](https://amircollider.com/unity-docsnap)** `v1.0.2` | Free · Plus · Pro | Editor extension that turns your project into readable, AI-ready documentation |
+| ✏️ **[Unity DirectTMP](https://amircollider.com/unity-directtmp)** `v1.2.2` | Free · MIT | Drop-in TextMeshPro workflow helper — install and forget |
 
 <sub>More at **[amircollider.com/tools](https://amircollider.com/tools)** 🛠️</sub>
 
@@ -126,6 +127,7 @@ Everything at **[amircollider.com](https://amircollider.com/)** runs from this r
 | 🎛️ | **دو پنل مدیریت** | `‎/thegod‎` بازی‌ها را می‌گرداند، `‎/testsite‎` کل مسیر خرید را بدون جابه‌جایی پول تمرین می‌کند |
 | 🌍 | **همیشه سه زبان** | هر صفحه به فارسی، انگلیسی و ژاپنی با راست‌چین/چپ‌چین درست — نه یک لایه‌ی ترجمه، بلکه یک قید طراحی |
 | 🌗 | **روشن / تاریک / خودکار** | تم پیش از اولین رندر تعیین می‌شود، پس هیچ‌وقت رنگ اشتباه یک لحظه دیده نمی‌شود |
+| 🔎 | **دیده‌شدن، به‌عمد** | canonical، hreflang، نقشه‌ی سایت و گراف داده‌ی ساختاریافته — به‌همراه فاویکونی که در قاب گرد گوشه‌هایش را از دست نمی‌دهد |
 | 📊 | **وضعیت زنده** | بررسی سلامت، تست پینگ، متریک‌ها و یادداشت‌های انتشار، به‌صورت داخلی |
 
 ### 🎮 بازی‌ها
@@ -181,6 +183,7 @@ Everything at **[amircollider.com](https://amircollider.com/)** runs from this r
 | 🎛️ | **2 つの管理パネル** | `/thegod` でゲームを運用し、`/testsite` で決済フロー全体をお金を動かさずリハーサル |
 | 🌍 | **常に 3 言語** | 全ページがペルシャ語・英語・日本語。翻訳レイヤーではなく設計上の制約です |
 | 🌗 | **ライト / ダーク / 自動** | 初回描画前にテーマを決定するため、色のちらつきがありません |
+| 🔎 | **意図して見つかる** | canonical・hreflang・サイトマップ・構造化データのグラフ。丸くトリミングされても欠けないファビコン付き |
 | 📊 | **ライブステータス** | ヘルスチェック、Ping テスト、メトリクス、リリースノートを内蔵 |
 
 ### 🎮 ゲーム
@@ -227,7 +230,8 @@ Everything at **[amircollider.com](https://amircollider.com/)** runs from this r
 🎮 Games/           registry, store, sessions, purchases, player records
 💳 Commerce/        orders, payment provider, fulfilment, mail
 🔑 Licensing/       keys, offline tokens, activations
-📚 Content/         authored data: catalogues, templates, the Unity kit
+📚 Content/         authored data: catalogues, templates, the biography,
+                    the Unity kit
 
 📖 Docs/            Games.md · Checkout.md · Licensing.md
 🗃️ migrations/      D1 schema, applied with wrangler
@@ -241,6 +245,7 @@ Everything at **[amircollider.com](https://amircollider.com/)** runs from this r
 | Path | What it is |
 |---|---|
 | `/` | 🏠 the dashboard: games, tools, live status |
+| `/about` | 👋 who is behind all of this |
 | `/{game}` · `/{game}/versions` | 🎮 a game's landing page and release history |
 | `/{game}/account` · `/{game}/store` | 👤 the player's account and the storefront |
 | `/{game}/leaderboard` · `/health` · `/ping` | 🏆 public game surfaces |
