@@ -30,7 +30,7 @@ import { escapeHtml, safeColor } from '../Core/Html.js'
 import { themeBootScript } from '../Core/PageChrome.js'
 import { seoHead, breadcrumbLd, softwareApplicationLd } from '../Core/Seo.js'
 import {
-  siteNavCss, siteHeader, siteBreadcrumb, siteFooter, siteChromeScript, NAV_I18N
+  siteNavCss, siteHeader, siteBreadcrumb, siteFooter, siteBackToTop, siteChromeScript, NAV_I18N
 } from '../Core/SiteNav.js'
 import { langCookieHeader, parseCookies, resolveLang, resolveRequestLang, resolveRequestTheme } from '../Core/RequestContext.js'
 
@@ -196,7 +196,7 @@ function getToolsCSS() {
        the viewport edges and puts the same gutter back inside - and
        its contents land exactly above the cards. */
     .ac-nav { margin-inline: -20px; padding-inline: 20px; margin-block-end: 24px; }
-    [id] { scroll-margin-top: 84px; }
+    [id] { scroll-margin-top: 24px; }
 
     /* ---------- topbar ---------- */
     .topbar {
@@ -443,6 +443,7 @@ function createToolsPage(lang, theme) {
     </main>
     ${siteFooter({ lang: resolved })}
   </div>
+  ${siteBackToTop({ lang })}
   ${siteChromeScript()}
 </body>
 </html>`

@@ -21,7 +21,7 @@ import { getPageHead } from '../Core/DesignSystem.js'
 import { escapeHtml, safeColor } from '../Core/Html.js'
 import { seoHead, breadcrumbLd } from '../Core/Seo.js'
 import {
-  siteNavCss, siteHeader, siteBreadcrumb, siteFooter, siteChromeScript, NAV_I18N
+  siteNavCss, siteHeader, siteBreadcrumb, siteFooter, siteBackToTop, siteChromeScript, NAV_I18N
 } from '../Core/SiteNav.js'
 import { dirFor, langCookieHeader, resolveRequestTheme, parseCookies } from '../Core/RequestContext.js'
 
@@ -445,6 +445,7 @@ ${chromeHead({ title, description, accent: game.color, head, seo })}
     </main>
     ${chromeFoot(game, lang, games)}
   </div>
+  ${siteBackToTop({ lang })}
   ${siteChromeScript()}
   ${chromeScript()}
   ${script}

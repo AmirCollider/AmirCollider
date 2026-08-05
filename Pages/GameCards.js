@@ -239,6 +239,8 @@ function downloadEnabled(game) {
 // SVG icon set (stroke uses currentColor)
 // ==========================================
 const ICONS = {
+  // Points the way reading goes: flipped under [dir="rtl"] by CSS.
+  arrow: '<path d="M5 12h14"/><path d="M13 6l6 6-6 6"/>',
   health: '<path d="M3 12h4l2-7 4 14 2-7h4"/>',
   ping: '<path d="M4 13a9 9 0 0 1 16 0"/><path d="M7.5 14.5a5.5 5.5 0 0 1 9 0"/><circle cx="12" cy="16" r="1.4"/>',
   metrics: '<line x1="6" y1="20" x2="6" y2="12"/><line x1="12" y1="20" x2="12" y2="5"/><line x1="18" y1="20" x2="18" y2="14"/>',
@@ -429,6 +431,41 @@ function getGamesCardsCSS() {
     color: color-mix(in srgb, var(--accent) 55%, var(--gc-text));
     background: color-mix(in srgb, var(--accent) 12%, transparent);
     border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+
+  /* A chip that goes somewhere looks like it does: it gains the
+     text colour of a link, an arrow, and it lifts on hover. The
+     arrow is held back until hover on a pointer device so a row of
+     five chips is not five arrows; on touch, where there is no
+     hover, it is always shown. */
+  .gc-cap--link {
+    text-decoration: none;
+    color: var(--gc-text);
+    cursor: pointer;
+    transition: transform 0.16s ease, border-color 0.16s ease,
+                background 0.16s ease, color 0.16s ease;
+  }
+  .gc-cap--link:hover, .gc-cap--link:focus-visible {
+    transform: translateY(-2px);
+    color: color-mix(in srgb, var(--accent) 60%, var(--gc-text));
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    border-color: color-mix(in srgb, var(--accent) 38%, transparent);
+  }
+  .gc-cap--link:active { transform: translateY(0); }
+  .gc-cap-go {
+    width: 11px; height: 11px; opacity: 0;
+    margin-inline-start: -4px;
+    transition: opacity 0.16s ease, margin 0.16s ease;
+  }
+  [dir="rtl"] .gc-cap-go { transform: scaleX(-1); }
+  .gc-cap--link:hover .gc-cap-go,
+  .gc-cap--link:focus-visible .gc-cap-go { opacity: 0.75; margin-inline-start: 0; }
+  @media (hover: none) {
+    .gc-cap-go { opacity: 0.55; margin-inline-start: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .gc-cap--link, .gc-cap-go { transition: none; }
+    .gc-cap--link:hover { transform: none; }
   }
 
   .gc-divider {
@@ -679,26 +716,37 @@ function createStatusBadge(game, lang) {
 // ==========================================
 function createCapabilities(game, lang) {
   const capability = caps(game)
+  const sid = safeId(game.id)
   const chips = []
 
+  // Every capability that names a real page links to it. These read
+  // as buttons, so they were being clicked; a chip saying
+  // "Leaderboard" that does nothing when pressed is a broken button,
+  // not a label. The two that describe how the game behaves rather
+  // than where to go - online and offline play - stay as text,
+  // because there is nowhere honest to send anyone.
   if (capability.onlinePlay) {
     chips.push({ ic: 'ping', label: t(lang, 'capOnline'), lead: true })
   } else {
     chips.push({ ic: 'wifiOff', label: t(lang, 'capOffline'), lead: true, title: offlineHint(game, lang) })
   }
 
-  if (capability.login) chips.push({ ic: 'key', label: t(lang, 'capLogin') })
-  if (capability.cloudSave) chips.push({ ic: 'cloud', label: t(lang, 'capCloud') })
-  if (capability.leaderboard) chips.push({ ic: 'leaderboard', label: t(lang, 'capBoard') })
-  if (capability.store) chips.push({ ic: 'cart', label: t(lang, 'capStore') })
+  if (capability.login) chips.push({ ic: 'key', label: t(lang, 'capLogin'), href: `/${sid}/account` })
+  if (capability.cloudSave) chips.push({ ic: 'cloud', label: t(lang, 'capCloud'), href: `/${sid}/account` })
+  if (capability.leaderboard) chips.push({ ic: 'leaderboard', label: t(lang, 'capBoard'), href: `/${sid}/leaderboard` })
+  if (capability.store) chips.push({ ic: 'cart', label: t(lang, 'capStore'), href: `/${sid}/store` })
 
   if (!chips.length) return ''
 
-  return `<div class="gc-caps">${chips.map(chip =>
-    `<span class="gc-cap${chip.lead ? ' gc-cap--lead' : ''}"` +
-    `${chip.title ? ` title="${escapeHtml(chip.title)}"` : ''}>` +
-    `${icon(chip.ic)}<span>${escapeHtml(chip.label)}</span></span>`
-  ).join('')}</div>`
+  return `<div class="gc-caps">${chips.map(chip => {
+    const classes = 'gc-cap' + (chip.lead ? ' gc-cap--lead' : '') + (chip.href ? ' gc-cap--link' : '')
+    const title = chip.title ? ` title="${escapeHtml(chip.title)}"` : ''
+    const body = `${icon(chip.ic)}<span>${escapeHtml(chip.label)}</span>`
+
+    return chip.href
+      ? `<a class="${classes}" href="${escapeHtml(chip.href)}"${title}>${body}${icon('arrow', 'gc-cap-go')}</a>`
+      : `<span class="${classes}"${title}>${body}</span>`
+  }).join('')}</div>`
 }
 
 

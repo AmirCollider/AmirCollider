@@ -9,7 +9,7 @@ import { getPageHead } from '../Core/DesignSystem.js'
 import { createJsonResponse, createHtmlResponse } from '../Core/Http.js'
 import { escapeHtml, hexToRgb } from '../Core/Html.js'
 import { seoHead } from '../Core/Seo.js'
-import { siteNavCss, siteFooter, siteChromeScript } from '../Core/SiteNav.js'
+import { siteNavCss, siteFooter, siteBackToTop, siteChromeScript } from '../Core/SiteNav.js'
 import { matchRequestLang } from '../Core/RequestContext.js'
 
 
@@ -370,6 +370,7 @@ function renderPingPage(pingData, game, baseUrl, gameId, lang) {
   </main>
 
   ${siteFooter({ lang })}
+  ${siteBackToTop({ lang })}
   ${siteChromeScript()}
 
   <script id="pg-data" type="application/json">${payloadJson}</script>

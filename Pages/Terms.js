@@ -35,7 +35,7 @@ import { escapeHtml } from '../Core/Html.js'
 import { themeBootScript } from '../Core/PageChrome.js'
 import { seoHead, breadcrumbLd } from '../Core/Seo.js'
 import {
-  siteNavCss, siteHeader, siteBreadcrumb, siteFooter, siteChromeScript, NAV_I18N
+  siteNavCss, siteHeader, siteBreadcrumb, siteFooter, siteBackToTop, siteChromeScript, NAV_I18N
 } from '../Core/SiteNav.js'
 import { dirFor, langCookieHeader, parseCookies, resolveLang, resolveRequestLang, resolveRequestTheme } from '../Core/RequestContext.js'
 
@@ -204,6 +204,7 @@ const I18N = {
     themeToDark: 'حالت تاریک',
     themeToLight: 'حالت روشن',
     brandSub: 'شرایط و قوانین',
+    brandAll: 'همه‌ی بازی‌ها و ابزارها',
     'sec.acceptance.title': 'پذیرش شرایط',
     'sec.acceptance.body':
       '<div class="callout callout-good"><p>با استفاده از بازی و سرویس‌های ما، شما موافقت می‌کنید که تمام شرایط و قوانین زیر را بپذیرید. اگر با این شرایط موافق نیستید، لطفاً از سرویس استفاده نکنید.</p></div>',
@@ -315,6 +316,7 @@ const I18N = {
     themeToDark: 'Dark mode',
     themeToLight: 'Light mode',
     brandSub: 'Terms of service',
+    brandAll: 'All games & tools',
     'sec.acceptance.title': 'Acceptance of Terms',
     'sec.acceptance.body':
       '<div class="callout callout-good"><p>By using our game and services, you agree to all the terms listed below. If you do not agree, please refrain from using the service.</p></div>',
@@ -426,6 +428,7 @@ const I18N = {
     themeToDark: 'ダークモード',
     themeToLight: 'ライトモード',
     brandSub: '利用規約',
+    brandAll: 'すべてのゲームとツール',
     'sec.acceptance.title': '規約への同意',
     'sec.acceptance.body':
       '<div class="callout callout-good"><p>当社のゲームおよびサービスをご利用いただくことで、お客様は以下のすべての規約に同意したものとみなされます。これらの規約に同意されない場合は、サービスのご利用をお控えください。</p></div>',
@@ -614,10 +617,11 @@ function getTermsCSS() {
 
     .wrap { max-width: var(--maxw); margin: 0 auto; }
 
-    /* Full-bleed shared header: out of the body gutter, gutter back
-       inside, so its contents line up with the panels below. */
+    /* The header spans the body's full width and puts the body's
+       own gutter back inside itself, so its contents line up with
+       the panels below. */
     .ac-nav { margin: -24px -20px 24px; padding-inline: 20px; }
-    [id] { scroll-margin-top: 84px; }
+    [id] { scroll-margin-top: 24px; }
 
     /* ---------- top bar (brand + controls) ---------- */
     .topbar {
@@ -679,8 +683,12 @@ function getTermsCSS() {
       transition: transform 0.25s ease;
     }
     .logo-orb:hover { transform: translateY(-4px) scale(1.03); }
-    .logo-orb img { width: 100%; height: 100%; object-fit: contain; padding: 14px; display: block; }
-    .logo-orb.is-game img { object-fit: cover; padding: 0; }
+    /* Both marks fill their circle. Fitting the mark inside padding
+       left the AmirCollider artwork - which carries its own opaque
+       square background - sitting as a visible square inside a round
+       frame, so the shape a reader saw was the square, not the
+       circle. */
+    .logo-orb img { width: 100%; height: 100%; object-fit: cover; padding: 0; display: block; }
     .logo-cell { text-align: center; }
     .logo-cell span { display: block; margin-block-start: 9px; font-size: 0.82em; font-weight: 700; color: var(--text-dim); }
     .logo-sep { width: 1px; height: 56px; background: linear-gradient(180deg, transparent, var(--border), transparent); }
@@ -835,14 +843,14 @@ function renderHero(lang, game, amirLogo, gameLogo) {
         <div class="logo-sep" aria-hidden="true"></div>
         <div class="logo-cell">
           <span class="logo-orb is-game">
-            <img src="${escapeHtml(gameLogo)}" alt="${escapeHtml(game.name)}"
+            <img src="${escapeHtml(gameLogo)}" alt=""
                  onerror="this.onerror=null;this.src='${escapeHtml(CONFIG.DEFAULT_GAME_LOGO)}'">
           </span>
-          <span>${escapeHtml(game.name)}</span>
+          <span>${escapeHtml(CONTEXT.siteLevel ? p.brandAll : game.name)}</span>
         </div>
       </div>
       <h1>${escapeHtml(p.title)}</h1>
-      <span class="pill"><span class="game-icon">${escapeHtml(game.icon)}</span>${escapeHtml(game.name)}</span>
+      ${CONTEXT.siteLevel ? '' : `<span class="pill"><span class="game-icon">${escapeHtml(game.icon)}</span>${escapeHtml(game.name)}</span>`}
     </div>`
 }
 
@@ -863,13 +871,21 @@ function renderContact(lang) {
   const p = pack(lang)
   const game = CONTEXT.game
   const baseUrl = CONTEXT.baseUrl
+
+  // The site-wide page is not about a game, so the two rows that
+  // name one are left out rather than filled with the first game
+  // in the registry - which is what made /privacy read as Neon
+  // Katana's policy to anyone who reached it from the footer.
+  const gameRows = CONTEXT.siteLevel ? '' : `
+          <li><span class="c-ic">${icon('user', 'p-ic')}</span><span class="c-key">${escapeHtml(p['contact.game'])}</span><span class="c-val">${escapeHtml(game.name)}</span></li>
+          ${game.myketUrl ? `<li><span class="c-ic">${icon('external', 'p-ic')}</span><span class="c-key">${escapeHtml(p['contact.myket'])}</span><span class="c-val"><a href="${escapeHtml(game.myketUrl)}" target="_blank" rel="noopener">${escapeHtml(p['contact.myketLink'])}</a></span></li>` : ''}`
+
   return `
       <section class="panel">
         <h2><span class="sec-ic">${icon('mail', 'p-ic')}</span><span>${escapeHtml(p['contact.title'])}</span></h2>
         <p>${escapeHtml(p['contact.intro'])}</p>
         <ul class="contact-list">
-          <li><span class="c-ic">${icon('user', 'p-ic')}</span><span class="c-key">${escapeHtml(p['contact.game'])}</span><span class="c-val">${escapeHtml(game.name)}</span></li>
-          <li><span class="c-ic">${icon('external', 'p-ic')}</span><span class="c-key">${escapeHtml(p['contact.myket'])}</span><span class="c-val"><a href="${escapeHtml(game.myketUrl)}" target="_blank" rel="noopener">${escapeHtml(p['contact.myketLink'])}</a></span></li>
+          ${gameRows}
           <li><span class="c-ic">${icon('mail', 'p-ic')}</span><span class="c-key">${escapeHtml(p['contact.email'])}</span><span class="c-val"><a href="mailto:${escapeHtml(CONFIG.SUPPORT_EMAIL)}">${escapeHtml(CONFIG.SUPPORT_EMAIL)}</a></span></li>
           <li><span class="c-ic">${icon('globe', 'p-ic')}</span><span class="c-key">${escapeHtml(p['contact.web'])}</span><span class="c-val"><a href="${escapeHtml(baseUrl)}">${escapeHtml(baseUrl)}</a></span></li>
         </ul>
@@ -889,10 +905,13 @@ function renderMeta(lang) {
 function renderActions(lang, gameId, baseUrl) {
   const p = pack(lang)
   const q = '?lang=' + resolveLang(lang)
+  // A visitor who arrived at the site-wide page is sent to the
+  // site-wide sibling, not into a game they never chose.
+  const sibling = CONTEXT.siteLevel ? '/privacy' : '/' + gameId + '/privacy'
   return `
     <div class="actions">
       <a class="action" href="${escapeHtml(baseUrl)}/${q}">${icon('home', 'p-ic')}<span>${escapeHtml(p['btn.home'])}</span></a>
-      <a class="action is-secondary" href="${escapeHtml(baseUrl)}/${escapeHtml(gameId)}/privacy${q}">${icon('lock', 'p-ic')}<span>${escapeHtml(p['btn.privacy'])}</span></a>
+      <a class="action is-secondary" href="${escapeHtml(baseUrl)}${escapeHtml(sibling)}${q}">${icon('lock', 'p-ic')}<span>${escapeHtml(p['btn.privacy'])}</span></a>
     </div>`
 }
 
@@ -900,24 +919,27 @@ function renderActions(lang, gameId, baseUrl) {
 // ==========================================
 // Render Context (shared with contact partial)
 // ==========================================
-let CONTEXT = { game: null, baseUrl: '' }
+let CONTEXT = { game: null, baseUrl: '', siteLevel: false }
 
 
 // ==========================================
 // Page Template
 // ==========================================
 function createTermsPage(game, gameId, baseUrl, lang, theme, { path = '/terms', games = [] } = {}) {
-  CONTEXT = { game, baseUrl }
+  const siteLevel = path === '/terms'
+  CONTEXT = { game, baseUrl, siteLevel }
 
   const amirLogo = CONFIG.AMIR_LOGO
-  const gameLogo = game.logo || CONFIG.DEFAULT_GAME_LOGO
+  // On the site-wide page the second mark is the neutral default,
+  // never the first game in the registry.
+  const gameLogo = siteLevel ? CONFIG.DEFAULT_GAME_LOGO : (game.logo || CONFIG.DEFAULT_GAME_LOGO)
   const resolved = resolveLang(lang)
   const dir = dirFor(resolved)
   const themeAttr = theme === 'light' || theme === 'dark' ? ` data-theme="${theme}"` : ''
   const p = pack(resolved)
   const site = NAV_I18N[resolved]
 
-  const perGame = path !== '/terms'
+  const perGame = !siteLevel
   const title = perGame ? `${p.meta} — ${game.name} | AmirCollider` : `${p.meta} — AmirCollider`
   const description = perGame
     ? `${p.meta} — ${game.name}. AmirCollider Games.`
@@ -963,6 +985,7 @@ function createTermsPage(game, gameId, baseUrl, lang, theme, { path = '/terms', 
     </main>
     ${siteFooter({ lang: resolved, games })}
   </div>
+  ${siteBackToTop({ lang })}
   ${siteChromeScript()}
 </body>
 </html>`

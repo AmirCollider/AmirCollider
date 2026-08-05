@@ -24,7 +24,7 @@ import { createHtmlResponse, create404Response } from '../Core/Http.js'
 import { escapeHtml } from '../Core/Html.js'
 import { seoHead } from '../Core/Seo.js'
 import { themeBootScript } from '../Core/PageChrome.js'
-import { siteNavCss, siteHeader, siteFooter, siteChromeScript } from '../Core/SiteNav.js'
+import { siteNavCss, siteHeader, siteFooter, siteBackToTop, siteChromeScript } from '../Core/SiteNav.js'
 import {
   dirFor, parseCookies, resolveLang, resolveRequestLang, resolveRequestTheme, themeAttribute
 } from '../Core/RequestContext.js'
@@ -134,9 +134,8 @@ function css() {
     }
     .wrap { max-width: var(--maxw); margin-inline: auto; }
 
-    /* The gutter is on <body>, so the sticky bar pulls back out to
-       the viewport edges and puts that gutter back inside itself -
-       otherwise its background stops 20px short of both edges. */
+    /* The gutter is on <body>; the header puts the same gutter back
+       inside itself so its contents line up with the panel below. */
     .ac-nav { margin-inline: -20px; padding-inline: 20px; }
 
     .nf {
@@ -226,6 +225,7 @@ export function createNotFoundPage({ lang, theme, path = '', games = [] }) {
     </main>
     ${siteFooter({ lang: code, games })}
   </div>
+  ${siteBackToTop({ lang })}
   ${siteChromeScript()}
 </body>
 </html>`

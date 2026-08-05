@@ -79,7 +79,7 @@ export const CORS_HEADERS = deepFreeze({
 // Runtime constants. Durations are milliseconds.
 // ==========================================
 export const CONFIG = deepFreeze({
-  VERSION: '6.8.0',
+  VERSION: '6.7.4',
 
   // A constant rather than url.origin: a handful of places have to
   // produce an absolute address (a licence refusal, canonical and
@@ -107,9 +107,9 @@ export const CONFIG = deepFreeze({
   // OpenGraph card, the search result. Written once, per language,
   // because a page with no description gets one invented for it.
   SITE_TAGLINE: {
-    fa: 'AmirCollider — سازنده‌ی بازی‌های اندرویدی مثل Neon Katana و افزونه‌های یونیتی مثل Unity DocSnap و Unity DirectTMP.',
-    en: 'AmirCollider — Android games such as Neon Katana and Unity editor extensions such as Unity DocSnap and Unity DirectTMP.',
-    ja: 'AmirCollider — Neon Katana などの Android ゲームと、Unity DocSnap・Unity DirectTMP などの Unity エディタ拡張。'
+    fa: 'AmirCollider — سازنده‌ی بازی‌های اندروید، کامپیوتر و تحت‌وب مثل Neon Katana، و افزونه‌های یونیتی مثل Unity DocSnap و Unity DirectTMP.',
+    en: 'AmirCollider — games for Android, PC and the web such as Neon Katana, and Unity editor extensions such as Unity DocSnap and Unity DirectTMP.',
+    ja: 'AmirCollider — Neon Katana などの Android・PC・ウェブ向けゲームと、Unity DocSnap・Unity DirectTMP などの Unity エディタ拡張。'
   },
 
   // Unity DocSnap - the paid Unity editor extension. Sold through

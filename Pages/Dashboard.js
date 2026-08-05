@@ -43,7 +43,7 @@ import { resolveGames } from '../Games/Registry.js'
 import { escapeHtml, safeColor } from '../Core/Html.js'
 import { themeBootScript } from '../Core/PageChrome.js'
 import { seoHead, videoGameLd, softwareApplicationLd } from '../Core/Seo.js'
-import { siteNavCss, siteHeader, siteFooter, siteChromeScript } from '../Core/SiteNav.js'
+import { siteNavCss, siteHeader, siteFooter, siteBackToTop, siteChromeScript } from '../Core/SiteNav.js'
 import { dirFor, langCookieHeader, parseCookies, resolveLang, resolveRequestLang, resolveRequestTheme } from '../Core/RequestContext.js'
 
 
@@ -60,9 +60,9 @@ const DASH_I18N = {
     // those words, and the one page with the authority to rank for
     // the brand was spending it on an implementation detail.
     title: 'AmirCollider',
-    tagline: 'بازی‌های اندروید و افزونه‌های یونیتی',
-    metaTitle: 'AmirCollider — بازی‌های اندروید و ابزارهای یونیتی',
-    metaDesc: 'AmirCollider سازنده‌ی بازی‌های اندرویدی مانند Neon Katana و افزونه‌های ادیتور یونیتی مانند Unity DocSnap و Unity DirectTMP است.',
+    tagline: 'بازی‌های اندروید، کامپیوتر و تحت‌وب — و افزونه‌های یونیتی',
+    metaTitle: 'AmirCollider — بازی‌های اندروید، کامپیوتر و وب، و ابزارهای یونیتی',
+    metaDesc: 'AmirCollider سازنده‌ی بازی‌های اندروید، کامپیوتر و تحت‌وب مانند Neon Katana، و افزونه‌های ادیتور یونیتی مانند Unity DocSnap و Unity DirectTMP است.',
     subtitle: 'سامانه مدیریت احراز هویت OAuth',
     langName: 'فارسی',
     themeToLight: 'حالت روشن',
@@ -110,9 +110,9 @@ const DASH_I18N = {
   en: {
     locale: 'en-US',
     title: 'AmirCollider',
-    tagline: 'Android games and Unity editor extensions',
-    metaTitle: 'AmirCollider — Android Games & Unity Editor Tools',
-    metaDesc: 'AmirCollider builds Android games such as Neon Katana and Unity editor extensions such as Unity DocSnap and Unity DirectTMP.',
+    tagline: 'Games for Android, PC and the web — and Unity editor extensions',
+    metaTitle: 'AmirCollider — Games for Android, PC & Web, and Unity Editor Tools',
+    metaDesc: 'AmirCollider builds games for Android, PC and the web such as Neon Katana, and Unity editor extensions such as Unity DocSnap and Unity DirectTMP.',
     subtitle: 'OAuth authentication management',
     langName: 'English',
     themeToLight: 'Light mode',
@@ -159,9 +159,9 @@ const DASH_I18N = {
   ja: {
     locale: 'ja-JP',
     title: 'AmirCollider',
-    tagline: 'Android ゲームと Unity エディタ拡張',
-    metaTitle: 'AmirCollider — Android ゲームと Unity エディタツール',
-    metaDesc: 'AmirCollider は Neon Katana などの Android ゲームと、Unity DocSnap・Unity DirectTMP などの Unity エディタ拡張を開発しています。',
+    tagline: 'Android・PC・ウェブ向けゲームと Unity エディタ拡張',
+    metaTitle: 'AmirCollider — Android・PC・ウェブ向けゲームと Unity エディタツール',
+    metaDesc: 'AmirCollider は Neon Katana などの Android・PC・ウェブ向けゲームと、Unity DocSnap・Unity DirectTMP などの Unity エディタ拡張を開発しています。',
     subtitle: 'OAuth 認証管理システム',
     langName: '日本語',
     themeToLight: 'ライトモード',
@@ -363,11 +363,11 @@ function getDashboardCSS() {
 
     .wrap { max-width: var(--maxw); margin: 0 auto; }
 
-    /* The shared header spans the viewport. The body pads itself,
-       so the bar pulls back out to the edges instead of floating
-       in a gutter, and section anchors clear its sticky height. */
+    /* The header spans the viewport. The body pads itself, so the
+       bar pulls back out to the edges and puts that padding back
+       inside, rather than floating in a gutter. */
     .ac-nav { margin: -24px -20px 24px; padding-inline: 20px; }
-    [id] { scroll-margin-top: 84px; }
+    [id] { scroll-margin-top: 24px; }
 
     /* ---------- top bar ---------- */
     .topbar {
@@ -925,6 +925,7 @@ function createDashboardPage(GAMES, baseUrl, routesCount, lang, theme, player = 
   </div>
 
   ${getClientScript(baseUrl, resolved)}
+  ${siteBackToTop({ lang })}
   ${siteChromeScript()}
 </body>
 </html>`

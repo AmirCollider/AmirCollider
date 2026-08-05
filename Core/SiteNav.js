@@ -12,11 +12,14 @@
 //
 // Exports
 //   siteNavCss()                      the stylesheet for header,
-//                                     breadcrumbs and footer
-//   siteHeader({ lang, active, ... }) the sticky top bar
+//                                     breadcrumbs, footer and the
+//                                     back-to-top button
+//   siteHeader({ lang, active, ... }) the top bar
 //   siteBreadcrumb({ lang, trail })   the trail under the header
 //   siteFooter({ lang, games })       the full site footer
-//   siteChromeScript()                theme + language runtime
+//   siteBackToTop({ lang })           the floating scroll-up button
+//   siteChromeScript()                theme, language and scroll
+//                                     runtime; render it once, last
 //   NAV_I18N                          the strings, for callers that
 //                                     need one of them inline
 //
@@ -45,6 +48,7 @@ export const NAV_I18N = {
     langName: 'فارسی',
     dir: 'rtl',
     brandSub: 'بازی‌ها و ابزارهای یونیتی',
+    backToTop: 'بازگشت به بالای صفحه',
     home: 'خانه',
     games: 'بازی‌ها',
     tools: 'ابزارها',
@@ -65,7 +69,7 @@ export const NAV_I18N = {
     colSite: 'سایت',
     colProducts: 'محصولات',
     colLegal: 'قوانین و پشتیبانی',
-    tagline: 'بازی‌های اندرویدی و افزونه‌های یونیتی، ساخته‌ی AmirCollider.',
+    tagline: 'بازی‌های اندروید، کامپیوتر و تحت‌وب، به‌همراه افزونه‌های ادیتور یونیتی — ساخته‌ی AmirCollider.',
     poweredBy: 'اجرا شده روی Cloudflare Workers',
     rights: 'همه‌ی حقوق محفوظ است.',
     backToGame: 'بازگشت به صفحه‌ی بازی'
@@ -74,6 +78,7 @@ export const NAV_I18N = {
     langName: 'English',
     dir: 'ltr',
     brandSub: 'Games & Unity tools',
+    backToTop: 'Back to top',
     home: 'Home',
     games: 'Games',
     tools: 'Tools',
@@ -94,7 +99,7 @@ export const NAV_I18N = {
     colSite: 'Site',
     colProducts: 'Products',
     colLegal: 'Legal & support',
-    tagline: 'Android games and Unity editor extensions by AmirCollider.',
+    tagline: 'Games for Android, PC and the web, plus Unity editor extensions — built by AmirCollider.',
     poweredBy: 'Powered by Cloudflare Workers',
     rights: 'All rights reserved.',
     backToGame: 'Back to the game page'
@@ -103,6 +108,7 @@ export const NAV_I18N = {
     langName: '日本語',
     dir: 'ltr',
     brandSub: 'ゲームと Unity ツール',
+    backToTop: 'ページ上部へ戻る',
     home: 'ホーム',
     games: 'ゲーム',
     tools: 'ツール',
@@ -123,7 +129,7 @@ export const NAV_I18N = {
     colSite: 'サイト',
     colProducts: '製品',
     colLegal: '規約とサポート',
-    tagline: 'AmirCollider による Android ゲームと Unity エディタ拡張。',
+    tagline: 'AmirCollider による Android・PC・ウェブ向けゲームと、Unity エディタ拡張。',
     poweredBy: 'Cloudflare Workers で稼働',
     rights: 'All rights reserved.',
     backToGame: 'ゲームページに戻る'
@@ -188,13 +194,17 @@ export function siteNavCss() {
     }
     .ac-skip:focus { inset-inline-start: 12px; }
 
-    /* ---------- header ---------- */
+    /* ---------- header ----------
+       No surface of its own, and not sticky. A bar with a filled
+       background and a bottom rule reads as a lid on the page; the
+       product pages never had one and are the better model. It sits
+       at the top of the document and scrolls away with everything
+       else, so nothing follows the reader down the page. */
     .ac-nav {
-      position: sticky; top: 0; z-index: 100;
+      position: static;
       margin-block-end: 22px;
-      background: color-mix(in srgb, var(--acn-bg) 86%, transparent);
-      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-      border-block-end: 1px solid var(--acn-border);
+      background: transparent;
+      border: 0;
     }
     /* The bar spans the viewport; its contents line up with the
        page. The inline gutter is the host page's job - it pulls the
@@ -214,8 +224,13 @@ export function siteNavCss() {
       transition: opacity 0.18s ease;
     }
     .ac-brand:hover { opacity: 0.82; }
+    /* Round, not a rounded square. The logo artwork carries its own
+       opaque background, so fitting it inside a circle with room to
+       spare showed the artwork's square edges through the frame -
+       the mark has to fill the circle for the circle to be the
+       shape anyone sees. */
     .ac-brand-logo {
-      width: 38px; height: 38px; border-radius: 11px; flex: none; overflow: hidden;
+      width: 38px; height: 38px; border-radius: 50%; flex: none; overflow: hidden;
       display: grid; place-items: center;
       background: var(--acn-surface-2); border: 1px solid var(--acn-border);
     }
@@ -304,7 +319,7 @@ export function siteNavCss() {
     .ac-foot-brand { display: flex; flex-direction: column; gap: 10px; }
     .ac-foot-mark { display: inline-flex; align-items: center; gap: 11px; text-decoration: none; color: var(--acn-fg); }
     .ac-foot-mark img {
-      width: 40px; height: 40px; border-radius: 12px; object-fit: cover;
+      width: 40px; height: 40px; border-radius: 50%; object-fit: cover;
       background: var(--acn-surface-2); border: 1px solid var(--acn-border);
     }
     .ac-foot-mark b { font-size: 1.02em; font-weight: 800; }
@@ -344,10 +359,63 @@ export function siteNavCss() {
       .ac-foot-brand { grid-column: 1 / -1; }
     }
 
+    /* ---------- back to top ----------
+       Physically bottom-right in both writing directions. A logical
+       property would put it bottom-left in Persian, and "bottom
+       right" is where a reader of any of these three languages
+       reaches for it.
+
+       Hidden until there is something to scroll back from, and
+       hidden entirely from assistive tech while it is - a button
+       that does nothing yet should not be announced. */
+    .ac-top {
+      position: fixed; bottom: 22px; right: 22px; z-index: 90;
+      width: 46px; height: 46px; border-radius: 50%; cursor: pointer;
+      display: grid; place-items: center;
+      color: var(--text, #fff);
+      background: var(--surface-2, rgba(255,255,255,0.09));
+      border: 1px solid var(--border, rgba(255,255,255,0.14));
+      box-shadow: 0 10px 26px rgba(0, 0, 0, 0.28);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      opacity: 0; visibility: hidden; transform: translateY(10px);
+      transition: opacity 0.22s ease, transform 0.22s ease, visibility 0.22s;
+    }
+    .ac-top.is-on { opacity: 1; visibility: visible; transform: translateY(0); }
+    .ac-top:hover {
+      transform: translateY(-3px);
+      border-color: color-mix(in srgb, var(--accent, var(--brand, #6c63ff)) 45%, var(--border, transparent));
+      color: color-mix(in srgb, var(--accent, var(--brand, #6c63ff)) 60%, var(--text, #fff));
+    }
+    .ac-top svg { width: 20px; height: 20px; }
+    .ac-top:focus-visible {
+      outline: 2px solid var(--accent, var(--brand, #6c63ff)); outline-offset: 3px;
+    }
+    @media (max-width: 560px) { .ac-top { bottom: 16px; right: 16px; width: 42px; height: 42px; } }
+
     @media (prefers-reduced-motion: reduce) {
-      .ac-nav *, .ac-foot * { transition: none !important; }
+      .ac-nav *, .ac-foot *, .ac-top { transition: none !important; }
     }
   `
+}
+
+
+// ==========================================
+// Back-to-top
+//
+// Markup only; siteChromeScript() wires the behaviour. Rendered
+// last in <body> so it is out of the tab order until the content
+// has been passed.
+// ==========================================
+export function siteBackToTop({ lang } = {}) {
+  const p = pack(lang)
+  return `
+    <button type="button" id="acTopBtn" class="ac-top" hidden
+            aria-label="${escapeHtml(p.backToTop)}" title="${escapeHtml(p.backToTop)}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 19V5"/><path d="M5 12l7-7 7 7"/>
+      </svg>
+    </button>`
 }
 
 
@@ -577,6 +645,35 @@ export function siteChromeScript() {
         window.location.href = url.toString();
         return false;
       };
+
+      // Back to top. The button carries [hidden] from the server so
+      // a visitor with no JavaScript never sees a control that
+      // cannot work; the first thing this does is take that off.
+      var top = document.getElementById('acTopBtn');
+      if (top) {
+        top.hidden = false;
+        var ticking = false;
+        var sync = function () {
+          ticking = false;
+          var y = window.pageYOffset || document.documentElement.scrollTop || 0;
+          top.classList.toggle('is-on', y > 320);
+        };
+        window.addEventListener('scroll', function () {
+          if (ticking) return;
+          ticking = true;
+          window.requestAnimationFrame(sync);
+        }, { passive: true });
+        top.addEventListener('click', function () {
+          var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
+          // Send focus back where the page starts, so a keyboard
+          // visitor lands at the top rather than staying parked on
+          // a button that has just scrolled out of sight.
+          var first = document.querySelector('.ac-brand') || document.body;
+          if (first && first.focus) first.focus({ preventScroll: true });
+        });
+        sync();
+      }
 
       applyLabel();
     })();

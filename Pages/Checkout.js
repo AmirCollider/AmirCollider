@@ -31,7 +31,7 @@ import { applyPaymentState, resendLicense, alertAdmin } from '../Commerce/Fulfil
 import { mailConfigured } from '../Commerce/Mailer.js'
 
 import { escapeHtml, jsString } from '../Core/Html.js'
-import { siteNavCss, siteFooter } from '../Core/SiteNav.js'
+import { siteNavCss, siteFooter, siteBackToTop, siteChromeScript } from '../Core/SiteNav.js'
 import { parseCookies, resolveRequestLang, resolveRequestTheme } from '../Core/RequestContext.js'
 const LANGS = ['fa', 'en', 'ja']
 const PROMISE_MINUTES = CONFIG.COMMERCE.DELIVERY_PROMISE_MINUTES
@@ -705,6 +705,8 @@ function shell(lang, theme, { title, body, script }) {
     </div>
     ${siteFooter({ lang })}
   </div>
+  ${siteBackToTop({ lang })}
+  ${siteChromeScript()}
   <script>${script || ''}${commonScript()}</script>
 </body>
 </html>`

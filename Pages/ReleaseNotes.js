@@ -28,7 +28,7 @@ import { escapeHtml } from '../Core/Html.js'
 import { themeBootScript } from '../Core/PageChrome.js'
 import { seoHead, breadcrumbLd } from '../Core/Seo.js'
 import {
-  siteNavCss, siteHeader, siteBreadcrumb, siteFooter, siteChromeScript, NAV_I18N
+  siteNavCss, siteHeader, siteBreadcrumb, siteFooter, siteBackToTop, siteChromeScript, NAV_I18N
 } from '../Core/SiteNav.js'
 import { dirFor, langCookieHeader, parseCookies, resolveLang, resolveRequestLang, resolveRequestTheme } from '../Core/RequestContext.js'
 
@@ -89,7 +89,7 @@ const RN_I18N = {
 // ==========================================
 const RELEASES = [
   {
-    version: '6.8.0',
+    version: '6.7.4',
     date: '2026-08-05',
     tag: 'latest',
     summary: {
@@ -102,21 +102,29 @@ const RELEASES = [
         title: { fa: 'ناوبری یکپارچه', en: 'One navigation surface', ja: '統一されたナビゲーション' },
         items: {
           fa: [
-            'هدر چسبان مشترک روی همه‌ی صفحه‌ها: لوگو (لینک به خانه)، خانه، بازی‌ها، ابزارها، Unity DocSnap و Unity DirectTMP، به‌همراه انتخاب زبان و تم در یک جای ثابت.',
+            'هدر مشترک روی همه‌ی صفحه‌ها: لوگو (لینک به خانه)، خانه، بازی‌ها، ابزارها، Unity DocSnap و Unity DirectTMP، به‌همراه انتخاب زبان و تم در یک جای ثابت. بدون پس‌زمینه و بدون چسبیدن به بالای صفحه — مثل هدر صفحه‌های محصول.',
             'فوتر کامل با چهار ستون روی همه‌ی صفحه‌ها؛ حریم خصوصی، شرایط استفاده، پیگیری سفارش و پشتیبانی همیشه یک کلیک فاصله دارند.',
             'مسیر صفحه (breadcrumb) روی صفحه‌های داخلی، هم برای کاربر و هم به‌صورت داده‌ی ساختاریافته برای گوگل.',
             'صفحه‌ی /tools دیگر بن‌بست نیست: نشان برند لینک خانه شد و هدر و فوتر مشترک گرفت. همین برای Unity DirectTMP و صفحه‌ی پرداخت هم انجام شد.',
-            'صفحه‌ی ۴۰۴ واقعی با ناوبری کامل؛ پیش از این یک بدنه‌ی JSON بود. کلاینت‌هایی که JSON می‌خواهند دقیقاً همان پاسخ قبلی را می‌گیرند.'
+            'صفحه‌ی ۴۰۴ واقعی با ناوبری کامل؛ پیش از این یک بدنه‌ی JSON بود. کلاینت‌هایی که JSON می‌خواهند دقیقاً همان پاسخ قبلی را می‌گیرند.',
+            'دکمه‌ی «بازگشت به بالای صفحه» در گوشه‌ی پایین سمت راست همه‌ی صفحه‌ها، که بعد از کمی اسکرول ظاهر می‌شود.',
+            'صفحه‌های /privacy و /terms دیگر بازی‌ای را که انتخاب نشده نشان نمی‌دهند: به‌جای لوگو و نام Neon Katana، از DefaultGameLogo و عنوان «همه‌ی بازی‌ها و ابزارها» استفاده می‌کنند.',
+            'قابلیت‌های روی کارت بازی (ورود با گوگل، ذخیره‌ی ابری، جدول امتیازات، خرید درون‌برنامه‌ای) حالا واقعاً لینک‌اند و به صفحه‌ی خودشان می‌روند.',
+            'لوگوی AmirCollider در هدر، فوتر و صفحه‌های قوانین دایره‌ای شد؛ قبلاً لبه‌های مربعی تصویر از داخل قاب گرد بیرون می‌زد.'
           ],
           en: [
-            'A shared sticky header on every page: the logo (a link home), Home, Games, Tools, Unity DocSnap and Unity DirectTMP, with the language and theme controls always in the same corner.',
+            'A shared header on every page: the logo (a link home), Home, Games, Tools, Unity DocSnap and Unity DirectTMP, with the language and theme controls always in the same corner. No surface of its own and not sticky, matching the product pages.',
             'A four-column footer on every page, so privacy, terms, order help and support are one click away from anywhere.',
             'Breadcrumbs on inner pages, both for readers and as BreadcrumbList structured data.',
             '/tools is no longer a dead end: its brand mark is a link home and it carries the shared header and footer. The same was done for Unity DirectTMP and the checkout.',
-            'A real 404 page with full navigation, where there used to be a JSON body. Clients that ask for JSON still get exactly the response they got before.'
+            'A real 404 page with full navigation, where there used to be a JSON body. Clients that ask for JSON still get exactly the response they got before.',
+            'A back-to-top button in the bottom-right corner of every page, appearing once there is something to scroll back from.',
+            '/privacy and /terms no longer show a game nobody chose: they use DefaultGameLogo and the heading "All games & tools" instead of Neon Katana\'s mark and name.',
+            'The capability chips on a game card (Google sign-in, cloud save, leaderboard, in-app purchases) are real links now and open the page they name.',
+            'The AmirCollider mark is round in the header, the footer and the policy pages; its square edges used to show through the round frame.'
           ],
           ja: [
-            '全ページ共通の固定ヘッダー：ロゴ（ホームへのリンク）、ホーム、ゲーム、ツール、Unity DocSnap、Unity DirectTMP。言語とテーマの切り替えは常に同じ位置に。',
+            '全ページ共通のヘッダー：ロゴ（ホームへのリンク）、ホーム、ゲーム、ツール、Unity DocSnap、Unity DirectTMP。言語とテーマの切り替えは常に同じ位置に。背景を持たず固定もしない、製品ページと同じ形です。',
             '全ページに 4 列のフッター。プライバシー、利用規約、注文サポート、サポートへどこからでも 1 クリックで到達できます。',
             '下層ページにパンくずリストを追加。読者向けの表示と BreadcrumbList 構造化データの両方。',
             '/tools は行き止まりではなくなりました。ブランドマークがホームへのリンクになり、共通ヘッダーとフッターを持ちます。Unity DirectTMP と決済ページも同様です。',
@@ -868,10 +876,10 @@ function getReleaseNotesCSS() {
 
     .wrap { max-width: var(--maxw); margin: 0 auto; }
 
-    /* Full-bleed shared header: out of the body gutter, and the
-       same gutter put back inside so its contents stay aligned. */
+    /* The header spans the body's full width and puts the body's
+       own gutter back inside itself, so its contents stay aligned. */
     .ac-nav { margin: -24px -20px 24px; padding-inline: 20px; }
-    [id] { scroll-margin-top: 84px; }
+    [id] { scroll-margin-top: 24px; }
 
     /* ---------- top bar ---------- */
     .topbar {
@@ -1162,6 +1170,7 @@ function createReleaseNotesPage(lang, theme) {
     </main>
     ${siteFooter({ lang: resolved })}
   </div>
+  ${siteBackToTop({ lang })}
   ${siteChromeScript()}
 </body>
 </html>`

@@ -31,7 +31,7 @@
 import { CONFIG } from '../Config.js'
 import { getPageHead } from '../Core/DesignSystem.js'
 import { seoHead } from '../Core/Seo.js'
-import { siteNavCss, siteFooter, siteChromeScript } from '../Core/SiteNav.js'
+import { siteNavCss, siteFooter, siteBackToTop, siteChromeScript } from '../Core/SiteNav.js'
 import { createJsonResponse, createHtmlResponse, clientIp, timingSafeEqual } from '../Core/Http.js'
 import { logInfo, logWarning } from '../Core/Logging.js'
 import { normalizeKey, isWellFormed, generateBatch } from '../Licensing/Keys.js'
@@ -517,6 +517,7 @@ function renderLicensePage() {
     ${siteFooter({ lang: 'en' })}
   </div>
 
+  ${siteBackToTop({ lang: 'en' })}
   ${siteChromeScript()}
   <script>${licenseScript()}</script>
 </body>

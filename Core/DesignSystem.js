@@ -234,9 +234,12 @@ function cssLayout() {
       object-position: center;
     }
 
+    /* The brand mark fills its circle like the game's does. Letting
+       it sit inside padding showed the artwork's own square edges
+       through the round frame. */
     .logo-container:first-child .logo-circle img {
-      object-fit: contain;
-      padding: 10px;
+      object-fit: cover;
+      padding: 0;
     }
 
     .logo-label {
