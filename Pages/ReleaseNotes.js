@@ -110,7 +110,7 @@ const RELEASES = [
             'دکمه‌ی «بازگشت به بالای صفحه» در گوشه‌ی پایین سمت راست همه‌ی صفحه‌ها، که بعد از کمی اسکرول ظاهر می‌شود.',
             'صفحه‌های /privacy و /terms دیگر بازی‌ای را که انتخاب نشده نشان نمی‌دهند: به‌جای لوگو و نام Neon Katana، از DefaultGameLogo و عنوان «همه‌ی بازی‌ها و ابزارها» استفاده می‌کنند.',
             'قابلیت‌های روی کارت بازی (ورود با گوگل، ذخیره‌ی ابری، جدول امتیازات، خرید درون‌برنامه‌ای) حالا واقعاً لینک‌اند و به صفحه‌ی خودشان می‌روند.',
-            'لوگوی AmirCollider در هدر، فوتر و صفحه‌های قوانین دایره‌ای شد؛ قبلاً لبه‌های مربعی تصویر از داخل قاب گرد بیرون می‌زد.'
+            'در صفحه‌های حریم خصوصی و شرایط استفاده، لوگوی AmirCollider که کنار لوگوی بازی می‌نشیند دایره‌ای شد — قبلاً لبه‌های مربعی تصویر از داخل قاب گرد بیرون می‌زد. لوگوی هدر و فوتر مربع با گوشه‌های گرد ماند و بزرگ‌تر شد تا خواناتر باشد.'
           ],
           en: [
             'A shared header on every page: the logo (a link home), Home, Games, Tools, Unity DocSnap and Unity DirectTMP, with the language and theme controls always in the same corner. No surface of its own and not sticky, matching the product pages.',
@@ -121,14 +121,18 @@ const RELEASES = [
             'A back-to-top button in the bottom-right corner of every page, appearing once there is something to scroll back from.',
             '/privacy and /terms no longer show a game nobody chose: they use DefaultGameLogo and the heading "All games & tools" instead of Neon Katana\'s mark and name.',
             'The capability chips on a game card (Google sign-in, cloud save, leaderboard, in-app purchases) are real links now and open the page they name.',
-            'The AmirCollider mark is round in the header, the footer and the policy pages; its square edges used to show through the round frame.'
+            'On the privacy and terms pages, the AmirCollider mark that sits beside the game\'s logo is round - its square edges used to show through the round frame. The header and footer marks stay rounded squares, and are larger now so they can actually be read.'
           ],
           ja: [
             '全ページ共通のヘッダー：ロゴ（ホームへのリンク）、ホーム、ゲーム、ツール、Unity DocSnap、Unity DirectTMP。言語とテーマの切り替えは常に同じ位置に。背景を持たず固定もしない、製品ページと同じ形です。',
             '全ページに 4 列のフッター。プライバシー、利用規約、注文サポート、サポートへどこからでも 1 クリックで到達できます。',
             '下層ページにパンくずリストを追加。読者向けの表示と BreadcrumbList 構造化データの両方。',
             '/tools は行き止まりではなくなりました。ブランドマークがホームへのリンクになり、共通ヘッダーとフッターを持ちます。Unity DirectTMP と決済ページも同様です。',
-            'JSON の本文だった 404 が、ナビゲーション付きの本物のページになりました。JSON を要求するクライアントには従来どおりの応答を返します。'
+            'JSON の本文だった 404 が、ナビゲーション付きの本物のページになりました。JSON を要求するクライアントには従来どおりの応答を返します。',
+            '全ページの右下に「ページ上部へ戻る」ボタンを追加。少しスクロールすると表示されます。',
+            '/privacy と /terms は選ばれていないゲームを表示しなくなりました。Neon Katana のロゴと名前ではなく、DefaultGameLogo と「すべてのゲームとツール」を使います。',
+            'ゲームカードの機能チップ（Google サインイン、クラウドセーブ、ランキング、アプリ内購入）が実際のリンクになり、対応するページを開きます。',
+            'プライバシーと利用規約のページで、ゲームのロゴの隣に並ぶ AmirCollider マークを円形にしました（従来は四角い縁が丸い枠から見えていました）。ヘッダーとフッターのマークは角丸の四角のままで、読み取りやすいよう大きくしました。'
           ]
         }
       },

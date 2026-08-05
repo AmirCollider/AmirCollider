@@ -224,13 +224,14 @@ export function siteNavCss() {
       transition: opacity 0.18s ease;
     }
     .ac-brand:hover { opacity: 0.82; }
-    /* Round, not a rounded square. The logo artwork carries its own
-       opaque background, so fitting it inside a circle with room to
-       spare showed the artwork's square edges through the frame -
-       the mark has to fill the circle for the circle to be the
-       shape anyone sees. */
+    /* A rounded square, and big enough to read. Circular was tried
+       and is wrong here: the mark is small at this size to begin
+       with, and clipping its corners took away the last of what
+       made it legible. The circle belongs to the policy-page
+       lockup, where the brand sits beside a game's round logo and
+       has room to be one. */
     .ac-brand-logo {
-      width: 38px; height: 38px; border-radius: 50%; flex: none; overflow: hidden;
+      width: 46px; height: 46px; border-radius: 13px; flex: none; overflow: hidden;
       display: grid; place-items: center;
       background: var(--acn-surface-2); border: 1px solid var(--acn-border);
     }
@@ -319,7 +320,7 @@ export function siteNavCss() {
     .ac-foot-brand { display: flex; flex-direction: column; gap: 10px; }
     .ac-foot-mark { display: inline-flex; align-items: center; gap: 11px; text-decoration: none; color: var(--acn-fg); }
     .ac-foot-mark img {
-      width: 40px; height: 40px; border-radius: 50%; object-fit: cover;
+      width: 44px; height: 44px; border-radius: 13px; object-fit: cover;
       background: var(--acn-surface-2); border: 1px solid var(--acn-border);
     }
     .ac-foot-mark b { font-size: 1.02em; font-weight: 800; }
@@ -464,7 +465,7 @@ export function siteHeader({ lang, active = '', extra = [], accent = '' } = {}) 
       <div class="ac-nav-in">
         <a class="ac-brand" href="/" aria-label="AmirCollider">
           <span class="ac-brand-logo">
-            <img src="${escapeHtml(CONFIG.AMIR_LOGO)}" alt="" width="38" height="38"
+            <img src="${escapeHtml(CONFIG.AMIR_LOGO)}" alt="" width="46" height="46"
                  onerror="this.style.display='none'">
           </span>
           <span class="ac-brand-text">
@@ -576,7 +577,7 @@ export function siteFooter({ lang, games = [] } = {}) {
       <div class="ac-foot-grid">
         <div class="ac-foot-brand">
           <a class="ac-foot-mark" href="/">
-            <img src="${escapeHtml(CONFIG.AMIR_LOGO)}" alt="" width="40" height="40"
+            <img src="${escapeHtml(CONFIG.AMIR_LOGO)}" alt="" width="44" height="44"
                  onerror="this.style.display='none'">
             <b>AmirCollider</b>
           </a>
