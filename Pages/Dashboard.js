@@ -42,7 +42,7 @@ import { resolveGames } from '../Games/Registry.js'
 
 import { escapeHtml, safeColor } from '../Core/Html.js'
 import { themeBootScript } from '../Core/PageChrome.js'
-import { seoHead, videoGameLd, softwareApplicationLd } from '../Core/Seo.js'
+import { seoHead, videoGameLd, softwareApplicationLd, personLd } from '../Core/Seo.js'
 import { siteNavCss, siteHeader, siteFooter, siteBackToTop, siteChromeScript } from '../Core/SiteNav.js'
 import { dirFor, langCookieHeader, parseCookies, resolveLang, resolveRequestLang, resolveRequestTheme } from '../Core/RequestContext.js'
 
@@ -61,6 +61,8 @@ const DASH_I18N = {
     // the brand was spending it on an implementation detail.
     title: 'AmirCollider',
     tagline: 'بازی‌های اندروید، کامپیوتر و تحت‌وب — و افزونه‌های یونیتی',
+    heroLede: 'اینجا خانه‌ی بازی‌ها و ابزارهای یونیتی‌ای است که AmirCollider می‌سازد. همه‌چیز — از صفحه‌ی هر بازی و فروشگاهش تا سرور لایسنس ابزارها — روی یک Cloudflare Worker اجرا می‌شود.',
+    heroAbout: 'درباره‌ی من',
     metaTitle: 'AmirCollider — بازی‌های اندروید، کامپیوتر و وب، و ابزارهای یونیتی',
     metaDesc: 'AmirCollider سازنده‌ی بازی‌های اندروید، کامپیوتر و تحت‌وب مانند Neon Katana، و افزونه‌های ادیتور یونیتی مانند Unity DocSnap و Unity DirectTMP است.',
     subtitle: 'سامانه مدیریت احراز هویت OAuth',
@@ -111,6 +113,8 @@ const DASH_I18N = {
     locale: 'en-US',
     title: 'AmirCollider',
     tagline: 'Games for Android, PC and the web — and Unity editor extensions',
+    heroLede: 'This is the home of the games and Unity editor extensions AmirCollider builds. Everything here — each game’s own page and storefront, the licence server behind the tools — runs on a single Cloudflare Worker.',
+    heroAbout: 'About me',
     metaTitle: 'AmirCollider — Games for Android, PC & Web, and Unity Editor Tools',
     metaDesc: 'AmirCollider builds games for Android, PC and the web such as Neon Katana, and Unity editor extensions such as Unity DocSnap and Unity DirectTMP.',
     subtitle: 'OAuth authentication management',
@@ -160,6 +164,8 @@ const DASH_I18N = {
     locale: 'ja-JP',
     title: 'AmirCollider',
     tagline: 'Android・PC・ウェブ向けゲームと Unity エディタ拡張',
+    heroLede: 'ここは AmirCollider が作るゲームと Unity エディタ拡張の拠点です。各ゲームのページとストアから、ツールのライセンスサーバーまで、すべてが 1 つの Cloudflare Worker で動いています。',
+    heroAbout: '自己紹介',
     metaTitle: 'AmirCollider — Android・PC・ウェブ向けゲームと Unity エディタツール',
     metaDesc: 'AmirCollider は Neon Katana などの Android・PC・ウェブ向けゲームと、Unity DocSnap・Unity DirectTMP などの Unity エディタ拡張を開発しています。',
     subtitle: 'OAuth 認証管理システム',
@@ -423,6 +429,14 @@ function getDashboardCSS() {
       -webkit-background-clip: text; background-clip: text; color: transparent;
     }
     .hero p { margin-block-start: 8px; color: var(--text-dim); font-size: 1.02em; }
+    .hero p.hero-lede {
+      max-width: 66ch; margin-inline: auto; line-height: 1.85; font-size: 0.96em;
+    }
+    .hero-cta a {
+      font-weight: 700; font-size: 0.92em; text-decoration: none;
+      color: color-mix(in srgb, var(--brand) 55%, var(--text));
+    }
+    .hero-cta a:hover { text-decoration: underline; }
     .pill {
       display: inline-flex; align-items: center; gap: 8px; margin-block-start: 16px;
       padding: 7px 16px; border-radius: 20px; font-size: 0.85em; font-weight: 700;
@@ -627,10 +641,22 @@ function getDashboardCSS() {
 // ==========================================
 function renderHero(lang, version) {
   const p = pack(lang)
+
+  // The lede is two sentences of ordinary prose, and it is here
+  // for a reason worth writing down: the front page used to be a
+  // heading, a tagline and a version pill, and a search engine
+  // asked to describe it had almost nothing to quote. It took the
+  // nearest run of text it could find - the capability chips on a
+  // game card - and published "plays offline, Google sign-in,
+  // cloud save, leaderboard" as the site's description. A page
+  // that does not say what it is gets described by whatever is
+  // lying around on it.
   return `
     <div class="hero">
       <h1>${escapeHtml(p.title)}</h1>
       <p>${escapeHtml(p.tagline)}</p>
+      <p class="hero-lede">${escapeHtml(p.heroLede)}</p>
+      <p class="hero-cta"><a href="/about">${escapeHtml(p.heroAbout)} &rarr;</a></p>
       <span class="pill"><span class="dot"></span>v${escapeHtml(version)}</span>
     </div>`
 }
@@ -864,6 +890,13 @@ function createDashboardPage(GAMES, baseUrl, routesCount, lang, theme, player = 
   // links to. One page describing the whole catalogue is what lets
   // a search engine connect the brand to the products.
   const graph = [
+    // The same node /about carries, under the same @id. The
+    // Organization on every page names this person as its founder,
+    // and a reference whose target is only ever defined on one
+    // other page is a reference a crawler may simply never resolve
+    // - the front page is the one it is guaranteed to read.
+    personLd(resolved),
+
     ...games.map(game => videoGameLd({
       name: game.name,
       description: (game.i18n && game.i18n.description && game.i18n.description[resolved]) || game.description,

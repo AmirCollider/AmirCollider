@@ -116,9 +116,18 @@ export const CONFIG = deepFreeze({
   // this Worker's own crypto checkout (see Docs/Checkout.md).
   // Tier names must match DocSnapEditionMatrix in the Unity package,
   // which is what a licence token carries.
+  //
+  // VERSION is the number the product page, the tools catalogue and
+  // the SoftwareApplication structured data all print. It is the
+  // `version` field of the package's own package.json - the one
+  // Unity's Package Manager shows - and it is copied here rather
+  // than fetched, because a page that renders from a GitHub call is
+  // a page that renders wrong the first time GitHub is slow.
+  // Whoever tags a release updates this line in the same commit:
+  //   https://github.com/AmirCollider/UnityDocSnap/blob/main/package.json
   DOCSNAP: {
     REPO_URL: 'https://github.com/AmirCollider/UnityDocSnap',
-    VERSION: '1.0.0',
+    VERSION: '1.0.2',
     TIERS: {
       plus: { name: 'Plus', price: '19.99', buyUrl: '/checkout?tier=plus' },
       pro: { name: 'Pro', price: '49.99', buyUrl: '/checkout?tier=pro' }
@@ -127,10 +136,11 @@ export const CONFIG = deepFreeze({
 
   // Unity DirectTMP - free and MIT, so no checkout and no tiers.
   // VERSION must match the package's package.json and
-  // DirectTMPConstants.Version.
+  // DirectTMPConstants.Version:
+  //   https://github.com/AmirCollider/UnityDirectTMP/blob/main/package.json
   DIRECTTMP: {
     REPO_URL: 'https://github.com/AmirCollider/UnityDirectTMP',
-    VERSION: '1.0.0',
+    VERSION: '1.2.2',
     GIT_URL: 'https://github.com/AmirCollider/UnityDirectTMP.git'
   },
 
@@ -192,6 +202,21 @@ export const CONFIG = deepFreeze({
     // Overrides change a few times a month, so a database read per
     // page view buys nothing; the panel always reads fresh.
     SETTINGS_CACHE_MS: 30 * 1000
+  },
+
+  // Where else this person and this project exist, in the exact
+  // form each platform publishes.
+  //
+  // These are the `sameAs` list a search engine reads to decide
+  // that the GitHub account, the Instagram account and this domain
+  // are one entity rather than three - which is the difference
+  // between a brand it recognises and a string it has seen before.
+  // Nothing is listed here on the strength of a guessed URL: an
+  // account that turns out to belong to somebody else is a claim
+  // about a stranger.
+  SOCIAL: {
+    github: 'https://github.com/AmirCollider',
+    instagram: 'https://www.instagram.com/amir.collider/'
   },
 
   STATE_EXPIRY_MS: 30 * 60 * 1000,
@@ -276,6 +301,30 @@ const GAME_REGISTRY = {
         fa: 'بازی اکشن شمشیر نئونی',
         en: 'Neon action sword game',
         ja: 'ネオンの剣アクションゲーム'
+      },
+
+      // A paragraph, not a tagline, and it lives in CODE rather than
+      // in the panel's landing-page blob on purpose.
+      //
+      // Google's OAuth verification reads the address configured as
+      // the app's home page - which for a game is /{gameId} - and
+      // asks two questions of it: does this page name the same
+      // application as the consent screen, and does it say what that
+      // application is FOR. A one-line tagline answers neither, and
+      // an empty database row answers nothing at all: the review
+      // that prompted this came back with exactly those two
+      // objections against a page whose every word was a database
+      // override that had not been filled in.
+      //
+      // So this is the one piece of a landing page an operator
+      // cannot empty. Write it as prose a stranger could read: what
+      // the game is, and - because this is the sentence a reviewer
+      // is actually looking for - what a Google account is used for
+      // in it.
+      purpose: {
+        fa: 'Neon Katana یک بازی اکشن تک‌نفره برای اندروید است که در آن با یک کاتانا در محیط‌های نئونی مبارزه می‌کنی. خود بازی بدون اینترنت اجرا می‌شود. ورود با حساب گوگل اختیاری است و فقط برای همگام‌سازی ذخیره‌ی ابری، ثبت امتیاز در جدول امتیازات عمومی و برگرداندن خریدهای درون‌برنامه‌ای روی دستگاه بعدی استفاده می‌شود.',
+        en: 'Neon Katana is a single-player action game for Android in which you fight through neon environments with a katana. The game itself runs without an internet connection. Signing in with a Google account is optional, and is used only to sync your cloud save, place your score on the public leaderboard, and restore your in-app purchases on your next device.',
+        ja: 'Neon Katana は、カタナでネオンの世界を戦い抜く Android 向けシングルプレイ・アクションゲームです。ゲーム本体はインターネット接続なしで動作します。Google アカウントでのサインインは任意で、クラウドセーブの同期、公開ランキングへのスコア登録、次の端末でのアプリ内購入の復元にのみ使用します。'
       }
     },
     tags: [

@@ -18,7 +18,9 @@
 //                                    OpenGraph, Twitter, JSON-LD
 //   jsonLd(value)                    one <script type=ld+json>
 //   organizationLd() / websiteLd()   the site-wide graph nodes
+//   personLd() / profilePageLd()     the About page's two nodes
 //   breadcrumbLd(trail)              from a SiteNav trail array
+//   faqPageLd(entries)               a question-and-answer list
 //   softwareApplicationLd({...})     a Unity tool
 //   videoGameLd({...})               a game
 //
@@ -36,7 +38,16 @@ const OG_LOCALE = { fa: 'fa_IR', en: 'en_US', ja: 'ja_JP' }
 // of the site shares when it does not.
 const DEFAULT_OG_IMAGE = '/assets/AmirColliderLogo.png'
 
-const GITHUB_ORG = 'https://github.com/AmirCollider'
+// Everywhere this project also exists. Read from Config so the
+// footer, the About page and the structured data cannot drift.
+const SAME_AS = Object.values(CONFIG.SOCIAL || {}).filter(Boolean)
+
+// The name the site is searched for, in every spelling somebody
+// actually types it in. "AmirCollider" is one word and always has
+// been, but half the people looking for it type two - and a search
+// engine will not split a compound word on your behalf unless you
+// tell it the split form is the same name.
+const ALSO_KNOWN_AS = ['Amir Collider', 'AmirCollider Games', 'amircollider']
 
 
 /** The canonical origin, without a trailing slash. */
@@ -75,30 +86,115 @@ export function jsonLd(value) {
 // ==========================================
 // Graph nodes
 // ==========================================
-export function organizationLd() {
+export function organizationLd(lang) {
+  const code = resolveLang(lang)
+
   return {
     '@context': 'https://schema.org',
     '@type': 'Organization',
     '@id': absoluteUrl('/#organization'),
     name: 'AmirCollider',
-    alternateName: ['Amir Collider', 'AmirCollider Games'],
+    alternateName: ALSO_KNOWN_AS,
+    description: CONFIG.SITE_TAGLINE[code] || CONFIG.SITE_TAGLINE.en,
     url: absoluteUrl('/'),
-    logo: absoluteUrl(CONFIG.AMIR_LOGO),
+
+    // An ImageObject rather than a bare URL string. Both are valid
+    // schema, and only one of them lets a consumer know the shape
+    // of the file before fetching it - which for a logo shown
+    // inside a circular frame is the whole question.
+    logo: {
+      '@type': 'ImageObject',
+      '@id': absoluteUrl('/#logo'),
+      url: absoluteUrl(CONFIG.AMIR_LOGO),
+      contentUrl: absoluteUrl(CONFIG.AMIR_LOGO),
+      caption: 'AmirCollider'
+    },
+    image: { '@id': absoluteUrl('/#logo') },
+
     email: CONFIG.SUPPORT_EMAIL,
-    sameAs: [GITHUB_ORG]
+    founder: { '@id': absoluteUrl('/about#person') },
+    sameAs: SAME_AS
   }
 }
 
 export function websiteLd(lang) {
+  const code = resolveLang(lang)
+
   return {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     '@id': absoluteUrl('/#website'),
     name: 'AmirCollider',
-    alternateName: 'AmirCollider Games',
+    alternateName: ALSO_KNOWN_AS,
+    description: CONFIG.SITE_TAGLINE[code] || CONFIG.SITE_TAGLINE.en,
     url: absoluteUrl('/'),
-    inLanguage: resolveLang(lang),
+    inLanguage: code,
     publisher: { '@id': absoluteUrl('/#organization') }
+  }
+}
+
+
+// ==========================================
+// personLd
+// The human behind the name.
+//
+// Deliberately thin: an alias, what they do, and where else they
+// exist. There is no legal name, no birth date and no location in
+// here, because there is none of that anywhere on this site
+// either - structured data is a place a fact leaks from long
+// after the page that carried it was rewritten.
+//
+// It exists at all because "AmirCollider" is a person as well as a
+// project, and a search engine that only ever sees an Organization
+// has nothing to attach a biography to.
+// ==========================================
+export function personLd(lang, { description = '', path = '/about' } = {}) {
+  const code = resolveLang(lang)
+
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Person',
+    '@id': absoluteUrl('/about#person'),
+    name: 'AmirCollider',
+    alternateName: ['Amir Collider', 'amircollider'],
+    description: description || CONFIG.SITE_TAGLINE[code] || CONFIG.SITE_TAGLINE.en,
+    url: absoluteUrl(path),
+    image: { '@id': absoluteUrl('/#logo') },
+    knowsAbout: ['Unity', 'Game development', 'C#', 'Android games', 'Unity editor extensions'],
+    sameAs: SAME_AS,
+    worksFor: { '@id': absoluteUrl('/#organization') }
+  }
+}
+
+
+/** The About page itself, tied to the person it is about. */
+export function profilePageLd(lang, path = '/about') {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'ProfilePage',
+    '@id': absoluteUrl(path) + '#profilepage',
+    url: absoluteUrl(path),
+    inLanguage: resolveLang(lang),
+    mainEntity: { '@id': absoluteUrl('/about#person') },
+    about: { '@id': absoluteUrl('/about#person') },
+    isPartOf: { '@id': absoluteUrl('/#website') }
+  }
+}
+
+
+/** A question-and-answer list, as Google reads one. */
+export function faqPageLd(entries = []) {
+  const items = (entries || []).filter(entry => entry && entry.q && entry.a)
+  if (!items.length) return null
+
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: items.map(entry => ({
+      '@type': 'Question',
+      name: entry.q,
+      acceptedAnswer: { '@type': 'Answer', text: entry.a }
+    }))
   }
 }
 
@@ -217,7 +313,7 @@ export function seoHead({
     : ''
 
   const nodes = []
-  if (siteNodes && !noindex) nodes.push(organizationLd(), websiteLd(code))
+  if (siteNodes && !noindex) nodes.push(organizationLd(code), websiteLd(code))
   for (const node of graph || []) if (node) nodes.push(node)
 
   const localeAlternates = LANGUAGES.supported

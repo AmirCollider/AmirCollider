@@ -58,6 +58,7 @@ function xmlEscape(value) {
 export function indexablePaths(games = {}) {
   const paths = [
     { loc: '/', priority: '1.0', changefreq: 'weekly' },
+    { loc: '/about', priority: '0.8', changefreq: 'monthly' },
     { loc: '/tools', priority: '0.9', changefreq: 'weekly' },
     { loc: '/unity-docsnap', priority: '0.9', changefreq: 'weekly' },
     { loc: '/unity-directtmp', priority: '0.9', changefreq: 'weekly' },

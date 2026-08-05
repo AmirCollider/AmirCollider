@@ -52,6 +52,7 @@ export const NAV_I18N = {
     home: 'خانه',
     games: 'بازی‌ها',
     tools: 'ابزارها',
+    about: 'درباره‌ی من',
     releaseNotes: 'یادداشت‌های انتشار',
     docsnap: 'Unity DocSnap',
     directtmp: 'Unity DirectTMP',
@@ -82,6 +83,7 @@ export const NAV_I18N = {
     home: 'Home',
     games: 'Games',
     tools: 'Tools',
+    about: 'About',
     releaseNotes: 'Release notes',
     docsnap: 'Unity DocSnap',
     directtmp: 'Unity DirectTMP',
@@ -112,6 +114,7 @@ export const NAV_I18N = {
     home: 'ホーム',
     games: 'ゲーム',
     tools: 'ツール',
+    about: '自己紹介',
     releaseNotes: 'リリースノート',
     docsnap: 'Unity DocSnap',
     directtmp: 'Unity DirectTMP',
@@ -144,9 +147,15 @@ function pack(lang) {
 // ==========================================
 // The primary navigation.
 //
-// Five entries and no more. A header that lists everything is a
+// Six entries and no more. A header that lists everything is a
 // header nobody reads; the long tail lives in the footer, which is
 // where a visitor looks for it.
+//
+// About is the newest of the six and the only one that is not a
+// product. It earns the place because it answers the question a
+// stranger arrives with - who made this - which nothing else on
+// the site did: there was no page about the person behind the
+// name at all, so a search for it found the tools and stopped.
 // ==========================================
 function primaryItems(lang) {
   const p = pack(lang)
@@ -155,7 +164,8 @@ function primaryItems(lang) {
     { key: 'games', href: '/#games', label: p.games },
     { key: 'tools', href: '/tools', label: p.tools },
     { key: 'docsnap', href: '/unity-docsnap', label: p.docsnap },
-    { key: 'directtmp', href: '/unity-directtmp', label: p.directtmp }
+    { key: 'directtmp', href: '/unity-directtmp', label: p.directtmp },
+    { key: 'about', href: '/about', label: p.about }
   ]
 }
 
@@ -538,6 +548,7 @@ export function siteFooter({ lang, games = [] } = {}) {
       title: p.colSite,
       links: [
         { href: '/', label: p.home },
+        { href: '/about', label: p.about },
         { href: '/#games', label: p.games },
         { href: '/tools', label: p.tools },
         { href: '/release-notes', label: p.releaseNotes },

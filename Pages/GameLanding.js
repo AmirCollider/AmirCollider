@@ -40,7 +40,7 @@
 import { createHtmlResponse, createJsonResponse } from '../Core/Http.js'
 import { logInfo } from '../Core/Logging.js'
 import {
-  resolveGame, isDownloadable, effectiveProducts, landingVideo
+  resolveGame, isDownloadable, effectiveProducts, landingVideo, gamePlatforms
 } from '../Games/Registry.js'
 import { db, listVersions } from '../Games/Store.js'
 import { chromeTheme, langHeader, page, localeFor } from './GameChrome.js'
@@ -134,7 +134,22 @@ const I18N = {
     signIn: 'ورود با گوگل',
     cloud: 'ذخیره‌ی ابری',
     offline: 'بدون نیاز به اینترنت',
-    online: 'بازی آنلاین'
+    online: 'بازی آنلاین',
+
+    purposeHead: 'این برنامه چیست',
+    platformNoun: { android: 'اندرویدی', web: 'تحت‌وب', both: 'اندرویدی و تحت‌وب' },
+    appIs: (name, kind) => `«${name}» یک بازی ${kind} است که AmirCollider آن را ساخته و منتشر می‌کند.`,
+    googleHead: 'ورود با گوگل در این بازی برای چیست',
+    googleLede: 'بازی بدون ورود هم کامل کار می‌کند. اگر وارد شوی، فقط این سه چیز از حساب گوگلت خوانده می‌شود: نام، نشانی ایمیل و تصویر پروفایل — یعنی همان scopeهای openid، profile و email. هیچ دسترسی دیگری به حساب گوگلت خواسته نمی‌شود.',
+    googleUses: {
+      account: 'حساب بازیکن: صفحه‌ی حساب همین سایت با همان حساب باز می‌شود و اسم نمایشی و تصویرت را از آن‌جا تنظیم می‌کنی.',
+      cloudSave: 'ذخیره‌ی ابری: پیشرفت بازی روی سرور نگه داشته می‌شود تا روی دستگاه بعدی از همان‌جا ادامه بدهی.',
+      leaderboard: 'جدول امتیازات: امتیاز و نام نمایشی‌ات در جدول عمومی ثبت می‌شود.',
+      store: 'خریدهای درون‌برنامه‌ای: هر خرید به همان حساب بسته می‌شود تا بعد از نصب دوباره برگردد.'
+    },
+    googleAfter: 'دسترسی این برنامه به حساب گوگلت را هر وقت خواستی می‌توانی از myaccount.google.com/permissions پس بگیری. حذف کامل حساب و داده‌هایش هم از صفحه‌ی حساب بازیکن انجام می‌شود.',
+    readPrivacy: 'سیاست حریم خصوصی',
+    readTerms: 'شرایط استفاده'
   },
   en: {
     play: 'Play',
@@ -167,7 +182,22 @@ const I18N = {
     signIn: 'Google sign-in',
     cloud: 'Cloud save',
     offline: 'Plays offline',
-    online: 'Online play'
+    online: 'Online play',
+
+    purposeHead: 'What this app is',
+    platformNoun: { android: 'an Android', web: 'a browser', both: 'an Android and browser' },
+    appIs: (name, kind) => `${name} is ${kind} game built and published by AmirCollider.`,
+    googleHead: 'What Google sign-in is used for here',
+    googleLede: 'The game works fully without signing in. If you do sign in, exactly three things are read from your Google account: your name, your email address and your profile picture — the openid, profile and email scopes. No other access to your Google account is requested.',
+    googleUses: {
+      account: 'Player account: the account page on this site opens with that same account, and your display name and picture are set from there.',
+      cloudSave: 'Cloud save: your progress is kept on the server so you can carry on from the same place on your next device.',
+      leaderboard: 'Leaderboard: your score and display name appear on the public board.',
+      store: 'In-app purchases: each purchase is tied to that account, so it comes back after a reinstall.'
+    },
+    googleAfter: 'You can withdraw this app’s access to your Google account at any time at myaccount.google.com/permissions. Deleting the account and its data outright is done from the player account page.',
+    readPrivacy: 'Privacy policy',
+    readTerms: 'Terms of service'
   },
   ja: {
     play: 'プレイ',
@@ -200,7 +230,22 @@ const I18N = {
     signIn: 'Google サインイン',
     cloud: 'クラウドセーブ',
     offline: 'オフライン対応',
-    online: 'オンラインプレイ'
+    online: 'オンラインプレイ',
+
+    purposeHead: 'このアプリについて',
+    platformNoun: { android: 'Android 向け', web: 'ブラウザ', both: 'Android およびブラウザ向け' },
+    appIs: (name, kind) => `${name} は、AmirCollider が開発・公開している${kind}ゲームです。`,
+    googleHead: 'Google サインインの用途',
+    googleLede: 'サインインしなくてもゲームはすべて遊べます。サインインした場合に Google アカウントから読み取るのは、お名前・メールアドレス・プロフィール画像の 3 つだけです(openid・profile・email スコープ)。それ以外のアクセス権は一切要求しません。',
+    googleUses: {
+      account: 'プレイヤーアカウント：同じアカウントでこのサイトのアカウントページにログインでき、表示名と画像もそこで設定します。',
+      cloudSave: 'クラウドセーブ：進行状況をサーバーに保存し、次の端末でも同じ場所から続けられます。',
+      leaderboard: 'ランキング：スコアと表示名が公開ランキングに掲載されます。',
+      store: 'アプリ内購入：購入はそのアカウントに紐づくため、再インストール後も復元されます。'
+    },
+    googleAfter: '本アプリの Google アカウントへのアクセスは myaccount.google.com/permissions でいつでも取り消せます。アカウントとデータの完全な削除は、プレイヤーアカウントページから行えます。',
+    readPrivacy: 'プライバシーポリシー',
+    readTerms: '利用規約'
   }
 }
 
@@ -315,6 +360,25 @@ function landingCss() {
 
     .ln-sec{margin-block-end:20px}
     .ln-about{white-space:pre-wrap;line-height:1.95;color:var(--text);font-size:1em;max-width:72ch}
+
+    /* ---------- what this app is ----------
+       Deliberately plain. This block is read by two audiences who
+       want the same thing from it - somebody deciding whether to
+       install, and a reviewer checking that the page says what the
+       application does - and neither is served by styling that
+       makes it look like marketing. */
+    .ln-purpose{line-height:1.95;font-size:1.02em;max-width:72ch}
+    .ln-purpose-name{font-weight:700}
+    .ln-purpose p+p{margin-block-start:12px}
+    .ln-en{margin-block-start:14px;padding-inline-start:12px;font-size:.9em;color:var(--dim);
+      border-inline-start:2px solid var(--border);line-height:1.8}
+    .ln-google{margin-block-start:20px;padding:18px;border-radius:14px;
+      background:var(--surface-2);border:1px solid var(--border)}
+    .ln-google h3{font-size:1.02em;font-weight:800;margin-block-end:10px}
+    .ln-google>p{color:var(--dim);font-size:.94em;line-height:1.85}
+    .ln-google ul{margin:12px 0;padding-inline-start:20px;line-height:1.85;font-size:.94em}
+    .ln-google li{margin-block-end:6px}
+    .ln-google .ln-policy{display:flex;flex-wrap:wrap;gap:8px;margin-block-start:14px}
 
     /* ---------- features ---------- */
     .ln-feats{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
@@ -502,6 +566,83 @@ function getBlock(game, lang) {
 }
 
 
+// ==========================================
+// purposeBlock
+// What this application is, and what a Google account is used
+// for in it.
+//
+// The one section on this page that is not database-driven, and
+// the one that always renders. Everything else here degrades to
+// nothing when its row is empty, which is right for a trailer
+// and wrong for this: an OAuth review reads /{gameId} as the
+// application's home page, and a home page that does not name
+// the app or say what it does fails verification - which is
+// exactly the two objections that came back the first time.
+//
+// So the prose comes from Config.js (i18n.purpose), the list of
+// what sign-in is FOR is derived from the same capabilities
+// flags that decide whether the account, store and leaderboard
+// pages exist at all, and neither can be emptied from the panel.
+//
+// The English paragraph on a non-English page is not a
+// translation widget - it is one sentence, for the reader (or
+// reviewer) who does not read the page's language and would
+// otherwise have to guess. The page still declares its own
+// language, so the fragment carries lang="en" and its own dir.
+// ==========================================
+function purposeBlock(game, lang) {
+  const d = dict(lang)
+  const en = I18N.en
+  const platform = gamePlatforms(game).kind
+
+  const purpose = pickLang(game.i18n && game.i18n.purpose, lang)
+  const description = pickLang(game.i18n && game.i18n.description, lang) || game.description || ''
+
+  // A game whose registry entry has no purpose paragraph yet still
+  // gets a page that names it and says what it is, built from what
+  // the card already knows. Shorter, and still an answer.
+  const body = purpose || description
+
+  const uses = []
+  if (game.capabilities.login) uses.push(d.googleUses.account)
+  if (game.capabilities.cloudSave) uses.push(d.googleUses.cloudSave)
+  if (game.capabilities.leaderboard) uses.push(d.googleUses.leaderboard)
+  if (game.capabilities.store) uses.push(d.googleUses.store)
+
+  const google = game.capabilities.login
+    ? `<div class="ln-google">
+        <h3>${escapeHtml(d.googleHead)}</h3>
+        <p>${escapeHtml(d.googleLede)}</p>
+        <ul>${uses.map(use => `<li>${escapeHtml(use)}</li>`).join('')}</ul>
+        <p>${escapeHtml(d.googleAfter)}</p>
+        <div class="ln-policy">
+          <a class="gbtn gbtn--ghost" style="padding:8px 14px;font-size:.84em"
+             href="/${escapeHtml(game.id)}/privacy">${escapeHtml(d.readPrivacy)}</a>
+          <a class="gbtn gbtn--ghost" style="padding:8px 14px;font-size:.84em"
+             href="/${escapeHtml(game.id)}/terms">${escapeHtml(d.readTerms)}</a>
+        </div>
+      </div>`
+    : ''
+
+  const englishAside = lang === 'en'
+    ? ''
+    : `<p class="ln-en" lang="en" dir="ltr">${escapeHtml(
+        en.appIs(game.name, en.platformNoun[platform] || en.platformNoun.android)
+      )} ${escapeHtml(pickLang(game.i18n && game.i18n.purpose, 'en') || game.description || '')}</p>`
+
+  return `<section class="gcard ln-sec">
+      <h2 class="ghead">${escapeHtml(d.purposeHead)}</h2>
+      <div class="ln-purpose" dir="auto">
+        <p class="ln-purpose-name">${escapeHtml(
+          d.appIs(game.name, d.platformNoun[platform] || d.platformNoun.android))}</p>
+        ${body ? `<p>${escapeHtml(body)}</p>` : ''}
+        ${englishAside}
+      </div>
+      ${google}
+    </section>`
+}
+
+
 function featuresBlock(game, lang) {
   const d = dict(lang)
   const features = rows(game.landing.features, 8)
@@ -655,28 +796,29 @@ function faqBlock(game, lang) {
 
 
 // ==========================================
-// socialHead
-// The tags a link preview reads.
+// gameLd
+// What a search engine is told this page is about: a game,
+// which one, what it costs and which platforms it runs on.
 //
-// A game link pasted into Telegram, WhatsApp or X is fetched by
-// a server, not a browser: it never runs the page's script and
-// never resolves a relative path. So every URL here is absolute
-// and everything it needs is in the markup.
-//
-// The JSON-LD block is for search engines and says the one thing
-// the prose cannot: that this page is about a game, which one,
-// what it costs and which platforms it runs on.
+// Returned as a node rather than as markup, because page() feeds
+// it to Core/Seo.js along with the breadcrumb - which is also
+// where the canonical, the hreflang set and the OpenGraph tags
+// come from. This file used to emit its own copy of all of
+// those beside the ones page() was already emitting, so every
+// game page shipped two canonical links and two og:title tags
+// that agreed with each other by accident and would not have
+// stayed that way. Two canonicals is the expensive one: a
+// crawler that finds a second one is entitled to ignore both.
 // ==========================================
-function socialHead(game, lang, origin, description, currentVersion) {
+function gameLd(game, lang, origin, description, currentVersion) {
   const url = absolute(origin, '/' + game.id)
   const image = absolute(origin, game.landing.hero || game.logo || CONFIG.DEFAULT_GAME_LOGO)
-  const title = `${game.name} — AmirCollider`
 
   const platforms = Object.keys((game.download && game.download.links) || {})
     .map(key => (key === 'web' ? 'Web browser' : key === 'apk' || key === 'myket' || key === 'googleplay' ? 'Android' : key))
   const unique = [...new Set(platforms)]
 
-  const structured = {
+  return {
     '@context': 'https://schema.org',
     '@type': 'VideoGame',
     name: game.name,
@@ -686,7 +828,12 @@ function socialHead(game, lang, origin, description, currentVersion) {
     applicationCategory: 'GameApplication',
     operatingSystem: unique.length ? unique.join(', ') : 'Android',
     ...(image ? { image } : {}),
+    ...(game.package ? { identifier: game.package } : {}),
     ...(currentVersion ? { softwareVersion: currentVersion.version } : {}),
+    ...(game.tags && game.tags.length
+      ? { genre: game.tags.map(tag => pickLang(tag, lang)).filter(Boolean) }
+      : {}),
+    author: { '@type': 'Organization', name: 'AmirCollider', url: absolute(origin, '/') },
     publisher: { '@type': 'Organization', name: 'AmirCollider', url: absolute(origin, '/') },
     offers: {
       '@type': 'Offer',
@@ -697,27 +844,24 @@ function socialHead(game, lang, origin, description, currentVersion) {
         : 'https://schema.org/PreOrder'
     }
   }
+}
 
-  // The same escaping rule the panel uses for inline data: the
-  // HTML parser ends a script at the first "</script>" wherever
-  // it appears, including inside a JSON string.
-  const json = JSON.stringify(structured).replace(/</g, '\\u003c')
 
+// ==========================================
+// gameHead
+// The two tags page() has no opinion about.
+//
+// `application-name` is here for one reason: Google's OAuth
+// verification compares the name configured on the consent
+// screen with the name this page claims for itself, and until
+// now the only machine-readable name on it was og:site_name,
+// which is the SITE - "AmirCollider" - and not the app.
+// ==========================================
+function gameHead(game) {
   return `
-  <link rel="canonical" href="${escapeHtml(url)}">
-  <meta property="og:type" content="website">
-  <meta property="og:site_name" content="AmirCollider">
-  <meta property="og:title" content="${escapeHtml(title)}">
-  <meta property="og:description" content="${escapeHtml(description)}">
-  <meta property="og:url" content="${escapeHtml(url)}">
-  ${image ? `<meta property="og:image" content="${escapeHtml(image)}">` : ''}
-  <meta property="og:locale" content="${escapeHtml(localeFor(lang).replace('-', '_'))}">
-  <meta name="twitter:card" content="${image ? 'summary_large_image' : 'summary'}">
-  <meta name="twitter:title" content="${escapeHtml(title)}">
-  <meta name="twitter:description" content="${escapeHtml(description)}">
-  ${image ? `<meta name="twitter:image" content="${escapeHtml(image)}">` : ''}
-  <meta name="theme-color" content="${escapeHtml(game.color || '#6c63ff')}">
-  <script type="application/ld+json">${json}</script>`
+  <meta name="application-name" content="${escapeHtml(game.name)}">
+  <meta name="apple-mobile-web-app-title" content="${escapeHtml(game.name)}">
+  <meta name="theme-color" content="${escapeHtml(game.color || '#6c63ff')}">`
 }
 
 
@@ -754,6 +898,7 @@ export async function handleGameLanding(url, request, gameId, requestId, GAMES, 
   const body = `
     <style>${landingCss()}</style>
     ${heroBlock(game, lang, current)}
+    ${purposeBlock(game, lang)}
     ${getBlock(game, lang)}
     ${featuresBlock(game, lang)}
     ${shotsBlock(game, lang)}
@@ -767,7 +912,9 @@ export async function handleGameLanding(url, request, gameId, requestId, GAMES, 
     game, lang, theme,
     title: `${game.name} — AmirCollider`,
     description,
-    head: socialHead(game, lang, url.origin, description, current),
+    head: gameHead(game),
+    seoGraph: [gameLd(game, lang, url.origin, description, current)],
+    ogImage: game.landing.hero || game.logo || CONFIG.DEFAULT_GAME_LOGO,
     active: 'landing',
     downloadable: isDownloadable(game),
     skipLabel: d.skip,

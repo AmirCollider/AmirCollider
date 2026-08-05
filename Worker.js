@@ -41,6 +41,8 @@ import { handleTheGodApi } from './Api/TheGodApi.js'
 
 import { handleNotFound } from './Pages/NotFound.js'
 import { handleRobots, handleSitemap } from './Pages/Sitemap.js'
+import { handleSiteIcon } from './Pages/Icon.js'
+import { handleAbout } from './Pages/About.js'
 import { handleUserProfile } from './Pages/PlayerProfile.js'
 import { handleDashboard } from './Pages/Dashboard.js'
 import { handleHealthWithUI } from './Pages/Health.js'
@@ -154,10 +156,19 @@ const ROUTES = [
   { path: '/metrics', method: 'GET', handler: handleMetrics },
   { path: '/release-notes', method: 'GET', handler: handleReleaseNotes },
 
+  // Who is behind all of this. Linked from the header and the
+  // footer of every page, and the one page a search engine can
+  // attach a biography to.
+  { path: '/about', method: 'GET', handler: handleAbout },
+
   // What a crawler asks for first, and what Search Console asks
   // for when a property is added.
   { path: '/robots.txt', method: 'GET', handler: handleRobots },
   { path: '/sitemap.xml', method: 'GET', handler: handleSitemap },
+
+  // The favicon, with a safe area around it so a round crop does
+  // not take the logo's corners off. See Pages/Icon.js.
+  { path: '/icon.svg', method: 'GET', handler: handleSiteIcon },
 
   // The site-wide policy pages. Google's OAuth consent screen and
   // Play Console both want a privacy policy and terms at a stable
