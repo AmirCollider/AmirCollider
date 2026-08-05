@@ -25,11 +25,15 @@
 //   -- what a player owns --
 //   grantEntitlement / listEntitlements / consumeEntitlement
 //   revokeEntitlement / listEntitlementEvents / logEntitlementEvent
+//
+//   -- who a player id belongs to --
+//   claimPlayerIdentity / readPlayerIdentity
 // ==========================================
 
 import { CONFIG } from '../Config.js'
 import { hashEmail } from '../Commerce/Seal.js'
 import { hashIp } from '../Licensing/Keys.js'
+import { sameEmail } from '../Core/PlayerIdentity.js'
 
 
 // ==========================================
@@ -920,4 +924,90 @@ export async function findPlayers(database, { gameId = '', q = '', limit = 30 } 
     lastOrderAt: row.last_order_at,
     spentUsd: Math.round((row.spent || 0) * 100) / 100
   }))
+}
+
+
+// ==========================================
+// Player identity claims
+//
+// A player id is fifteen characters of an email address's local
+// part, so it is not unique to a person: ali@gmail.com and
+// ali@yahoo.com both derive "ali". Everywhere that id keys a
+// player's own row, the row's `email` column settles ownership -
+// but entitlements are keyed by (game_id, player_uid) with no
+// address on them at all, so there was nothing to compare and two
+// people with colliding addresses shared one balance.
+//
+// This table is that missing column, kept once rather than on
+// every table that needs it: the first verified address to use a
+// player id owns it, and a second address is refused instead of
+// being handed the first one's purchases.
+//
+// It is deliberately a claim and not an account. Nothing here
+// creates a player, nothing here can be edited from a request,
+// and a game whose database has not run 0009 simply has no claims
+// to check - see the catch in claimPlayerIdentity.
+// ==========================================
+
+/** The address that owns a player id, or null when unclaimed. */
+export async function readPlayerIdentity(database, gameId, playerUid) {
+  try {
+    return await database.prepare(
+      'SELECT email, google_sub, claimed_at FROM player_identity WHERE game_id = ? AND player_uid = ? LIMIT 1'
+    ).bind(gameId, playerUid).first()
+  } catch {
+    return null
+  }
+}
+
+
+/**
+ * Claims a player id for one address, or reports who already has it.
+ *
+ * Returns { ok: true } when the caller owns the id - either
+ * because they just claimed it or because they already did - and
+ * { ok: false, ownerEmail } when somebody else does.
+ *
+ * A database error is an { ok: true }: this is a guard against a
+ * rare collision, not a gate on the storefront, and taking every
+ * purchase down because one INSERT failed trades a small problem
+ * for a big one. The failure is visible in the logs of whatever
+ * called the query.
+ */
+export async function claimPlayerIdentity(database, gameId, playerUid, email, googleSub) {
+  const address = String(email || '').trim().toLowerCase()
+  if (!database || !gameId || !playerUid || !address) return { ok: true }
+
+  try {
+    const existing = await database.prepare(
+      'SELECT email FROM player_identity WHERE game_id = ? AND player_uid = ? LIMIT 1'
+    ).bind(gameId, playerUid).first()
+
+    if (existing) {
+      return sameEmail(existing.email, address)
+        ? { ok: true }
+        : { ok: false, ownerEmail: existing.email }
+    }
+
+    // INSERT OR IGNORE, then re-read. Two first requests from the
+    // same new player can race here, and the loser of that race
+    // must not be told the id belongs to somebody else when it
+    // belongs to them.
+    await database.prepare(
+      `INSERT OR IGNORE INTO player_identity (game_id, player_uid, email, google_sub, claimed_at)
+       VALUES (?, ?, ?, ?, ?)`
+    ).bind(gameId, playerUid, address, String(googleSub || ''), now()).run()
+
+    const settled = await database.prepare(
+      'SELECT email FROM player_identity WHERE game_id = ? AND player_uid = ? LIMIT 1'
+    ).bind(gameId, playerUid).first()
+
+    if (!settled) return { ok: true }
+    return sameEmail(settled.email, address)
+      ? { ok: true }
+      : { ok: false, ownerEmail: settled.email }
+
+  } catch {
+    return { ok: true }
+  }
 }

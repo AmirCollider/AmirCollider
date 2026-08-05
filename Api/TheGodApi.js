@@ -19,6 +19,7 @@
 
 import { createJsonResponse, timingSafeEqual } from '../Core/Http.js'
 import { logInfo, logWarning } from '../Core/Logging.js'
+import { panelPassword } from '../Core/PanelSession.js'
 import { getGameProduct, getGameEnvNames } from '../Config.js'
 import { isTheGodSession } from '../Pages/TheGod.js'
 import {
@@ -58,12 +59,16 @@ const LANGS = ['fa', 'en', 'ja']
 // ==========================================
 async function authorize(request, env) {
   const token = env && env.DOCSNAP_ADMIN_TOKEN
-  const password = env && env.TestSitePassword
+  // TheGodPassword, falling back to TestSitePassword - the same
+  // resolution the panel itself uses, so signing in at /thegod and
+  // calling this endpoint never disagree about which secret is in
+  // force.
+  const password = panelPassword(env, 'thegod')
 
   if (!token && !password) {
     return createJsonResponse({
       ok: false, error: 'not_configured',
-      message: 'Set TestSitePassword (for the panel) or DOCSNAP_ADMIN_TOKEN (for curl).'
+      message: 'Set TheGodPassword (for the panel) or DOCSNAP_ADMIN_TOKEN (for curl).'
     }, 503)
   }
 
@@ -76,6 +81,7 @@ async function authorize(request, env) {
     ok: false, error: 'unauthorized',
     message: 'Sign in at /thegod, or send Authorization: Bearer <DOCSNAP_ADMIN_TOKEN>.'
   }, 401)
+
 }
 
 

@@ -269,7 +269,14 @@ wrangler d1 execute amircollider-licenses --remote --file=migrations/0001_licens
 wrangler d1 execute neon-katana-db        --remote --file=migrations/neon-katana.sql
 ```
 
-Secrets go in with `wrangler secret put`. The Worker refuses to start without the Google client id and secret of any game that claims the `login` capability. Everything else **degrades instead of crashing**: no payment key disables the checkout, no mail key disables delivery, and every page keeps working. 🛟
+Secrets go in with `wrangler secret put`. Three are **required** — the Worker refuses to start without them:
+
+| Secret | Why it has no fallback |
+|---|---|
+| `*_GOOGLE_CLIENT_ID_WEB` · `*_GOOGLE_CLIENT_SECRET` | Any game that claims the `login` capability |
+| `STATE_SIGNING_SECRET` | Signs OAuth state and player session cookies. It used to fall back to the Google client secret, which made one credential do two jobs — rotating it for either reason broke the other |
+
+Everything else **degrades instead of crashing**: no payment key disables the checkout, no mail key disables delivery, and every page keeps working. 🛟
 
 ### ➕ Adding a game
 

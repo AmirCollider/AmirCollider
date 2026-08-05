@@ -38,6 +38,7 @@ import {
   db, ORDER_STATE, newOrderId, createTestOrder, getOrder, listTestOrders,
   purgeTestOrders, listEvents, listOutbox, isTestOrder, logEvent
 } from '../Commerce/Orders.js'
+import { panelPassword } from '../Core/PanelSession.js'
 
 
 // ==========================================
@@ -46,7 +47,10 @@ import {
 // ==========================================
 async function authorize(request, env) {
   const token = env && env.DOCSNAP_ADMIN_TOKEN
-  const password = env && env.TestSitePassword
+  // Reached from /testsite and gated by that panel's session, so
+  // it resolves that panel's secret rather than reading the
+  // variable directly - one rule, in Core/PanelSession.js.
+  const password = panelPassword(env, 'testsite')
 
   if (!token && !password) {
     return createJsonResponse({

@@ -177,7 +177,11 @@ CREATE TABLE IF NOT EXISTS order_events (
   -- a plaintext key, never a full provider payload.
   detail    TEXT,
 
-  at        INTEGER NOT NULL
+  at        INTEGER NOT NULL,
+
+  -- An event is a line in one order's history and means nothing
+  -- without it, so it goes when the order does.
+  FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_events_order ON order_events (order_id, at);
@@ -235,7 +239,11 @@ CREATE TABLE IF NOT EXISTS mail_outbox (
   sent_via        TEXT,
 
   last_error      TEXT,
-  created_at      INTEGER NOT NULL
+  created_at      INTEGER NOT NULL,
+
+  -- Nullable and SET NULL: the admin alerts belong to no purchase,
+  -- and a delivery record outlives the order it referred to.
+  FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE SET NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_outbox_due   ON mail_outbox (sent_at, next_attempt_at);
@@ -264,7 +272,11 @@ CREATE TABLE IF NOT EXISTS webhook_log (
   event_key  TEXT NOT NULL,
   order_id   TEXT,
   at         INTEGER NOT NULL,
-  PRIMARY KEY (provider, event_key)
+  PRIMARY KEY (provider, event_key),
+
+  -- SET NULL: a callback for an order we never had is exactly the
+  -- case worth keeping, and it is the one with no parent.
+  FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE SET NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_webhook_at ON webhook_log (at);

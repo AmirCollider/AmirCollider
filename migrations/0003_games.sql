@@ -302,7 +302,12 @@ CREATE TABLE IF NOT EXISTS game_entitlements (
   granted_at  INTEGER NOT NULL,
   updated_at  INTEGER NOT NULL,
 
-  PRIMARY KEY (game_id, player_uid, product_id)
+  PRIMARY KEY (game_id, player_uid, product_id),
+
+  -- SET NULL, not CASCADE. An entitlement outlives its receipt,
+  -- and some are granted by hand with no order at all. Losing the
+  -- record of a purchase must never lose the purchase.
+  FOREIGN KEY (order_id) REFERENCES game_orders (id) ON DELETE SET NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_entitlements_player ON game_entitlements (game_id, player_uid);

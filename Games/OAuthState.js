@@ -27,11 +27,17 @@ function bytesFromBase64Url(value) {
 // ==========================================
 // getStateSecret
 // The worker-wide signing secret.
+//
+// One variable, no fallback. This used to drop back to the first
+// game's Google client secret, which meant the key protecting
+// OAuth state against forgery was the same value we send to
+// Google to prove who we are - two jobs for one secret, so
+// rotating it for either reason broke the other, and a leak of it
+// was a leak of both. Config.js requires STATE_SIGNING_SECRET at
+// boot now, so an unset value never reaches this far.
 // ==========================================
 export function getStateSecret(GAMES, env) {
-  if (env && env.STATE_SIGNING_SECRET) return env.STATE_SIGNING_SECRET
-  const first = GAMES && GAMES[Object.keys(GAMES)[0]]
-  return (first && first.oauth && first.oauth.secret) || ''
+  return (env && env.STATE_SIGNING_SECRET) || ''
 }
 
 

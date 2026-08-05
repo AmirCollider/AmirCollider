@@ -30,7 +30,7 @@ import { getPageHead } from '../Core/DesignSystem.js'
 import { createJsonResponse, createHtmlResponse } from '../Core/Http.js'
 import { escapeHtml, hexToRgb } from '../Core/Html.js'
 import { themeBootScript } from '../Core/PageChrome.js'
-import { matchRequestLang } from '../Core/RequestContext.js'
+import { matchRequestLang, themeFromCookie } from '../Core/RequestContext.js'
 const LANGS = ['fa', 'en', 'ja']
 const DEFAULT_LANG = 'fa'
 
@@ -206,14 +206,7 @@ export async function handleMetrics(url, request, gameId, requestId, GAMES, _env
 
 
 
-// ==========================================
-// Theme From Cookie ('light' | 'dark' | null = follow OS)
-// ==========================================
-function themeFromCookie(request) {
-  const cookie = request.headers.get('Cookie') || ''
-  const match = cookie.match(/(?:^|;\s*)theme=([^;]+)/)
-  return match && (match[1] === 'light' || match[1] === 'dark') ? match[1] : null
-}
+
 
 
 
