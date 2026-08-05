@@ -8,6 +8,8 @@ import { CONFIG, validateGameId } from '../Config.js'
 import { getPageHead } from '../Core/DesignSystem.js'
 import { createJsonResponse, createHtmlResponse } from '../Core/Http.js'
 import { escapeHtml, hexToRgb } from '../Core/Html.js'
+import { seoHead } from '../Core/Seo.js'
+import { siteNavCss, siteFooter, siteChromeScript } from '../Core/SiteNav.js'
 import { matchRequestLang } from '../Core/RequestContext.js'
 
 
@@ -234,7 +236,8 @@ function renderHealthPage(healthData, game, baseUrl, gameId, lang) {
 <html lang="${lang}" dir="${meta.dir}" data-theme="">
 <head>
   ${getPageHead({ title: `${I18N[lang].title} - ${escapeHtml(game.name)} | AmirCollider`, amirLogo })}
-  <style>${healthStyles(accent, accentRgb)}</style>
+  ${seoHead({ path: `/${gameId}/health`, title: I18N[lang].title, lang, noindex: true })}
+  <style>${siteNavCss()}${healthStyles(accent, accentRgb)}</style>
 </head>
 <body>
   <div class="hc-bg" aria-hidden="true"></div>
@@ -309,6 +312,9 @@ function renderHealthPage(healthData, game, baseUrl, gameId, lang) {
       <a class="hc-btn" href="${escapeHtml(baseUrl)}/testsite"><span class="hc-ic">${ICONS.flask}</span><span data-i18n="testsite">${escapeHtml(I18N[lang].testsite)}</span></a>
     </nav>
   </main>
+
+  ${siteFooter({ lang })}
+  ${siteChromeScript()}
 
   <script id="hc-data" type="application/json">${payloadJson}</script>
   <script>${healthClientScript()}</script>

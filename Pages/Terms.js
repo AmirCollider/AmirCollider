@@ -32,12 +32,20 @@ import { getPageHead } from '../Core/DesignSystem.js'
 import { createErrorPage } from '../Core/ErrorPage.js'
 import { createHtmlResponse } from '../Core/Http.js'
 import { escapeHtml } from '../Core/Html.js'
-import { chromeScript, themeBootScript } from '../Core/PageChrome.js'
+import { themeBootScript } from '../Core/PageChrome.js'
+import { seoHead, breadcrumbLd } from '../Core/Seo.js'
+import {
+  siteNavCss, siteHeader, siteBreadcrumb, siteFooter, siteChromeScript, NAV_I18N
+} from '../Core/SiteNav.js'
 import { dirFor, langCookieHeader, parseCookies, resolveLang, resolveRequestLang, resolveRequestTheme } from '../Core/RequestContext.js'
 
 
 // ==========================================
 // Route Handler
+//
+// Answers at /terms (the site-wide address Google Play and the
+// OAuth consent screen are given) and at /:gameId/terms (what
+// shipped builds link to). Canonical follows the request.
 // ==========================================
 export async function handleTermsWithGame(url, request, gameId, requestId, GAMES) {
   const game = validateGameId(gameId, GAMES)
@@ -57,7 +65,14 @@ export async function handleTermsWithGame(url, request, gameId, requestId, GAMES
 
   const headers = langCookieHeader(url, lang)
 
-  return createHtmlResponse(createTermsPage(game, gameId, url.origin, lang, theme), 200, headers)
+  return createHtmlResponse(
+    createTermsPage(game, game.id, url.origin, lang, theme, {
+      path: url.pathname,
+      games: Object.values(GAMES || {})
+    }),
+    200,
+    headers
+  )
 }
 
 
@@ -175,13 +190,6 @@ const SECTION_ORDER = [
   { key: 'changes',        ic: 'edit' },
   { key: 'confirm',        ic: 'badge' }
 ]
-
-const LANGUAGES = [
-  { code: 'fa', label: 'فارسی' },
-  { code: 'en', label: 'English' },
-  { code: 'ja', label: '日本語' }
-]
-
 
 // ==========================================
 // Content Dictionary (single source of truth)
@@ -606,6 +614,11 @@ function getTermsCSS() {
 
     .wrap { max-width: var(--maxw); margin: 0 auto; }
 
+    /* Full-bleed shared header: out of the body gutter, gutter back
+       inside, so its contents line up with the panels below. */
+    .ac-nav { margin: -24px -20px 24px; padding-inline: 20px; }
+    [id] { scroll-margin-top: 84px; }
+
     /* ---------- top bar (brand + controls) ---------- */
     .topbar {
       display: flex; align-items: center; justify-content: space-between;
@@ -804,36 +817,9 @@ function getTermsCSS() {
 
 // ==========================================
 // Partials
+//
+// The top bar and footer come from Core/SiteNav.js.
 // ==========================================
-function renderTopbar(lang, amirLogo) {
-  const p = pack(lang)
-  const cur = resolveLang(lang)
-
-  const segLinks = LANGUAGES.map(l =>
-    '<a href="?lang=' + l.code + '" data-lang="' + l.code + '" lang="' + l.code + '"'
-    + ' aria-current="' + (l.code === cur ? 'true' : 'false') + '"'
-    + ' onclick="return acSetLang(\'' + l.code + '\')">' + escapeHtml(l.label) + '</a>'
-  ).join('')
-
-  return `
-    <div class="topbar">
-      <div class="brand">
-        <span class="brand-logo">
-          <img src="${escapeHtml(amirLogo)}" alt="AmirCollider" onerror="this.style.display='none'">
-        </span>
-        <span>
-          <span class="brand-name">AmirCollider</span><br>
-          <span class="brand-sub">${escapeHtml(p.brandSub)}</span>
-        </span>
-      </div>
-      <div class="controls">
-        <div class="seg" role="group" aria-label="${escapeHtml(p.langName)}">${segLinks}</div>
-        <button type="button" id="themeBtn" class="icon-btn" onclick="acToggleTheme()"
-                aria-label="${escapeHtml(p.themeToDark)}">${icon('contrast')}</button>
-      </div>
-    </div>`
-}
-
 function renderHero(lang, game, amirLogo, gameLogo) {
   const p = pack(lang)
   return `
@@ -920,7 +906,7 @@ let CONTEXT = { game: null, baseUrl: '' }
 // ==========================================
 // Page Template
 // ==========================================
-function createTermsPage(game, gameId, baseUrl, lang, theme) {
+function createTermsPage(game, gameId, baseUrl, lang, theme, { path = '/terms', games = [] } = {}) {
   CONTEXT = { game, baseUrl }
 
   const amirLogo = CONFIG.AMIR_LOGO
@@ -929,30 +915,55 @@ function createTermsPage(game, gameId, baseUrl, lang, theme) {
   const dir = dirFor(resolved)
   const themeAttr = theme === 'light' || theme === 'dark' ? ` data-theme="${theme}"` : ''
   const p = pack(resolved)
+  const site = NAV_I18N[resolved]
+
+  const perGame = path !== '/terms'
+  const title = perGame ? `${p.meta} — ${game.name} | AmirCollider` : `${p.meta} — AmirCollider`
+  const description = perGame
+    ? `${p.meta} — ${game.name}. AmirCollider Games.`
+    : `${p.meta} — AmirCollider.`
+
+  const trail = perGame
+    ? [
+        { href: '/', label: site.home },
+        { href: `/${game.id}`, label: game.name },
+        { href: path, label: site.terms }
+      ]
+    : [
+        { href: '/', label: site.home },
+        { href: '/terms', label: site.terms }
+      ]
 
   return `<!DOCTYPE html>
 <html dir="${dir}" lang="${resolved}"${themeAttr}>
 <head>
-  ${getPageHead({
-    title: `${p.meta} - ${game.name}`,
-    amirLogo,
-    description: `${p.meta} ${game.name} - AmirCollider Games`
+  ${getPageHead({ title, amirLogo, description })}
+  ${seoHead({
+    path,
+    title,
+    description,
+    lang: resolved,
+    graph: [breadcrumbLd(trail)]
   })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   ${themeBootScript()}
-  <style>${getTermsCSS()}</style>
+  <style>${siteNavCss()}${getTermsCSS()}</style>
 </head>
 <body>
+  ${siteHeader({ lang: resolved })}
   <div class="wrap">
-    ${renderTopbar(resolved, amirLogo)}
-    ${renderHero(resolved, game, amirLogo, gameLogo)}
-    ${renderSections(resolved)}
-    ${renderMeta(resolved)}
-    ${renderActions(resolved, gameId, baseUrl)}
+    ${siteBreadcrumb({ lang: resolved, trail })}
+    <main id="main">
+      ${renderHero(resolved, game, amirLogo, gameLogo)}
+      ${renderSections(resolved)}
+      ${renderMeta(resolved)}
+      ${renderActions(resolved, gameId, baseUrl)}
+    </main>
+    ${siteFooter({ lang: resolved, games })}
   </div>
-  ${chromeScript()}
+  ${siteChromeScript()}
 </body>
 </html>`
 }

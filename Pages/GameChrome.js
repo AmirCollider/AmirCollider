@@ -3,7 +3,7 @@
 // The frame every player-facing game page sits in.
 //
 // Public exports:
-//   escapeHtml(value) / jsString(value)
+//   escapeHtml(value)
 //   chromeTheme(request) / langHeader(url, lang)
 //   chromeCss(accent)
 //   chromeHead(options)
@@ -18,10 +18,13 @@
 
 import { CONFIG } from '../Config.js'
 import { getPageHead } from '../Core/DesignSystem.js'
-import { escapeHtml, jsString, safeColor } from '../Core/Html.js'
+import { escapeHtml, safeColor } from '../Core/Html.js'
+import { seoHead, breadcrumbLd } from '../Core/Seo.js'
+import {
+  siteNavCss, siteHeader, siteBreadcrumb, siteFooter, siteChromeScript, NAV_I18N
+} from '../Core/SiteNav.js'
 import { dirFor, langCookieHeader, resolveRequestTheme, parseCookies } from '../Core/RequestContext.js'
 
-const LANGS = ['fa', 'en', 'ja']
 const DEFAULT_LANG = 'fa'
 
 const META = {
@@ -213,9 +216,19 @@ export function chromeCss(accent) {
     .gchip.is-warn{color:var(--warn);background:rgba(255,152,0,.14);border-color:rgba(255,152,0,.4)}
     .gchip.is-dim{color:var(--dim);background:var(--surface);border-color:var(--border)}
 
-    footer{margin-block-start:40px;text-align:center;padding:24px;border-radius:var(--radius);
+    /* The game's own row, above the site footer: the four
+       addresses that are about THIS game, in the game's accent. */
+    .gfoot-game{margin-block-start:40px;display:flex;flex-wrap:wrap;justify-content:center;
+      align-items:center;gap:9px;padding:16px 20px;border-radius:var(--radius);
       background:var(--surface);border:1px solid var(--border);color:var(--dim);font-size:.85em}
-    footer a{color:color-mix(in srgb,var(--accent) 55%,var(--text));text-decoration:none}
+    .gfoot-game a{color:color-mix(in srgb,var(--accent) 55%,var(--text));text-decoration:none;font-weight:700}
+    .gfoot-game a:hover{text-decoration:underline}
+
+    /* Any <footer> a page renders for itself. The site footer opts
+       out - it brings its own surface and its own spacing. */
+    footer:not(.ac-foot){margin-block-start:40px;text-align:center;padding:24px;border-radius:var(--radius);
+      background:var(--surface);border:1px solid var(--border);color:var(--dim);font-size:.85em}
+    footer:not(.ac-foot) a{color:color-mix(in srgb,var(--accent) 55%,var(--text));text-decoration:none}
 
     /* ---- mobile ----
        The nav gained two more links (the game page and its
@@ -245,6 +258,14 @@ export function chromeCss(accent) {
       .gcard{animation-delay:.06s}
     }
     @keyframes gRise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+
+    ${siteNavCss()}
+
+    /* The site header spans the viewport; the game pages pad their
+       own body, so the bar has to pull back out to the edges to
+       sit flush rather than floating in a 22px gutter. */
+    .ac-nav{margin-inline:-18px;margin-block:-22px 20px;padding-inline:18px}
+    @media (max-width:720px){.ac-nav{margin-inline:-12px;margin-block-start:-16px;padding-inline:12px}}
   `
 }
 
@@ -257,11 +278,12 @@ export function chromeCss(accent) {
 // because a page that renders light and then flips to dark
 // looks broken on every single load for anybody who chose dark.
 // ==========================================
-export function chromeHead({ title, description = '', accent, head = '' }) {
+export function chromeHead({ title, description = '', accent, head = '', seo = '' }) {
   const font = 'https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap'
 
   return `
   ${getPageHead({ title: escapeHtml(title), amirLogo: CONFIG.AMIR_LOGO, description: escapeHtml(description) })}
+  ${seo}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="${font}" media="print" onload="this.media='all'">
@@ -306,11 +328,10 @@ export function chromeTop(game, lang, active, { downloadable = true } = {}) {
     `${item.off ? ' class="is-off" aria-disabled="true"' : ''}>${escapeHtml(item.label)}</a>`
   ).join('')
 
-  const segs = ['fa', 'en', 'ja'].map(code =>
-    `<button type="button" onclick="gcSetLang('${code}')" aria-pressed="${code === lang ? 'true' : 'false'}" lang="${code}">` +
-    `${escapeHtml(META[code].label)}</button>`
-  ).join('')
-
+  // The language picker and the theme toggle used to live here as
+  // well. They are in the site header now - one set of controls per
+  // page, in the same corner on every page, which is the whole
+  // point of having a site header.
   return `
     <div class="gtop">
       <a class="gbrand" href="/${escapeHtml(game.id)}">
@@ -321,51 +342,51 @@ export function chromeTop(game, lang, active, { downloadable = true } = {}) {
           <span class="gbrand-sub">AmirCollider Games</span>
         </span>
       </a>
-      <div class="gnav">
+      <nav class="gnav" aria-label="${escapeHtml(game.name)}">
         ${links}
-        <span class="gseg" role="group">${segs}</span>
-        <button type="button" class="gicon-btn" onclick="gcToggleTheme()" aria-label="theme">◐</button>
-      </div>
+      </nav>
     </div>`
 }
 
 
-export function chromeFoot(game, lang) {
+// ==========================================
+// chromeFoot
+// The site footer, plus the one row that is about this game.
+// ==========================================
+export function chromeFoot(game, lang, games = []) {
   const nav = NAV[lang] || NAV.fa
+  const list = (games && games.length) ? games : [{ id: game.id, name: game.name }]
+
   return `
-    <footer>
-      <a href="/">${escapeHtml(nav.home)}</a> &middot;
-      <a href="/${escapeHtml(game.id)}/privacy">privacy</a> &middot;
-      <a href="/${escapeHtml(game.id)}/terms">terms</a> &middot;
-      <span>v${escapeHtml(CONFIG.VERSION)}</span>
-    </footer>`
+    <div class="gfoot-game">
+      <a href="/${escapeHtml(game.id)}">${escapeHtml(game.name)}</a>
+      <span aria-hidden="true">&middot;</span>
+      <a href="/${escapeHtml(game.id)}/privacy">${escapeHtml((NAV_I18N[lang] || NAV_I18N.fa).privacy)}</a>
+      <span aria-hidden="true">&middot;</span>
+      <a href="/${escapeHtml(game.id)}/terms">${escapeHtml((NAV_I18N[lang] || NAV_I18N.fa).terms)}</a>
+      <span aria-hidden="true">&middot;</span>
+      <a href="/">${escapeHtml(nav.home)}</a>
+    </div>
+    ${siteFooter({ lang, games: list })}`
 }
 
 
 // ==========================================
 // chromeScript
-// Theme and language, which every page needs and none of them
-// should own.
 //
-// Language reloads rather than swapping strings client-side, so
-// the document direction is always set by the server and an
-// RTL page can never end up with LTR chrome.
+// Kept as an export because it is part of this module's published
+// surface, and now delegates: theme and language moved to
+// Core/SiteNav.js when the site header took over both controls.
+// Two copies of a theme toggle is one copy too many - the second
+// is the one that quietly stops matching the first.
+//
+// gcToggleTheme / gcSetLang remain as aliases so a page still
+// calling them keeps working.
 // ==========================================
 export function chromeScript() {
   return `<script>
-    function gcToggleTheme(){
-      var dark = getComputedStyle(document.documentElement).colorScheme.indexOf('dark') !== -1;
-      var next = dark ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', next);
-      try { localStorage.setItem('ac_theme', next); } catch (e) {}
-      document.cookie = 'theme=' + next + ';path=/;max-age=31536000;samesite=lax';
-    }
-    function gcSetLang(code){
-      document.cookie = 'lang=' + code + ';path=/;max-age=31536000;samesite=lax';
-      var url = new URL(window.location.href);
-      url.searchParams.set('lang', code);
-      window.location.href = url.toString();
-    }
+    function gcToggleTheme(){ if (window.acToggleTheme) window.acToggleTheme(); }
+    function gcSetLang(code){ if (window.acSetLang) window.acSetLang(code); }
   </script>`
 }
 
@@ -376,24 +397,55 @@ export function chromeScript() {
 // ==========================================
 export function page({
   game, lang, theme, title, description = '', active, body,
-  script = '', head = '', downloadable = true, skipLabel = ''
+  script = '', head = '', downloadable = true, skipLabel = '',
+  path = '', games = [], seoGraph = [], noindex = false, ogImage = ''
 }) {
   const themeAttr = theme === 'light' || theme === 'dark' ? ` data-theme="${theme}"` : ''
+  const nav = NAV[lang] || NAV.fa
+  const site = NAV_I18N[lang] || NAV_I18N.fa
+  const canonicalPath = path || `/${game.id}`
+
+  // Home > Games > <this game> > <this section>. The last hop is
+  // omitted on the game's own front page, where it would just
+  // repeat the entry before it.
+  const trail = [
+    { href: '/', label: site.home },
+    { href: '/#games', label: site.games },
+    { href: `/${game.id}`, label: game.name }
+  ]
+  if (active && active !== 'landing') {
+    const label = nav[active] || active
+    trail.push({ href: canonicalPath, label })
+  }
+
+  const seo = seoHead({
+    path: canonicalPath,
+    title,
+    description,
+    lang,
+    type: 'website',
+    noindex,
+    image: ogImage || game.logo || CONFIG.AMIR_LOGO,
+    graph: [breadcrumbLd(trail), ...(seoGraph || [])]
+  })
 
   return `<!DOCTYPE html>
 <html lang="${escapeHtml(lang)}" dir="${dirFor(lang)}"${themeAttr}>
 <head>
-${chromeHead({ title, description, accent: game.color, head })}
+${chromeHead({ title, description, accent: game.color, head, seo })}
 </head>
 <body>
   ${skipLabel ? `<a class="skip" href="#main">${escapeHtml(skipLabel)}</a>` : ''}
+  ${siteHeader({ lang, active: 'games', accent: gameAccent(game.color) })}
   <div class="wrap">
+    ${siteBreadcrumb({ lang, trail })}
     ${chromeTop(game, lang, active, { downloadable })}
     <main id="main">
     ${body}
     </main>
-    ${chromeFoot(game, lang)}
+    ${chromeFoot(game, lang, games)}
   </div>
+  ${siteChromeScript()}
   ${chromeScript()}
   ${script}
 </body>

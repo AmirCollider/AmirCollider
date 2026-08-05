@@ -8,6 +8,8 @@ import { CONFIG, validateGameId } from '../Config.js'
 import { getPageHead } from '../Core/DesignSystem.js'
 import { createJsonResponse, createHtmlResponse } from '../Core/Http.js'
 import { escapeHtml, hexToRgb } from '../Core/Html.js'
+import { seoHead } from '../Core/Seo.js'
+import { siteNavCss, siteFooter, siteChromeScript } from '../Core/SiteNav.js'
 import { matchRequestLang } from '../Core/RequestContext.js'
 
 
@@ -273,7 +275,8 @@ function renderPingPage(pingData, game, baseUrl, gameId, lang) {
 <html lang="${lang}" dir="${meta.dir}" data-theme="">
 <head>
   ${getPageHead({ title: `${t.title} - ${escapeHtml(game.name)} | AmirCollider`, amirLogo })}
-  <style>${pingStyles(accent, accentRgb)}</style>
+  ${seoHead({ path: `/${gameId}/ping`, title: t.title, lang, noindex: true })}
+  <style>${siteNavCss()}${pingStyles(accent, accentRgb)}</style>
 </head>
 <body>
   <div class="pg-bg" aria-hidden="true"></div>
@@ -365,6 +368,9 @@ function renderPingPage(pingData, game, baseUrl, gameId, lang) {
       <a class="pg-btn" href="${escapeHtml(baseUrl)}/testsite"><span class="pg-ic">${ICONS.flask}</span><span data-i18n="testsite">${escapeHtml(t.testsite)}</span></a>
     </nav>
   </main>
+
+  ${siteFooter({ lang })}
+  ${siteChromeScript()}
 
   <script id="pg-data" type="application/json">${payloadJson}</script>
   <script>${pingClientScript()}</script>

@@ -31,6 +31,7 @@ import { applyPaymentState, resendLicense, alertAdmin } from '../Commerce/Fulfil
 import { mailConfigured } from '../Commerce/Mailer.js'
 
 import { escapeHtml, jsString } from '../Core/Html.js'
+import { siteNavCss, siteFooter } from '../Core/SiteNav.js'
 import { parseCookies, resolveRequestLang, resolveRequestTheme } from '../Core/RequestContext.js'
 const LANGS = ['fa', 'en', 'ja']
 const PROMISE_MINUTES = CONFIG.COMMERCE.DELIVERY_PROMISE_MINUTES
@@ -687,19 +688,22 @@ function shell(lang, theme, { title, body, script }) {
       } catch (e) {}
     })();
   </script>
-  <style>${css()}</style>
+  <style>${siteNavCss()}${css()}</style>
 </head>
 <body>
   <div class="wrap">
     ${topbar(lang)}
+    <main id="main">
     ${body}
-    <footer>
+    </main>
+    <div class="ck-links">
       <a href="/unity-docsnap">${escapeHtml(p.backProduct)}</a>
       <span>·</span>
       <a href="/order">${escapeHtml(p.safeCta)}</a>
       <span>·</span>
       <a href="/license">${escapeHtml(p.maskedKey)}</a>
-    </footer>
+    </div>
+    ${siteFooter({ lang })}
   </div>
   <script>${script || ''}${commonScript()}</script>
 </body>
@@ -715,10 +719,13 @@ function topbar(lang) {
 
   return `
     <div class="topbar">
-      <a class="brand" href="/unity-docsnap">
-        <img src="${escapeHtml(CONFIG.AMIR_LOGO)}" alt="" onerror="this.style.display='none'">
-        <span>Unity DocSnap</span>
-      </a>
+      <div class="brand-group">
+        <a class="brand" href="/" aria-label="AmirCollider">
+          <img src="${escapeHtml(CONFIG.AMIR_LOGO)}" alt="" onerror="this.style.display='none'">
+          <span>AmirCollider</span>
+        </a>
+        <a class="brand brand-product" href="/unity-docsnap">Unity DocSnap</a>
+      </div>
       <div class="controls">
         <div class="seg" role="group">${buttons}</div>
         <button type="button" class="icon-btn" onclick="acTheme()" aria-label="Theme">◐</button>
@@ -1128,8 +1135,18 @@ export function css() {
     .wrap { max-width: 660px; margin-inline: auto; }
 
     .topbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+    .brand-group { display: flex; align-items: center; gap: 10px; min-width: 0; }
     .brand { display: flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none; font-weight: 800; }
     .brand img { width: 32px; height: 32px; border-radius: 10px; object-fit: cover; }
+    /* Which product this checkout is for, next to who is selling it.
+       The logo used to be the product's only link, which left the
+       one page a stranger reaches with money in hand unable to
+       reach the site that is asking for it. */
+    .brand-product {
+      font-size: 0.84em; font-weight: 700; color: var(--text-dim);
+      padding-inline-start: 10px; border-inline-start: 1px solid var(--border);
+    }
+    .brand-product:hover { color: var(--text); }
     .controls { display: flex; gap: 10px; align-items: center; }
     .seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); }
     .seg button {
@@ -1223,13 +1240,15 @@ export function css() {
       padding: 2px 7px; border-radius: 7px; font-size: 0.9em;
     }
 
-    footer {
+    /* The three links that are about this purchase. The site
+       footer sits underneath and carries everything else. */
+    .ck-links {
       display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
       margin-block-start: 40px; padding-block-start: 22px;
       border-top: 1px solid var(--border); color: var(--text-dim); font-size: 0.88em;
     }
-    footer a { color: var(--text-dim); text-decoration: none; }
-    footer a:hover { color: var(--text); }
+    .ck-links a { color: var(--text-dim); text-decoration: none; }
+    .ck-links a:hover { color: var(--text); }
 
     a:focus-visible, button:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; border-radius: 6px; }
 

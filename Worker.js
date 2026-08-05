@@ -23,7 +23,7 @@
 // ==========================================
 
 import { CONFIG, CORS_HEADERS, SECURITY, getGamesConfig, validateEnvironment } from './Config.js'
-import { createJsonResponse, create404Response, createErrorResponse } from './Core/Http.js'
+import { createJsonResponse, createErrorResponse } from './Core/Http.js'
 import { logInfo, logError, generateRequestId } from './Core/Logging.js'
 
 import { handleOAuthAuth, handleOAuthCallback, handleTokenExchange, handleRefreshToken } from './Api/OAuthApi.js'
@@ -39,6 +39,8 @@ import {
 } from './Api/GameApi.js'
 import { handleTheGodApi } from './Api/TheGodApi.js'
 
+import { handleNotFound } from './Pages/NotFound.js'
+import { handleRobots, handleSitemap } from './Pages/Sitemap.js'
 import { handleUserProfile } from './Pages/PlayerProfile.js'
 import { handleDashboard } from './Pages/Dashboard.js'
 import { handleHealthWithUI } from './Pages/Health.js'
@@ -151,6 +153,19 @@ const ROUTES = [
   { path: '/', method: 'GET', handler: handleDashboard },
   { path: '/metrics', method: 'GET', handler: handleMetrics },
   { path: '/release-notes', method: 'GET', handler: handleReleaseNotes },
+
+  // What a crawler asks for first, and what Search Console asks
+  // for when a property is added.
+  { path: '/robots.txt', method: 'GET', handler: handleRobots },
+  { path: '/sitemap.xml', method: 'GET', handler: handleSitemap },
+
+  // The site-wide policy pages. Google's OAuth consent screen and
+  // Play Console both want a privacy policy and terms at a stable
+  // address on the same domain as the homepage - not one buried
+  // under a game id that could be retired. The per-game pages
+  // below still answer, because shipped APKs link to those.
+  { path: '/privacy', method: 'GET', handler: handlePrivacyPolicyWithGame },
+  { path: '/terms', method: 'GET', handler: handleTermsWithGame },
 
   // The tools catalogue. The path is a promise: it appears in
   // shipped C# constants that cannot be updated once somebody has
@@ -286,7 +301,26 @@ const ROUTES = [
 // Route matching
 // ==========================================
 function patternToRegex(path) {
-  return new RegExp(`^${path.replace(/:\w+/g, '([^/]+)')}$`)
+  // Dots are literal here: '/robots.txt' as a pattern must not also
+  // match '/robotsXtxt'. Only ':param' is a wildcard.
+  const escaped = path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`^${escaped.replace(/:\w+/g, '([^/]+)')}$`)
+}
+
+/**
+ * Percent-decoding that cannot throw.
+ *
+ * decodeURIComponent('%E0%A4%A') is a URIError, and a game id is
+ * whatever a caller put in the path - so an unescaped '%' in a URL
+ * used to become an uncaught exception and a 500 where a 404 was
+ * the honest answer.
+ */
+function decodeParam(value) {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
 }
 
 function pathMatches(route, path) {
@@ -308,10 +342,49 @@ function matchRoute(path, method) {
   const matches = path.match(patternToRegex(dynamicRoute.path)) || []
   const params = {}
   ;(dynamicRoute.path.match(/:\w+/g) || []).forEach((name, index) => {
-    params[name.slice(1)] = decodeURIComponent(matches[index + 1])
+    params[name.slice(1)] = decodeParam(matches[index + 1])
   })
 
   return { ...dynamicRoute, params }
+}
+
+
+// ==========================================
+// One address per page
+//
+// The Worker answers on its workers.dev hostname as well as on the
+// domain. Same bytes, two addresses - which to a search engine is
+// two sites competing for the same words, and to a visitor is a
+// bookmark that quietly stops matching the links they are sent.
+//
+// Only page requests are redirected. A shipped Android build calls
+// /database/, /auth/ and /games/ with its own HTTP stack and may
+// not follow a 301 at all, so those keep answering wherever they
+// are called - the redirect is for browsers, and browsers ask for
+// pages with GET.
+// ==========================================
+const CANONICAL_EXEMPT = [
+  '/oauth/', '/auth/', '/database/', '/games/', '/profile/',
+  '/assets/', '/video/', '/thegod', '/testsite', '/checkout/'
+]
+
+function canonicalRedirect(url, request) {
+  const host = url.hostname.toLowerCase()
+  const canonicalHost = new URL(CONFIG.SITE_URL).hostname.toLowerCase()
+
+  if (host === canonicalHost) return null
+  if (!CONFIG.ALT_HOSTS.some(alt => alt.toLowerCase() === host)) return null
+  if (request.method !== 'GET' && request.method !== 'HEAD') return null
+  if (CANONICAL_EXEMPT.some(prefix => url.pathname.startsWith(prefix))) return null
+
+  const target = new URL(url.pathname + url.search, CONFIG.SITE_URL)
+  return new Response(null, {
+    status: 301,
+    headers: {
+      Location: target.toString(),
+      'Cache-Control': 'public, max-age=3600'
+    }
+  })
 }
 
 
@@ -341,6 +414,10 @@ async function handleRequest(request, env) {
   const GAMES = getGamesConfig(env)
   const url = new URL(request.url)
   const path = url.pathname
+
+  const redirect = canonicalRedirect(url, request)
+  if (redirect) return redirect
+
   const requestId = generateRequestId()
   const gameId = request.headers.get('X-Game-ID') || url.searchParams.get('game') || Object.keys(GAMES)[0]
   const logContext = { requestId, gameId, path, method: request.method }
@@ -358,7 +435,20 @@ async function handleRequest(request, env) {
           requestId
         }, 405)
       }
-      return create404Response(requestId)
+      // A browser gets a page it can navigate away from; a shipped
+      // client asking for JSON gets exactly the body it got before.
+      return handleNotFound(url, request, requestId, Object.values(GAMES))
+    }
+
+    // A game id in the path that names no game is a 404, not a
+    // silent fallback to the first registered game. The fallback
+    // meant /anything/leaderboard rendered Neon Katana's board
+    // under an address that is not its own - one page at unlimited
+    // URLs, which is a duplicate-content problem for a crawler and
+    // a wrong answer for a person.
+    if (route.params && route.params.gameId && route.path.startsWith('/:gameId')
+        && !GAMES[route.params.gameId]) {
+      return handleNotFound(url, request, requestId, Object.values(GAMES))
     }
 
     const availableEndpoints = ROUTES.map(entry => `${entry.method} ${entry.path}`)

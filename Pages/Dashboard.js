@@ -42,14 +42,9 @@ import { resolveGames } from '../Games/Registry.js'
 
 import { escapeHtml, safeColor } from '../Core/Html.js'
 import { themeBootScript } from '../Core/PageChrome.js'
+import { seoHead, videoGameLd, softwareApplicationLd } from '../Core/Seo.js'
+import { siteNavCss, siteHeader, siteFooter, siteChromeScript } from '../Core/SiteNav.js'
 import { dirFor, langCookieHeader, parseCookies, resolveLang, resolveRequestLang, resolveRequestTheme } from '../Core/RequestContext.js'
-
-
-// ==========================================
-// SITE_NAME
-// What the browser tab says.
-// ==========================================
-const SITE_NAME = 'AmirCollider'
 
 
 // ==========================================
@@ -58,7 +53,16 @@ const SITE_NAME = 'AmirCollider'
 const DASH_I18N = {
   fa: {
     locale: 'fa-IR',
-    title: 'پروکسی AmirCollider',
+    // The <h1> and the <title> of the site's front page. It used to
+    // say "AmirCollider proxy / OAuth authentication management",
+    // which describes the plumbing rather than the site: nobody
+    // searching for Neon Katana or Unity DocSnap types either of
+    // those words, and the one page with the authority to rank for
+    // the brand was spending it on an implementation detail.
+    title: 'AmirCollider',
+    tagline: 'بازی‌های اندروید و افزونه‌های یونیتی',
+    metaTitle: 'AmirCollider — بازی‌های اندروید و ابزارهای یونیتی',
+    metaDesc: 'AmirCollider سازنده‌ی بازی‌های اندرویدی مانند Neon Katana و افزونه‌های ادیتور یونیتی مانند Unity DocSnap و Unity DirectTMP است.',
     subtitle: 'سامانه مدیریت احراز هویت OAuth',
     langName: 'فارسی',
     themeToLight: 'حالت روشن',
@@ -105,7 +109,10 @@ const DASH_I18N = {
   },
   en: {
     locale: 'en-US',
-    title: 'AmirCollider Proxy',
+    title: 'AmirCollider',
+    tagline: 'Android games and Unity editor extensions',
+    metaTitle: 'AmirCollider — Android Games & Unity Editor Tools',
+    metaDesc: 'AmirCollider builds Android games such as Neon Katana and Unity editor extensions such as Unity DocSnap and Unity DirectTMP.',
     subtitle: 'OAuth authentication management',
     langName: 'English',
     themeToLight: 'Light mode',
@@ -151,7 +158,10 @@ const DASH_I18N = {
   },
   ja: {
     locale: 'ja-JP',
-    title: 'AmirCollider プロキシ',
+    title: 'AmirCollider',
+    tagline: 'Android ゲームと Unity エディタ拡張',
+    metaTitle: 'AmirCollider — Android ゲームと Unity エディタツール',
+    metaDesc: 'AmirCollider は Neon Katana などの Android ゲームと、Unity DocSnap・Unity DirectTMP などの Unity エディタ拡張を開発しています。',
     subtitle: 'OAuth 認証管理システム',
     langName: '日本語',
     themeToLight: 'ライトモード',
@@ -352,6 +362,12 @@ function getDashboardCSS() {
     }
 
     .wrap { max-width: var(--maxw); margin: 0 auto; }
+
+    /* The shared header spans the viewport. The body pads itself,
+       so the bar pulls back out to the edges instead of floating
+       in a gutter, and section anchors clear its sticky height. */
+    .ac-nav { margin: -24px -20px 24px; padding-inline: 20px; }
+    [id] { scroll-margin-top: 84px; }
 
     /* ---------- top bar ---------- */
     .topbar {
@@ -573,14 +589,9 @@ function getDashboardCSS() {
       vertical-align: -2px; margin-inline-end: 7px;
     }
 
-    /* ---------- footer ---------- */
-    footer {
-      text-align: center; padding: 28px; border-radius: var(--radius);
-      background: var(--surface); border: 1px solid var(--border); color: var(--text-dim);
-    }
-    footer .f-name { color: var(--text); font-weight: 800; font-size: 1.05em; }
-    footer .f-meta { margin-block-start: 6px; font-size: 0.85em; }
-    footer .f-meta b { color: color-mix(in srgb, var(--brand) 45%, var(--text)); }
+    /* The footer is Core/SiteNav.js's now and brings its own
+       styling; the rule that used to live here would have centred
+       its four columns into one stack. */
 
     @media (max-width: 480px) {
       .games-grid { grid-template-columns: 1fr; }
@@ -608,42 +619,18 @@ function getDashboardCSS() {
 
 // ==========================================
 // Partials
+//
+// The top bar and the footer this file used to build itself now
+// come from Core/SiteNav.js, which every other page also renders -
+// so the brand mark, the language picker and the theme toggle are
+// in the same place, in the same style, on all of them.
 // ==========================================
-function renderTopbar(lang, amirLogo) {
-  const p = pack(lang)
-  const cur = resolveLang(lang)
-  const langs = [['fa', DASH_I18N.fa.langName], ['en', DASH_I18N.en.langName], ['ja', DASH_I18N.ja.langName]]
-
-  const segButtons = langs.map(([code, label]) =>
-    '<button type="button" data-lang="' + code + '" aria-pressed="' + (code === cur ? 'true' : 'false') + '"'
-    + ' onclick="acSetLang(\'' + code + '\')" lang="' + code + '">' + escapeHtml(label) + '</button>'
-  ).join('')
-
-  return `
-    <div class="topbar">
-      <div class="brand">
-        <span class="brand-logo">
-          <img src="${escapeHtml(amirLogo)}" alt="AmirCollider" onerror="this.style.display='none'">
-        </span>
-        <span>
-          <span class="brand-name">AmirCollider</span><br>
-          <span class="brand-sub">${escapeHtml(p.subtitle)}</span>
-        </span>
-      </div>
-      <div class="controls">
-        <div class="seg" role="group" aria-label="${escapeHtml(p.langName)}">${segButtons}</div>
-        <button type="button" id="themeBtn" class="icon-btn" onclick="acToggleTheme()"
-                aria-label="${escapeHtml(p.themeToDark)}">${icon('contrast')}</button>
-      </div>
-    </div>`
-}
-
 function renderHero(lang, version) {
   const p = pack(lang)
   return `
     <div class="hero">
       <h1>${escapeHtml(p.title)}</h1>
-      <p>${escapeHtml(p.subtitle)}</p>
+      <p>${escapeHtml(p.tagline)}</p>
       <span class="pill"><span class="dot"></span>v${escapeHtml(version)}</span>
     </div>`
 }
@@ -697,7 +684,7 @@ function renderTools(lang) {
   }).join('')
 
   return `
-    <div class="section-title">${escapeHtml(p.sectionTools)}</div>
+    <h2 class="section-title" id="tools">${escapeHtml(p.sectionTools)}</h2>
     <div class="tools-strip">${cards}</div>
     <div class="tools-more">
       <a href="/tools">${escapeHtml(p.toolsAll)} &rarr;</a>
@@ -714,16 +701,6 @@ function renderSystemLinks(lang) {
   return '<div class="syslinks">' + links.map(l =>
     '<a class="syslink" href="' + escapeHtml(l.href) + '">' + icon(l.ic) + '<span>' + escapeHtml(l.label) + '</span></a>'
   ).join('') + '</div>'
-}
-
-function renderFooter(lang, version) {
-  const p = pack(lang)
-  return `
-    <footer>
-      <div class="f-name">AmirCollider Games</div>
-      <div class="f-meta">${escapeHtml(p.footerTagline)}</div>
-      <div class="f-meta">${escapeHtml(p.footerPowered)} &middot; <b>v${escapeHtml(version)}</b></div>
-    </footer>`
 }
 
 
@@ -746,39 +723,9 @@ function getClientScript(baseUrl, lang) {
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
-    // ---- theme ----
-    function acApplyThemeLabel() {
-      var btn = acById('themeBtn');
-      if (!btn) return;
-      var dark = getComputedStyle(document.documentElement).colorScheme.indexOf('dark') !== -1;
-      btn.setAttribute('aria-label', dark ? 'Light mode' : 'Dark mode');
-    }
-    function acToggleTheme() {
-      var cur = document.documentElement.getAttribute('data-theme');
-      var dark = getComputedStyle(document.documentElement).colorScheme.indexOf('dark') !== -1;
-      var next = dark ? 'light' : 'dark';
-      var commit = function () {
-        document.documentElement.setAttribute('data-theme', next);
-        acApplyThemeLabel();
-      };
-      var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      if (document.startViewTransition && !reduce) {
-        document.startViewTransition(commit);
-      } else {
-        commit();
-      }
-      try { localStorage.setItem('ac_theme', next); } catch (e) {}
-      document.cookie = 'theme=' + next + ';path=/;max-age=31536000;samesite=lax';
-    }
-    window.acToggleTheme = acToggleTheme;
-
-    // ---- language (server-driven; reloads so RTL/LTR stays correct) ----
-    function acSetLang(code) {
-      try { localStorage.setItem('ac_lang', code); } catch (e) {}
-      document.cookie = 'lang=' + code + ';path=/;max-age=31536000;samesite=lax';
-      window.location.href = AC.baseUrl + '/?lang=' + encodeURIComponent(code);
-    }
-    window.acSetLang = acSetLang;
+    // Theme and language live in Core/SiteNav.js now: they are the
+    // same two functions on every page, and having a second copy
+    // here meant a fix to one of them silently missed this page.
 
     // ---- localized helpers ----
     function acLocalTime(ts) {
@@ -895,7 +842,6 @@ function getClientScript(baseUrl, lang) {
       });
     }
 
-    acApplyThemeLabel();
     acCountUp();
   `
 
@@ -910,34 +856,76 @@ function createDashboardPage(GAMES, baseUrl, routesCount, lang, theme, player = 
   const amirLogo = CONFIG.AMIR_LOGO
   const resolved = resolveLang(lang)
   const dir = dirFor(resolved)
+  const p = pack(resolved)
   const themeAttr = theme === 'light' || theme === 'dark' ? ` data-theme="${theme}"` : ''
+  const games = Object.values(GAMES)
+
+  // The landing page carries the structured data for everything it
+  // links to. One page describing the whole catalogue is what lets
+  // a search engine connect the brand to the products.
+  const graph = [
+    ...games.map(game => videoGameLd({
+      name: game.name,
+      description: (game.i18n && game.i18n.description && game.i18n.description[resolved]) || game.description,
+      path: '/' + game.id,
+      image: game.logo,
+      downloadUrl: game.myketUrl,
+      genres: (game.tags || []).map(tag => tag[resolved] || tag.en).filter(Boolean)
+    })),
+    softwareApplicationLd({
+      name: 'Unity DocSnap',
+      description: 'Unity editor extension that turns in-editor documentation into shareable snapshots.',
+      path: '/unity-docsnap',
+      version: CONFIG.DOCSNAP.VERSION,
+      price: CONFIG.DOCSNAP.TIERS.plus.price,
+      repo: CONFIG.DOCSNAP.REPO_URL
+    }),
+    softwareApplicationLd({
+      name: 'Unity DirectTMP',
+      description: 'Free MIT-licensed Unity editor extension for working with TextMeshPro directly.',
+      path: '/unity-directtmp',
+      version: CONFIG.DIRECTTMP.VERSION,
+      price: '0',
+      repo: CONFIG.DIRECTTMP.REPO_URL
+    })
+  ]
 
   return `<!DOCTYPE html>
 <html dir="${dir}" lang="${resolved}"${themeAttr}>
 <head>
-  ${getPageHead({ title: SITE_NAME, amirLogo })}
+  ${getPageHead({ title: p.metaTitle, amirLogo, description: p.metaDesc })}
+  ${seoHead({
+    path: '/',
+    title: p.metaTitle,
+    description: p.metaDesc,
+    lang: resolved,
+    graph
+  })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   ${themeBootScript()}
-  <style>${getDashboardCSS()}</style>
+  <style>${siteNavCss()}${getDashboardCSS()}</style>
 </head>
 <body>
+  ${siteHeader({ lang: resolved, active: 'home' })}
   <div class="wrap">
-    ${renderTopbar(resolved, amirLogo)}
-    ${renderHero(resolved, CONFIG.VERSION)}
-    ${renderStats(resolved, Object.keys(GAMES).length, routesCount)}
+    <main id="main">
+      ${renderHero(resolved, CONFIG.VERSION)}
+      ${renderStats(resolved, Object.keys(GAMES).length, routesCount)}
 
-    <div class="section-title">${escapeHtml(pack(resolved).sectionGames)}</div>
-    ${createGamesCardsHTML(GAMES, baseUrl, { lang: resolved, player })}
+      <h2 class="section-title" id="games">${escapeHtml(p.sectionGames)}</h2>
+      ${createGamesCardsHTML(GAMES, baseUrl, { lang: resolved, player })}
 
-    ${renderTools(resolved)}
+      ${renderTools(resolved)}
 
-   ${renderSystemLinks(resolved)}
-    ${renderFooter(resolved, CONFIG.VERSION)}
+      ${renderSystemLinks(resolved)}
+    </main>
+    ${siteFooter({ lang: resolved, games })}
   </div>
 
   ${getClientScript(baseUrl, resolved)}
+  ${siteChromeScript()}
 </body>
 </html>`
 }

@@ -52,6 +52,8 @@ import { otherTools } from '../Content/ToolsCatalog.js'
 
 import { escapeHtml } from '../Core/Html.js'
 import { chromeScript, themeBootScript } from '../Core/PageChrome.js'
+import { seoHead, breadcrumbLd, softwareApplicationLd } from '../Core/Seo.js'
+import { siteNavCss, siteBreadcrumb, siteFooter, NAV_I18N } from '../Core/SiteNav.js'
 import { langCookieHeader, parseCookies, resolveRequestLang, resolveRequestTheme } from '../Core/RequestContext.js'
 
 const PLUS = CONFIG.DOCSNAP.TIERS.plus
@@ -921,27 +923,47 @@ function renderShelf(lang) {
 // ==========================================
 function renderPage(lang, theme) {
   const p = I18N[lang]
+  const site = NAV_I18N[lang] || NAV_I18N.fa
   const themeAttr = theme === 'light' || theme === 'dark' ? ` data-theme="${theme}"` : ''
+  const title = p.title + ' — ' + p.tagline
+  const trail = [
+    { href: '/', label: site.home },
+    { href: '/tools', label: site.tools },
+    { href: '/unity-docsnap', label: 'Unity DocSnap' }
+  ]
 
   return `<!DOCTYPE html>
 <html lang="${lang}" dir="${p.dir}"${themeAttr}>
 <head>
   ${getPageHead({
-    title: p.title + ' — ' + p.tagline,
+    title,
     amirLogo: CONFIG.AMIR_LOGO,
-    description: escapeHtml(p.lede)
+    description: p.lede
   })}
-  <link rel="canonical" href="${CONFIG.SITE_URL}/unity-docsnap">
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="${escapeHtml(p.title)}">
-  <meta property="og:description" content="${escapeHtml(p.tagline)}">
-  <meta property="og:url" content="${CONFIG.SITE_URL}/unity-docsnap">
+  ${seoHead({
+    path: '/unity-docsnap',
+    title,
+    description: p.lede,
+    lang,
+    type: 'product',
+    graph: [
+      breadcrumbLd(trail),
+      softwareApplicationLd({
+        name: 'Unity DocSnap',
+        description: p.lede,
+        path: '/unity-docsnap',
+        version: VERSION,
+        price: CONFIG.DOCSNAP.TIERS.plus.price,
+        repo: REPO_URL
+      })
+    ]
+  })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Quicksand:wght@400;500;600;700&family=Space+Mono&family=Vazirmatn:wght@400;600;700;800&display=swap" rel="stylesheet">
   ${themeBootScript()}
   <script>document.documentElement.classList.add('js');</script>
-  <style>${css()}</style>
+  <style>${siteNavCss()}${css()}</style>
 </head>
 <body>
   <div class="pearls" aria-hidden="true">
@@ -955,23 +977,25 @@ function renderPage(lang, theme) {
   </div>
   <div class="wrap">
     ${renderTopbar(lang)}
-    ${renderHero(p)}
-    ${renderWhat(p, lang)}
-    ${renderVideos(p, lang)}
-    ${renderSpotlight(p)}
-    ${renderCompare(p, lang)}
-    ${renderPricing(p, lang)}
-    ${renderFaq(p)}
-    ${renderShelf(lang)}
-    <footer class="reveal">
-      <a href="/">${escapeHtml(p.footerBack)}</a>
-      <span>·</span>
+    ${siteBreadcrumb({ lang, trail })}
+    <main id="main">
+      ${renderHero(p)}
+      ${renderWhat(p, lang)}
+      ${renderVideos(p, lang)}
+      ${renderSpotlight(p)}
+      ${renderCompare(p, lang)}
+      ${renderPricing(p, lang)}
+      ${renderFaq(p)}
+      ${renderShelf(lang)}
+    </main>
+    <div class="ds-links reveal">
       <a href="${escapeHtml(REPO_URL)}" rel="noopener">GitHub</a>
       <span>·</span>
       <a href="/license">${escapeHtml(p.haveKey)}</a>
       <span>·</span>
       <a href="/order">${escapeHtml(p.orderHelp)}</a>
-    </footer>
+    </div>
+    ${siteFooter({ lang })}
   </div>
   ${chromeScript()}
   <script>${script(lang, p)}</script>
@@ -1480,14 +1504,21 @@ function css() {
 
     /* ---------- footer ---------- */
     /* Dashed, which is how the original skin separated things
-       that are only loosely related. */
-    footer {
+       that are only loosely related. This row is the product's own
+       three links; the site footer underneath it carries the rest
+       of the site and is styled by Core/SiteNav.js. */
+    .ds-links {
       display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
       margin-block-start: 48px; padding-block-start: 24px;
       border-top: 2px dashed var(--border-strong); color: var(--text-dim); font-size: 0.9em;
     }
-    footer a { color: var(--text-dim); text-decoration: none; transition: color .15s ease; }
-    footer a:hover { color: var(--coral); }
+    .ds-links a { color: var(--text-dim); text-decoration: none; transition: color .15s ease; }
+    .ds-links a:hover { color: var(--coral); }
+
+    /* The shared footer borrows this skin's own accent rather than
+       arriving in the site's default violet. */
+    .ac-foot { --acn-accent: var(--lav); --acn-surface: var(--surface-2); }
+    [id] { scroll-margin-top: 24px; }
 
     a:focus-visible, button:focus-visible, summary:focus-visible {
       outline: 2px solid var(--coral); outline-offset: 3px; border-radius: 999px;

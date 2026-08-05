@@ -38,6 +38,8 @@ import { otherTools } from '../Content/ToolsCatalog.js'
 
 import { escapeHtml } from '../Core/Html.js'
 import { chromeScript, themeBootScript } from '../Core/PageChrome.js'
+import { seoHead, breadcrumbLd, softwareApplicationLd } from '../Core/Seo.js'
+import { siteNavCss, siteBreadcrumb, siteFooter, NAV_I18N } from '../Core/SiteNav.js'
 import { langCookieHeader, parseCookies, resolveLang, resolveRequestLang, resolveRequestTheme } from '../Core/RequestContext.js'
 
 const REPO_URL = CONFIG.DIRECTTMP.REPO_URL
@@ -703,15 +705,17 @@ function getCSS() {
     }
     .back-link svg { width: 18px; height: 18px; }
 
-    footer { text-align: center; color: var(--text-dim); font-size: 0.85em; }
-    .f-name { font-weight: 800; color: var(--text); margin-block-end: 6px; }
+    /* The brand mark in the corner is a link home now, so it needs
+       to stop looking like body text when it is hovered. */
+    .brand { text-decoration: none; color: inherit; transition: opacity 0.18s ease; }
+    .brand:hover { opacity: 0.82; }
 
     @media (max-width: 620px) {
       .tofu-demo { grid-template-columns: 1fr; }
     }
 
     @media (prefers-reduced-motion: no-preference) {
-      .topbar, .hero, section, .nav, footer { animation: uRise 0.5s cubic-bezier(0.16,1,0.3,1) both; }
+      .topbar, .hero, section { animation: uRise 0.5s cubic-bezier(0.16,1,0.3,1) both; }
       .hero { animation-delay: 0.05s; }
       .inky { animation: uFloat 4.5s ease-in-out infinite; }
     }
@@ -736,15 +740,15 @@ function renderTopbar(lang, amirLogo) {
 
   return `
     <div class="topbar">
-      <div class="brand">
+      <a class="brand" href="/" aria-label="AmirCollider">
         <span class="brand-logo">
-          <img src="${escapeHtml(amirLogo)}" alt="AmirCollider" onerror="this.style.display='none'">
+          <img src="${escapeHtml(amirLogo)}" alt="" onerror="this.style.display='none'">
         </span>
         <span>
           <span class="brand-name">AmirCollider</span><br>
           <span class="brand-sub">Unity DirectTMP v${escapeHtml(VERSION)}</span>
         </span>
-      </div>
+      </a>
       <div class="controls">
         <div class="seg" role="group" aria-label="${escapeHtml(p.langName)}">${segButtons}</div>
         <button type="button" id="themeBtn" class="icon-btn" onclick="acToggleTheme()"
@@ -932,24 +936,6 @@ function renderShelf(lang) {
     </section>`
 }
 
-function renderNav(lang) {
-  const p = pack(lang)
-  return `
-    <div class="nav">
-      <a class="back-link" href="/tools">${icon('grid')}<span>${escapeHtml(p.back)}</span></a>
-    </div>`
-}
-
-function renderFooter(lang, version) {
-  const p = pack(lang)
-  return `
-    <footer>
-      <div class="f-name">AmirCollider</div>
-      <div class="f-meta">${escapeHtml(p.footerTagline)}</div>
-      <div class="f-meta">${escapeHtml(p.footerPowered)} &middot; <b>v${escapeHtml(version)}</b></div>
-    </footer>`
-}
-
 
 // ==========================================
 // Page
@@ -958,41 +944,59 @@ function createPage(lang, theme) {
   const amirLogo = CONFIG.AMIR_LOGO
   const resolved = resolveLang(lang)
   const p = pack(resolved)
+  const site = NAV_I18N[resolved]
   const themeAttr = theme === 'light' || theme === 'dark' ? ` data-theme="${theme}"` : ''
+  const title = `${p.title} — ${p.tagline}`
+  const trail = [
+    { href: '/', label: site.home },
+    { href: '/tools', label: site.tools },
+    { href: '/unity-directtmp', label: 'Unity DirectTMP' }
+  ]
 
   return `<!DOCTYPE html>
 <html dir="${p.dir}" lang="${resolved}"${themeAttr}>
 <head>
-  ${getPageHead({
-    title: `${p.title} — ${p.tagline}`,
-    amirLogo,
-    description: escapeHtml(p.lede)
+  ${getPageHead({ title, amirLogo, description: p.lede })}
+  ${seoHead({
+    path: '/unity-directtmp',
+    title,
+    description: p.lede,
+    lang: resolved,
+    type: 'product',
+    graph: [
+      breadcrumbLd(trail),
+      softwareApplicationLd({
+        name: 'Unity DirectTMP',
+        description: p.lede,
+        path: '/unity-directtmp',
+        version: CONFIG.DIRECTTMP.VERSION,
+        price: '0',
+        repo: CONFIG.DIRECTTMP.REPO_URL
+      })
+    ]
   })}
-  <link rel="canonical" href="${CONFIG.SITE_URL}/unity-directtmp">
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="${escapeHtml(p.title)}">
-  <meta property="og:description" content="${escapeHtml(p.tagline)}">
-  <meta property="og:url" content="${CONFIG.SITE_URL}/unity-directtmp">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   ${themeBootScript()}
-  <style>${getCSS()}</style>
+  <style>${siteNavCss()}${getCSS()}</style>
 </head>
 <body>
   <div class="wrap">
     ${renderTopbar(resolved, amirLogo)}
-    ${renderHero(resolved)}
-    ${renderProblem(resolved)}
-    ${renderEditorFont(resolved)}
-    ${renderCatalog(resolved)}
-    ${renderFeatures(resolved)}
-    ${renderInstall(resolved)}
-    ${renderRequirements(resolved)}
-    ${renderFaq(resolved)}
-    ${renderShelf(resolved)}
-    ${renderNav(resolved)}
-    ${renderFooter(resolved, CONFIG.VERSION)}
+    ${siteBreadcrumb({ lang: resolved, trail })}
+    <main id="main">
+      ${renderHero(resolved)}
+      ${renderProblem(resolved)}
+      ${renderEditorFont(resolved)}
+      ${renderCatalog(resolved)}
+      ${renderFeatures(resolved)}
+      ${renderInstall(resolved)}
+      ${renderRequirements(resolved)}
+      ${renderFaq(resolved)}
+      ${renderShelf(resolved)}
+    </main>
+    ${siteFooter({ lang: resolved })}
   </div>
   ${chromeScript()}
   ${copyUrlScript()}

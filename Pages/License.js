@@ -30,6 +30,8 @@
 
 import { CONFIG } from '../Config.js'
 import { getPageHead } from '../Core/DesignSystem.js'
+import { seoHead } from '../Core/Seo.js'
+import { siteNavCss, siteFooter, siteChromeScript } from '../Core/SiteNav.js'
 import { createJsonResponse, createHtmlResponse, clientIp, timingSafeEqual } from '../Core/Http.js'
 import { logInfo, logWarning } from '../Core/Logging.js'
 import { normalizeKey, isWellFormed, generateBatch } from '../Licensing/Keys.js'
@@ -476,7 +478,13 @@ function renderLicensePage() {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <style>${licenseCss()}</style>
+  ${seoHead({
+    path: '/license',
+    title: 'Licence — Unity DocSnap',
+    description: 'Check your Unity DocSnap licence and manage the machines it is activated on.',
+    noindex: true
+  })}
+  <style>${siteNavCss()}${licenseCss()}</style>
 </head>
 <body>
   <div class="wrap">
@@ -505,8 +513,11 @@ function renderLicensePage() {
          file copies, project backups, CI automation and a custom logo. Both are one-off.</p>
       <a class="btn" href="/unity-docsnap">Compare all three</a>
     </section>
+
+    ${siteFooter({ lang: 'en' })}
   </div>
 
+  ${siteChromeScript()}
   <script>${licenseScript()}</script>
 </body>
 </html>`

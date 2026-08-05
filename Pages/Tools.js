@@ -27,7 +27,11 @@ import { createHtmlResponse } from '../Core/Http.js'
 import { toolsFor } from '../Content/ToolsCatalog.js'
 
 import { escapeHtml, safeColor } from '../Core/Html.js'
-import { chromeScript, themeBootScript } from '../Core/PageChrome.js'
+import { themeBootScript } from '../Core/PageChrome.js'
+import { seoHead, breadcrumbLd, softwareApplicationLd } from '../Core/Seo.js'
+import {
+  siteNavCss, siteHeader, siteBreadcrumb, siteFooter, siteChromeScript, NAV_I18N
+} from '../Core/SiteNav.js'
 import { langCookieHeader, parseCookies, resolveLang, resolveRequestLang, resolveRequestTheme } from '../Core/RequestContext.js'
 
 
@@ -182,10 +186,17 @@ function getToolsCSS() {
       color: var(--text);
       min-height: 100vh;
       line-height: 1.7;
+      padding-inline: 20px;
       -webkit-font-smoothing: antialiased;
     }
 
-    .wrap { max-width: var(--maxw); margin-inline: auto; padding: 26px 20px 60px; }
+    .wrap { max-width: var(--maxw); margin-inline: auto; padding-block-end: 60px; }
+
+    /* The gutter lives on <body>, so the header pulls back out to
+       the viewport edges and puts the same gutter back inside - and
+       its contents land exactly above the cards. */
+    .ac-nav { margin-inline: -20px; padding-inline: 20px; margin-block-end: 24px; }
+    [id] { scroll-margin-top: 84px; }
 
     /* ---------- topbar ---------- */
     .topbar {
@@ -283,28 +294,14 @@ function getToolsCSS() {
       color: color-mix(in srgb, var(--tool) 58%, var(--text));
     }
 
-    /* ---------- nav & footer ---------- */
-    .nav { display: flex; justify-content: center; margin-block: 34px 26px; }
-    .back-link {
-      display: inline-flex; align-items: center; gap: 9px;
-      padding: 11px 18px; border-radius: 13px; text-decoration: none;
-      font-weight: 600; font-size: 0.9em; color: var(--text);
-      background: var(--surface); border: 1px solid var(--border);
-    }
-    .back-link svg { width: 18px; height: 18px; }
-
-    footer { text-align: center; color: var(--text-dim); font-size: 0.85em; }
-    .f-name { font-weight: 800; color: var(--text); margin-block-end: 6px; }
-
     @media (max-width: 560px) {
       .tool-body { padding: 18px; }
     }
 
     @media (prefers-reduced-motion: no-preference) {
-      .topbar, .hero, .tools, .nav, footer { animation: tRise 0.5s cubic-bezier(0.16,1,0.3,1) both; }
+      .hero, .tools { animation: tRise 0.5s cubic-bezier(0.16,1,0.3,1) both; }
       .hero  { animation-delay: 0.05s; }
       .tools { animation-delay: 0.10s; }
-      .nav   { animation-delay: 0.14s; }
     }
     @keyframes tRise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
   `
@@ -313,36 +310,12 @@ function getToolsCSS() {
 
 // ==========================================
 // Partials
+//
+// The header and the footer come from Core/SiteNav.js. This page
+// used to build its own, which is how it ended up as the one page
+// on the site whose brand mark was not a link home - the exact
+// complaint that started this rewrite.
 // ==========================================
-function renderTopbar(lang, amirLogo) {
-  const p = pack(lang)
-  const cur = resolveLang(lang)
-  const langs = [['fa', I18N.fa.langName], ['en', I18N.en.langName], ['ja', I18N.ja.langName]]
-
-  const segButtons = langs.map(([code, label]) =>
-    '<button type="button" data-lang="' + code + '" aria-pressed="' + (code === cur ? 'true' : 'false') + '"'
-    + ' onclick="acSetLang(\'' + code + '\')" lang="' + code + '">' + escapeHtml(label) + '</button>'
-  ).join('')
-
-  return `
-    <div class="topbar">
-      <div class="brand">
-        <span class="brand-logo">
-          <img src="${escapeHtml(amirLogo)}" alt="AmirCollider" onerror="this.style.display='none'">
-        </span>
-        <span>
-          <span class="brand-name">AmirCollider</span><br>
-          <span class="brand-sub">${escapeHtml(p.subtitle)}</span>
-        </span>
-      </div>
-      <div class="controls">
-        <div class="seg" role="group" aria-label="${escapeHtml(p.langName)}">${segButtons}</div>
-        <button type="button" id="themeBtn" class="icon-btn" onclick="acToggleTheme()"
-                aria-label="${escapeHtml(p.themeToDark)}">${icon('contrast')}</button>
-      </div>
-    </div>`
-}
-
 function renderHero(lang, count) {
   const p = pack(lang)
   return `
@@ -395,24 +368,6 @@ function renderTools(lang) {
   return `<div class="tools" aria-label="${escapeHtml(p.title)}">${cards}</div>`
 }
 
-function renderNav(lang) {
-  const p = pack(lang)
-  return `
-    <div class="nav">
-      <a class="back-link" href="/">${icon('home')}<span>${escapeHtml(p.back)}</span></a>
-    </div>`
-}
-
-function renderFooter(lang, version) {
-  const p = pack(lang)
-  return `
-    <footer>
-      <div class="f-name">AmirCollider</div>
-      <div class="f-meta">${escapeHtml(p.footerTagline)}</div>
-      <div class="f-meta">${escapeHtml(p.footerPowered)} &middot; <b>v${escapeHtml(version)}</b></div>
-    </footer>`
-}
-
 
 // ==========================================
 // Page
@@ -421,33 +376,74 @@ function createToolsPage(lang, theme) {
   const amirLogo = CONFIG.AMIR_LOGO
   const resolved = resolveLang(lang)
   const p = pack(resolved)
+  const site = NAV_I18N[resolved]
   const themeAttr = theme === 'light' || theme === 'dark' ? ` data-theme="${theme}"` : ''
   const tools = toolsFor(resolved)
+
+  const trail = [
+    { href: '/', label: site.home },
+    { href: '/tools', label: p.title }
+  ]
+
+  // One SoftwareApplication node per tool, plus the list itself.
+  // A crawler that reads this knows the page is a catalogue and
+  // what each entry costs, without inferring either from prose.
+  const graph = [
+    breadcrumbLd(trail),
+    {
+      '@context': 'https://schema.org',
+      '@type': 'ItemList',
+      name: `${p.title} — AmirCollider`,
+      numberOfItems: tools.length,
+      itemListElement: tools.map((tool, index) => ({
+        '@type': 'ListItem',
+        position: index + 1,
+        name: tool.name,
+        url: CONFIG.SITE_URL + tool.href
+      }))
+    },
+    ...tools.map(tool => softwareApplicationLd({
+      name: tool.name,
+      description: tool.description,
+      path: tool.href,
+      version: tool.version,
+      price: tool.pricing === 'free' ? '0' : null,
+      repo: tool.repo
+    }))
+  ]
 
   return `<!DOCTYPE html>
 <html dir="${p.dir}" lang="${resolved}"${themeAttr}>
 <head>
   ${getPageHead({
-    title: `${p.title} — AmirCollider`,
+    title: `${p.title} — Unity Extensions by AmirCollider`,
     amirLogo,
-    description: escapeHtml(p.lede)
+    description: p.lede
   })}
-  <link rel="canonical" href="${CONFIG.SITE_URL}/tools">
+  ${seoHead({
+    path: '/tools',
+    title: `${p.title} — Unity Extensions by AmirCollider`,
+    description: p.lede,
+    lang: resolved,
+    graph
+  })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   ${themeBootScript()}
-  <style>${getToolsCSS()}</style>
+  <style>${siteNavCss()}${getToolsCSS()}</style>
 </head>
 <body>
+  ${siteHeader({ lang: resolved, active: 'tools' })}
   <div class="wrap">
-    ${renderTopbar(resolved, amirLogo)}
-    ${renderHero(resolved, tools.length)}
-    ${renderTools(resolved)}
-    ${renderNav(resolved)}
-    ${renderFooter(resolved, CONFIG.VERSION)}
+    ${siteBreadcrumb({ lang: resolved, trail })}
+    <main id="main">
+      ${renderHero(resolved, tools.length)}
+      ${renderTools(resolved)}
+    </main>
+    ${siteFooter({ lang: resolved })}
   </div>
-  ${chromeScript()}
+  ${siteChromeScript()}
 </body>
 </html>`
 }

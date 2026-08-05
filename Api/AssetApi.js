@@ -15,8 +15,22 @@ const CONTENT_TYPES = {
   ico: 'image/x-icon'
 }
 
+/**
+ * Percent-decoding that cannot throw. An unescaped '%' anywhere in
+ * an asset path used to raise a URIError before any validation ran,
+ * which turned a malformed URL into a 500 rather than the 400 it
+ * plainly is.
+ */
+function decodeKey(raw) {
+  try {
+    return decodeURIComponent(raw)
+  } catch {
+    return null
+  }
+}
+
 export async function handleAsset(url, request, gameId, requestId, GAMES, env) {
-  const key = decodeURIComponent(url.pathname.replace('/assets/', ''))
+  const key = decodeKey(url.pathname.replace('/assets/', ''))
   if (!key || key.includes('..') || key.includes('/')) {
     return createJsonResponse({ error: 'invalid_asset', message: 'Invalid asset path', requestId }, 400)
   }

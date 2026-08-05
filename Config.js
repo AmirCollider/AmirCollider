@@ -36,8 +36,32 @@ export const SECURITY = deepFreeze({
     'X-Content-Type-Options': 'nosniff',
     'X-Frame-Options': 'DENY',
     'Referrer-Policy': 'strict-origin-when-cross-origin',
-    'Permissions-Policy': 'geolocation=(), microphone=(), camera=()',
-    'Strict-Transport-Security': 'max-age=31536000; includeSubDomains'
+    'Permissions-Policy': 'geolocation=(), microphone=(), camera=(), payment=()',
+    'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
+
+    // Every page here is server-rendered with its stylesheet and
+    // its runtime inline, so 'unsafe-inline' is not a concession -
+    // it is the architecture. What the policy is actually for is
+    // the rest: no plugins, no framing, no <base> rewrite, forms
+    // that can only post back here, and exactly one third-party
+    // frame host (the YouTube embeds a game landing page builds
+    // itself). Anything an injection would want to reach - an
+    // exfiltration endpoint, a remote script - is not on the list.
+    'Content-Security-Policy': [
+      "default-src 'self'",
+      "base-uri 'self'",
+      "object-src 'none'",
+      "frame-ancestors 'none'",
+      "form-action 'self'",
+      "img-src 'self' data: https:",
+      "media-src 'self'",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src 'self' data: https://fonts.gstatic.com",
+      "script-src 'self' 'unsafe-inline'",
+      "connect-src 'self'",
+      'frame-src https://www.youtube.com https://www.youtube-nocookie.com',
+      'upgrade-insecure-requests'
+    ].join('; ')
   }
 })
 
@@ -55,13 +79,38 @@ export const CORS_HEADERS = deepFreeze({
 // Runtime constants. Durations are milliseconds.
 // ==========================================
 export const CONFIG = deepFreeze({
-  VERSION: '6.7.3',
+  VERSION: '6.8.0',
 
   // A constant rather than url.origin: a handful of places have to
   // produce an absolute address (a licence refusal, canonical and
   // OpenGraph tags), and the request origin is whatever host the
   // caller used - a preview deployment would bake in the wrong one.
-  SITE_URL: 'https://amircollider.n95pluss.workers.dev',
+  //
+  // This is the public domain, NOT the workers.dev hostname the
+  // Worker also answers on. Both serve the same bytes, so pointing
+  // canonical tags at workers.dev told search engines the real site
+  // was the duplicate - the one thing guaranteed to keep
+  // amircollider.com out of the results it should own.
+  SITE_URL: 'https://amircollider.com',
+
+  // The hostnames that are not the canonical one. A request that
+  // arrives on any of them is redirected to SITE_URL, so a link
+  // shared from a workers.dev preview still lands on the real site
+  // and one page never accumulates two addresses.
+  ALT_HOSTS: [
+    'amircollider.n95pluss.workers.dev',
+    'www.amircollider.com'
+  ],
+
+  // What the site says about itself when something else is doing
+  // the describing: the landing page's meta description, the
+  // OpenGraph card, the search result. Written once, per language,
+  // because a page with no description gets one invented for it.
+  SITE_TAGLINE: {
+    fa: 'AmirCollider — سازنده‌ی بازی‌های اندرویدی مثل Neon Katana و افزونه‌های یونیتی مثل Unity DocSnap و Unity DirectTMP.',
+    en: 'AmirCollider — Android games such as Neon Katana and Unity editor extensions such as Unity DocSnap and Unity DirectTMP.',
+    ja: 'AmirCollider — Neon Katana などの Android ゲームと、Unity DocSnap・Unity DirectTMP などの Unity エディタ拡張。'
+  },
 
   // Unity DocSnap - the paid Unity editor extension. Sold through
   // this Worker's own crypto checkout (see Docs/Checkout.md).

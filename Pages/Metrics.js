@@ -30,6 +30,8 @@ import { getPageHead } from '../Core/DesignSystem.js'
 import { createJsonResponse, createHtmlResponse } from '../Core/Http.js'
 import { escapeHtml, hexToRgb } from '../Core/Html.js'
 import { themeBootScript } from '../Core/PageChrome.js'
+import { seoHead } from '../Core/Seo.js'
+import { siteNavCss, siteFooter, siteChromeScript } from '../Core/SiteNav.js'
 import { matchRequestLang, themeFromCookie } from '../Core/RequestContext.js'
 const LANGS = ['fa', 'en', 'ja']
 const DEFAULT_LANG = 'fa'
@@ -259,8 +261,9 @@ function renderMetricsPage(metricsData, baseUrl, GAMES, lang, theme) {
     amirLogo,
     description: escapeHtml(dict.subtitle)
   })}
+  ${seoHead({ path: '/metrics', title: dict.title, description: dict.subtitle, lang, noindex: true })}
   ${themeBootScript()}
-  <style>${metricsStyles(accent, accentRgb)}</style>
+  <style>${siteNavCss()}${metricsStyles(accent, accentRgb)}</style>
 </head>
 <body>
   <div class="mc-bg" aria-hidden="true"></div>
@@ -338,6 +341,9 @@ function renderMetricsPage(metricsData, baseUrl, GAMES, lang, theme) {
       <div class="mc-f-meta"><span data-i18n="footerPowered">${escapeHtml(dict.footerPowered)}</span> &middot; <b>v${escapeHtml(metricsData.version)}</b></div>
     </footer>
   </main>
+
+  ${siteFooter({ lang })}
+  ${siteChromeScript()}
 
   <script id="mc-data" type="application/json">${payloadJson}</script>
   <script>${metricsClientScript()}</script>

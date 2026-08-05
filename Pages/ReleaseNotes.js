@@ -25,15 +25,13 @@ import { CONFIG } from '../Config.js'
 import { getPageHead } from '../Core/DesignSystem.js'
 import { createHtmlResponse } from '../Core/Http.js'
 import { escapeHtml } from '../Core/Html.js'
-import { chromeScript, themeBootScript } from '../Core/PageChrome.js'
+import { themeBootScript } from '../Core/PageChrome.js'
+import { seoHead, breadcrumbLd } from '../Core/Seo.js'
+import {
+  siteNavCss, siteHeader, siteBreadcrumb, siteFooter, siteChromeScript, NAV_I18N
+} from '../Core/SiteNav.js'
 import { dirFor, langCookieHeader, parseCookies, resolveLang, resolveRequestLang, resolveRequestTheme } from '../Core/RequestContext.js'
 
-
-// ==========================================
-// SITE_NAME
-// What the browser tab says.
-// ==========================================
-const SITE_NAME = 'AmirCollider'
 
 const DEFAULT_LANG = 'fa'
 
@@ -91,9 +89,151 @@ const RN_I18N = {
 // ==========================================
 const RELEASES = [
   {
+    version: '6.8.0',
+    date: '2026-08-05',
+    tag: 'latest',
+    summary: {
+      fa: 'سایت از چند صفحه‌ی جدا به یک سایت واحد تبدیل شد: هدر و فوتر مشترک روی همه‌ی صفحه‌ها، جدول امتیازات به بازی خودش وصل شد، صفحه‌ی ۴۰۴ واقعی، و آماده‌سازی کامل برای Google Search Console و Google Cloud Console.',
+      en: 'The site stopped being a set of separate pages: one shared header and footer everywhere, the leaderboard reconnected to its game, a real 404 page, and a full SEO pass for Google Search Console and Google Cloud Console.',
+      ja: '個別のページの寄せ集めから 1 つのサイトへ：全ページ共通のヘッダーとフッター、ゲームに接続されたリーダーボード、本物の 404 ページ、Google Search Console と Google Cloud Console 向けの SEO 対応。'
+    },
+    groups: [
+      {
+        title: { fa: 'ناوبری یکپارچه', en: 'One navigation surface', ja: '統一されたナビゲーション' },
+        items: {
+          fa: [
+            'هدر چسبان مشترک روی همه‌ی صفحه‌ها: لوگو (لینک به خانه)، خانه، بازی‌ها، ابزارها، Unity DocSnap و Unity DirectTMP، به‌همراه انتخاب زبان و تم در یک جای ثابت.',
+            'فوتر کامل با چهار ستون روی همه‌ی صفحه‌ها؛ حریم خصوصی، شرایط استفاده، پیگیری سفارش و پشتیبانی همیشه یک کلیک فاصله دارند.',
+            'مسیر صفحه (breadcrumb) روی صفحه‌های داخلی، هم برای کاربر و هم به‌صورت داده‌ی ساختاریافته برای گوگل.',
+            'صفحه‌ی /tools دیگر بن‌بست نیست: نشان برند لینک خانه شد و هدر و فوتر مشترک گرفت. همین برای Unity DirectTMP و صفحه‌ی پرداخت هم انجام شد.',
+            'صفحه‌ی ۴۰۴ واقعی با ناوبری کامل؛ پیش از این یک بدنه‌ی JSON بود. کلاینت‌هایی که JSON می‌خواهند دقیقاً همان پاسخ قبلی را می‌گیرند.'
+          ],
+          en: [
+            'A shared sticky header on every page: the logo (a link home), Home, Games, Tools, Unity DocSnap and Unity DirectTMP, with the language and theme controls always in the same corner.',
+            'A four-column footer on every page, so privacy, terms, order help and support are one click away from anywhere.',
+            'Breadcrumbs on inner pages, both for readers and as BreadcrumbList structured data.',
+            '/tools is no longer a dead end: its brand mark is a link home and it carries the shared header and footer. The same was done for Unity DirectTMP and the checkout.',
+            'A real 404 page with full navigation, where there used to be a JSON body. Clients that ask for JSON still get exactly the response they got before.'
+          ],
+          ja: [
+            '全ページ共通の固定ヘッダー：ロゴ（ホームへのリンク）、ホーム、ゲーム、ツール、Unity DocSnap、Unity DirectTMP。言語とテーマの切り替えは常に同じ位置に。',
+            '全ページに 4 列のフッター。プライバシー、利用規約、注文サポート、サポートへどこからでも 1 クリックで到達できます。',
+            '下層ページにパンくずリストを追加。読者向けの表示と BreadcrumbList 構造化データの両方。',
+            '/tools は行き止まりではなくなりました。ブランドマークがホームへのリンクになり、共通ヘッダーとフッターを持ちます。Unity DirectTMP と決済ページも同様です。',
+            'JSON の本文だった 404 が、ナビゲーション付きの本物のページになりました。JSON を要求するクライアントには従来どおりの応答を返します。'
+          ]
+        }
+      },
+      {
+        title: { fa: 'جدول امتیازات', en: 'Leaderboard', ja: 'リーダーボード' },
+        items: {
+          fa: [
+            'جدول امتیازات حالا یکی از صفحه‌های خودِ بازی است: رنگ اختصاصی بازی، نوار ناوبری بازی (صفحه‌ی بازی، حساب، فروشگاه، نسخه‌ها، دانلود) و بازگشت مستقیم به بازی.',
+            'بازیکنان با امتیاز صفر دیگر نمایش داده نمی‌شوند؛ هم در جدول و هم در شمارش «بازیکنان دارای امتیاز».',
+            'عدد «مجموع» دیگر تکرار تعداد ردیف‌های نمایش‌داده‌شده نیست و شمارش واقعی کل بازیکنان رتبه‌بندی‌شده است.',
+            'تصویر پیش‌فرض بازیکنان بدون عکس، به‌جای درخواست به سرویس بیرونی placehold.co، به‌صورت محلی ساخته می‌شود.',
+            'اگر پایگاه داده در دسترس نباشد، مرورگر یک صفحه‌ی قابل‌فهم می‌بیند نه یک متن JSON.'
+          ],
+          en: [
+            'The leaderboard is now one of its game\'s own pages: the game\'s accent colour, the game\'s navigation (game page, account, store, versions, download) and a direct route back to the game.',
+            'Players with a score of zero no longer appear, neither in the table nor in the "ranked players" count.',
+            'The "total" figure is no longer a copy of the number of rows shown; it is a real count of every ranked player.',
+            'The fallback avatar for a player with no photo is generated locally instead of fetched from placehold.co.',
+            'When the database cannot be read, a browser gets a page it can understand rather than a JSON body.'
+          ],
+          ja: [
+            'リーダーボードはゲーム自身のページになりました：ゲームのアクセントカラー、ゲームのナビゲーション（ゲームページ、アカウント、ストア、バージョン、ダウンロード）、ゲームへ戻る導線。',
+            'スコアが 0 のプレイヤーは表にも「ランク入りプレイヤー」の集計にも表示されなくなりました。',
+            '「合計」の数値は表示行数のコピーではなく、ランク入りプレイヤー全体の実数になりました。',
+            '写真のないプレイヤーの代替アバターは placehold.co ではなくローカルで生成されます。',
+            'データベースを読めない場合、ブラウザには JSON ではなく理解できるページが表示されます。'
+          ]
+        }
+      },
+      {
+        title: { fa: 'SEO و آماده‌سازی برای گوگل', en: 'SEO and Google readiness', ja: 'SEO と Google 対応' },
+        items: {
+          fa: [
+            'آدرس رسمی سایت به amircollider.com تغییر کرد. پیش از این تگ‌های canonical به دامنه‌ی workers.dev اشاره می‌کردند؛ یعنی به گوگل گفته می‌شد نسخه‌ی اصلی جای دیگری است.',
+            'درخواست‌های صفحه روی دامنه‌های دیگر با ۳۰۱ به دامنه‌ی رسمی منتقل می‌شوند. مسیرهای API از این قاعده مستثنا هستند تا کلاینت‌های منتشرشده دست‌نخورده بمانند.',
+            'sitemap.xml و robots.txt اضافه شدند؛ نقشه‌ی سایت از روی همان رجیستری‌ای ساخته می‌شود که صفحه‌ها از آن می‌آیند.',
+            'روی هر صفحه: canonical، hreflang برای هر سه زبان، توضیحات متا، OpenGraph و Twitter Card.',
+            'داده‌ی ساختاریافته: Organization، WebSite، VideoGame برای هر بازی و SoftwareApplication برای هر ابزار.',
+            'صفحه‌های تشخیصی و مسیرهای پرداخت با noindex علامت خوردند تا اعتبار صفحه‌های اصلی را نگیرند.',
+            'عنوان و توضیح صفحه‌ی اصلی از «پروکسی OAuth» به نام و کار واقعی برند تغییر کرد.'
+          ],
+          en: [
+            'The canonical address is now amircollider.com. Canonical tags used to point at the workers.dev hostname, which told search engines the real site was somewhere else.',
+            'Page requests on any other hostname are redirected with a 301. API paths are exempt, so shipped clients are untouched.',
+            'sitemap.xml and robots.txt were added; the sitemap is generated from the same registry the pages render from.',
+            'On every page: canonical, hreflang for all three languages, a meta description, OpenGraph and Twitter Card tags.',
+            'Structured data: Organization, WebSite, a VideoGame node per game and a SoftwareApplication node per tool.',
+            'Diagnostic pages and checkout steps are marked noindex so they cannot take authority from the pages that matter.',
+            'The landing page title and description changed from "OAuth proxy" to what the brand is and does.'
+          ],
+          ja: [
+            '正規のアドレスを amircollider.com に変更しました。従来 canonical は workers.dev を指しており、検索エンジンに「本体は別の場所」と伝えていました。',
+            '他のホスト名へのページ要求は 301 で正規ドメインへ転送されます。API パスは対象外なので、公開済みクライアントに影響はありません。',
+            'sitemap.xml と robots.txt を追加。サイトマップはページと同じレジストリから生成されます。',
+            '全ページに canonical、3 言語分の hreflang、meta description、OpenGraph、Twitter Card を付与。',
+            '構造化データ：Organization、WebSite、ゲームごとの VideoGame、ツールごとの SoftwareApplication。',
+            '診断ページと決済ステップは noindex に。重要なページの評価を奪わないためです。',
+            'トップページのタイトルと説明を「OAuth プロキシ」からブランドの実態に合わせて書き換えました。'
+          ]
+        }
+      },
+      {
+        title: { fa: 'حریم خصوصی و امنیت', en: 'Privacy and security', ja: 'プライバシーとセキュリティ' },
+        items: {
+          fa: [
+            'بخش «داده‌های حساب گوگل» به سیاست حریم خصوصی اضافه شد: فهرست دقیق scope‌های درخواستی و بیانیه‌ی Limited Use مطابق Google API Services User Data Policy.',
+            'بخش «حذف حساب و داده‌ها» با روش درخواست و مهلت ۳۰ روزه اضافه شد — یکی از شرط‌های تأیید OAuth.',
+            'صفحه‌های /privacy و /terms در سطح سایت اضافه شدند تا آدرسی ثابت برای Google Cloud Console و Play Console وجود داشته باشد. صفحه‌های هر بازی هم مثل قبل کار می‌کنند.',
+            'یک Content-Security-Policy روی همه‌ی پاسخ‌ها: بدون افزونه، بدون قاب‌شدن، و فرم‌هایی که فقط به همین دامنه ارسال می‌شوند.'
+          ],
+          en: [
+            'A "Google account data" section was added to the privacy policy: the exact scopes requested and the Limited Use statement the Google API Services User Data Policy asks for.',
+            'An "account and data deletion" section with the request route and a 30-day commitment - one of the conditions of OAuth verification.',
+            'Site-level /privacy and /terms pages, so Google Cloud Console and Play Console have a stable address to be given. The per-game pages still answer as before.',
+            'A Content-Security-Policy on every response: no plugins, no framing, and forms that can only post back here.'
+          ],
+          ja: [
+            'プライバシーポリシーに「Google アカウントデータ」の節を追加：要求するスコープの明示と、Google API サービスのユーザーデータに関するポリシーが求める限定的な使用の記載。',
+            '「アカウントとデータの削除」の節を追加。申請方法と 30 日以内の対応を明記 — OAuth 審査の要件のひとつです。',
+            'サイト全体の /privacy と /terms を追加し、Google Cloud Console と Play Console に渡せる固定アドレスを用意しました。ゲームごとのページも従来どおり動作します。',
+            '全応答に Content-Security-Policy を追加：プラグインなし、フレーム埋め込みなし、フォームの送信先は自サイトのみ。'
+          ]
+        }
+      },
+      {
+        title: { fa: 'رفع اشکال', en: 'Fixes', ja: '修正' },
+        items: {
+          fa: [
+            'آدرسی با درصدِ نامعتبر (مثل /%E0%A4%A) دیگر خطای ۵۰۰ نمی‌دهد و مثل هر آدرس ناشناخته‌ی دیگری ۴۰۴ می‌گیرد. همین مشکل در مسیر /assets/ هم برطرف شد.',
+            'شناسه‌ی بازی ناشناخته در آدرس (مثل /foo/leaderboard) دیگر بی‌سروصدا صفحه‌ی اولین بازی را نشان نمی‌دهد و ۴۰۴ می‌گیرد.',
+            'الگوی مسیرها دیگر نقطه را به‌عنوان «هر کاراکتری» تفسیر نمی‌کند؛ /robots.txt فقط با خودش تطبیق می‌یابد.',
+            'نشان برند در صفحه‌ی Unity DirectTMP و در صفحه‌ی پرداخت به خانه لینک شد.'
+          ],
+          en: [
+            'A URL with an invalid percent escape (like /%E0%A4%A) no longer raises a 500; it answers 404 like any other unknown address. The same fix was applied to /assets/.',
+            'An unknown game id in a path (like /foo/leaderboard) no longer quietly renders the first registered game; it answers 404.',
+            'Route patterns no longer treat a dot as "any character", so /robots.txt matches only itself.',
+            'The brand mark on the Unity DirectTMP page and on the checkout is now a link home.'
+          ],
+          ja: [
+            '不正なパーセントエスケープを含む URL（例：/%E0%A4%A）で 500 が発生しなくなり、他の未知のアドレスと同じく 404 を返します。/assets/ も同様に修正しました。',
+            'パス内の未知のゲーム ID（例：/foo/leaderboard）が最初のゲームを黙って表示することはなくなり、404 を返します。',
+            'ルートパターンがドットを「任意の文字」として扱わなくなり、/robots.txt は自身にのみ一致します。',
+            'Unity DirectTMP ページと決済ページのブランドマークをホームへのリンクにしました。'
+          ]
+        }
+      }
+    ]
+  },
+  {
     version: '6.7.3',
     date: '2026-07-31',
-    tag: 'latest',
+    tag: '',
     summary: {
       fa: 'بازسازی کامل کدها بدون هیچ تغییری در رفتار سایت: حذف کدهای تکراری و مرده، ماژول‌بندی دوباره‌ی پروژه، نام‌گذاری یکدست فایل‌ها و کوتاه‌کردن کامنت‌ها.',
       en: 'A full code remaster with no change in behaviour: duplicated and dead code removed, the project re-modularised, file naming made consistent and comments cut back to what earns its place.',
@@ -728,6 +868,11 @@ function getReleaseNotesCSS() {
 
     .wrap { max-width: var(--maxw); margin: 0 auto; }
 
+    /* Full-bleed shared header: out of the body gutter, and the
+       same gutter put back inside so its contents stay aligned. */
+    .ac-nav { margin: -24px -20px 24px; padding-inline: 20px; }
+    [id] { scroll-margin-top: 84px; }
+
     /* ---------- top bar ---------- */
     .topbar {
       display: flex; align-items: center; justify-content: space-between;
@@ -872,13 +1017,15 @@ function getReleaseNotesCSS() {
     .back-link svg { width: 18px; height: 18px; }
 
     /* ---------- footer ---------- */
-    footer {
+    /* Scoped away from the shared site footer, which brings its
+       own surface and must not be centred by this rule. */
+    footer:not(.ac-foot) {
       text-align: center; padding: 28px; border-radius: var(--radius);
       background: var(--surface); border: 1px solid var(--border); color: var(--text-dim);
     }
-    footer .f-name { color: var(--text); font-weight: 800; font-size: 1.05em; }
-    footer .f-meta { margin-block-start: 6px; font-size: 0.85em; }
-    footer .f-meta b { color: color-mix(in srgb, var(--brand) 45%, var(--text)); }
+    footer:not(.ac-foot) .f-name { color: var(--text); font-weight: 800; font-size: 1.05em; }
+    footer:not(.ac-foot) .f-meta { margin-block-start: 6px; font-size: 0.85em; }
+    footer:not(.ac-foot) .f-meta b { color: color-mix(in srgb, var(--brand) 45%, var(--text)); }
 
     /* ---------- smooth theme transition (light <-> dark) ---------- */
     @media (prefers-reduced-motion: no-preference) {
@@ -905,40 +1052,6 @@ function getReleaseNotesCSS() {
       .release { padding: 20px 18px; }
     }
   `
-}
-
-
-// ==========================================
-// Partial: Topbar (brand + language pills + theme toggle)
-// ==========================================
-function renderTopbar(lang, amirLogo) {
-  const p = pack(lang)
-  const cur = resolveLang(lang)
-  const langs = [['fa', RN_I18N.fa.langName], ['en', RN_I18N.en.langName], ['ja', RN_I18N.ja.langName]]
-
-  const segButtons = langs.map(([code, label]) =>
-    '<button type="button" data-lang="' + code + '" aria-pressed="' + (code === cur ? 'true' : 'false') + '"'
-    + ' onclick="acSetLang(\'' + code + '\')" lang="' + code + '">' + escapeHtml(label) + '</button>'
-  ).join('')
-
-  return `
-    <div class="topbar">
-      <a class="brand" href="/" title="${escapeHtml(p.backHome)}">
-        <span class="brand-logo">
-          <img src="${escapeHtml(amirLogo)}" alt="AmirCollider" onerror="this.style.display='none'">
-        </span>
-        <span>
-          <span class="brand-name">AmirCollider</span><br>
-          <span class="brand-sub">${escapeHtml(p.subtitle)}</span>
-        </span>
-        <span class="brand-back" aria-hidden="true">${ICONS.home}</span>
-      </a>
-      <div class="controls">
-        <div class="seg" role="group" aria-label="${escapeHtml(p.langName)}">${segButtons}</div>
-        <button type="button" id="themeBtn" class="icon-btn" onclick="acToggleTheme()"
-                aria-label="${escapeHtml(p.themeToDark)}">${icon('contrast')}</button>
-      </div>
-    </div>`
 }
 
 
@@ -998,27 +1111,11 @@ function renderReleases(lang) {
 // ==========================================
 // Partial: Back-to-home navigation
 // ==========================================
-function renderNav(lang) {
-  const p = pack(lang)
-  return `
-    <div class="nav">
-      <a class="back-link" href="/">${icon('home')}<span>${escapeHtml(p.back)}</span></a>
-    </div>`
-}
 
 
 // ==========================================
 // Partial: Footer
 // ==========================================
-function renderFooter(lang, version) {
-  const p = pack(lang)
-  return `
-    <footer>
-      <div class="f-name">AmirCollider Games</div>
-      <div class="f-meta">${escapeHtml(p.footerTagline)}</div>
-      <div class="f-meta">${escapeHtml(p.footerPowered)} &middot; <b>v${escapeHtml(version)}</b></div>
-    </footer>`
-}
 
 
 // ==========================================
@@ -1028,27 +1125,44 @@ function createReleaseNotesPage(lang, theme) {
   const amirLogo = CONFIG.AMIR_LOGO
   const resolved = resolveLang(lang)
   const dir = dirFor(resolved)
+  const p = pack(resolved)
+  const site = NAV_I18N[resolved]
   const themeAttr = theme === 'light' || theme === 'dark' ? ` data-theme="${theme}"` : ''
+  const title = `${site.releaseNotes} — AmirCollider`
+  const description = p.footerTagline
+  const trail = [
+    { href: '/', label: site.home },
+    { href: '/release-notes', label: site.releaseNotes }
+  ]
 
   return `<!DOCTYPE html>
 <html dir="${dir}" lang="${resolved}"${themeAttr}>
 <head>
-  ${getPageHead({ title: SITE_NAME, amirLogo })}
+  ${getPageHead({ title, amirLogo, description })}
+  ${seoHead({
+    path: '/release-notes',
+    title,
+    description,
+    lang: resolved,
+    graph: [breadcrumbLd(trail)]
+  })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   ${themeBootScript()}
-  <style>${getReleaseNotesCSS()}</style>
+  <style>${siteNavCss()}${getReleaseNotesCSS()}</style>
 </head>
 <body>
+  ${siteHeader({ lang: resolved, active: 'releaseNotes' })}
   <div class="wrap">
-    ${renderTopbar(resolved, amirLogo)}
-    ${renderHero(resolved)}
-    ${renderReleases(resolved)}
-    ${renderNav(resolved)}
-    ${renderFooter(resolved, CONFIG.VERSION)}
+    ${siteBreadcrumb({ lang: resolved, trail })}
+    <main id="main">
+      ${renderHero(resolved)}
+      ${renderReleases(resolved)}
+    </main>
+    ${siteFooter({ lang: resolved })}
   </div>
-  ${chromeScript()}
+  ${siteChromeScript()}
 </body>
 </html>`
 }

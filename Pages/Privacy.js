@@ -32,12 +32,22 @@ import { getPageHead } from '../Core/DesignSystem.js'
 import { createErrorPage } from '../Core/ErrorPage.js'
 import { createHtmlResponse } from '../Core/Http.js'
 import { escapeHtml } from '../Core/Html.js'
-import { chromeScript, themeBootScript } from '../Core/PageChrome.js'
+import { themeBootScript } from '../Core/PageChrome.js'
+import { seoHead, breadcrumbLd } from '../Core/Seo.js'
+import {
+  siteNavCss, siteHeader, siteBreadcrumb, siteFooter, siteChromeScript, NAV_I18N
+} from '../Core/SiteNav.js'
 import { dirFor, langCookieHeader, parseCookies, resolveLang, resolveRequestLang, resolveRequestTheme } from '../Core/RequestContext.js'
 
 
 // ==========================================
 // Route Handler
+//
+// Answers at two addresses: /privacy, which is the site-wide policy
+// URL that Google's OAuth consent screen and Play Console are given,
+// and /:gameId/privacy, which is what shipped builds link to. The
+// canonical tag is whichever one was actually requested, so the two
+// do not compete for the same words.
 // ==========================================
 export async function handlePrivacyPolicyWithGame(url, request, gameId, requestId, GAMES) {
   const game = validateGameId(gameId, GAMES)
@@ -57,7 +67,14 @@ export async function handlePrivacyPolicyWithGame(url, request, gameId, requestI
 
   const headers = langCookieHeader(url, lang)
 
-  return createHtmlResponse(createPrivacyPage(game, gameId, url.origin, lang, theme), 200, headers)
+  return createHtmlResponse(
+    createPrivacyPage(game, game.id, url.origin, lang, theme, {
+      path: url.pathname,
+      games: Object.values(GAMES || {})
+    }),
+    200,
+    headers
+  )
 }
 
 
@@ -157,25 +174,27 @@ function icon(name, cls) {
 // ==========================================
 // Section Order (data-driven; reorder or remove here)
 // ==========================================
+// `googledata` and `deletion` are not decoration. Google's OAuth
+// verification reviews this page against the API Services User Data
+// Policy, and it looks for two things by name: an explicit
+// statement of which Google scopes are requested and what is done
+// with what they return, and a route for a user to have that data
+// deleted. A policy that covers everything except those two is a
+// policy that fails review.
 const SECTION_ORDER = [
-  { key: 'intro',    ic: 'doc' },
-  { key: 'collect',  ic: 'clipboard' },
-  { key: 'usage',    ic: 'chart' },
-  { key: 'security', ic: 'shield' },
-  { key: 'sharing',  ic: 'lock' },
-  { key: 'cookies',  ic: 'cookie' },
-  { key: 'rights',   ic: 'user' },
-  { key: 'children', ic: 'heart' },
-  { key: 'intl',     ic: 'globe' },
-  { key: 'changes',  ic: 'refresh' }
+  { key: 'intro',      ic: 'doc' },
+  { key: 'collect',    ic: 'clipboard' },
+  { key: 'googledata', ic: 'shield' },
+  { key: 'usage',      ic: 'chart' },
+  { key: 'security',   ic: 'shield' },
+  { key: 'sharing',    ic: 'lock' },
+  { key: 'deletion',   ic: 'user' },
+  { key: 'cookies',    ic: 'cookie' },
+  { key: 'rights',     ic: 'user' },
+  { key: 'children',   ic: 'heart' },
+  { key: 'intl',       ic: 'globe' },
+  { key: 'changes',    ic: 'refresh' }
 ]
-
-const LANGUAGES = [
-  { code: 'fa', label: 'فارسی' },
-  { code: 'en', label: 'English' },
-  { code: 'ja', label: '日本語' }
-]
-
 
 // ==========================================
 // Content Dictionary (single source of truth)
@@ -202,6 +221,36 @@ const I18N = {
       + '<li><strong>عکس پروفایل:</strong> عکس پروفایل گوگل شما</li>'
       + '<li><strong>نام:</strong> نامی که در حساب گوگل شما ثبت شده است</li>'
       + '<li><strong>آمار بازی:</strong> امتیازات، سطح و دستاوردهای شما</li>'
+      + '</ul>',
+    'sec.googledata.title': 'داده‌های حساب گوگل و سیاست Google API Services',
+    'sec.googledata.body':
+      '<p>ورود به این سرویس از طریق «ورود با گوگل» انجام می‌شود. تنها دامنه‌های دسترسی (scope) زیر درخواست می‌شوند:</p>'
+      + '<ul>'
+      + '<li><code>openid</code> — شناسه‌ی یکتای حساب شما برای تشخیص اینکه همان کاربر دوباره وارد شده است</li>'
+      + '<li><code>email</code> — آدرس ایمیل، برای شناسایی حساب و ارتباط در موارد ضروری</li>'
+      + '<li><code>profile</code> — نام نمایشی و عکس پروفایل، برای نمایش در حساب کاربری و جدول امتیازات</li>'
+      + '</ul>'
+      + '<div class="callout callout-good">'
+      + '<p><strong>Limited Use:</strong> استفاده و انتقال اطلاعات دریافت‌شده از Google APIs توسط این سرویس، از '
+      + '<a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API Services User Data Policy</a> '
+      + 'از جمله الزامات Limited Use پیروی می‌کند.</p>'
+      + '</div>'
+      + '<ul>'
+      + '<li>این داده‌ها <strong>فروخته نمی‌شوند</strong> و برای تبلیغات یا تبلیغات هدفمند استفاده نمی‌شوند.</li>'
+      + '<li>این داده‌ها برای آموزش مدل‌های هوش مصنوعی یا یادگیری ماشین به کار نمی‌روند.</li>'
+      + '<li>هیچ انسانی این داده‌ها را نمی‌خواند، مگر با اجازه‌ی صریح شما، برای امنیت، یا در صورت الزام قانونی.</li>'
+      + '<li>ما به محتوای Gmail، Drive، مخاطبین یا تقویم شما <strong>دسترسی نداریم و درخواست هم نمی‌کنیم</strong>.</li>'
+      + '</ul>',
+    'sec.deletion.title': 'حذف حساب و داده‌ها',
+    'sec.deletion.body':
+      '<p>می‌توانید هر زمان بخواهید حساب و همه‌ی داده‌های مرتبط با آن را حذف کنید:</p>'
+      + '<ul>'
+      + '<li>یک ایمیل با موضوع «Delete my account» از همان آدرس ایمیلی که با آن وارد شده‌اید به '
+      + '<a href="mailto:' + CONFIG.SUPPORT_EMAIL + '">' + CONFIG.SUPPORT_EMAIL + '</a> بفرستید.</li>'
+      + '<li>درخواست حداکثر ظرف <strong>۳۰ روز</strong> انجام می‌شود و تأیید آن برایتان ارسال می‌گردد.</li>'
+      + '<li>با حذف حساب، پروفایل، امتیازها، رکورد جدول امتیازات و ذخیره‌ی ابری شما پاک می‌شود.</li>'
+      + '<li>دسترسی این برنامه به حساب گوگل خود را هر زمان می‌توانید از '
+      + '<a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a> لغو کنید.</li>'
       + '</ul>',
     'sec.usage.title': 'نحوه استفاده از اطلاعات',
     'sec.usage.body':
@@ -297,6 +346,36 @@ const I18N = {
       + '<li><strong>Name:</strong> The name associated with your Google account</li>'
       + '<li><strong>Game stats:</strong> Your scores, level, and achievements</li>'
       + '</ul>',
+    'sec.googledata.title': 'Google Account Data and the Google API Services Policy',
+    'sec.googledata.body':
+      '<p>Signing in to this service is done through "Sign in with Google". Only the following scopes are requested:</p>'
+      + '<ul>'
+      + '<li><code>openid</code> — the stable identifier for your account, so we can tell that the same person has signed in again</li>'
+      + '<li><code>email</code> — your email address, used to identify your account and to contact you when something requires it</li>'
+      + '<li><code>profile</code> — your display name and profile photo, shown on your account page and on the leaderboard</li>'
+      + '</ul>'
+      + '<div class="callout callout-good">'
+      + '<p><strong>Limited Use:</strong> This application\'s use and transfer of information received from Google APIs adheres to the '
+      + '<a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API Services User Data Policy</a>, '
+      + 'including the Limited Use requirements.</p>'
+      + '</div>'
+      + '<ul>'
+      + '<li>This data is <strong>never sold</strong>, and is never used for advertising or ad targeting.</li>'
+      + '<li>This data is never used to train artificial intelligence or machine learning models.</li>'
+      + '<li>No human reads this data, except with your explicit permission, for security purposes, or where the law requires it.</li>'
+      + '<li>We do <strong>not</strong> request or receive access to your Gmail, Drive, Contacts or Calendar content.</li>'
+      + '</ul>',
+    'sec.deletion.title': 'Account and Data Deletion',
+    'sec.deletion.body':
+      '<p>You can have your account and every piece of data attached to it deleted at any time:</p>'
+      + '<ul>'
+      + '<li>Email <a href="mailto:' + CONFIG.SUPPORT_EMAIL + '">' + CONFIG.SUPPORT_EMAIL + '</a> '
+      + 'with the subject "Delete my account", from the same address you signed in with.</li>'
+      + '<li>The request is carried out within <strong>30 days</strong> and you are sent a confirmation when it is done.</li>'
+      + '<li>Deletion removes your profile, your scores, your leaderboard entry and your cloud save.</li>'
+      + '<li>You can revoke this application\'s access to your Google account at any time at '
+      + '<a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a>.</li>'
+      + '</ul>',
     'sec.usage.title': 'How We Use Your Information',
     'sec.usage.body':
       '<p>We use your information for the following purposes:</p>'
@@ -390,6 +469,36 @@ const I18N = {
       + '<li><strong>プロフィール写真：</strong>Googleアカウントのプロフィール写真</li>'
       + '<li><strong>お名前：</strong>Googleアカウントに登録された名前</li>'
       + '<li><strong>ゲーム統計：</strong>スコア、レベル、実績</li>'
+      + '</ul>',
+    'sec.googledata.title': 'Google アカウントデータと Google API サービスポリシー',
+    'sec.googledata.body':
+      '<p>本サービスへのログインは「Google でログイン」で行われます。要求するスコープは以下のみです。</p>'
+      + '<ul>'
+      + '<li><code>openid</code> — 同一のユーザーが再度ログインしたことを判別するためのアカウント識別子</li>'
+      + '<li><code>email</code> — アカウントの識別と、必要な場合のご連絡に使用するメールアドレス</li>'
+      + '<li><code>profile</code> — アカウントページとリーダーボードに表示する表示名とプロフィール写真</li>'
+      + '</ul>'
+      + '<div class="callout callout-good">'
+      + '<p><strong>限定的な使用：</strong>本アプリケーションによる Google API から受け取った情報の使用および転送は、'
+      + '<a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API サービスのユーザーデータに関するポリシー</a>'
+      + '（限定的な使用の要件を含む）に準拠します。</p>'
+      + '</div>'
+      + '<ul>'
+      + '<li>このデータを<strong>販売することはありません</strong>。広告や広告ターゲティングにも使用しません。</li>'
+      + '<li>このデータを AI・機械学習モデルの学習に使用することはありません。</li>'
+      + '<li>お客様の明示的な許可、セキュリティ上の必要、法令による要求がある場合を除き、人がこのデータを読むことはありません。</li>'
+      + '<li>Gmail、Drive、連絡先、カレンダーの内容への<strong>アクセスは要求も取得もしていません</strong>。</li>'
+      + '</ul>',
+    'sec.deletion.title': 'アカウントとデータの削除',
+    'sec.deletion.body':
+      '<p>アカウントと関連するすべてのデータは、いつでも削除を依頼できます。</p>'
+      + '<ul>'
+      + '<li>ログインに使用したメールアドレスから、件名「Delete my account」で '
+      + '<a href="mailto:' + CONFIG.SUPPORT_EMAIL + '">' + CONFIG.SUPPORT_EMAIL + '</a> 宛にご連絡ください。</li>'
+      + '<li>ご依頼は<strong>30 日以内</strong>に実行し、完了時に確認をお送りします。</li>'
+      + '<li>削除により、プロフィール、スコア、リーダーボードの記録、クラウドセーブが消去されます。</li>'
+      + '<li>本アプリケーションの Google アカウントへのアクセスは '
+      + '<a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a> でいつでも取り消せます。</li>'
       + '</ul>',
     'sec.usage.title': '情報の利用方法',
     'sec.usage.body':
@@ -550,6 +659,11 @@ function getPrivacyCSS() {
     }
 
     .wrap { max-width: var(--maxw); margin: 0 auto; }
+
+    /* The shared header is full-bleed: it pulls out of the body's
+       gutter and puts the same gutter back inside itself. */
+    .ac-nav { margin: -24px -20px 24px; padding-inline: 20px; }
+    [id] { scroll-margin-top: 84px; }
 
     /* ---------- top bar (brand + controls) ---------- */
     .topbar {
@@ -748,36 +862,10 @@ function getPrivacyCSS() {
 
 // ==========================================
 // Partials
+//
+// The top bar and footer come from Core/SiteNav.js, so this page
+// looks like - and navigates like - every other page on the site.
 // ==========================================
-function renderTopbar(lang, amirLogo) {
-  const p = pack(lang)
-  const cur = resolveLang(lang)
-
-  const segLinks = LANGUAGES.map(l =>
-    '<a href="?lang=' + l.code + '" data-lang="' + l.code + '" lang="' + l.code + '"'
-    + ' aria-current="' + (l.code === cur ? 'true' : 'false') + '"'
-    + ' onclick="return acSetLang(\'' + l.code + '\')">' + escapeHtml(l.label) + '</a>'
-  ).join('')
-
-  return `
-    <div class="topbar">
-      <div class="brand">
-        <span class="brand-logo">
-          <img src="${escapeHtml(amirLogo)}" alt="AmirCollider" onerror="this.style.display='none'">
-        </span>
-        <span>
-          <span class="brand-name">AmirCollider</span><br>
-          <span class="brand-sub">${escapeHtml(p.brandSub)}</span>
-        </span>
-      </div>
-      <div class="controls">
-        <div class="seg" role="group" aria-label="${escapeHtml(p.langName)}">${segLinks}</div>
-        <button type="button" id="themeBtn" class="icon-btn" onclick="acToggleTheme()"
-                aria-label="${escapeHtml(p.themeToDark)}">${icon('contrast')}</button>
-      </div>
-    </div>`
-}
-
 function renderHero(lang, game, amirLogo, gameLogo) {
   const p = pack(lang)
   return `
@@ -864,7 +952,7 @@ let CONTEXT = { game: null, baseUrl: '' }
 // ==========================================
 // Page Template
 // ==========================================
-function createPrivacyPage(game, gameId, baseUrl, lang, theme) {
+function createPrivacyPage(game, gameId, baseUrl, lang, theme, { path = '/privacy', games = [] } = {}) {
   CONTEXT = { game, baseUrl }
 
   const amirLogo = CONFIG.AMIR_LOGO
@@ -873,30 +961,55 @@ function createPrivacyPage(game, gameId, baseUrl, lang, theme) {
   const dir = dirFor(resolved)
   const themeAttr = theme === 'light' || theme === 'dark' ? ` data-theme="${theme}"` : ''
   const p = pack(resolved)
+  const site = NAV_I18N[resolved]
+
+  const perGame = path !== '/privacy'
+  const title = perGame ? `${p.meta} — ${game.name} | AmirCollider` : `${p.meta} — AmirCollider`
+  const description = perGame
+    ? `${p.meta} — ${game.name}. AmirCollider Games.`
+    : `${p.meta} — AmirCollider.`
+
+  const trail = perGame
+    ? [
+        { href: '/', label: site.home },
+        { href: `/${game.id}`, label: game.name },
+        { href: path, label: site.privacy }
+      ]
+    : [
+        { href: '/', label: site.home },
+        { href: '/privacy', label: site.privacy }
+      ]
 
   return `<!DOCTYPE html>
 <html dir="${dir}" lang="${resolved}"${themeAttr}>
 <head>
-  ${getPageHead({
-    title: `${p.meta} - ${game.name}`,
-    amirLogo,
-    description: `${p.meta} ${game.name} - AmirCollider Games`
+  ${getPageHead({ title, amirLogo, description })}
+  ${seoHead({
+    path,
+    title,
+    description,
+    lang: resolved,
+    graph: [breadcrumbLd(trail)]
   })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   ${themeBootScript()}
-  <style>${getPrivacyCSS()}</style>
+  <style>${siteNavCss()}${getPrivacyCSS()}</style>
 </head>
 <body>
+  ${siteHeader({ lang: resolved })}
   <div class="wrap">
-    ${renderTopbar(resolved, amirLogo)}
-    ${renderHero(resolved, game, amirLogo, gameLogo)}
-    ${renderSections(resolved)}
-    ${renderMeta(resolved)}
-    ${renderActions(resolved, gameId, baseUrl)}
+    ${siteBreadcrumb({ lang: resolved, trail })}
+    <main id="main">
+      ${renderHero(resolved, game, amirLogo, gameLogo)}
+      ${renderSections(resolved)}
+      ${renderMeta(resolved)}
+      ${renderActions(resolved, gameId, baseUrl)}
+    </main>
+    ${siteFooter({ lang: resolved, games })}
   </div>
-  ${chromeScript()}
+  ${siteChromeScript()}
 </body>
 </html>`
 }
