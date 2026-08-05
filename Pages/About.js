@@ -71,7 +71,7 @@ function aboutCss() {
       --brand: #6c63ff;
       --warm: #ff7ea8;
       --radius: 18px;
-      --maxw: 860px;
+      --maxw: 940px;
 
       --bg-1: #0b0e16;
       --bg-2: #141a2e;
@@ -141,18 +141,21 @@ function aboutCss() {
 
     /* ---------- hero ---------- */
     .ab-hero { text-align: center; padding-block: 12px 30px; }
+    /* A rounded square, not a circle.
+       The logo is a square image with its own background painted
+       to the edges. Put that inside a circle and you see a square
+       inside a circle - two shapes disagreeing, with the corners
+       cut off for good measure. The site header solved this the
+       same way and for the same reason: the frame matches the
+       mark. */
     .ab-avatar {
-      width: 96px; height: 96px; border-radius: 50%; margin-inline: auto;
+      width: 104px; height: 104px; border-radius: 28px; margin-inline: auto;
       overflow: hidden; display: grid; place-items: center;
       background: var(--surface-2);
       border: 2px solid color-mix(in srgb, var(--warm) 45%, var(--border));
       box-shadow: 0 12px 34px rgba(0,0,0,0.22);
     }
-    /* The avatar is round and the logo is square, which is the same
-       crop that costs the favicon its corners - so the mark is
-       inset here rather than covering the circle. Contained rather
-       than covered, so a logo of any aspect ratio stays itself. */
-    .ab-avatar img { width: 74%; height: 74%; object-fit: contain; display: block; }
+    .ab-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .ab-hero h1 {
       font-size: clamp(1.75em, 5vw, 2.5em); font-weight: 800; line-height: 1.25;
       letter-spacing: -0.01em; margin-block-start: 18px;
@@ -202,35 +205,51 @@ function aboutCss() {
       background: linear-gradient(270deg, var(--border), transparent);
     }
     .ab-lede { color: var(--text-dim); font-size: 0.94em; margin-block-end: 16px; }
-    .ab-prose p { margin-block-start: 14px; }
+    .ab-prose p { margin-block-start: 14px; max-width: 74ch; }
     .ab-prose p:first-child { margin-block-start: 0; }
 
     /* ---------- timeline ----------
-       Three dates and a rule down the side. Deliberately small:
-       it is a paper trail, not an achievement wall, and drawing
-       it like a career ladder would say something the page
-       spends a paragraph explaining is not true. */
-    .ab-time { list-style: none; position: relative; padding-inline-start: 26px; }
+       A rail with a card hung off each date, and an icon on the
+       rail where the dot used to be. Three lines of loose text
+       under a heading read as a footnote; three cards read as a
+       record, which is what they are. */
+    .ab-time { list-style: none; display: grid; gap: 14px; position: relative;
+               padding-inline-start: 56px; }
     .ab-time::before {
-      content: ''; position: absolute; inset-block: 8px; inset-inline-start: 5px;
+      content: ''; position: absolute; inset-block: 18px; inset-inline-start: 21px;
       width: 2px; border-radius: 2px;
       background: linear-gradient(180deg,
-        color-mix(in srgb, var(--warm) 55%, transparent),
+        color-mix(in srgb, var(--warm) 60%, transparent),
         color-mix(in srgb, var(--brand) 45%, transparent));
     }
-    .ab-time li { position: relative; padding-block: 6px 16px; }
-    .ab-time li::before {
-      content: ''; position: absolute; inset-inline-start: -26px; top: 15px;
-      width: 12px; height: 12px; border-radius: 50%;
+    .ab-time li {
+      position: relative; padding: 16px 20px; border-radius: 15px;
+      background: var(--surface); border: 1px solid var(--border);
+      transition: border-color 0.18s ease, transform 0.18s ease;
+    }
+    .ab-time li:hover {
+      border-color: color-mix(in srgb, var(--warm) 34%, var(--border));
+      transform: translateY(-2px);
+    }
+    .ab-time-ic {
+      position: absolute; inset-inline-start: -56px; top: 14px;
+      width: 44px; height: 44px; border-radius: 50%;
+      display: grid; place-items: center; font-size: 1.15em; line-height: 1;
       background: var(--bg-1);
-      border: 2px solid color-mix(in srgb, var(--warm) 60%, var(--border));
+      border: 2px solid color-mix(in srgb, var(--warm) 45%, var(--border));
     }
     .ab-time .ab-date {
       display: block; font-size: 0.78em; font-weight: 800; letter-spacing: 0.02em;
       color: color-mix(in srgb, var(--warm) 55%, var(--text-dim));
     }
-    .ab-time b { display: block; font-size: 1.02em; font-weight: 700; }
+    .ab-time b { display: block; font-size: 1.04em; font-weight: 700; margin-block-start: 2px; }
     .ab-time span.ab-body { display: block; color: var(--text-dim); font-size: 0.92em; }
+
+    @media (max-width: 560px) {
+      .ab-time { padding-inline-start: 46px; }
+      .ab-time::before { inset-inline-start: 17px; }
+      .ab-time-ic { inset-inline-start: -46px; width: 36px; height: 36px; font-size: 1em; }
+    }
 
     .ab-hint {
       margin-block-start: 14px; padding: 13px 16px; border-radius: 13px;
@@ -280,27 +299,13 @@ function aboutCss() {
     .ab-fact span.ab-ic { font-size: 1.4em; line-height: 1.4; flex: none; }
     .ab-fact p { font-size: 0.93em; line-height: 1.8; }
 
-    /* ---------- this site, and the sign-off ---------- */
-    .ab-chips { display: flex; flex-wrap: wrap; gap: 9px; margin-block-start: 16px; }
-    .ab-chip {
-      display: inline-flex; align-items: center; gap: 7px;
-      padding: 9px 16px; border-radius: 999px; text-decoration: none;
-      font-size: 0.88em; font-weight: 700; color: var(--text);
-      background: var(--surface-2); border: 1px solid var(--border);
-      transition: transform 0.16s ease, border-color 0.16s ease;
-    }
-    .ab-chip:hover {
-      transform: translateY(-2px);
-      border-color: color-mix(in srgb, var(--warm) 45%, var(--border));
-    }
-
+    /* ---------- the sign-off ---------- */
     .ab-outro {
       text-align: center; margin-block-start: 8px; padding: 26px 20px;
       border-radius: var(--radius);
       background: var(--surface); border: 1px solid var(--border);
     }
     .ab-outro p { font-size: 1.04em; font-weight: 700; }
-    .ab-outro .ab-chips { justify-content: center; }
 
     @media (max-width: 560px) {
       body { line-height: 1.85; }
@@ -327,7 +332,7 @@ function renderHero(p) {
   return `
     <header class="ab-hero">
       <div class="ab-avatar">
-        <img src="${escapeHtml(CONFIG.AMIR_LOGO)}" alt="" width="96" height="96"
+        <img src="${escapeHtml(CONFIG.AMIR_LOGO)}" alt="" width="104" height="104"
              onerror="this.style.display='none'">
       </div>
       <h1>${escapeHtml(p.hello)}</h1>
@@ -347,12 +352,18 @@ function renderRequest(p) {
 }
 
 
-function renderStory(p) {
+// Every narrative section on the page - the opening, the learning
+// years, the YouTube story - is this one function with different
+// words. They used to be questions with answers under them
+// ("after six years, why is your resume so small?"), which is a
+// page interrogating its own subject and then defending him. The
+// facts did not change; only who is asking.
+function renderProse(head, paragraphs) {
   return `
     <section class="ab-sec">
-      <h2>${escapeHtml(p.storyHead)}</h2>
+      <h2>${escapeHtml(head)}</h2>
       <div class="ab-prose">
-        ${p.story.map(line => `<p>${escapeHtml(line)}</p>`).join('')}
+        ${paragraphs.map(line => `<p>${escapeHtml(line)}</p>`).join('')}
       </div>
     </section>`
 }
@@ -361,6 +372,7 @@ function renderStory(p) {
 function renderProof(p) {
   const items = p.proof.map(entry => `
     <li>
+      <span class="ab-time-ic" aria-hidden="true">${entry.icon}</span>
       <span class="ab-date" dir="auto">${escapeHtml(entry.date)}</span>
       <b>${escapeHtml(entry.title)}</b>
       <span class="ab-body">${escapeHtml(entry.body)}</span>
@@ -407,36 +419,16 @@ function renderFacts(p) {
 }
 
 
-function renderSite(p) {
-  const chips = p.siteLinks.map(link =>
-    `<a class="ab-chip" href="${escapeHtml(link.href)}">${escapeHtml(link.label)}</a>`
-  ).join('')
-
-  return `
-    <section class="ab-sec">
-      <h2>${escapeHtml(p.siteHead)}</h2>
-      <div class="ab-prose"><p>${escapeHtml(p.siteBody)}</p></div>
-      <div class="ab-chips">${chips}</div>
-    </section>`
-}
-
-
+// One line, and nothing under it.
+//
+// This used to end with a row of GitHub / Instagram / email
+// chips. Every one of those is already in the footer of every
+// page on the site, and a page that has just spent two thousand
+// words being a person should not close by asking for anything.
 function renderOutro(p) {
-  const social = [
-    { href: CONFIG.SOCIAL.github, label: 'GitHub' },
-    { href: CONFIG.SOCIAL.instagram, label: 'Instagram' },
-    { href: 'mailto:' + CONFIG.SUPPORT_EMAIL, label: p.email }
-  ].filter(link => link.href)
-
-  const chips = social.map(link =>
-    `<a class="ab-chip" href="${escapeHtml(link.href)}" rel="me noopener">${escapeHtml(link.label)}</a>`
-  ).join('')
-
   return `
     <section class="ab-outro">
       <p>${escapeHtml(p.outro)}</p>
-      <p class="ab-lede" style="margin:6px 0 0">${escapeHtml(p.contactHead)}</p>
-      <div class="ab-chips">${chips}</div>
     </section>`
 }
 
@@ -491,12 +483,12 @@ function createAboutPage(lang, theme) {
     <main id="main">
       ${renderHero(p)}
       ${renderRequest(p)}
-      ${renderStory(p)}
+      ${renderProse(p.storyHead, p.story)}
+      ${renderProse(p.learningHead, p.learning)}
       ${renderProof(p)}
-      ${renderQuestions(p.fairHead, p.fairLede, p.fair)}
-      ${renderQuestions(p.moreHead, '', p.more)}
+      ${renderProse(p.youtubeHead, p.youtube)}
+      ${renderQuestions(p.askHead, '', p.ask)}
       ${renderFacts(p)}
-      ${renderSite(p)}
       ${renderOutro(p)}
     </main>
     ${siteFooter({ lang: resolved })}

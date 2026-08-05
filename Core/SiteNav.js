@@ -147,15 +147,18 @@ function pack(lang) {
 // ==========================================
 // The primary navigation.
 //
-// Six entries and no more. A header that lists everything is a
+// Five entries and no more. A header that lists everything is a
 // header nobody reads; the long tail lives in the footer, which is
 // where a visitor looks for it.
 //
-// About is the newest of the six and the only one that is not a
-// product. It earns the place because it answers the question a
-// stranger arrives with - who made this - which nothing else on
-// the site did: there was no page about the person behind the
-// name at all, so a search for it found the tools and stopped.
+// About was tried here as a sixth and taken back out. Two of the
+// five are product names long enough to be their own sentences -
+// "Unity DocSnap" and "Unity DirectTMP" - and one more link past
+// them pushed the row wider than the content column on every page
+// whose column is narrower than the dashboard's. What that looks
+// like is not a slightly tight header: the bar wraps to its
+// phone layout on a desktop. Five is what fits. About is in the
+// footer, on every page, where the rest of the tail lives.
 // ==========================================
 function primaryItems(lang) {
   const p = pack(lang)
@@ -164,8 +167,7 @@ function primaryItems(lang) {
     { key: 'games', href: '/#games', label: p.games },
     { key: 'tools', href: '/tools', label: p.tools },
     { key: 'docsnap', href: '/unity-docsnap', label: p.docsnap },
-    { key: 'directtmp', href: '/unity-directtmp', label: p.directtmp },
-    { key: 'about', href: '/about', label: p.about }
+    { key: 'directtmp', href: '/unity-directtmp', label: p.directtmp }
   ]
 }
 

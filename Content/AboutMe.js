@@ -5,29 +5,38 @@
 // Public export:
 //   ABOUT              the whole page as data, keyed by language
 //   aboutFor(lang)     one language's pack
-//   aboutFaq(lang)     every question and answer, flattened - for
-//                      the FAQPage structured data, so the page
-//                      and the markup a crawler reads can never
-//                      say different things
+//   aboutFaq(lang)     the questions, flattened - for the FAQPage
+//                      structured data, so the page and the markup
+//                      a crawler reads can never say different
+//                      things
 //
 // Authored data lives in Content/ on this site (the tools
 // catalogue, the support templates, the Unity kit) and this is
 // the same idea: Pages/About.js decides how a paragraph LOOKS,
 // and nothing in it decides what a paragraph SAYS.
 //
-// Two rules this file follows, and they are the whole reason it
+// Four rules this file follows, and they are the whole reason it
 // is worth reading before editing:
 //
 //   • No real name, no age, no city, no photograph. Not in the
 //     prose, not in a caption, not in the structured data. That
-//     is the page's first sentence and it would be a strange
-//     page that broke its own request one section later.
+//     is the page's first request and it would be a strange page
+//     that broke its own request one section later.
 //
-//   • Nothing here is rounded up. The dates are the dates, the
-//     resume is as small as it is, and the reasons for both are
-//     written out rather than smoothed over. A biography that
-//     oversells is one somebody catches, and this one has
-//     nothing to gain from it.
+//   • Tell it, do not defend it. An early draft asked "after six
+//     years, why is your resume so small?" and then answered it.
+//     Both halves of that are a page apologising for its subject.
+//     The same facts are here, as a story with a beginning: the
+//     resume is small because everything in it was built from
+//     zero, twice.
+//
+//   • The voice is spoken, not written. Persian in particular:
+//     می‌خوام, می‌گم, می‌شه - the way somebody actually introduces
+//     themselves, not the way a form does.
+//
+//   • Nothing about the site's plumbing. Cloudflare, Workers, the
+//     licence server - none of it belongs on a page about a
+//     person. It has its own pages.
 // ==========================================
 
 
@@ -40,112 +49,103 @@ export const ABOUT = {
     dir: 'rtl',
 
     metaTitle: 'درباره‌ی من — AmirCollider',
-    metaDesc: 'AmirCollider کیست: بازی‌ساز مستقل و سازنده‌ی ابزارهای یونیتی. داستان شروع کار، چیزهایی که از دست رفت، و جواب سؤال‌هایی که شاید برایت پیش بیاید.',
+    metaDesc: 'AmirCollider کیست: بازی‌ساز مستقل، سازنده‌ی ابزارهای یونیتی و سازنده‌ی همین سایت. داستان اینکه از کجا شروع شد، چه چیزهایی از دست رفت، و چرا هنوز ادامه دارد.',
 
     breadcrumb: 'درباره‌ی من',
     hello: 'سلام، من AmirCollider هستم!',
-    role: 'بازی‌ساز مستقل · سازنده‌ی ابزارهای یونیتی · کسی که بلد نیست بس کند',
-    intro: 'اینجا یک صفحه‌ی ساده و دوستانه است درباره‌ی خودم — نه رزومه، نه معرفی رسمی. فقط داستان اینکه چطور شروع شد و چرا هنوز ادامه دارد.',
+    role: 'بازی‌ساز مستقل · سازنده‌ی ابزارهای یونیتی · سازنده‌ی کامل سایت، مثل همینی که الآن داری می‌بینی!',
+    intro: 'از بچگی بازی می‌کردم، بعد شروع کردم به ساختنشون، و از یه جایی به بعد دیگه نتونستم بس کنم.',
 
-    privacyTitle: 'یک خواهش کوچک، قبل از هر چیز',
-    privacyBody: 'ترجیح می‌دهم اسم و سن و محل زندگی‌ام مخفی بماند. مرسی که درک می‌کنی! 🙏',
-    privacyAside: 'اگر توی دنیای واقعی من را می‌شناسی — به‌عنوان همکار، فامیل، دوست یا هر چیز دیگری — و اسم و سنم را می‌دانی، خیلی خوشحال می‌شوم موقع معرفی من به بقیه فقط از اسم AmirCollider استفاده کنی.',
+    privacyTitle: 'یه خواهش کوچیک، قبل از هر چیز',
+    privacyBody: 'ترجیح می‌دم اسم و سن و محل زندگیم مخفی بمونه. مرسی که درک می‌کنی! 🙏',
+    privacyAside: 'اگه توی دنیای واقعی من رو می‌شناسی — به‌عنوان همکار، فامیل، دوست یا هر چیز دیگه‌ای — و اسم و سنم رو می‌دونی، خیلی خوشحال می‌شم موقع معرفی من به بقیه فقط از اسم AmirCollider استفاده کنی.',
 
     storyHead: 'از کجا شروع شد',
     story: [
-      'از بچگی عاشق سه چیز بودم: بازی کردن، بازی ساختن، و تولید محتوا. آن‌قدر پای گوشی و کامپیوتر بودم که کم‌کم دیگر بازی کردن برایم کافی نبود — دلم می‌خواست دنیاهای خودم را بسازم که بقیه هم از آن‌ها لذت ببرند.',
-      'اما بی‌تجربه بودم، منبع آموزشی درست‌وحسابی نبود، سنم کم بود و همیشه تنهایی برای خودم کار می‌کردم. نتیجه‌اش این شد که تقریباً همه‌ی اطلاعات و نمونه‌کارهای قدیمی‌ام را از دست دادم. خیلی از چیزهایی که ساخته بودم رفتند، دوباره از صفر ساختمشان — و نسخه‌ی دوم همیشه بهتر از اولی درآمد.'
+      'از بچگی عاشق سه چیز بودم: بازی کردن، بازی ساختن، و تولید محتوا. اون‌قدر پای گوشی و کامپیوتر بودم که کم‌کم دیگه بازی کردن برام کافی نبود.',
+      'اون موقع بازی‌های زیاد و باکیفیتی وجود نداشت، و من دلم می‌خواست دنیاهای خودم رو بسازم — دنیاهایی که بقیه هم ازشون لذت ببرن. کل ماجرا از همون‌جا شروع شد.'
     ],
 
-    proofHead: 'تنها چیزی که از آن روزها مانده',
-    proofLede: 'از کارهای قدیمی مدرک زیادی ندارم. این‌ها تنها چیزهایی هستند که هنوز تاریخشان ثبت است — و قبل از هر دویشان هم توی یونیتی و یوتیوب کار می‌کردم، فقط چیزی برای نشان دادنش ندارم.',
+    learningHead: 'مسیر یادگیری و چالش‌ها',
+    learning: [
+      'بی‌تجربه بودم، منبع آموزشی درست‌وحسابی نبود، سنم کم بود و همیشه تنهایی برای خودم کار می‌کردم. هوش مصنوعی‌ای هم نبود که ازش کمک بگیرم. یعنی هر چیزی که الآن بلدم رو از صفر ساختم.',
+      'هزینه‌ش هم این بود که بیشتر نمونه‌کارهای قدیمیم رو از دست دادم. خیلی از چیزهایی که ساخته بودم رفتن — و من دوباره ساختمشون. نسخه‌ی دوم همیشه بهتر از اولی درمی‌اومد.',
+      'برای همین چیزی که ازم مونده کوچیکه، و اصلاً اذیتم نمی‌کنه: هر چیزی که از دست رفت، مهارت ساختنش پیش خودم موند.'
+    ],
+
+    proofHead: 'ردپای زمان',
+    proofLede: 'از کارهای قدیمی مدرک زیادی ندارم. این‌ها تنها تاریخ‌هایی‌ان که هنوز ثبت‌ان — و قبل از هر دوشون هم توی یونیتی و یوتیوب کار می‌کردم، فقط چیزی برای نشون دادنش ندارم.',
     proof: [
       {
+        icon: '🎮',
         date: '۱۱ آگوست ۲۰۲۰',
-        title: 'لایسنس یونیتی‌ام',
-        body: 'قدیمی‌ترین رد پایی که از کار کردنم مانده.'
+        title: 'لایسنس یونیتیم',
+        body: 'قدیمی‌ترین ردی که از کار کردنم مونده.'
       },
       {
+        icon: '🎬',
         date: '۱۶ دسامبر ۲۰۲۰',
         title: 'اولین ویدیوی یوتیوبم',
         body: 'اولین چیزی که منتشر کردم و تاریخش هنوز هست.'
       },
       {
+        icon: '🔁',
         date: '۲۶ دسامبر ۲۰۲۳',
         title: 'شروع دوباره‌ی یوتیوب',
-        body: 'ویدیوهای قبل از این را خودم خصوصی کردم و کانال را از نو ساختم.'
+        body: 'کانال رو از نو ساختم و از این تاریخ به بعد رو نگه داشتم.'
       }
     ],
-    proofNote: 'مدرک‌هایی از آکادمی‌های مختلف و انستیتو ملی بازی‌سازی ایران هم دارم، اما چون اسم واقعی‌ام رویشان است منتشرشان نمی‌کنم.',
+    proofNote: 'مدرک‌هایی از آکادمی‌های مختلف و انستیتو ملی بازی‌سازی ایران هم دارم، ولی چون اسم واقعیم روشونه منتشرشون نمی‌کنم.',
 
-    fairHead: 'سؤال‌هایی که شاید برایت پیش بیاید',
-    fairLede: 'و کاملاً هم منطقی‌اند. پس جوابشان را می‌نویسم.',
-    fair: [
-      {
-        q: 'بعد از ۶ سال فعالیت، چرا این‌قدر رزومه‌ی کوچکی داری؟',
-        a: 'چون خودم خیلی چیزها را بلد نبودم، منبع آموزشی نبود، و هوش مصنوعی هم نبود که ازش کمک بگیرم. هر چیزی که الآن دارم را از صفر ساختم. خیلی از چیزهایی را که ساخته بودم از دست دادم و دوباره به دستشان آوردم — و بهتر از قبل ساختمشان.'
-      },
-      {
-        q: 'چرا اولین ویدیوی یوتیوبت برای ۲۶ دسامبر ۲۰۲۳ است؟',
-        a: 'نیست — ویدیوهای قبل از آن را خودم خصوصی کردم. کیفیتشان پایین بود و لگ داشتند، و دلم می‌خواست حرفم را دوباره و کامل بسازم.'
-      },
-      {
-        q: 'چرا در یوتیوب کم فعالیت کردی و کنارش گذاشتی؟',
-        a: 'از ۲۶ دسامبر ۲۰۲۳ که دوباره شروع کردم، سیستمم را ارتقا دادم و یک میکروفن ارزان‌قیمت هم خریدم، به امید اینکه این بار ویدیوها سالم و بدون مشکل ضبط شوند. اما سیستمم باز آن‌قدری قوی نبود که بازی‌هایی را که می‌خواهم و مردم بیشتر دوست دارند اجرا کند، و میکروفن هم کیفیت قابل قبولی نداشت. کنار این‌ها آن‌قدر مشکل عجیب‌وغریب توی زندگی بود که حتی نمی‌توانم برایت لیستشان کنم — ولی با همه‌شان کنار آمدم و ادامه دادم، تا رسیدم به اینترنت. سرعت پایینش مشکلی نداشت؛ قیمت‌هایش داشت. آن‌قدر پول ندارم که بتوانم بسته‌ی حجیم برای آپلود بگیرم :) همیشه به این کار علاقه دارم و به اولین فرصتی که بتوانم، یوتیوبم را ادامه می‌دهم.'
-      }
+    youtubeHead: 'داستان یوتیوب و ارتقا',
+    youtube: [
+      'ویدیوهای قبل از ۲۶ دسامبر ۲۰۲۳ رو خودم خصوصی کردم. کیفیتشون پایین بود و لگ داشتن، و دلم می‌خواست حرفم رو دوباره و کامل بسازم.',
+      'همون موقع سیستمم رو ارتقا دادم و یه میکروفن ارزون هم خریدم، به امید اینکه این بار ویدیوها سالم دربیان. ولی سیستم هنوز اون‌قدری قوی نبود که بازی‌هایی رو که خودم دوست دارم و مردم بیشتر می‌خوان اجرا کنه، و میکروفن هم کیفیت قابل قبولی نداشت.',
+      'کنارش اون‌قدر مشکل عجیب‌وغریب توی زندگی بود که حتی نمی‌تونم لیستشون کنم. با همه‌شون کنار اومدم و ادامه دادم، تا رسیدم به اینترنت. سرعت پایینش مشکلی نداشت؛ قیمتش داشت. اون‌قدر پول ندارم که بتونم بسته‌ی حجیم برای آپلود بگیرم :)',
+      'هنوز عاشق این کارم، و اولین فرصتی که پیش بیاد یوتیوبم رو ادامه می‌دم.'
     ],
 
-    moreHead: 'چند سؤال دیگر',
-    more: [
+    askHead: 'چیزهایی که ازم می‌پرسن',
+    ask: [
       {
         q: '«AmirCollider» یعنی چی؟',
-        a: 'همیشه ویدیوهای ARIA KEOXER را می‌دیدم و خودم هم دنبال یک لقب بودم. یک اسم کوتاه به‌علاوه‌ی یک لقب: اسم Amir را انتخاب کردم، و Collider هم اسم یکی از بخش‌های بازی‌سازی داخل یونیتی است. یعنی از روی لقبم هم می‌شود تشخیص داد که من برنامه‌نویسی را حتی قبل از یوتیوبم انجام می‌دادم.'
+        a: 'همیشه ویدیوهای ARIA KEOXER رو می‌دیدم و خودمم دنبال یه لقب بودم. یه اسم کوتاه به‌علاوه‌ی یه لقب: اسم Amir رو انتخاب کردم، و Collider هم اسم یکی از بخش‌های بازی‌سازی داخل یونیتیه. یعنی از روی لقبمم می‌شه فهمید که قبل از یوتیوب هم برنامه‌نویسی می‌کردم.'
       },
       {
-        q: 'اولین بار کِی به ذهنت رسید که «خودم می‌خواهم بازی بسازم»؟',
-        a: 'از بچگی خیلی خیلی پای گوشی و کامپیوتر بودم، و آن موقع بازی‌های زیاد و باکیفیت وجود نداشت. دلم می‌خواست دنیاهای خودم را بسازم که بقیه هم ازشان لذت ببرند. اولین بازی‌ای که می‌خواستم بسازم دقیقاً از همان‌جا آمد.'
+        q: 'اولین بار کِی به ذهنت رسید که «خودم می‌خوام بازی بسازم»؟',
+        a: 'از بچگی خیلی خیلی پای گوشی و کامپیوتر بودم، و اون موقع بازی‌های زیاد و باکیفیت وجود نداشت. دلم می‌خواست دنیاهای خودم رو بسازم که بقیه هم ازشون لذت ببرن. اولین بازی‌ای که می‌خواستم بسازم دقیقاً از همون‌جا اومد.'
       },
       {
-        q: 'اولین موتور بازی‌سازی‌ای که استفاده کردی چه بود؟',
-        a: 'یونیتی — از همان اول تا همین الآن. سبک بود و من سیستم قوی‌ای نداشتم، پس عملاً بین گزینه‌ها تنها گزینه‌ام بود.'
+        q: 'اولین موتور بازی‌سازی‌ای که استفاده کردی چی بود؟',
+        a: 'یونیتی — از همون اول تا همین الآن. سبک بود و من سیستم قوی‌ای نداشتم، پس عملاً بین گزینه‌ها تنها گزینه‌م بود.'
       },
       {
-        q: 'اولین پروژه‌ای که یادت می‌آید ساختی چه بود؟',
-        a: 'یک بازی پلتفرمر کوچک دوبعدی.'
+        q: 'اولین پروژه‌ای که یادت می‌آد ساختی چی بود؟',
+        a: 'یه بازی پلتفرمر کوچیک دوبعدی.'
       },
       {
-        q: 'چرا بعد از این همه مشکل ادامه می‌دهی؟',
-        a: 'من توی مغزم چیزی به اسم بس کردن وجود ندارد. همیشه ادامه می‌دهم و خودم هم نمی‌دانم چرا. انرژی مثبت زیادی درونم هست و همیشه احساس خوشحالی می‌کنم که دارم ادامه می‌دهم. عاشق بازی کردن و بازی ساختنم. فکر کنم اگر حتی هزار بار دیگر قرار بود به دنیا بیایم، باز هم AmirCollider بودن را انتخاب می‌کردم.'
+        q: 'چرا بعد از این همه مشکل ادامه می‌دی؟',
+        a: 'من توی مغزم چیزی به اسم بس کردن وجود نداره. همیشه ادامه می‌دم و خودمم نمی‌دونم چرا. انرژی مثبت زیادی درونمه و همیشه احساس خوشحالی می‌کنم که دارم ادامه می‌دم. عاشق بازی کردن و بازی ساختنم. فکر کنم اگه حتی هزار بار دیگه قرار بود به دنیا بیام، باز هم AmirCollider بودن رو انتخاب می‌کردم.'
       },
       {
-        q: 'الآن روی چی کار می‌کنی؟ و هدفت چیست؟',
-        a: 'اگر بخواهم از بازی بگویم: دارم روی یک بازی خیلی خاص کار می‌کنم که فرآیند ساخت طولانی‌ای دارد. امیدوارم آن‌قدری که می‌خواهم موفق و دیده شود؛ جزئیاتش یک سوپرایز است. و هدف کلی‌ام این است که آدم خوبی باشم. کار سختی است، اما نمی‌خواهم کسی با شنیدن اسمم ناراحت شود یا خاطره‌ی بدی سراغش بیاید. این تمام خواسته‌ی من از زندگی‌ام است.'
+        q: 'الآن روی چی کار می‌کنی؟ و هدفت چیه؟',
+        a: 'اگه بخوام از بازی بگم: دارم روی یه بازی خیلی خاص کار می‌کنم که فرآیند ساخت طولانی‌ای داره. امیدوارم اون‌قدری که می‌خوام موفق و دیده بشه؛ جزئیاتش یه سوپرایزه. و هدف کلیم اینه که آدم خوبی باشم. کار سختیه، اما نمی‌خوام کسی با شنیدن اسمم ناراحت بشه یا خاطره‌ی بدی سراغش بیاد. این تمام خواسته‌ی من از زندگیمه.'
       },
       {
         q: 'چه چیزهایی دوست داری بسازی؟',
-        a: 'واقعاً نمی‌دانم. بعضی وقت‌ها ایده‌ها بدون مقدمه می‌آیند توی ذهنم. فقط دلم می‌خواهد هر چیزی که می‌سازم باعث خوشحالی بقیه بشود.'
+        a: 'واقعاً نمی‌دونم. بعضی وقت‌ها ایده‌ها بدون مقدمه می‌آن توی ذهنم. فقط دلم می‌خواد هر چیزی که می‌سازم باعث خوشحالی بقیه بشه.'
       }
     ],
 
-    factsHead: 'چند حقیقت کوچک درباره‌ی من',
+    factsHead: 'چند حقیقت کوچیک درباره‌ی من',
     facts: [
-      { icon: '🎯', text: 'خیلی کمال‌گرا هستم.' },
-      { icon: '🧩', text: 'همیشه می‌خواهم همه‌ی کارها را تنهایی انجام بدهم.' },
-      { icon: '📺', text: 'دلم می‌خواهد انیمه و سریال ببینم، اما مغزم ناخودآگاه احساس می‌کند دارم وقتم را از دست می‌دهم — با اینکه همان وقت‌ها را توی اینستاگرام می‌چرخم و بیشترش را هدر می‌دهم!' },
-      { icon: '🌱', text: 'همیشه خوشحالم تا وقتی که بقیه خوشحال باشند. ناراحتی بقیه من را هم ناراحت می‌کند. امیدوارم هیچ‌کس هیچ‌وقت توی زندگی‌اش احساس ناراحتی نکند.' }
+      { icon: '🎯', text: 'خیلی کمال‌گرام.' },
+      { icon: '🧩', text: 'همیشه دلم می‌خواد همه‌ی کارها رو تنهایی انجام بدم.' },
+      { icon: '📺', text: 'دلم می‌خواد انیمه و سریال ببینم، ولی مغزم ناخودآگاه حس می‌کنه دارم وقتم رو از دست می‌دم — با اینکه همون وقت‌ها رو توی اینستاگرام می‌چرخم و بیشترش رو هدر می‌دم!' },
+      { icon: '🌱', text: 'همیشه خوشحالم تا وقتی بقیه خوشحال باشن. ناراحتی بقیه من رو هم ناراحت می‌کنه. امیدوارم هیچ‌کس هیچ‌وقت توی زندگیش احساس ناراحتی نکنه.' }
     ],
 
-    siteHead: 'و این سایت چیست',
-    siteBody: 'هر چیزی که در amircollider.com می‌بینی — صفحه‌ی بازی‌ها، فروشگاه، جدول امتیازات، حساب بازیکن و صفحه‌های ابزارها — روی یک Cloudflare Worker اجرا می‌شود که خودم نوشته‌ام. اینجا دو چیز پیدا می‌کنی: بازی‌هایی که می‌سازم، و ابزارهایی که اول برای پروژه‌های خودم ساختم و بعد دیدم به کار بقیه هم می‌آیند.',
-    siteLinks: [
-      { href: '/#games', label: 'بازی‌ها' },
-      { href: '/tools', label: 'ابزارها' },
-      { href: '/release-notes', label: 'یادداشت‌های انتشار' }
-    ],
-
-    outro: 'مرسی که تا اینجا خواندی. 💜',
-    contactHead: 'اگر حرفی داشتی',
-    email: 'ایمیل'
+    outro: 'مرسی که تا اینجا خوندی. 💜'
   },
 
 
@@ -157,12 +157,12 @@ export const ABOUT = {
     dir: 'ltr',
 
     metaTitle: 'About me — AmirCollider',
-    metaDesc: 'Who AmirCollider is: an indie game developer and the author of the Unity tools on this site. How it started, what got lost along the way, and honest answers to the questions people ask.',
+    metaDesc: 'Who AmirCollider is: an indie game developer, the author of the Unity tools on this site, and the person who built the site itself. How it started, what got lost along the way, and why it is still going.',
 
     breadcrumb: 'About',
     hello: 'Hi, I’m AmirCollider!',
-    role: 'Indie game developer · Unity tool maker · someone who does not know how to stop',
-    intro: 'This is a plain, friendly page about me — not a résumé and not a formal bio. Just the story of how it started, and why it is still going.',
+    role: 'Indie game developer · Unity tool maker · built this whole site, the one you are looking at right now!',
+    intro: 'I played games as a kid, then I started making them, and at some point I simply could not stop.',
 
     privacyTitle: 'One small request, before anything else',
     privacyBody: 'I would rather keep my name, my age and where I live private. Thank you for understanding! 🙏',
@@ -170,50 +170,51 @@ export const ABOUT = {
 
     storyHead: 'Where it started',
     story: [
-      'Ever since I was a kid I have loved three things: playing games, making them, and making content. I spent so much time on a phone and a computer that playing eventually stopped being enough — I wanted to build worlds of my own, ones other people could enjoy too.',
-      'But I had no experience, there were no decent learning resources, I was young, and I always worked alone. The result is that I lost almost everything old — my notes and nearly all of my early work. A lot of what I had built simply went, so I built it again from nothing — and the second version always came out better than the first.'
+      'Ever since I was a kid I have loved three things: playing games, making them, and making content. I spent so much time on a phone and a computer that playing eventually stopped being enough.',
+      'There were not many good games around back then, and I wanted to build worlds of my own — ones other people would enjoy too. The whole thing started right there.'
     ],
 
-    proofHead: 'The only paper trail left',
-    proofLede: 'There is not much proof of the old work. These are the only dates I can still point at — and I was working in Unity and on YouTube before both of them, I just have nothing left to show for it.',
+    learningHead: 'Learning it, and what it cost',
+    learning: [
+      'I had no experience, there were no decent learning resources, I was young, and I always worked alone. There was no AI to ask for help either. Which means everything I know now, I built from zero.',
+      'The price was that I lost most of my early work. A lot of what I had built simply went — and I built it again. The second version always came out better than the first.',
+      'So what is left of it is small, and that does not bother me at all: whatever was lost, the ability to make it stayed with me.'
+    ],
+
+    proofHead: 'A trail of dates',
+    proofLede: 'There is not much proof of the old work. These are the only dates still on record — and I was working in Unity and on YouTube before both of them, I just have nothing left to show for it.',
     proof: [
       {
+        icon: '🎮',
         date: '11 August 2020',
         title: 'My Unity licence',
         body: 'The oldest trace of my work that still exists.'
       },
       {
+        icon: '🎬',
         date: '16 December 2020',
         title: 'My first YouTube video',
         body: 'The first thing I published whose date is still on record.'
       },
       {
+        icon: '🔁',
         date: '26 December 2023',
         title: 'Starting YouTube again',
-        body: 'I made everything before this private and rebuilt the channel.'
+        body: 'I rebuilt the channel and kept everything from this date onward.'
       }
     ],
     proofNote: 'I also have certificates from various academies and from Iran’s National Game Development Institute, but my real name is on them, so I do not publish them.',
 
-    fairHead: 'Questions you might have',
-    fairLede: 'They are fair ones, so here are the answers.',
-    fair: [
-      {
-        q: 'Six years in — why is your résumé so small?',
-        a: 'Because there was a lot I did not know, there were no learning resources, and there was no AI to ask for help. Everything I have now, I built from zero. A lot of what I made was lost and then made again — and the second time it came out better.'
-      },
-      {
-        q: 'Why is your first YouTube video dated 26 December 2023?',
-        a: 'It is not — I made the earlier ones private myself. The quality was poor and they lagged, and I wanted to build what I had to say properly, from the start.'
-      },
-      {
-        q: 'Why did you post so little on YouTube, and then stop?',
-        a: 'When I started again on 26 December 2023 I upgraded my machine and bought a cheap microphone, hoping the videos would finally come out clean. But the machine still was not strong enough to run the games I want to play and that people most want to watch, and the microphone was not good enough either. On top of that there were more strange problems in my life than I could list for you — I made peace with all of them and kept going, right up until the internet. The slow speed was not the problem; the price was. I do not have enough money for a data plan large enough to upload on :) I still love doing this, and the first chance I get, I will carry on with YouTube.'
-      }
+    youtubeHead: 'The YouTube story',
+    youtube: [
+      'I made the videos before 26 December 2023 private myself. The quality was poor and they lagged, and I wanted to build what I had to say properly, from the start.',
+      'At the same time I upgraded my machine and bought a cheap microphone, hoping the videos would finally come out clean. But the machine still was not strong enough to run the games I want to play and that people most want to watch, and the microphone was not good enough either.',
+      'On top of that there were more strange problems in my life than I could list for you. I made peace with all of them and kept going, right up until the internet. The slow speed was not the problem; the price was. I do not have enough money for a data plan large enough to upload on :)',
+      'I still love doing this, and the first chance I get, I will carry on with YouTube.'
     ],
 
-    moreHead: 'A few more questions',
-    more: [
+    askHead: 'Things people ask me',
+    ask: [
       {
         q: 'What does “AmirCollider” mean?',
         a: 'I always watched ARIA KEOXER’s videos and I was looking for a handle of my own. A short name plus a tag: I picked Amir for the name, and Collider is the name of one of the game-making pieces inside Unity. So you can tell from the handle alone that I was already programming before I started on YouTube.'
@@ -252,17 +253,7 @@ export const ABOUT = {
       { icon: '🌱', text: 'I am happy as long as everyone else is happy. Other people being sad makes me sad. I hope nobody ever feels sad in their life.' }
     ],
 
-    siteHead: 'And what this site is',
-    siteBody: 'Everything you see on amircollider.com — the game pages, the store, the leaderboard, the player account and the tool pages — runs on a single Cloudflare Worker that I wrote myself. There are two things here: the games I make, and the tools I first built for my own projects and then found were useful to other people too.',
-    siteLinks: [
-      { href: '/#games', label: 'Games' },
-      { href: '/tools', label: 'Tools' },
-      { href: '/release-notes', label: 'Release notes' }
-    ],
-
-    outro: 'Thank you for reading this far. 💜',
-    contactHead: 'If you want to say something',
-    email: 'Email'
+    outro: 'Thank you for reading this far. 💜'
   },
 
 
@@ -274,12 +265,12 @@ export const ABOUT = {
     dir: 'ltr',
 
     metaTitle: '自己紹介 — AmirCollider',
-    metaDesc: 'AmirCollider について。インディーゲーム開発者であり、このサイトの Unity ツールの作者です。始まりの話、失ったもの、そしてよく聞かれる質問への正直な答え。',
+    metaDesc: 'AmirCollider について。インディーゲーム開発者であり、このサイトの Unity ツールの作者であり、このサイト自体を作った人間です。どう始まり、何を失い、なぜ今も続いているのか。',
 
     breadcrumb: '自己紹介',
     hello: 'こんにちは、AmirCollider です!',
-    role: 'インディーゲーム開発者 · Unity ツール作者 · やめ方を知らない人間',
-    intro: '履歴書でも公式なプロフィールでもない、ふつうの自己紹介ページです。どう始まって、なぜ今も続いているのか、それだけを書きました。',
+    role: 'インディーゲーム開発者 · Unity ツール作者 · 今ご覧のこのサイトも、全部ひとりで作りました!',
+    intro: '子どもの頃はゲームで遊んでいて、そのうち作る側になって、気づいたらもうやめられなくなっていました。',
 
     privacyTitle: 'はじめに、ひとつだけお願い',
     privacyBody: '本名・年齢・住んでいる場所は伏せさせてください。ご理解ありがとうございます! 🙏',
@@ -287,50 +278,51 @@ export const ABOUT = {
 
     storyHead: '始まりの話',
     story: [
-      '子どもの頃から、遊ぶこと・作ること・発信することの 3 つが大好きでした。スマホとパソコンに向かう時間があまりに長くて、そのうち遊ぶだけでは足りなくなりました。自分の世界を作って、それを誰かにも楽しんでほしくなったのです。',
-      'けれど経験はなく、まともな学習教材もなく、年齢も若く、いつもひとりで作っていました。その結果、昔の記録も初期の作品もほとんど失いました。作ったものの多くは消えて、またゼロから作り直しました — そして 2 度目はいつも、1 度目より良いものになりました。'
+      '子どもの頃から、遊ぶこと・作ること・発信することの 3 つが大好きでした。スマホとパソコンに向かう時間があまりに長くて、そのうち遊ぶだけでは足りなくなりました。',
+      '当時は良いゲームが多くなくて、自分の世界を作りたくなったんです。誰かにも楽しんでもらえる世界を。すべてはそこから始まりました。'
     ],
 
-    proofHead: '当時から残っている唯一の記録',
-    proofLede: '昔の仕事の証拠はほとんど残っていません。日付をたどれるのはこれだけです。この 2 つより前から Unity と YouTube を触っていましたが、見せられるものが残っていません。',
+    learningHead: '学びの道のりと、その代償',
+    learning: [
+      '経験はなく、まともな学習教材もなく、年齢も若く、いつもひとりで作っていました。頼れる AI もありませんでした。つまり今できることは、すべてゼロから身につけたものです。',
+      'その代償として、初期の作品はほとんど失いました。作ったものの多くは消えて、私はまた作り直しました。2 度目はいつも、1 度目より良いものになりました。',
+      'だから手元に残っているものは少ないのですが、それは気になりません。失われても、作る力のほうは自分の中に残ったからです。'
+    ],
+
+    proofHead: '時間の足あと',
+    proofLede: '昔の仕事の証拠はほとんど残っていません。記録が残っているのはこれだけです。この 2 つより前から Unity と YouTube を触っていましたが、見せられるものが残っていません。',
     proof: [
       {
+        icon: '🎮',
         date: '2020年8月11日',
         title: 'Unity ライセンス',
         body: '作業していたことを示す、いちばん古い痕跡です。'
       },
       {
+        icon: '🎬',
         date: '2020年12月16日',
         title: '最初の YouTube 動画',
         body: '公開したもののうち、日付が今も残っている最初のものです。'
       },
       {
+        icon: '🔁',
         date: '2023年12月26日',
         title: 'YouTube の再スタート',
-        body: 'それ以前の動画は自分で非公開にし、チャンネルを作り直しました。'
+        body: 'チャンネルを作り直し、この日以降を残しています。'
       }
     ],
     proofNote: '各種アカデミーやイラン国立ゲーム開発研究所の修了証もありますが、本名が記載されているため公開していません。',
 
-    fairHead: '聞かれそうな質問',
-    fairLede: 'どれも当然の疑問だと思うので、答えを書いておきます。',
-    fair: [
-      {
-        q: '6 年もやっていて、なぜ実績がこんなに少ないのですか?',
-        a: '知らないことが多く、学べる教材がなく、頼れる AI もなかったからです。今持っているものはすべてゼロから作りました。作ったものの多くを失い、そのたびに取り戻し、前より良いものにしてきました。'
-      },
-      {
-        q: '最初の YouTube 動画が 2023年12月26日なのはなぜですか?',
-        a: '実際はそうではありません。それ以前の動画は自分で非公開にしました。画質が低くカクついていたので、言いたいことをもう一度きちんと作り直したかったのです。'
-      },
-      {
-        q: 'なぜ YouTube の投稿が少なく、そのまま止まったのですか?',
-        a: '2023年12月26日に再開したとき、PC を新しくし、安価なマイクも買いました。今度こそ問題なく撮れると思ったからです。それでも PC は、自分がやりたくて視聴者も見たいゲームを動かせるほどの性能ではなく、マイクの音質も十分ではありませんでした。加えて、とても書き並べられないほど不思議な問題が生活の中にありました。それらとは折り合いをつけて続けましたが、最後に残ったのがインターネットです。速度の遅さは問題ではなく、料金が問題でした。アップロードに足りる大容量プランを買えるだけのお金がありません :) それでもこの仕事が好きなので、できる最初の機会に YouTube を再開します。'
-      }
+    youtubeHead: 'YouTube の話',
+    youtube: [
+      '2023年12月26日より前の動画は、自分で非公開にしました。画質が低くカクついていたので、言いたいことをもう一度きちんと作り直したかったのです。',
+      '同じ時期に PC を新しくし、安価なマイクも買いました。今度こそきれいに撮れると思ったからです。それでも PC は、自分がやりたくて視聴者も見たいゲームを動かせるほどの性能ではなく、マイクの音質も十分ではありませんでした。',
+      '加えて、とても書き並べられないほど不思議な問題が生活の中にありました。それらとは折り合いをつけて続けましたが、最後に残ったのがインターネットです。速度の遅さは問題ではなく、料金が問題でした。アップロードに足りる大容量プランを買えるだけのお金がありません :)',
+      'それでもこの活動が好きなので、できる最初の機会に YouTube を再開します。'
     ],
 
-    moreHead: 'もう少し質問',
-    more: [
+    askHead: 'よく聞かれること',
+    ask: [
       {
         q: '「AmirCollider」の意味は?',
         a: 'ARIA KEOXER さんの動画をいつも見ていて、自分にもハンドルネームが欲しくなりました。短い名前 + 呼び名という形で、名前は Amir を選び、Collider は Unity のゲーム制作で使う要素の名前です。つまりこの名前だけで、YouTube を始める前からプログラミングをしていたことが分かります。'
@@ -369,17 +361,7 @@ export const ABOUT = {
       { icon: '🌱', text: '周りの人が幸せなら、私も幸せです。誰かが悲しんでいると私も悲しくなります。誰も人生で悲しい思いをしませんように。' }
     ],
 
-    siteHead: 'このサイトについて',
-    siteBody: 'amircollider.com で見えるもの — ゲームページ、ストア、ランキング、プレイヤーアカウント、ツールのページ — はすべて、私が書いた 1 つの Cloudflare Worker で動いています。ここにあるのは 2 つです。私が作るゲームと、もともと自分のプロジェクトのために作り、他の方にも役立つと分かったツールです。',
-    siteLinks: [
-      { href: '/#games', label: 'ゲーム' },
-      { href: '/tools', label: 'ツール' },
-      { href: '/release-notes', label: 'リリースノート' }
-    ],
-
-    outro: 'ここまで読んでくださってありがとうございます。💜',
-    contactHead: '何かひとこと',
-    email: 'メール'
+    outro: 'ここまで読んでくださってありがとうございます。💜'
   }
 }
 
@@ -396,9 +378,10 @@ export function aboutFor(lang) {
  * The FAQPage node is built from this rather than from a second
  * hand-written list, because structured data that says something
  * the page does not is the one kind of markup Google penalises
- * rather than ignores.
+ * rather than ignores. The narrative sections are deliberately
+ * absent: they are prose, not questions, and dressing them up as
+ * a Q&A for a crawler would be exactly that kind of markup.
  */
 export function aboutFaq(lang) {
-  const pack = aboutFor(lang)
-  return [...(pack.fair || []), ...(pack.more || [])]
+  return aboutFor(lang).ask || []
 }
