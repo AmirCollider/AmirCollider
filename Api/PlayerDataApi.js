@@ -143,6 +143,50 @@ async function refuseIfSomebodyElses(db, playerId, email, requestId) {
   return playerIdConflict(requestId, { playerId })
 }
 
+/**
+ * Creates the caller's own row if this is the first time they have
+ * been seen.
+ *
+ * The schema says "the row is created at first sign-in", and nothing
+ * created it. There is no INSERT into `players` anywhere else in this
+ * Worker: a row came from the migration's demo seed or from nowhere at
+ * all. So a player who had signed in perfectly well - correct token,
+ * correct id - still met 404 on their profile and 404 on every score
+ * they tried to save, for as long as they owned the game.
+ *
+ * Here rather than at sign-in because this is where an identity has
+ * just been verified against Google, and because a row is then only
+ * ever made for the person asking about themselves: `authenticate`
+ * has already resolved the id from the token, and the callers below
+ * have already refused a path naming anybody else.
+ *
+ * INSERT OR IGNORE, so two first requests racing each other produce
+ * one row rather than an error, and so an id that already belongs to
+ * somebody else is left exactly as it is - the collision guard that
+ * follows is what refuses that case, and it can only do its job on a
+ * row this has not overwritten.
+ *
+ * `username` is deliberately left null. The column takes 3 to 12
+ * English letters and digits and nothing else, which a Google account
+ * name is under no obligation to be; the player chooses one on the
+ * site, and until then the game shows their account name instead.
+ */
+async function ensureOwnRow(db, playerId, identity) {
+  if (!playerId || !identity || !identity.email) return
+
+  try {
+    const now = Date.now()
+    await db.prepare(
+      `INSERT OR IGNORE INTO players (player_id, email, profile_pic_url, created_at, last_login)
+       VALUES (?, ?, ?, ?, ?)`
+    ).bind(playerId, identity.email, identity.picture || null, now, now).run()
+  } catch {
+    // Not fatal on its own. Whatever the caller was doing is about to
+    // read or write the same row and will report the failure itself,
+    // with the status that actually describes it.
+  }
+}
+
 function parseJsonBody(body, requestId) {
   try {
     return { data: JSON.parse(body) }
@@ -200,6 +244,11 @@ export async function handleDatabaseGet(url, request, gameId, requestId, GAMES, 
           requestId
         }, 403)
       }
+
+      // Their own record, and they have just proved who they are, so
+      // "there is no row yet" is the first read of a new player rather
+      // than a failure to report back to them.
+      await ensureOwnRow(db, userMatch[1], caller.identity)
 
       const player = await db.prepare('SELECT * FROM players WHERE player_id = ? LIMIT 1')
         .bind(userMatch[1]).first().catch(() => null)
@@ -278,6 +327,11 @@ export async function handleDatabaseSet(url, request, gameId, requestId, GAMES, 
   try {
     const highScoreMatch = dbPath.match(/^games\/([^/]+)\/users\/([^/]+)\/highScore$/)
     if (highScoreMatch) {
+      // Before the guard, not after: an id that already belongs to
+      // somebody else is left untouched by INSERT OR IGNORE, so the
+      // guard still has the other person's row to refuse on.
+      await ensureOwnRow(db, highScoreMatch[2], auth.identity)
+
       const conflict = await refuseIfSomebodyElses(db, highScoreMatch[2], auth.identity.email, requestId)
       if (conflict) return conflict
       return writeHighScore(db, highScoreMatch[2], body, gameId, requestId)
@@ -285,6 +339,8 @@ export async function handleDatabaseSet(url, request, gameId, requestId, GAMES, 
 
     const userMatch = dbPath.match(/^games\/([^/]+)\/users\/([^/]+)$/)
     if (userMatch) {
+      await ensureOwnRow(db, userMatch[2], auth.identity)
+
       const conflict = await refuseIfSomebodyElses(db, userMatch[2], auth.identity.email, requestId)
       if (conflict) return conflict
       return writeProfile(db, userMatch[2], body, gameId, requestId, false)
@@ -395,6 +451,8 @@ export async function handleDatabasePatch(url, request, gameId, requestId, GAMES
   if (!auth.ownerMatch) return unknownPath(requestId)
 
   try {
+    await ensureOwnRow(db, auth.ownerMatch[1], auth.identity)
+
     const conflict = await refuseIfSomebodyElses(db, auth.ownerMatch[1], auth.identity.email, requestId)
     if (conflict) return conflict
     return await writeProfile(db, auth.ownerMatch[1], body, gameId, requestId, true)
