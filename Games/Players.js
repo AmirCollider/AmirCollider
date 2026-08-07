@@ -243,8 +243,16 @@ export async function setUsername(database, playerId, username) {
       .bind(name, playerId).first()
     if (taken) return { ok: false, reason: 'taken' }
 
-    await database.prepare('UPDATE players SET username = ? WHERE player_id = ?')
+    // The row-count is checked now. This returned ok for an UPDATE
+    // that matched nothing, so a player with no row — everybody who
+    // reached the site before they had ever played, back when only
+    // the game client created rows — was told their name was saved
+    // and given a form that had done nothing.
+    const result = await database.prepare('UPDATE players SET username = ? WHERE player_id = ?')
       .bind(name, playerId).run()
+
+    if (!changed(result)) return { ok: false, reason: 'no_such_player' }
+
     return { ok: true, reason: '' }
   } catch {
     return { ok: false, reason: 'failed' }

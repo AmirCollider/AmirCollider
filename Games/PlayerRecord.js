@@ -234,6 +234,88 @@ export function buildProfileUpdate(data, includeGamesPlayed = false, currentData
 
 
 // ==========================================
+// ensurePlayerRow
+// Creates the caller's own row the first time they are seen.
+//
+// The schema says "the row is created at first sign-in", and for
+// a long time only ONE of the two sign-ins created it: the game
+// client's, on its way through Api/PlayerDataApi.js. The website
+// signed a player in, minted them a week-long session, welcomed
+// them by name - and left the players table untouched.
+//
+// What that looked like to somebody who visited the site before
+// they had played:
+//
+//   - the stats block and the whole profile form are rendered
+//     `record ? ... : ''`, so both simply were not on the page.
+//     There was no way to set a username or an avatar at all.
+//   - a save that did reach the server UPDATEd nothing and said
+//     it had worked, because setUsername() never looked at how
+//     many rows changed.
+//   - and then playing the game created the row for real, with
+//     a null username, quietly discarding whatever they thought
+//     they had set.
+//
+// So it lives here, next to everything else that knows the shape
+// of this table, and both sign-ins call it.
+//
+// INSERT OR IGNORE, so two first requests racing each other
+// produce one row rather than an error - and so an id that
+// already belongs to somebody else is left exactly as it is. The
+// collision guard in Core/PlayerIdentity.js is what refuses that
+// case, and it can only do its job on a row this has not
+// overwritten.
+//
+// `username` is deliberately left null. The column takes 3 to 12
+// English letters and digits and nothing else, which a Google
+// account name is under no obligation to be; the player chooses
+// one on the site, and until then the game shows their account
+// name instead.
+// ==========================================
+export async function ensurePlayerRow(db, playerId, identity) {
+  if (!db || !playerId || !identity || !identity.email) return
+
+  try {
+    const now = Date.now()
+
+    await db.prepare(
+      `INSERT OR IGNORE INTO players (player_id, email, profile_pic_url, created_at, last_login)
+       VALUES (?, ?, ?, ?, ?)`
+    ).bind(playerId, identity.email, identity.picture || null, now, now).run()
+
+    // ==========================================
+    // The picture, for a row that already existed.
+    //
+    // INSERT OR IGNORE fills profile_pic_url in exactly once -
+    // the moment the row is created. A player whose row was made
+    // before Google's picture was being read, or made by a path
+    // that had no identity to hand, therefore had no picture and
+    // no way of ever getting one: the game asked for the profile,
+    // the profile came back with photoURL empty, and the avatar
+    // stayed on its placeholder for good.
+    //
+    // Only when the column is empty. A picture the player chose
+    // on the site is theirs, and having Google overwrite it on
+    // every sign-in would be a worse bug than the one this fixes.
+    // ==========================================
+    if (identity.picture) {
+      await db.prepare(
+        `UPDATE players
+            SET profile_pic_url = ?, last_login = ?
+          WHERE player_id = ?
+            AND email = ?
+            AND (profile_pic_url IS NULL OR profile_pic_url = '')`
+      ).bind(identity.picture, now, playerId, identity.email).run()
+    }
+  } catch {
+    // Not fatal on its own. Whatever the caller was doing is about to
+    // read or write the same row and will report the failure itself,
+    // with the status that actually describes it.
+  }
+}
+
+
+// ==========================================
 // Moderation, enforced
 //
 // A ban that only shows in the panel is a note, not a ban. Every

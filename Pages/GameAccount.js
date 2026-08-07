@@ -18,6 +18,8 @@ import { logInfo, logWarning, logError } from '../Core/Logging.js'
 import { resolveGame, isDownloadable, effectiveProducts } from '../Games/Registry.js'
 import { db, listEntitlements } from '../Games/Store.js'
 import { playerDb, getGamePlayer, setUsername } from '../Games/Players.js'
+import { ensurePlayerRow } from '../Games/PlayerRecord.js'
+import { emailMatchesRow } from '../Core/PlayerIdentity.js'
 import {
   readPlayerSession, issuePlayerSession, clearPlayerSession, verifyGoogleIdToken
 } from '../Games/Session.js'
@@ -70,6 +72,7 @@ const I18N = {
     profileSaved: 'ذخیره شد.',
     nameTaken: 'این نام کاربری قبلاً گرفته شده. یکی دیگر انتخاب کن.',
     nameBad: 'نام کاربری باید ۳ تا ۱۲ نویسه و فقط حروف انگلیسی و عدد باشد. آدرس تصویر هم باید با https شروع شود.',
+    nameConflict: 'این شناسه‌ی بازیکن به حساب گوگل دیگری تعلق دارد. برای جدا کردن رکورد با پشتیبانی تماس بگیر.',
 
     ownedTitle: 'خریدهای تو',
     ownedEmpty: 'هنوز چیزی نخریده‌ای. فروشگاه را ببین.',
@@ -132,6 +135,7 @@ const I18N = {
     profileSaved: 'Saved.',
     nameTaken: 'That username is already taken. Pick another.',
     nameBad: 'A username is 3 to 12 characters, English letters and digits. A picture URL must start with https.',
+    nameConflict: 'This player id already belongs to a different Google account. Contact support so the record can be separated.',
 
     ownedTitle: 'What you own',
     ownedEmpty: 'Nothing yet. Have a look at the store.',
@@ -194,6 +198,7 @@ const I18N = {
     profileSaved: '保存しました。',
     nameTaken: 'そのユーザー名は既に使われています。',
     nameBad: 'ユーザー名は 3〜12 文字の英数字です。画像 URL は https で始まる必要があります。',
+    nameConflict: 'このプレイヤー ID は別の Google アカウントのものです。記録を分けるにはサポートにご連絡ください。',
 
     ownedTitle: '所有アイテム',
     ownedEmpty: 'まだ何もありません。ストアをご覧ください。',
@@ -269,11 +274,31 @@ export async function handleGameAccount(url, request, gameId, requestId, GAMES, 
   // no join date, no score and no play time until now: it was
   // only ever reading the table that holds purchases.
   //
-  // Null is a fine answer: a player who has signed in on the site
-  // but never launched the game has no row yet, and the page
-  // simply leaves that section out.
+  // The row is created here if this player has never had one.
+  //
+  // "Null is a fine answer" is what this used to say, and it was
+  // not: the stats block and the profile form are both rendered
+  // `record ? ... : ''`, so a player with no row was shown an
+  // account page with no account on it — no name to set, no
+  // avatar to set, nothing. Signing in on the site is a sign-in,
+  // and the schema has always said the row is made at first
+  // sign-in; it was simply only ever made by the game.
+  //
+  // Also covers the sessions already out there, which were minted
+  // by a build that created nothing. They last a week, so waiting
+  // for them to expire is not a fix.
   const gameDatabase = playerDb(env, game)
-  const record = gameDatabase ? await getGamePlayer(gameDatabase, player.playerId) : null
+
+  if (gameDatabase) await ensurePlayerRow(gameDatabase, player.playerId, player)
+
+  const found = gameDatabase ? await getGamePlayer(gameDatabase, player.playerId) : null
+
+  // A row whose email is somebody else's is not this player's row,
+  // however well the derived id matches — see the note on the
+  // profile handler. Treated as no row at all: the stats shown
+  // would be another person's, and the form beside them would
+  // edit that person's name.
+  const record = emailMatchesRow(found, player.email) ? found : null
 
   const saved = url.searchParams.get('saved') === '1'
   const nameError = url.searchParams.get('name_error') || ''
@@ -320,7 +345,30 @@ export async function handleGameAccountProfile(url, request, gameId, requestId, 
   // so the player is not told "saved" about a form that half
   // applied.
   const username = String(form.get('username') || '').trim()
+
+  await ensurePlayerRow(database, player.playerId, player)
+
   const current = await getGamePlayer(database, player.playerId)
+
+  // ==========================================
+  // Is this row actually theirs?
+  //
+  // Deriving a player id from an address is not injective —
+  // fifteen characters of the local part means ali@gmail.com and
+  // ali@yahoo.com are both "ali". The game's data API has refused
+  // that case since Core/PlayerIdentity.js was written; this page
+  // never asked. So the second person to sign in on the SITE with
+  // a colliding address could rename the first one, and replace
+  // the avatar shown beside their score on the public board.
+  //
+  // Same rule, same helper, same answer as the game gets.
+  // ==========================================
+  if (!emailMatchesRow(current, player.email)) {
+    logWarning('Site profile edit refused: player id belongs to another account', {
+      requestId, gameId: id, playerId: player.playerId
+    })
+    return Response.redirect(back('?name_error=conflict'), 302)
+  }
 
   if (username && username !== (current && current.username)) {
     const named = await setUsername(database, player.playerId, username)
@@ -471,6 +519,23 @@ export async function completeSiteSignIn(url, request, stateData, code, GAMES, e
     return Response.redirect(`${url.origin}/${gameId}/account?error=1`, 302)
   }
 
+  // ==========================================
+  // The row, which this half of sign-in never made.
+  //
+  // Only the game client's requests ever created one. So somebody
+  // who came to the site first - to buy something, or to claim a
+  // username before their friends did - got a session, a welcome
+  // and an account page with no stats block and no profile form
+  // on it at all, because both are rendered `record ? ... : ''`.
+  // There was no way to set a name. Then playing the game created
+  // the row properly, and anything they had managed to submit in
+  // the meantime had gone nowhere.
+  //
+  // Failure is not fatal here: the session is already valid, and
+  // the account page ensures the row again on its way in.
+  // ==========================================
+  await ensurePlayerRow(playerDb(env, game), player.playerId, player)
+
   logInfo('Player signed in on the site', { gameId, playerId: player.playerId })
 
   return new Response(null, {
@@ -619,7 +684,9 @@ function renderAccount(game, lang, theme, player, owned, record, flash = {}) {
       ${flash.saved ? `<div class="gnote is-ok" style="margin-block-end:14px">${escapeHtml(t.profileSaved)}</div>` : ''}
       ${flash.nameError
         ? `<div class="gnote is-err" style="margin-block-end:14px">${escapeHtml(
-            flash.nameError === 'taken' ? t.nameTaken : t.nameBad)}</div>` : ''}
+            flash.nameError === 'taken' ? t.nameTaken
+            : flash.nameError === 'conflict' ? t.nameConflict
+            : t.nameBad)}</div>` : ''}
 
       <form method="POST" action="/${escapeHtml(game.id)}/account/profile" class="acc-form">
         <label class="acc-field">
