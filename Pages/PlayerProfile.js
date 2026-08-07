@@ -10,6 +10,7 @@ import { createErrorPage } from '../Core/ErrorPage.js'
 import { logError } from '../Core/Logging.js'
 import { escapeHtml } from '../Core/Html.js'
 import { parseCookies, resolveLang, resolveRequestLang, resolveRequestTheme } from '../Core/RequestContext.js'
+import { localizedPath } from '../Core/Locale.js'
 import { authText, authLocale, renderAuthShell } from './AuthFlow.js'
 
 export async function handleUserProfile(url, request, gameId, requestId, GAMES, env) {
@@ -110,7 +111,7 @@ function renderProfilePage(userData, game, gameId, lang, theme) {
     </div>
 
     <div class="btn-container">
-      <a class="btn" href="/?lang=${code}">${escapeHtml(authText(lang, 'backHome'))}</a>
+      <a class="btn" href="${escapeHtml(localizedPath('/', code))}">${escapeHtml(authText(lang, 'backHome'))}</a>
       <a class="btn btn-secondary" href="/oauth/auth?game=${escapeHtml(gameId)}">${escapeHtml(authText(lang, 'enterGame'))}</a>
     </div>`
 

@@ -18,6 +18,7 @@
 
 import { CONFIG, LANGUAGES, GAME_STATUS } from '../Config.js'
 import { absoluteUrl, siteOrigin } from '../Core/Seo.js'
+import { localizedPath } from '../Core/Locale.js'
 
 
 // Paths a crawler must never index: operator panels, anything that
@@ -34,7 +35,13 @@ const DISALLOW = [
   '/database/',
   '/profile/',
   '/games/',
-  '/video/'
+  '/video/',
+
+  // The donation flow's inner steps, not the page itself. The
+  // trailing slash is what draws that line: '/donate' is a page
+  // with something to say and belongs in the index, '/donate/thanks'
+  // is a receipt.
+  '/donate/'
 ]
 
 
@@ -58,11 +65,12 @@ function xmlEscape(value) {
 export function indexablePaths(games = {}) {
   const paths = [
     { loc: '/', priority: '1.0', changefreq: 'weekly' },
-    { loc: '/about', priority: '0.8', changefreq: 'monthly' },
+    { loc: '/about', priority: '0.9', changefreq: 'monthly' },
     { loc: '/games', priority: '0.9', changefreq: 'weekly' },
     { loc: '/tools', priority: '0.9', changefreq: 'weekly' },
     { loc: '/unity-docsnap', priority: '0.9', changefreq: 'weekly' },
     { loc: '/unity-directtmp', priority: '0.9', changefreq: 'weekly' },
+    { loc: '/donate', priority: '0.6', changefreq: 'monthly' },
     { loc: '/release-notes', priority: '0.6', changefreq: 'weekly' },
     { loc: '/privacy', priority: '0.4', changefreq: 'yearly' },
     { loc: '/terms', priority: '0.4', changefreq: 'yearly' }
@@ -114,30 +122,46 @@ export function handleRobots(url, request, gameId, requestId, GAMES) {
 // ==========================================
 // sitemap.xml
 //
-// Each URL carries an xhtml:link alternate per language, which is
-// how a trilingual page tells a crawler that its three forms are
-// one page and not three competing ones.
+// Every page appears once PER LANGUAGE, at its own address, and
+// each of those entries carries the full set of alternates
+// including itself.
+//
+// It used to list one entry per page - the bare path - with three
+// `?lang=` alternates hanging off it. That was the sitemap
+// faithfully describing the bug: those three addresses all declared
+// the bare path as their canonical, so the cluster named one page
+// three times and Google kept the one. The English and Japanese
+// versions of this site were never submitted anywhere, which is a
+// large part of why they were never indexed.
+//
+// Reciprocity is the rule an hreflang cluster is validated against:
+// if /about names /en/about as its English alternate, /en/about
+// must name /about as its Persian one, and both must name
+// themselves. Generating all of them from one loop is what makes
+// that true by construction rather than by proofreading.
 // ==========================================
 export function handleSitemap(url, request, gameId, requestId, GAMES) {
   const lastmod = new Date().toISOString().slice(0, 10)
 
-  const entries = indexablePaths(GAMES).map(entry => {
-    const canonical = absoluteUrl(entry.loc)
-    const alternates = LANGUAGES.supported.map(code => {
-      const href = canonical + (entry.loc.includes('?') ? '&' : '?') + 'lang=' + code
-      return '    <xhtml:link rel="alternate" hreflang="' + code + '" href="' + xmlEscape(href) + '"/>'
-    }).join('\n')
+  const entries = indexablePaths(GAMES).flatMap(entry => {
+    const alternates = LANGUAGES.supported.map(code =>
+      '    <xhtml:link rel="alternate" hreflang="' + code + '" href="'
+      + xmlEscape(absoluteUrl(localizedPath(entry.loc, code))) + '"/>'
+    ).join('\n')
 
-    return [
+    const xDefault = '    <xhtml:link rel="alternate" hreflang="x-default" href="'
+      + xmlEscape(absoluteUrl(localizedPath(entry.loc, LANGUAGES.default))) + '"/>'
+
+    return LANGUAGES.supported.map(code => [
       '  <url>',
-      '    <loc>' + xmlEscape(canonical) + '</loc>',
+      '    <loc>' + xmlEscape(absoluteUrl(localizedPath(entry.loc, code))) + '</loc>',
       alternates,
-      '    <xhtml:link rel="alternate" hreflang="x-default" href="' + xmlEscape(canonical) + '"/>',
+      xDefault,
       '    <lastmod>' + lastmod + '</lastmod>',
       '    <changefreq>' + entry.changefreq + '</changefreq>',
       '    <priority>' + entry.priority + '</priority>',
       '  </url>'
-    ].join('\n')
+    ].join('\n'))
   }).join('\n')
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>

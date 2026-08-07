@@ -531,12 +531,28 @@ export function getLogosHTML(amirLogo, gameLogo, gameName) {
 // Document <head> fragment: charset, viewport, theme metadata, title and
 // icons. Native UI follows the active theme via color-scheme / theme-color.
 //
-// Two icons, one logo. The PNG is the object itself; /icon.svg is the
-// same object with a safe area drawn around it, which is what stops a
-// round crop - Google's mobile results, a share sheet - taking the
-// corners off a mark that fills its own square. A browser that
-// understands SVG favicons takes the SVG whichever order they appear
-// in; one that does not never sees that line. See Pages/Icon.js.
+// ------------------------------------------------------------
+// THE ICONS
+// ------------------------------------------------------------
+// One logo, three declarations, and the order is deliberate.
+//
+// /icon.svg is the logo with a backdrop painted under it and a safe
+// area around it (Pages/Icon.js). It is first and it is what any
+// modern browser and Google's favicon fetcher will take, because it
+// is the only form of the mark that survives being cropped to a
+// circle.
+//
+// /favicon.ico is the raw logo, and it is here for two audiences:
+// anything that cannot read an SVG icon, and everything that asks
+// for that address without reading the document at all. There used
+// to be no route for it, so those requests got the 404 page - an
+// HTML document served where an image was expected, which is enough
+// on its own to leave a tab blank.
+//
+// The `amirLogo` parameter is no longer used for any of them. It
+// stays in the signature because every page passes it, and a
+// removed parameter is a merge conflict in fifteen files for no
+// gain.
 // ==========================================
 export function getPageHead({ title, amirLogo, description = '' }) {
   return `
@@ -548,10 +564,10 @@ export function getPageHead({ title, amirLogo, description = '' }) {
   <meta name="format-detection" content="telephone=no">
   <meta name="google-site-verification" content="uFvaRQchIco-iyGmdsNknLK7mL5Asxg47GjaOQmhf0Q" />
   <title>${title}</title>
-  <link rel="icon" href="${amirLogo}" type="image/png">
-  <link rel="icon" href="/icon.svg" type="image/svg+xml">
-  <link rel="shortcut icon" href="${amirLogo}" type="image/png">
-  <link rel="apple-touch-icon" href="${amirLogo}">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml" sizes="any">
+  <link rel="icon" href="/favicon.ico" sizes="48x48">
+  <link rel="apple-touch-icon" href="/icon.svg">
+  <link rel="manifest" href="/site.webmanifest">
   ${description ? `<meta name="description" content="${description}">` : ''}
   `
 }

@@ -24,12 +24,89 @@ keeps working exactly as before.
 > Adding a new hostname to the Worker later? Add it to `ALT_HOSTS`, or
 > it will serve a second copy of the whole site.
 
+### One address per language
+
+**This is the change that mattered most, and it is worth understanding
+before touching anything near it.**
+
+Every language now has its own URL:
+
+| Language | Address |
+|---|---|
+| Persian (default) | `/about` |
+| English | `/en/about` |
+| Japanese | `/ja/about` |
+
+`Core/Locale.js` owns the rule; `Worker.js` applies it.
+
+**What it replaced, and why that was fatal.** The language used to live
+in `?lang=`. So `/`, `/?lang=fa`, `/?lang=en` and `/?lang=ja` were four
+addresses that all declared `/` as their canonical. A search engine
+resolves an hreflang cluster whose members all point at one member by
+keeping that member and discarding the annotations — so the site had
+exactly **one indexable address per page**, not three.
+
+And the language of that one address was decided by `Accept-Language`.
+Googlebot sends no `Accept-Language` header, and `LANGUAGES.default` is
+`fa`. Every page Google has ever indexed of this site is therefore the
+Persian one. That is the mechanism behind "searching the brand from a
+non-Persian IP finds nothing" and behind the English and Japanese
+content never appearing anywhere.
+
+**The rule that makes it work:** a bare path is *always* the default
+language. Not "the default unless a cookie says otherwise" — always.
+One URL, one language, one set of bytes, for every visitor and every
+crawler. A human who prefers another language is redirected to that
+language's own URL with a **302** (the preference belongs to the
+visitor, not to the address); Googlebot, sending neither a cookie nor
+an `Accept-Language` header, never sees that redirect.
+
+**Every old address still resolves:**
+
+| Request | Response |
+|---|---|
+| `/about?lang=en` | `301` → `/en/about` |
+| `/fa/about` | `301` → `/about` |
+| `/en/assets/x.png` | `301` → `/assets/x.png` |
+| `/en/checkout` | `301` → `/checkout?lang=en` |
+| `/about` + a reader who prefers English | `302` → `/en/about` |
+
+Query strings other than `lang` are preserved throughout — the
+checkout's signed order handle arrives as one.
+
+**What is deliberately exempt** (`NO_LANG_ROUTING` in `Core/Locale.js`):
+the machine surface (`/assets/`, `/oauth/`, `/database/`, `/games/{id}/…`)
+because shipped Android builds call it and some do not follow redirects
+at all; and the transactional surface (`/checkout`, `/order`, `/license`)
+because the payment provider holds a `success_url` carrying `?lang=` for
+the life of an invoice. Those pages are `noindex` and disallowed in
+`robots.txt`, so nothing is lost.
+
+> Adding a language: one entry in `LANGUAGES.supported`. Everything
+> below — canonicals, hreflang, the sitemap, the switcher — follows.
+>
+> A **two-letter game id** would collide with a language prefix.
+> `splitLangPath` guards against it by checking `LANGUAGES.supported`
+> rather than the shape alone, so such a game keeps working — but do
+> not name a game `fa`, `en` or `ja`.
+
+### Internal links follow the page's language
+
+`localizedPath()` is applied to every site-relative href: the header,
+the footer, breadcrumbs, game cards, tool cards, the product pages and
+the policy pages. A reader on the English front page used to leave it
+into Persian on the first click, and — more expensively — a crawler
+reading that page found **no English pages to follow at all**.
+
 ### Per-page metadata
 
 `Core/Seo.js` renders, for every page:
 
-- `<link rel="canonical">` — the page's own path on the canonical host
-- `hreflang` for `fa`, `en`, `ja` plus `x-default`
+- `<link rel="canonical">` — the page's own address **in the language it
+  is rendering**. Callers pass the bare path (`/about`); the prefix is
+  added once, inside `seoHead()`, so no page has to remember to do it.
+- `hreflang` for `fa`, `en`, `ja` plus `x-default` — now naming three
+  genuinely different canonicals, which is what makes the cluster real
 - `robots` — `index, follow, max-image-preview:large` by default,
   `noindex, nofollow` where the page passes `noindex: true`
 - OpenGraph and Twitter Card tags, with `og:image`
@@ -48,18 +125,39 @@ canonical links.
 
 ### The favicon
 
-`GET /icon.svg` (`Pages/Icon.js`) reads `CONFIG.AMIR_LOGO` out of R2 and
-serves it back inside an SVG with a **safe area** around it: the artwork
-sits in the middle 70% of the square, so any surface that crops the icon
-to a circle — Google's mobile results, some bookmark bars — takes the
-padding and not the logo's corners.
+Three routes, one logo object in R2.
 
-It is generated rather than uploaded, so there is no second image file
-to re-export whenever the logo changes. Every failure path (no R2
-binding, object missing, object implausibly large) redirects to the raw
-PNG, which is also what the `<link rel="icon" type="image/png">` above
-it points at — a browser with no SVG favicon support never sees the
-SVG line at all.
+`GET /icon.svg` (`Pages/Icon.js`) reads `CONFIG.AMIR_LOGO` out of R2 and
+serves it inside an SVG that does two things:
+
+1. paints `CONFIG.ICON_BG` across the **whole** canvas, and
+2. places the artwork inside the middle **70%**.
+
+Step 2 alone was the previous version, and it was not enough. Google
+draws a favicon inside a circle; the logo is a square that paints its
+own background to its own edges; insetting it inside a *transparent*
+canvas produced a small square sitting inside a ring — two shapes
+disagreeing, which is exactly what the search result showed. A circle
+can only ever crop the outermost band, so that band has to be something
+worth cropping. With the backdrop painted first, what the circle takes
+is a ring of solid colour and what it leaves is a round mark.
+
+> **Set `CONFIG.ICON_BG` to the logo's own background colour.** Whatever
+> colour the PNG paints its corners is the value that makes the seam
+> between artwork and backdrop invisible; anything else leaves a faint
+> square edge visible inside the circle.
+
+`GET /favicon.ico` serves the logo's own bytes as a PNG. A browser asks
+for that address whether the document links to an icon or not, and so do
+several crawlers — Google's favicon fetcher among them. There was no
+route for it, so all of them got the 404 page: an HTML document served
+where an image was expected, which is on its own enough to leave a tab
+blank.
+
+`GET /site.webmanifest` describes the icon to an Android launcher,
+including `purpose: "maskable"` — which tells the launcher the icon
+already carries its own safe area and it should not add padding of its
+own on top.
 
 > Replacing the logo is still one object in R2. Nothing else has to
 > change, in code or in the bucket.
@@ -95,6 +193,14 @@ looking for the name type it as two words.
 
 `Pages/Sitemap.js`. Both are generated from `GAME_REGISTRY`, so a game
 added in `Config.js` appears in the sitemap on the next deploy.
+
+The sitemap lists every page **once per language**, at its own address,
+each carrying the full reciprocal set of alternates — 48 URLs where
+there used to be 16. It previously listed one entry per page with three
+`?lang=` alternates hanging off it, which was the sitemap faithfully
+describing the bug: those three addresses all canonicalised back to the
+bare path, so the English and Japanese versions of this site were never
+submitted anywhere.
 
 Disallowed for crawlers: `/thegod`, `/testsite`, `/checkout`, `/order`,
 `/license`, `/oauth/`, `/auth/`, `/database/`, `/profile/`, `/games/`,
@@ -133,6 +239,31 @@ That is what makes a game page substantial with an empty database —
 and substance is the actual fix for a crawler that could not tell the
 site had games on it.
 
+### The front page has a paragraph, on purpose
+
+Google's result for this domain read:
+
+> قابل بازی بدون اینترنت ورود با گوگل ذخیره‌ی ابری جدول امتیازات خرید
+> درون‌برنامه‌ای. خرید درون‌برنامه‌ای پرداخت با ارز دیجیتال ورود به حساب
+> با حساب گوگل.
+
+That is not a description of anything. It is the capability chips off
+the first game card, read left to right (`Pages/GameCards.js`).
+
+A search engine writes its own snippet when the page gives it nothing
+better, and this page gave it nothing better: a one-word heading, a
+six-word tagline, four stat tiles of digits, and cards made almost
+entirely of two-word labels. The `<meta name="description">` was correct
+the whole time and was ignored — a description with no matching prose on
+the page is a claim a snippet generator has no reason to trust.
+
+`renderHero()` now emits a `lede` paragraph: one paragraph, in the
+reader's language, above everything else, saying the same thing as the
+meta description without being a copy of it.
+
+> If the snippet ever goes wrong again, this is the first thing to look
+> at — not the meta tag.
+
 ### noindex pages
 
 Diagnostics and anything transactional: `/metrics`, `/:game/health`,
@@ -157,8 +288,11 @@ Domain verification is already in place: `getPageHead()` emits the
    meta tag verifies it with no further work.
 3. **Sitemaps** → submit `sitemap.xml`.
 4. **URL Inspection** → paste `https://amircollider.com/` → *Request
-   indexing*. Repeat for `/games`, `/about`, `/tools`,
-   `/unity-docsnap`, `/unity-directtmp`, `/neon-katana`.
+   indexing*. Repeat for `/games`, `/about`, `/tools`, `/donate`,
+   `/unity-docsnap`, `/unity-directtmp`, `/neon-katana` — and then for
+   the **`/en/` form of each of them**, which is the half of the site
+   Google has never seen. `/en`, `/en/about` and `/en/neon-katana` are
+   the three worth doing first.
 5. Come back after a week and read **Pages** for anything reported as
    *Duplicate, Google chose a different canonical* — that is the one
    error class this setup is designed to prevent, and it is worth
@@ -179,11 +313,13 @@ deployment can do it:
 - Keep the product names spelled exactly the same everywhere. "Unity
   DocSnap" and "UnityDocSnap" are two different queries.
 - *AmirCollider* and *Amir Collider* are also two different queries.
-  The `alternateName` entries tell Google they name one thing, but the
-  association is something it decides over time — the off-site links
-  above are what make it decide sooner. Spell it **AmirCollider**
-  everywhere you write it yourself; the spaced form is for the people
-  typing it, not for the site to imitate.
+  Three things now say they are one name: the `alternateName` entries in
+  the structured data, a question on `/about` that answers it in prose
+  ("Is it AmirCollider or Amir Collider?"), and that question's presence
+  in the page's `FAQPage` markup. The association is still something
+  Google decides over time, and the off-site links above are what make
+  it decide sooner. Spell it **AmirCollider** everywhere you write it
+  yourself; the spaced form is for the people typing it.
 - Give it time. A new domain takes weeks to settle regardless of what
   the markup says.
 
@@ -282,6 +418,12 @@ choice for a client that is not about one particular game.
 | To change | Edit |
 |---|---|
 | The canonical domain | `CONFIG.SITE_URL` |
+| Which languages exist | `LANGUAGES.supported` |
+| Which paths take no language prefix | `NO_LANG_ROUTING` in `Core/Locale.js` |
+| The icon's backdrop colour | `CONFIG.ICON_BG` |
+| The front page's opening paragraph | `lede` in `DASH_I18N` (`Pages/Dashboard.js`) |
+| The social accounts | `CONFIG.SOCIAL` |
+| The donation amounts and bounds | `CONFIG.DONATE` |
 | What a game says it is for | `i18n.purpose` in `GAME_REGISTRY` |
 | A game page's baseline content | `landing` in `GAME_REGISTRY` |
 | The biography on `/about` | `Content/AboutMe.js` |

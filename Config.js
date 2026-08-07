@@ -79,7 +79,7 @@ export const CORS_HEADERS = deepFreeze({
 // Runtime constants. Durations are milliseconds.
 // ==========================================
 export const CONFIG = deepFreeze({
-  VERSION: '6.7.4',
+  VERSION: '6.8.0',
 
   // A constant rather than url.origin: a handful of places have to
   // produce an absolute address (a licence refusal, canonical and
@@ -214,9 +214,39 @@ export const CONFIG = deepFreeze({
   // Nothing is listed here on the strength of a guessed URL: an
   // account that turns out to belong to somebody else is a claim
   // about a stranger.
+  // Order matters: it is the order the footer and the About page
+  // render these in, and `sameAs` is read top-down.
   SOCIAL: {
     github: 'https://github.com/AmirCollider',
-    instagram: 'https://www.instagram.com/amir.collider/'
+    youtube: 'https://www.youtube.com/@amircollider',
+    instagram: 'https://www.instagram.com/amir.collider/',
+    x: 'https://x.com/AmirCollider'
+  },
+
+  // Donations. A separate shop again, and for the same reason the
+  // game store is separate from the licence checkout: nothing is
+  // delivered, so none of the fulfilment machinery applies. What is
+  // shared is the payment provider.
+  //
+  // The bounds are the provider's practical floor and a ceiling
+  // that exists only to keep a typo out of an invoice. A donation
+  // is not a product, so there is no catalogue and no price - the
+  // amount is whatever the person typed, validated against these.
+  DONATE: {
+    MIN_USD: 1,
+    MAX_USD: 5000,
+    // What the amount buttons offer before anybody types. Round
+    // numbers a person recognises, not a pricing ladder.
+    PRESETS_USD: [3, 5, 10, 25],
+    DEFAULT_USD: 5,
+    // Donations one IP may open per hour. Lower than either shop's:
+    // there is no delivery to chase, so the only thing a loop here
+    // can produce is noise in the provider's dashboard.
+    RATE_LIMIT: 8,
+    RATE_WINDOW_MS: 60 * 60 * 1000,
+    // How long a donor's note may be. It travels to the provider as
+    // the invoice description and comes back in their dashboard.
+    MAX_NOTE: 140
   },
 
   STATE_EXPIRY_MS: 30 * 60 * 1000,
@@ -227,7 +257,29 @@ export const CONFIG = deepFreeze({
   AUTO_COPY_CODE: true,
   SUPPORT_EMAIL: 'amiru.koraida@gmail.com',
   AMIR_LOGO: '/assets/AmirColliderLogo.png',
-  DEFAULT_GAME_LOGO: '/assets/DefaultGameLogo.png'
+  DEFAULT_GAME_LOGO: '/assets/DefaultGameLogo.png',
+
+  // ==========================================
+  // The icon's backdrop.
+  //
+  // Google draws a favicon inside a circle in its results, and so
+  // do a share sheet, an Android launcher and a bookmark bar. The
+  // logo is a square with its own background painted to its own
+  // edges, so dropping it into that circle showed a square floating
+  // inside a ring - two shapes disagreeing, with the corners cut
+  // off for good measure.
+  //
+  // Pages/Icon.js fixes that by painting this colour across the
+  // whole icon canvas FIRST and then placing the artwork inside the
+  // middle 70%. The circle then crops nothing but this colour, and
+  // what comes back is a solid round mark with the logo centred in
+  // it.
+  //
+  // Set it to the logo's own background colour. Whatever colour
+  // the PNG paints its corners is the value that makes the seam
+  // between artwork and backdrop invisible; anything else leaves a
+  // faint square edge visible inside the circle.
+  ICON_BG: '#0b0e16'
 })
 
 

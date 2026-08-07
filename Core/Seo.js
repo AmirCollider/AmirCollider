@@ -30,6 +30,7 @@
 import { CONFIG, LANGUAGES } from '../Config.js'
 import { escapeHtml } from './Html.js'
 import { resolveLang } from './RequestContext.js'
+import { localizedPath } from './Locale.js'
 
 
 const OG_LOCALE = { fa: 'fa_IR', en: 'en_US', ja: 'ja_JP' }
@@ -61,12 +62,19 @@ export function absoluteUrl(path = '/') {
   return siteOrigin() + (suffix.startsWith('/') ? suffix : '/' + suffix)
 }
 
-/** The same path carrying an explicit ?lang=, for hreflang. */
+/**
+ * The same page's address in another language.
+ *
+ * This used to append `?lang=`, and that is the single line that
+ * cost this site its multilingual indexing. Every variant it
+ * produced canonicalised back to the bare path, so the hreflang
+ * cluster named four URLs that were all declared to be one URL -
+ * which a search engine resolves by keeping the one and discarding
+ * the annotations. See Core/Locale.js.
+ */
 function langVariant(path, code) {
-  const [bare, query = ''] = String(path || '/').split('?')
-  const params = new URLSearchParams(query)
-  params.set('lang', code)
-  return absoluteUrl(bare + '?' + params.toString())
+  const bare = String(path || '/').split('?')[0]
+  return absoluteUrl(localizedPath(bare, code))
 }
 
 
@@ -167,14 +175,24 @@ export function personLd(lang, { description = '', path = '/about' } = {}) {
 }
 
 
-/** The About page itself, tied to the person it is about. */
+/**
+ * The About page itself, tied to the person it is about.
+ *
+ * `@id` stays on the bare path while `url` carries the language
+ * prefix: the id names one thing across every translation of the
+ * page, and the url names the address these particular bytes came
+ * from. Collapsing the two would give the English and Persian
+ * pages different ids for the same profile.
+ */
 export function profilePageLd(lang, path = '/about') {
+  const code = resolveLang(lang)
+
   return {
     '@context': 'https://schema.org',
     '@type': 'ProfilePage',
     '@id': absoluteUrl(path) + '#profilepage',
-    url: absoluteUrl(path),
-    inLanguage: resolveLang(lang),
+    url: absoluteUrl(localizedPath(path, code)),
+    inLanguage: code,
     mainEntity: { '@id': absoluteUrl('/about#person') },
     about: { '@id': absoluteUrl('/about#person') },
     isPartOf: { '@id': absoluteUrl('/#website') }
@@ -198,9 +216,19 @@ export function faqPageLd(entries = []) {
   }
 }
 
-/** BreadcrumbList from the same trail SiteNav renders. */
-export function breadcrumbLd(trail = []) {
+/**
+ * BreadcrumbList from the same trail SiteNav renders.
+ *
+ * `lang` localises the `item` URLs so the trail on an English page
+ * names English addresses. Optional, and bare paths when it is
+ * omitted - a breadcrumb pointing at the default language is
+ * wrong-ish rather than broken, and every caller passing it is
+ * better than one caller crashing without it.
+ */
+export function breadcrumbLd(trail = [], lang = LANGUAGES.default) {
   if (!trail || trail.length === 0) return null
+  const code = resolveLang(lang)
+
   return {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
@@ -208,7 +236,7 @@ export function breadcrumbLd(trail = []) {
       '@type': 'ListItem',
       position: index + 1,
       name: item.label,
-      item: absoluteUrl(item.href || '/')
+      item: absoluteUrl(localizedPath(item.href || '/', code))
     }))
   }
 }
@@ -303,17 +331,34 @@ export function seoHead({
   graph = []
 } = {}) {
   const code = resolveLang(lang)
-  const canonical = absoluteUrl(path)
+
+  // The canonical is this page's address IN THE LANGUAGE IT IS
+  // RENDERING. Callers pass the bare, language-free path they are
+  // conceptually at ('/about'); the prefix is added here, once, so
+  // no page has to remember to do it.
+  //
+  // This is what makes the hreflang block below mean something: the
+  // three URLs it names are three different canonicals, so a search
+  // engine can hold all three and pick per reader, instead of
+  // collapsing them into one and picking the language for everyone.
+  const bare = String(path || '/').split('?')[0]
+  const canonical = absoluteUrl(localizedPath(bare, code))
+
   const imageUrl = /^https?:\/\//.test(String(image)) ? String(image) : absoluteUrl(image)
 
   const robots = noindex
     ? '<meta name="robots" content="noindex, nofollow">'
     : '<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">'
 
+  // x-default points at the bare path - the default language's own
+  // address - because that is the URL a reader with no matching
+  // language should be sent to, and it is a real page rather than a
+  // redirector.
   const hreflang = alternates && !noindex
     ? LANGUAGES.supported.map(entry =>
-        '<link rel="alternate" hreflang="' + entry + '" href="' + escapeHtml(langVariant(path, entry)) + '">'
-      ).join('\n  ') + '\n  <link rel="alternate" hreflang="x-default" href="' + escapeHtml(canonical) + '">'
+        '<link rel="alternate" hreflang="' + entry + '" href="' + escapeHtml(langVariant(bare, entry)) + '">'
+      ).join('\n  ') + '\n  <link rel="alternate" hreflang="x-default" href="'
+        + escapeHtml(absoluteUrl(localizedPath(bare, LANGUAGES.default))) + '">'
     : ''
 
   const nodes = []

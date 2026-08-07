@@ -28,6 +28,7 @@
 
 import { escapeHtml, safeColor } from '../Core/Html.js'
 import { dirFor, resolveLang } from '../Core/RequestContext.js'
+import { localizedPath } from '../Core/Locale.js'
 
 const DEFAULT_LANG = 'fa'
 
@@ -202,6 +203,22 @@ function localizedDescription(game, lang) {
 // Reduce an id to a safe slug for use in selectors, hrefs and JS calls.
 function safeId(id) {
   return String(id == null ? '' : id).replace(/[^a-zA-Z0-9_-]/g, '')
+}
+
+
+/**
+ * One of a game's addresses, in the language the card is rendering
+ * in: at('neon-katana', '/store', 'en') -> '/en/neon-katana/store'.
+ *
+ * A card is the densest cluster of internal links on the site, and
+ * before this every one of them pointed at the default language. A
+ * reader on the English front page reached an English game card and
+ * left it into Persian; a crawler reading that page found no
+ * English pages to follow at all, which is most of what "Google
+ * only knows the Persian site" was made of.
+ */
+function at(sid, suffix, lang) {
+  return localizedPath('/' + sid + (suffix || ''), lang)
 }
 
 
@@ -731,10 +748,10 @@ function createCapabilities(game, lang) {
     chips.push({ ic: 'wifiOff', label: t(lang, 'capOffline'), lead: true, title: offlineHint(game, lang) })
   }
 
-  if (capability.login) chips.push({ ic: 'key', label: t(lang, 'capLogin'), href: `/${sid}/account` })
-  if (capability.cloudSave) chips.push({ ic: 'cloud', label: t(lang, 'capCloud'), href: `/${sid}/account` })
-  if (capability.leaderboard) chips.push({ ic: 'leaderboard', label: t(lang, 'capBoard'), href: `/${sid}/leaderboard` })
-  if (capability.store) chips.push({ ic: 'cart', label: t(lang, 'capStore'), href: `/${sid}/store` })
+  if (capability.login) chips.push({ ic: 'key', label: t(lang, 'capLogin'), href: at(sid, '/account', lang) })
+  if (capability.cloudSave) chips.push({ ic: 'cloud', label: t(lang, 'capCloud'), href: at(sid, '/account', lang) })
+  if (capability.leaderboard) chips.push({ ic: 'leaderboard', label: t(lang, 'capBoard'), href: at(sid, '/leaderboard', lang) })
+  if (capability.store) chips.push({ ic: 'cart', label: t(lang, 'capStore'), href: at(sid, '/store', lang) })
 
   if (!chips.length) return ''
 
@@ -776,7 +793,7 @@ function createPrimaryActions(game, lang, player) {
 
   if (capability.store) {
     actions.push({
-      href: `/${sid}/store`,
+      href: at(sid, '/store', lang),
       ic: 'cart',
       label: t(lang, 'store'),
       hint: t(lang, 'storeHint'),
@@ -791,7 +808,7 @@ function createPrimaryActions(game, lang, player) {
     // for something already done.
     const signedIn = Boolean(player && player.playerId)
     actions.push({
-      href: `/${sid}/account`,
+      href: at(sid, '/account', lang),
       ic: 'user',
       label: signedIn ? t(lang, 'accountOpen') : t(lang, 'account'),
       hint: signedIn
@@ -846,7 +863,7 @@ function createDownloadButton(game, lang) {
 
     return `
     <a class="gc-store${index === 0 ? ' gc-store--primary' : ''}${enabled ? '' : ' gc-store--off'}"
-       href="${enabled ? `/${sid}/download?store=${encodeURIComponent(key)}` : '#'}"
+       href="${enabled ? at(sid, '/download', lang) + `?store=${encodeURIComponent(key)}` : '#'}"
        ${enabled ? '' : 'aria-disabled="true" tabindex="-1"'}>
       <span class="gc-store-logo">${meta
         ? `<img src="${escapeHtml(meta.logo)}" alt="${escapeHtml(label)}" loading="lazy"
@@ -878,11 +895,11 @@ function createSecondaryLinks(game, lang) {
     // whether to install came to read - and until they existed
     // the card's only outward links were a policy page and a
     // leaderboard.
-    { href: `/${sid}`, ic: 'home', label: t(lang, 'gamePage') },
-    { href: `/${sid}/versions`, ic: 'versions', label: t(lang, 'versions') },
-    capability.leaderboard ? { href: `/${sid}/leaderboard`, ic: 'leaderboard', label: t(lang, 'leaderboard') } : null,
-    { href: `/${sid}/privacy`, ic: 'privacy', label: t(lang, 'privacy') },
-    { href: `/${sid}/terms`, ic: 'terms', label: t(lang, 'terms') }
+    { href: at(sid, '', lang), ic: 'home', label: t(lang, 'gamePage') },
+    { href: at(sid, '/versions', lang), ic: 'versions', label: t(lang, 'versions') },
+    capability.leaderboard ? { href: at(sid, '/leaderboard', lang), ic: 'leaderboard', label: t(lang, 'leaderboard') } : null,
+    { href: at(sid, '/privacy', lang), ic: 'privacy', label: t(lang, 'privacy') },
+    { href: at(sid, '/terms', lang), ic: 'terms', label: t(lang, 'terms') }
   ].filter(Boolean)
 
   return `<div class="gc-links">${links.map(link =>
@@ -955,7 +972,7 @@ function createDefaultGameCard(id, game, baseUrl, lang, index, player) {
       <div class="gc-head">
         <div class="gc-logo">${fallback}${logoImg}</div>
         <div class="gc-meta">
-          <h2 class="gc-title"><a href="/${sid}">${escapeHtml(game.name)}</a></h2>
+          <h2 class="gc-title"><a href="${at(sid, '', lang)}">${escapeHtml(game.name)}</a></h2>
           <div class="gc-desc">${escapeHtml(localizedDescription(game, lang))}</div>
           <div class="gc-badges">
             ${createStatusBadge(game, lang)}

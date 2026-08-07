@@ -89,9 +89,98 @@ const RN_I18N = {
 // ==========================================
 const RELEASES = [
   {
+    version: '6.8.0',
+    date: '2026-08-07',
+    tag: 'latest',
+    summary: {
+      fa: 'زبان از داخل «؟» به داخل مسیر آدرس منتقل شد، و همین یک تغییر بود که باعث می‌شد سایت فقط به فارسی ایندکس شود. به‌علاوه: آیکون سایت که دیگر داخل دایره‌ی نتایج گوگل بریده نمی‌شود، یک پاراگراف واقعی روی صفحه‌ی اصلی، لینک شبکه‌های اجتماعی، و یک صفحه‌ی حمایت مالی.',
+      en: 'The language moved out of the query string and into the URL path — the one change that was keeping this site indexed in Persian only. Plus: a site icon that no longer gets cropped inside Google’s circle, a real paragraph on the front page, social links, and a donation page.',
+      ja: '言語がクエリ文字列から URL のパスへ移りました。これがこのサイトをペルシャ語だけでインデックスさせていた原因でした。ほかに、Google の円形の枠で切り取られなくなったサイトアイコン、トップページの本文段落、SNS リンク、支援ページを追加しました。'
+    },
+    groups: [
+      {
+        title: { fa: 'زبان، در مسیر آدرس', en: 'The language, in the path', ja: '言語を URL パスへ' },
+        items: {
+          fa: [
+            'هر زبان حالا آدرس خودش را دارد: «/about» فارسی، «/en/about» انگلیسی و «/ja/about» ژاپنی. زبان پیش‌فرض (فارسی) بدون پیشوند می‌ماند.',
+            'چرا مهم بود: قبلاً هر چهار آدرس «/»، «/?lang=fa»، «/?lang=en» و «/?lang=ja» همگی «/» را به‌عنوان canonical معرفی می‌کردند. گوگل خوشه‌ای از آدرس‌ها را که همه به یکی برمی‌گردند دور می‌ریزد و فقط همان یکی را نگه می‌دارد — یعنی کل سایت فقط یک آدرس قابل ایندکس داشت.',
+            'و زبان آن یک آدرس را هدر Accept-Language تعیین می‌کرد. Googlebot این هدر را نمی‌فرستد، و زبان پیش‌فرض فارسی است — پس هر صفحه‌ای که گوگل تا امروز از این سایت دیده، نسخه‌ی فارسی بوده. این دلیل اصلی «سایت با آی‌پی خارجی پیدا نمی‌شود» بود.',
+            'همه‌ی آدرس‌های قدیمی زنده‌اند: «/about?lang=en» با ۳۰۱ به «/en/about» می‌رود، پس اعتبار لینک‌هایی که تا حالا به اشتراک گذاشته شده از دست نمی‌رود.',
+            'لینک‌های داخلی هر صفحه هم‌زبانِ خودش شدند — منو، فوتر، مسیر صفحه، کارت بازی‌ها و کارت ابزارها. قبلاً خواننده‌ی صفحه‌ی انگلیسی با اولین کلیک به فارسی می‌افتاد و خزنده هم هیچ صفحه‌ی انگلیسی‌ای برای دنبال کردن پیدا نمی‌کرد.',
+            'sitemap.xml حالا هر صفحه را در هر سه زبان فهرست می‌کند (۴۸ آدرس به‌جای ۱۶) و هر کدام مجموعه‌ی کامل alternate را دارند.',
+            'صفحه‌های پرداخت و پنل‌ها عمداً دست‌نخورده ماندند: ارائه‌دهنده‌ی پرداخت آدرس بازگشت را برای تمام عمر فاکتور نگه می‌دارد و این صفحه‌ها هم noindex هستند.'
+          ],
+          en: [
+            'Every language has its own address now: /about is Persian, /en/about is English, /ja/about is Japanese. The default language keeps the bare path.',
+            'Why it mattered: /, /?lang=fa, /?lang=en and /?lang=ja all declared / as their canonical. Google resolves a cluster whose members all point at one member by keeping that one and discarding the annotations — so the site had exactly one indexable address per page.',
+            'And the language of that one address was decided by Accept-Language. Googlebot sends no Accept-Language header, and the default is Persian — so every page Google has ever indexed of this site is the Persian one. That is most of what "searching the brand from abroad finds nothing" was made of.',
+            'Every old address still works: /about?lang=en is a 301 to /en/about, so the authority carried by links already shared moves to the new address instead of being stranded.',
+            'Internal links now stay in the language of the page they are on — header, footer, breadcrumbs, game cards and tool cards. A reader on the English front page used to leave it into Persian on the first click, and a crawler reading that page found no English pages to follow at all.',
+            'sitemap.xml lists every page in all three languages (48 URLs, up from 16), each carrying the full reciprocal set of alternates.',
+            'The checkout and the operator panels were deliberately left alone: the payment provider holds a return URL for the life of an invoice, and those pages are noindex anyway.'
+          ],
+          ja: [
+            '各言語が独自のアドレスを持つようになりました。/about はペルシャ語、/en/about は英語、/ja/about は日本語です。既定の言語はプレフィックスなしのままです。',
+            '重要だった理由：/、/?lang=fa、/?lang=en、/?lang=ja のすべてが / を canonical として宣言していました。すべてが 1 つを指すクラスターを Google はその 1 つだけ残して解決するため、サイトはページごとに 1 つしかインデックス可能なアドレスを持っていませんでした。',
+            'そしてその 1 つのアドレスの言語は Accept-Language が決めていました。Googlebot はこのヘッダーを送らず、既定はペルシャ語です。つまり Google がこれまでインデックスしたのはすべてペルシャ語版でした。',
+            '古いアドレスはすべて生きています。/about?lang=en は /en/about へ 301 リダイレクトするので、共有済みのリンクの評価は新しいアドレスへ移ります。',
+            '内部リンクはページの言語に追従するようになりました（ヘッダー、フッター、パンくず、ゲームカード、ツールカード）。以前は英語のトップページから最初のクリックでペルシャ語に移ってしまい、クローラーは辿れる英語ページを見つけられませんでした。',
+            'sitemap.xml は全ページを 3 言語分（16 件から 48 件に）列挙し、それぞれが完全な相互 alternate を持ちます。',
+            '決済ページと運用パネルは意図的にそのままです。決済プロバイダーは請求書の有効期間中ずっと戻り先 URL を保持しますし、これらは元々 noindex です。'
+          ]
+        }
+      },
+      {
+        title: { fa: 'آیکون سایت', en: 'The site icon', ja: 'サイトアイコン' },
+        items: {
+          fa: [
+            'گوگل آیکون سایت را داخل یک دایره نشان می‌دهد. لوگو یک مربع است که پس‌زمینه‌اش تا لبه‌ها رنگ شده، پس نتیجه یک مربع کوچک وسط یک دایره بود — دو شکل که با هم نمی‌خوانند.',
+            'حالا رنگ پس‌زمینه (CONFIG.ICON_BG) اول روی کل بوم کشیده می‌شود و لوگو داخل ۷۰٪ میانی می‌نشیند؛ چیزی که دایره می‌برد فقط یک حلقه‌ی رنگ یکدست است.',
+            'مسیر /favicon.ico اضافه شد. مرورگر این آدرس را چه سند لینکش بدهد چه ندهد درخواست می‌کند و تا امروز صفحه‌ی ۴۰۴ را می‌گرفت — یک سند HTML آن‌جا که تصویر انتظار می‌رفت، که خودش به‌تنهایی برای خالی ماندن آیکون تب کافی است.',
+            'یک /site.webmanifest هم اضافه شد، با آیکون maskable برای لانچرهای اندروید.'
+          ],
+          en: [
+            'Google draws a favicon inside a circle. The logo is a square that paints its background to its own edges, so what came back was a small square sitting inside a ring — two shapes disagreeing.',
+            'The backdrop colour (CONFIG.ICON_BG) is now painted across the whole icon canvas first and the artwork placed inside the middle 70%, so a circular crop takes nothing but a ring of solid colour.',
+            'A /favicon.ico route was added. A browser asks for that address whether the document links to an icon or not, and until now it got the 404 page — an HTML document served where an image was expected, which is enough on its own to leave a tab blank.',
+            'A /site.webmanifest was added too, with a maskable icon for Android launchers.'
+          ],
+          ja: [
+            'Google はファビコンを円の中に描画します。ロゴは背景を端まで塗った正方形なので、輪の中に小さな四角が浮く見た目になっていました。',
+            '背景色（CONFIG.ICON_BG）をアイコン全体に先に塗り、その中央 70% にロゴを配置するようにしました。円形に切り取られるのは単色の縁だけです。',
+            '/favicon.ico のルートを追加しました。ブラウザーは文書のリンク有無に関わらずこのアドレスを要求しますが、これまでは 404 ページ（画像が期待される場所に HTML）が返っていました。これだけでもタブのアイコンが空になる原因になります。',
+            'Android ランチャー向けの maskable アイコンを含む /site.webmanifest も追加しました。'
+          ]
+        }
+      },
+      {
+        title: { fa: 'متن، لینک‌ها و حمایت', en: 'Words, links and support', ja: '文章・リンク・支援' },
+        items: {
+          fa: [
+            'صفحه‌ی اصلی حالا یک پاراگراف واقعی دارد. گوگل به‌جای متای صفحه، چیپ‌های کارت بازی را به‌عنوان توضیح سایت نشان می‌داد («قابل بازی بدون اینترنت ورود با گوگل ذخیره‌ی ابری…») چون تنها متن پیوسته‌ی صفحه همان‌ها بودند.',
+            'لینک گیت‌هاب، یوتیوب، اینستاگرام و توییتر (X) در فوتر همه‌ی صفحه‌ها و در صفحه‌ی «درباره‌ی من»، با rel="me" و در فهرست sameAs داده‌ی ساختاریافته.',
+            'صفحه‌ی جدید «حمایت مالی» در /donate: مبلغ دلخواه، پرداخت با ارز دیجیتال، بدون ثبت‌نام. چیزی تحویل داده نمی‌شود و چیزی هم پشتش قفل نیست — و سایت هیچ اطلاعاتی از آن ذخیره نمی‌کند.',
+            'در صفحه‌ی «درباره‌ی من» توضیح داده شد که AmirCollider و Amir Collider یک نفرند؛ نصف کسانی که دنبال این اسم می‌گردند آن را با فاصله می‌نویسند.'
+          ],
+          en: [
+            'The front page has a real paragraph now. Google was showing the game card\u2019s capability chips as the site\u2019s description ("Plays offline Google sign-in Cloud save\u2026") rather than the meta description, because those chips were the only continuous text on the page.',
+            'GitHub, YouTube, Instagram and X links in the footer of every page and on the About page, carrying rel="me" and listed in the sameAs structured data.',
+            'A new donation page at /donate: any amount, paid in cryptocurrency, no sign-up. Nothing is delivered and nothing is locked behind it — and the site stores nothing about it.',
+            'The About page now says in words that AmirCollider and Amir Collider are the same person; roughly half the people looking for the name type it as two words.'
+          ],
+          ja: [
+            'トップページに本文の段落を追加しました。ページ上で連続した文章がゲームカードのチップだけだったため、Google は meta description ではなくそれらを説明文として表示していました。',
+            'GitHub・YouTube・Instagram・X へのリンクを全ページのフッターと自己紹介ページに追加しました（rel="me" 付き、構造化データの sameAs にも記載）。',
+            '/donate に支援ページを新設しました。金額は自由、暗号資産で支払い、登録不要です。何も配布されず、何も制限されず、サイトは一切記録しません。',
+            '自己紹介ページに、AmirCollider と Amir Collider が同一人物であることを明記しました。この名前を探す人のおよそ半数は二語で入力します。'
+          ]
+        }
+      }
+    ]
+  },
+  {
     version: '6.7.4',
     date: '2026-08-05',
-    tag: 'latest',
     summary: {
       fa: 'سایت از چند صفحه‌ی جدا به یک سایت واحد تبدیل شد: هدر و فوتر مشترک روی همه‌ی صفحه‌ها، جدول امتیازات به بازی خودش وصل شد، صفحه‌ی ۴۰۴ واقعی، و آماده‌سازی کامل برای Google Search Console و Google Cloud Console.',
       en: 'The site stopped being a set of separate pages: one shared header and footer everywhere, the leaderboard reconnected to its game, a real 404 page, and a full SEO pass for Google Search Console and Google Cloud Console.',
@@ -1156,7 +1245,7 @@ function createReleaseNotesPage(lang, theme) {
     title,
     description,
     lang: resolved,
-    graph: [breadcrumbLd(trail)]
+    graph: [breadcrumbLd(trail, resolved)]
   })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

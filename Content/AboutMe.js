@@ -134,6 +134,10 @@ export const ABOUT = {
       {
         q: 'چه چیزهایی دوست داری بسازی؟',
         a: 'واقعاً نمی‌دونم. بعضی وقت‌ها ایده‌ها بدون مقدمه می‌آن توی ذهنم. فقط دلم می‌خواد هر چیزی که می‌سازم باعث خوشحالی بقیه بشه.'
+      },
+      {
+        q: 'اسمت رو AmirCollider می‌نویسی یا Amir Collider؟',
+        a: 'یک کلمه، بدون فاصله: AmirCollider. ولی خیلی‌ها جدا می‌نویسنش — Amir Collider — و هر دوش من هستم. اگه یه جایی دنبالم گشتی و پیدام نکردی، معمولاً همون یه فاصله دلیلشه.'
       }
     ],
 
@@ -144,6 +148,13 @@ export const ABOUT = {
       { icon: '📺', text: 'دلم می‌خواد انیمه و سریال ببینم، ولی مغزم ناخودآگاه حس می‌کنه دارم وقتم رو از دست می‌دم — با اینکه همون وقت‌ها رو توی اینستاگرام می‌چرخم و بیشترش رو هدر می‌دم!' },
       { icon: '🌱', text: 'همیشه خوشحالم تا وقتی بقیه خوشحال باشن. ناراحتی بقیه من رو هم ناراحت می‌کنه. امیدوارم هیچ‌کس هیچ‌وقت توی زندگیش احساس ناراحتی نکنه.' }
     ],
+
+    findHead: 'کجا پیدام کنی',
+    findLede: 'کارهای در جریان، تیزرها و هر چیزی که ارزش نشون دادن داشته باشه رو این‌جاها می‌ذارم.',
+
+    supportHead: 'اگه دوست داشتی حمایت کنی',
+    supportBody: 'همه‌ی بازی‌ها و ابزارهای این‌جا رایگانن و همین‌طور می‌مونن. اگه یکیشون به کارت اومد و دوست داشتی جبران کنی، یه صفحه‌ی کوچیک برای همین هست — با هر مبلغی که خودت بخوای. هیچ‌چیزی پشتش قفل نیست؛ فقط اگه دلت خواست.',
+    supportCta: 'صفحه‌ی حمایت مالی',
 
     outro: 'مرسی که تا اینجا خوندی. 💜'
   },
@@ -242,6 +253,10 @@ export const ABOUT = {
       {
         q: 'What kinds of things do you like to make?',
         a: 'I honestly do not know. Sometimes ideas just arrive in my head with no warning. I only want whatever I make to make other people happy.'
+      },
+      {
+        q: 'Is it AmirCollider or Amir Collider?',
+        a: 'One word, no space: AmirCollider. But a lot of people write it as two — Amir Collider — and both of them are me. If you have looked for me somewhere and come up empty, that single space is usually the reason.'
       }
     ],
 
@@ -252,6 +267,13 @@ export const ABOUT = {
       { icon: '📺', text: 'I would love to watch anime and series, but some part of my brain insists I am wasting time — even though I spend that same time scrolling Instagram and waste far more of it!' },
       { icon: '🌱', text: 'I am happy as long as everyone else is happy. Other people being sad makes me sad. I hope nobody ever feels sad in their life.' }
     ],
+
+    findHead: 'Where to find me',
+    findLede: 'Work in progress, trailers and anything else worth showing goes up in these places.',
+
+    supportHead: 'If you feel like supporting it',
+    supportBody: 'Every game and every tool here is free and is staying that way. If one of them was useful to you and you feel like giving something back, there is a small page for exactly that — any amount you like. Nothing is locked behind it; it is only there if you want it.',
+    supportCta: 'The donation page',
 
     outro: 'Thank you for reading this far. 💜'
   },
@@ -350,6 +372,10 @@ export const ABOUT = {
       {
         q: 'どんなものを作るのが好きですか?',
         a: '正直に言うと分かりません。ときどき、前触れもなくアイデアが浮かんできます。ただ、自分が作るもので誰かが幸せになってくれたら、それでいいのです。'
+      },
+      {
+        q: '表記は AmirCollider ですか、Amir Collider ですか?',
+        a: 'スペースなしの一語で AmirCollider です。ただ、Amir Collider と二語で書く人も多く、どちらも私のことです。どこかで探して見つからなかったとしたら、たいていはその空白が原因です。'
       }
     ],
 
@@ -360,6 +386,13 @@ export const ABOUT = {
       { icon: '📺', text: 'アニメやドラマを見たいのに、脳が勝手に「時間を無駄にしている」と感じてしまいます。実際にはその時間で Instagram を眺めて、もっと無駄にしているのに!' },
       { icon: '🌱', text: '周りの人が幸せなら、私も幸せです。誰かが悲しんでいると私も悲しくなります。誰も人生で悲しい思いをしませんように。' }
     ],
+
+    findHead: '見つけられる場所',
+    findLede: '制作中の様子やトレーラー、見せる価値のあるものはこれらの場所に上げています。',
+
+    supportHead: 'もし支援したいと思ってくれたら',
+    supportBody: 'ここにあるゲームもツールもすべて無料で、これからも変わりません。どれかが役に立って、何か返したいと思ってくれたなら、そのための小さなページがあります。金額はお好きなだけです。何かが制限されるわけではなく、望む人のためだけにあります。',
+    supportCta: '支援ページ',
 
     outro: 'ここまで読んでくださってありがとうございます。💜'
   }

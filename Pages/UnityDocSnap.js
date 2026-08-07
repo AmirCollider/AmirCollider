@@ -53,6 +53,7 @@ import { otherTools } from '../Content/ToolsCatalog.js'
 import { escapeHtml } from '../Core/Html.js'
 import { chromeScript, themeBootScript } from '../Core/PageChrome.js'
 import { seoHead, breadcrumbLd, softwareApplicationLd } from '../Core/Seo.js'
+import { localizedPath } from '../Core/Locale.js'
 import { siteNavCss, siteBreadcrumb, siteFooter, NAV_I18N } from '../Core/SiteNav.js'
 import { langCookieHeader, parseCookies, resolveRequestLang, resolveRequestTheme } from '../Core/RequestContext.js'
 
@@ -618,7 +619,7 @@ function renderTopbar(lang) {
 
   return `
     <div class="topbar">
-      <a class="brand" href="/">
+      <a class="brand" href="${escapeHtml(localizedPath('/', lang))}">
         <img src="${escapeHtml(CONFIG.AMIR_LOGO)}" alt="" onerror="this.style.display='none'">
         <span class="brand-text">
           <span class="brand-name">AmirCollider</span>
@@ -946,7 +947,7 @@ function renderShelf(lang) {
     const tagline = tool.i18n.tagline[lang] || tool.i18n.tagline.en
     const cta = tool.i18n.cta[lang] || tool.i18n.cta.en
     return `
-      <a class="shelf-item lift" href="${escapeHtml(tool.href)}">
+      <a class="shelf-item lift" href="${escapeHtml(localizedPath(tool.href, lang))}">
         <span class="shelf-mark" aria-hidden="true">${tool.mark}</span>
         <span class="shelf-body">
           <b>${escapeHtml(tool.name)}</b><br>
@@ -993,7 +994,7 @@ function renderPage(lang, theme) {
     lang,
     type: 'product',
     graph: [
-      breadcrumbLd(trail),
+      breadcrumbLd(trail, lang),
       softwareApplicationLd({
         name: 'Unity DocSnap',
         description: p.lede,

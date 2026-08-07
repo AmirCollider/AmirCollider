@@ -48,8 +48,10 @@ import { escapeHtml } from '../Core/Html.js'
 import { themeBootScript } from '../Core/PageChrome.js'
 import { seoHead, breadcrumbLd, personLd, profilePageLd, faqPageLd } from '../Core/Seo.js'
 import {
-  siteNavCss, siteHeader, siteBreadcrumb, siteFooter, siteBackToTop, siteChromeScript, NAV_I18N
+  siteNavCss, siteHeader, siteBreadcrumb, siteFooter, siteBackToTop, siteChromeScript,
+  socialLinks, NAV_I18N
 } from '../Core/SiteNav.js'
+import { localizedPath } from '../Core/Locale.js'
 import { langCookieHeader, parseCookies, resolveLang, resolveRequestLang, resolveRequestTheme } from '../Core/RequestContext.js'
 
 
@@ -299,6 +301,46 @@ function aboutCss() {
     .ab-fact span.ab-ic { font-size: 1.4em; line-height: 1.4; flex: none; }
     .ab-fact p { font-size: 0.93em; line-height: 1.8; }
 
+    /* ---------- the accounts ----------
+       Named links rather than bare icons, unlike the footer. The
+       footer's row is chrome a reader skims; this one is content,
+       and a page about a person should say "YouTube" rather than
+       make them recognise a glyph. */
+    .ab-socials { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+    .ab-social {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 18px; border-radius: 15px; text-decoration: none;
+      color: var(--text); background: var(--surface); border: 1px solid var(--border);
+      font-weight: 700; font-size: 0.93em;
+      transition: transform 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+    }
+    .ab-social:hover {
+      transform: translateY(-2px);
+      color: color-mix(in srgb, var(--warm) 55%, var(--text));
+      border-color: color-mix(in srgb, var(--warm) 38%, var(--border));
+    }
+    .ab-social svg { flex: none; }
+
+    /* ---------- the ask ---------- */
+    .ab-support {
+      display: flex; align-items: flex-start; gap: 15px;
+      padding: 20px 22px; border-radius: var(--radius);
+      background: linear-gradient(135deg,
+        color-mix(in srgb, var(--warm) 12%, var(--surface)),
+        color-mix(in srgb, var(--brand) 10%, var(--surface)));
+      border: 1px solid color-mix(in srgb, var(--warm) 26%, var(--border));
+    }
+    .ab-support-ic { font-size: 2em; line-height: 1.2; flex: none; }
+    .ab-support p { font-size: 0.95em; }
+    .ab-support-cta {
+      display: inline-block; margin-block-start: 12px;
+      padding: 10px 20px; border-radius: 13px; text-decoration: none;
+      font-weight: 800; font-size: 0.9em; color: #fff;
+      background: linear-gradient(135deg, var(--warm), color-mix(in srgb, var(--warm) 50%, #ffc46b));
+      transition: transform 0.18s ease;
+    }
+    .ab-support-cta:hover { transform: translateY(-2px); }
+
     /* ---------- the sign-off ---------- */
     .ab-outro {
       text-align: center; margin-block-start: 8px; padding: 26px 20px;
@@ -419,12 +461,65 @@ function renderFacts(p) {
 }
 
 
-// One line, and nothing under it.
+// ==========================================
+// Where to find him, and the one thing the page asks for.
 //
-// This used to end with a row of GitHub / Instagram / email
-// chips. Every one of those is already in the footer of every
-// page on the site, and a page that has just spent two thousand
-// words being a person should not close by asking for anything.
+// An earlier version of this page ended on a single line and
+// deliberately had no links at all: everything was already in the
+// footer, and a page that has just spent two thousand words being
+// a person should not close by asking for something.
+//
+// That reasoning was right about the closing line and wrong about
+// the accounts. `sameAs` in the structured data claims that a
+// GitHub profile, a YouTube channel, an Instagram account and an X
+// account are all this person - and this is the one page on the
+// site that is ABOUT that person, so it is the page where the claim
+// belongs in words a reader can also check. The links carry
+// `rel="me"`, which is the same claim in the form a machine reads.
+//
+// The donation link sits under them, phrased as an offer rather
+// than a request, and it is one line followed by a link. The outro
+// still closes the page on its own.
+// ==========================================
+function renderFind(p, code) {
+  const accounts = socialLinks()
+  if (!accounts.length) return ''
+
+  return `
+    <section class="ab-sec">
+      <h2>${escapeHtml(p.findHead)}</h2>
+      <p class="ab-lede">${escapeHtml(p.findLede)}</p>
+      <div class="ab-socials">
+        ${accounts.map(entry => `
+          <a class="ab-social" href="${escapeHtml(entry.href)}" rel="me noopener" target="_blank">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+              <path d="${entry.path}"/>
+            </svg>
+            <span>${escapeHtml(entry.label)}</span>
+          </a>`).join('')}
+      </div>
+    </section>`
+}
+
+
+function renderSupport(p, code) {
+  return `
+    <section class="ab-sec">
+      <h2>${escapeHtml(p.supportHead)}</h2>
+      <div class="ab-support">
+        <span class="ab-support-ic" aria-hidden="true">🫙</span>
+        <div>
+          <p>${escapeHtml(p.supportBody)}</p>
+          <a class="ab-support-cta" href="${escapeHtml(localizedPath('/donate', code))}">
+            ${escapeHtml(p.supportCta)} &rarr;
+          </a>
+        </div>
+      </div>
+    </section>`
+}
+
+
+// One line, and nothing under it.
 function renderOutro(p) {
   return `
     <section class="ab-outro">
@@ -452,7 +547,7 @@ function createAboutPage(lang, theme) {
   // `founder` points at, which is what joins the two into one
   // graph rather than two unrelated claims on the same domain.
   const graph = [
-    breadcrumbLd(trail),
+    breadcrumbLd(trail, resolved),
     personLd(resolved, { description: p.metaDesc }),
     profilePageLd(resolved),
     faqPageLd(aboutFaq(resolved))
@@ -489,6 +584,8 @@ function createAboutPage(lang, theme) {
       ${renderProse(p.youtubeHead, p.youtube)}
       ${renderQuestions(p.askHead, '', p.ask)}
       ${renderFacts(p)}
+      ${renderFind(p, resolved)}
+      ${renderSupport(p, resolved)}
       ${renderOutro(p)}
     </main>
     ${siteFooter({ lang: resolved })}

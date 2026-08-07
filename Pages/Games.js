@@ -40,6 +40,7 @@ import { resolveGames, isDownloadable, gamePlatforms } from '../Games/Registry.j
 import { escapeHtml, safeColor } from '../Core/Html.js'
 import { themeBootScript } from '../Core/PageChrome.js'
 import { seoHead, breadcrumbLd, videoGameLd, absoluteUrl } from '../Core/Seo.js'
+import { localizedPath } from '../Core/Locale.js'
 import {
   siteNavCss, siteHeader, siteBreadcrumb, siteFooter, siteBackToTop, siteChromeScript, NAV_I18N
 } from '../Core/SiteNav.js'
@@ -313,7 +314,7 @@ function gameCard(game, lang) {
   if (game.capabilities.store) chips.push(`<span class="chip">${escapeHtml(p.capStore)}</span>`)
 
   return `
-    <a class="game" href="/${escapeHtml(game.id)}" style="--gc: ${accent}">
+    <a class="game" href="${escapeHtml(localizedPath('/' + game.id, lang))}" style="--gc: ${accent}">
       <span class="game-stripe"></span>
       <span class="game-body">
         <span class="game-logo">${escapeHtml(game.icon || '🎮')}${game.logo
@@ -351,7 +352,7 @@ function createGamesPage(games, lang, theme) {
   // page knows it is a catalogue, how many entries it has, and
   // that every entry is a game.
   const graph = [
-    breadcrumbLd(trail),
+    breadcrumbLd(trail, resolved),
     {
       '@context': 'https://schema.org',
       '@type': 'ItemList',
@@ -407,7 +408,7 @@ function createGamesPage(games, lang, theme) {
           <b>${escapeHtml(p.toolsHead)}</b>
           <span>${escapeHtml(p.toolsBody)}</span>
         </span>
-        <a href="/tools">${escapeHtml(p.toolsCta)}</a>
+        <a href="${escapeHtml(localizedPath('/tools', resolved))}">${escapeHtml(p.toolsCta)}</a>
       </div>
     </main>
     ${siteFooter({ lang: resolved, games })}

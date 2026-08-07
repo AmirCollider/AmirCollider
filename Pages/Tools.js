@@ -29,6 +29,7 @@ import { toolsFor } from '../Content/ToolsCatalog.js'
 import { escapeHtml, safeColor } from '../Core/Html.js'
 import { themeBootScript } from '../Core/PageChrome.js'
 import { seoHead, breadcrumbLd, softwareApplicationLd } from '../Core/Seo.js'
+import { localizedPath } from '../Core/Locale.js'
 import {
   siteNavCss, siteHeader, siteBreadcrumb, siteFooter, siteBackToTop, siteChromeScript, NAV_I18N
 } from '../Core/SiteNav.js'
@@ -343,7 +344,7 @@ function renderTools(lang) {
     ).join('')
 
     return `
-      <a class="tool" href="${escapeHtml(tool.href)}"
+      <a class="tool" href="${escapeHtml(localizedPath(tool.href, lang))}"
          style="--tool: ${accent}; --tool-2: ${accentSoft}">
         <span class="tool-stripe"></span>
         <span class="tool-body">
@@ -389,7 +390,7 @@ function createToolsPage(lang, theme) {
   // A crawler that reads this knows the page is a catalogue and
   // what each entry costs, without inferring either from prose.
   const graph = [
-    breadcrumbLd(trail),
+    breadcrumbLd(trail, resolved),
     {
       '@context': 'https://schema.org',
       '@type': 'ItemList',

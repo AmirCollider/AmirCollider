@@ -22,9 +22,11 @@
 //     authorization codes, no raw upstream error bodies.
 // ==========================================
 
-import { CONFIG, CORS_HEADERS, SECURITY, getGamesConfig, validateEnvironment } from './Config.js'
+import { CONFIG, CORS_HEADERS, LANGUAGES, SECURITY, getGamesConfig, validateEnvironment } from './Config.js'
 import { createJsonResponse, createErrorResponse } from './Core/Http.js'
 import { logInfo, logError, generateRequestId } from './Core/Logging.js'
+import { isLangRoutable, localizedPath, splitLangPath } from './Core/Locale.js'
+import { matchRequestLang } from './Core/RequestContext.js'
 
 import { handleOAuthAuth, handleOAuthCallback, handleTokenExchange, handleRefreshToken } from './Api/OAuthApi.js'
 import { handleValidateToken, handleCheckUserExists } from './Api/AuthApi.js'
@@ -41,8 +43,9 @@ import { handleTheGodApi } from './Api/TheGodApi.js'
 
 import { handleNotFound } from './Pages/NotFound.js'
 import { handleRobots, handleSitemap } from './Pages/Sitemap.js'
-import { handleSiteIcon } from './Pages/Icon.js'
+import { handleSiteIcon, handleFavicon, handleWebManifest } from './Pages/Icon.js'
 import { handleAbout } from './Pages/About.js'
+import { handleDonate, handleDonateCreate, handleDonateThanks } from './Pages/Donate.js'
 import { handleGamesIndex } from './Pages/Games.js'
 import { handleUserProfile } from './Pages/PlayerProfile.js'
 import { handleDashboard } from './Pages/Dashboard.js'
@@ -178,7 +181,22 @@ const ROUTES = [
 
   // The favicon, with a safe area around it so a round crop does
   // not take the logo's corners off. See Pages/Icon.js.
+  //
+  // /favicon.ico is registered because a browser asks for it whether
+  // the document links to an icon or not, and so do several
+  // crawlers - Google's favicon fetcher among them. Answering 404
+  // there was enough on its own to leave a tab blank.
   { path: '/icon.svg', method: 'GET', handler: handleSiteIcon },
+  { path: '/favicon.ico', method: 'GET', handler: handleFavicon },
+  { path: '/site.webmanifest', method: 'GET', handler: handleWebManifest },
+
+  // Supporting the work, with whatever amount the donor types.
+  // Nothing is delivered and nothing is owed, so this rides the
+  // payment provider without any of the checkout's fulfilment
+  // machinery. See Pages/Donate.js.
+  { path: '/donate', method: 'GET', handler: handleDonate },
+  { path: '/donate/create', method: 'POST', handler: handleDonateCreate },
+  { path: '/donate/thanks', method: 'GET', handler: handleDonateThanks },
 
   // The site-wide policy pages. Google's OAuth consent screen and
   // Play Console both want a privacy policy and terms at a stable
@@ -389,6 +407,94 @@ const CANONICAL_EXEMPT = [
   '/assets/', '/video/', '/thegod', '/testsite', '/checkout/'
 ]
 
+// ==========================================
+// One address per language
+//
+// Core/Locale.js explains why the language moved out of `?lang=`
+// and into the path. This is the part that keeps every address
+// that ever worked still working, and keeps exactly one of them
+// canonical:
+//
+//   /fa/about          301  ->  /about
+//     The default language has no prefix of its own. Answering on
+//     both is the duplicate this whole change exists to remove.
+//
+//   /about?lang=en     301  ->  /en/about
+//     Every link ever shared, every Search Console entry, every
+//     bookmark. A 301 moves the authority they carry onto the new
+//     address instead of stranding it.
+//
+//   /en/assets/x.png   301  ->  /assets/x.png
+//     A prefix on something that never had one.
+//
+//   /about             302  ->  /en/about   (for a reader who
+//     prefers English)
+//     A 302, not a 301: the preference belongs to the visitor, not
+//     to the address. Googlebot sends neither a cookie nor an
+//     Accept-Language header, so it never sees this and always
+//     reads the bare path as the default language - which is what
+//     makes the bare path stable enough to index.
+//
+// Query strings other than `lang` are preserved throughout. The
+// checkout's signed order handle arrives as one.
+// ==========================================
+function redirectTo(pathname, params, status) {
+  const query = params && params.toString ? params.toString() : ''
+  return new Response(null, {
+    status,
+    headers: {
+      Location: pathname + (query ? '?' + query : ''),
+      'Cache-Control': status === 301 ? 'public, max-age=3600' : 'no-store'
+    }
+  })
+}
+
+function languageRedirect(url, request) {
+  if (request.method !== 'GET' && request.method !== 'HEAD') return null
+
+  const { lang: pathLang, path } = splitLangPath(url.pathname)
+  const params = new URLSearchParams(url.search)
+  const queryLang = params.get('lang')
+
+  // A prefix on a path that never takes one. The language is kept
+  // rather than dropped, in the query form those paths still speak
+  // - otherwise the language switcher would silently stop working
+  // the moment a visitor reached the checkout.
+  if (pathLang && !isLangRoutable(path)) {
+    params.set('lang', pathLang)
+    return redirectTo(path, params, 301)
+  }
+
+  // The default language's own prefix. It has none: the bare path
+  // is its address, and answering on both is the duplicate this
+  // whole change exists to remove.
+  if (pathLang === LANGUAGES.default) {
+    params.delete('lang')
+    return redirectTo(path, params, 301)
+  }
+
+  // The old query form. Only for paths that take a prefix - the
+  // checkout keeps `?lang=` exactly as it is, because a payment
+  // provider is holding a `success_url` that carries one.
+  if (!pathLang && queryLang && LANGUAGES.supported.includes(queryLang) && isLangRoutable(path)) {
+    params.delete('lang')
+    return redirectTo(localizedPath(path, queryLang), params, 301)
+  }
+
+  // A bare path, and a reader who would rather have another
+  // language. matchRequestLang reads cookie -> Accept-Language ->
+  // default, so "no opinion" resolves to the default and stays put.
+  if (!pathLang && !queryLang && isLangRoutable(path)) {
+    const preferred = matchRequestLang(url, request)
+    if (preferred !== LANGUAGES.default) {
+      return redirectTo(localizedPath(path, preferred), params, 302)
+    }
+  }
+
+  return null
+}
+
+
 function canonicalRedirect(url, request) {
   const host = url.hostname.toLowerCase()
   const canonicalHost = new URL(CONFIG.SITE_URL).hostname.toLowerCase()
@@ -434,10 +540,27 @@ async function handleRequest(request, env) {
 
   const GAMES = getGamesConfig(env)
   const url = new URL(request.url)
-  const path = url.pathname
 
   const redirect = canonicalRedirect(url, request)
   if (redirect) return redirect
+
+  const moved = languageRedirect(url, request)
+  if (moved) return moved
+
+  // Past this point the language is settled, and the rest of the
+  // Worker is written against a path with no language in it.
+  //
+  // The prefix is folded back into `?lang=` on the URL object the
+  // handlers receive - not on the wire, only in memory - so every
+  // page keeps resolving its language through resolveRequestLang()
+  // exactly as before, and langCookieHeader() keeps persisting an
+  // explicit choice. Sixty call sites did not have to learn a new
+  // way to ask what language they are in.
+  const { lang: pathLang, path } = splitLangPath(url.pathname)
+  if (pathLang) {
+    url.pathname = path
+    url.searchParams.set('lang', pathLang)
+  }
 
   const requestId = generateRequestId()
   const gameId = request.headers.get('X-Game-ID') || url.searchParams.get('game') || Object.keys(GAMES)[0]

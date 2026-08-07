@@ -34,6 +34,7 @@ import { createHtmlResponse } from '../Core/Http.js'
 import { escapeHtml } from '../Core/Html.js'
 import { themeBootScript } from '../Core/PageChrome.js'
 import { seoHead, breadcrumbLd } from '../Core/Seo.js'
+import { localizedPath } from '../Core/Locale.js'
 import {
   siteNavCss, siteHeader, siteBreadcrumb, siteFooter, siteBackToTop, siteChromeScript, NAV_I18N
 } from '../Core/SiteNav.js'
@@ -902,16 +903,23 @@ function renderMeta(lang) {
     </div>`
 }
 
+// The two sibling links used to append `?lang=` so a reader who had
+// chosen a language kept it across the hop. localizedPath() carries
+// it in the path instead, which is the same promise made at an
+// address a search engine can index. These pages ARE indexed - they
+// are the ones an OAuth review and a store listing link to - so the
+// query form mattered here more than anywhere else it survived.
 function renderActions(lang, gameId, baseUrl) {
   const p = pack(lang)
-  const q = '?lang=' + resolveLang(lang)
   // A visitor who arrived at the site-wide page is sent to the
   // site-wide sibling, not into a game they never chose.
   const sibling = CONTEXT.siteLevel ? '/privacy' : '/' + gameId + '/privacy'
+  const home = escapeHtml(baseUrl + localizedPath('/', lang))
+  const other = escapeHtml(baseUrl + localizedPath(sibling, lang))
   return `
     <div class="actions">
-      <a class="action" href="${escapeHtml(baseUrl)}/${q}">${icon('home', 'p-ic')}<span>${escapeHtml(p['btn.home'])}</span></a>
-      <a class="action is-secondary" href="${escapeHtml(baseUrl)}${escapeHtml(sibling)}${q}">${icon('lock', 'p-ic')}<span>${escapeHtml(p['btn.privacy'])}</span></a>
+      <a class="action" href="${home}">${icon('home', 'p-ic')}<span>${escapeHtml(p['btn.home'])}</span></a>
+      <a class="action is-secondary" href="${other}">${icon('lock', 'p-ic')}<span>${escapeHtml(p['btn.privacy'])}</span></a>
     </div>`
 }
 
@@ -965,7 +973,7 @@ function createTermsPage(game, gameId, baseUrl, lang, theme, { path = '/terms', 
     title,
     description,
     lang: resolved,
-    graph: [breadcrumbLd(trail)]
+    graph: [breadcrumbLd(trail, resolved)]
   })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

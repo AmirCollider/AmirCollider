@@ -46,6 +46,7 @@ import { db, listVersions } from '../Games/Store.js'
 import { chromeTheme, langHeader, page, localeFor } from './GameChrome.js'
 import { escapeHtml } from '../Core/Html.js'
 import { matchRequestLang } from '../Core/RequestContext.js'
+import { localizedPath } from '../Core/Locale.js'
 import { CONFIG } from '../Config.js'
 
 
@@ -518,15 +519,15 @@ function getBlock(game, lang) {
 
   const extras = []
   if (game.capabilities.store) {
-    extras.push(`<a class="gbtn gbtn--ghost" href="/${escapeHtml(game.id)}/store">${escapeHtml(d.store)}</a>`)
+    extras.push(`<a class="gbtn gbtn--ghost" href="${escapeHtml(localizedPath(`/${game.id}/store`, lang))}">${escapeHtml(d.store)}</a>`)
   }
   if (game.capabilities.leaderboard) {
-    extras.push(`<a class="gbtn gbtn--ghost" href="/${escapeHtml(game.id)}/leaderboard">${escapeHtml(d.board)}</a>`)
+    extras.push(`<a class="gbtn gbtn--ghost" href="${escapeHtml(localizedPath(`/${game.id}/leaderboard`, lang))}">${escapeHtml(d.board)}</a>`)
   }
   if (game.capabilities.login) {
-    extras.push(`<a class="gbtn gbtn--ghost" href="/${escapeHtml(game.id)}/account">${escapeHtml(d.account)}</a>`)
+    extras.push(`<a class="gbtn gbtn--ghost" href="${escapeHtml(localizedPath(`/${game.id}/account`, lang))}">${escapeHtml(d.account)}</a>`)
   }
-  extras.push(`<a class="gbtn gbtn--ghost" href="/${escapeHtml(game.id)}/versions">${escapeHtml(d.versionsLink)}</a>`)
+  extras.push(`<a class="gbtn gbtn--ghost" href="${escapeHtml(localizedPath(`/${game.id}/versions`, lang))}">${escapeHtml(d.versionsLink)}</a>`)
 
   // A game with nothing to download still gets its other links -
   // the store, the leaderboard, the account page all work while a
@@ -550,7 +551,7 @@ function getBlock(game, lang) {
     const verb = meta.play ? d.play : d.get
 
     return `<a class="ln-store${key === primary ? ' is-primary' : ''}"
-      href="/${escapeHtml(game.id)}/download?store=${encodeURIComponent(key)}" rel="noopener">
+      href="${escapeHtml(localizedPath(`/${game.id}/download`, lang))}?store=${encodeURIComponent(key)}" rel="noopener">
       ${meta.logo
         ? `<img src="${escapeHtml(meta.logo)}" alt="" loading="lazy" onerror="this.style.display='none'">`
         : '<span aria-hidden="true" style="font-size:1.5em">⬇</span>'}
@@ -620,9 +621,9 @@ function purposeBlock(game, lang) {
         <p>${escapeHtml(d.googleAfter)}</p>
         <div class="ln-policy">
           <a class="gbtn gbtn--ghost" style="padding:8px 14px;font-size:.84em"
-             href="/${escapeHtml(game.id)}/privacy">${escapeHtml(d.readPrivacy)}</a>
+             href="${escapeHtml(localizedPath(`/${game.id}/privacy`, lang))}">${escapeHtml(d.readPrivacy)}</a>
           <a class="gbtn gbtn--ghost" style="padding:8px 14px;font-size:.84em"
-             href="/${escapeHtml(game.id)}/terms">${escapeHtml(d.readTerms)}</a>
+             href="${escapeHtml(localizedPath(`/${game.id}/terms`, lang))}">${escapeHtml(d.readTerms)}</a>
         </div>
       </div>`
     : ''
@@ -770,7 +771,7 @@ function productsBlock(game, lang) {
       <h2 class="ghead">${escapeHtml(d.products)}</h2>
       <div class="ln-prods">${items}</div>
       <div style="margin-block-start:14px">
-        <a class="gbtn" href="/${escapeHtml(game.id)}/store">${escapeHtml(d.store)}</a>
+        <a class="gbtn" href="${escapeHtml(localizedPath(`/${game.id}/store`, lang))}">${escapeHtml(d.store)}</a>
       </div>
     </section>`
 }
@@ -1021,7 +1022,7 @@ export async function handleGameVersions(url, request, gameId, requestId, GAMES,
     <div class="gcard" style="margin-block-end:18px">
       <h1 class="ghead" style="margin-block-start:0">${escapeHtml(game.name)} — ${escapeHtml(d.versions)}</h1>
       <p class="glede" style="margin:0">
-        <a href="/${escapeHtml(game.id)}">${escapeHtml(d.backToGame)}</a>
+        <a href="${escapeHtml(localizedPath(`/${game.id}`, lang))}">${escapeHtml(d.backToGame)}</a>
       </p>
     </div>
     ${releases || empty}`

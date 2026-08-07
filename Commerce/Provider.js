@@ -160,24 +160,34 @@ export async function createInvoice(env, {
   orderId, statusToken, tier, priceUsd, lang, description, siteUrl,
   webhookPath = '/checkout/webhook',
   successPath = '/checkout/pay',
+  successUrl = null,
   cancelUrl = null
 }) {
-  const result = await call(env, '/invoice', {
-    method: 'POST',
-    body: {
-      price_amount: Number(priceUsd),
-      price_currency: CONFIG.COMMERCE.PRICE_CURRENCY,
-      order_id: orderId,
-      order_description: description,
-      ipn_callback_url: `${siteUrl}${webhookPath}`,
-      // The signed token, not the bare order id. This URL ends up
-      // in the customer's browser history and in the payment
-      // provider's own records, and the token is the form of the
-      // handle that is safe to have in both.
-      success_url: `${siteUrl}${successPath}?o=${encodeURIComponent(statusToken)}&lang=${encodeURIComponent(lang)}`,
-      cancel_url: cancelUrl || `${siteUrl}/checkout?tier=${encodeURIComponent(tier)}&lang=${encodeURIComponent(lang)}`
-    }
-  })
+  // A donation has no order to look up afterwards and nothing to
+  // deliver, so it passes its own success_url and no webhook path
+  // at all. Both are therefore conditional rather than assumed:
+  // sending `ipn_callback_url` as the bare origin - which is what
+  // an empty webhookPath used to concatenate to - is an address the
+  // provider will happily accept and then POST to for the life of
+  // the invoice.
+  const body = {
+    price_amount: Number(priceUsd),
+    price_currency: CONFIG.COMMERCE.PRICE_CURRENCY,
+    order_id: orderId,
+    order_description: description,
+
+    // The signed token, not the bare order id. This URL ends up
+    // in the customer's browser history and in the payment
+    // provider's own records, and the token is the form of the
+    // handle that is safe to have in both.
+    success_url: successUrl
+      || `${siteUrl}${successPath}?o=${encodeURIComponent(statusToken)}&lang=${encodeURIComponent(lang)}`,
+    cancel_url: cancelUrl || `${siteUrl}/checkout?tier=${encodeURIComponent(tier)}&lang=${encodeURIComponent(lang)}`
+  }
+
+  if (webhookPath) body.ipn_callback_url = `${siteUrl}${webhookPath}`
+
+  const result = await call(env, '/invoice', { method: 'POST', body })
 
   if (!result.ok) return result
 

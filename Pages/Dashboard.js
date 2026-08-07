@@ -22,9 +22,12 @@
 // Theme & language
 //   - Theme: <html data-theme="light|dark">; "auto" follows the OS.
 //     GamesCards.js reads the same attribute, so cards stay in sync.
-//   - Language: server-resolved from ?lang= -> cookie -> Accept-Language.
-//     Switching reloads with ?lang=xx so RTL/LTR is always correct
-//     (chrome and SSR cards switch together, no client re-flow bugs).
+//   - Language: server-resolved. It lives in the PATH (`/en/`, `/ja/`,
+//     and the bare path for the default) rather than in a query
+//     string - see Core/Locale.js for why that distinction decided
+//     whether this site was indexable in more than one language.
+//     Switching reloads so RTL/LTR is always correct (chrome and SSR
+//     cards switch together, no client re-flow bugs).
 //
 // Extending
 //   - Add a UI language: add one entry to DASH_I18N below.
@@ -38,6 +41,7 @@ import { createHtmlResponse } from '../Core/Http.js'
 import { createGamesCardsHTML } from './GameCards.js'
 import { readPlayerSession } from '../Games/Session.js'
 import { toolsFor } from '../Content/ToolsCatalog.js'
+import { localizedPath } from '../Core/Locale.js'
 import { resolveGames } from '../Games/Registry.js'
 
 import { escapeHtml, safeColor } from '../Core/Html.js'
@@ -63,6 +67,8 @@ const DASH_I18N = {
     tagline: 'بازی‌های اندروید، کامپیوتر و تحت‌وب — و افزونه‌های یونیتی',
     metaTitle: 'AmirCollider — بازی‌های اندروید، کامپیوتر و وب، و ابزارهای یونیتی',
     metaDesc: 'AmirCollider سازنده‌ی بازی‌های اندروید، کامپیوتر و تحت‌وب مانند Neon Katana، و افزونه‌های ادیتور یونیتی مانند Unity DocSnap و Unity DirectTMP است.',
+    // The one paragraph of prose above the fold. See renderHero().
+    lede: 'من AmirCollider هستم؛ بازی می‌سازم و برای ساختنشان ابزار می‌نویسم. هرچه ساخته‌ام این‌جاست: بازی‌هایی مثل Neon Katana برای اندروید، و افزونه‌هایی برای ادیتور یونیتی مثل Unity DocSnap و Unity DirectTMP که کارهای تکراری ساخت بازی را کوتاه‌تر می‌کنند. همه‌چیز رایگان قابل امتحان است و کدهای بیشترشان باز است.',
     subtitle: 'سامانه مدیریت احراز هویت OAuth',
     langName: 'فارسی',
     themeToLight: 'حالت روشن',
@@ -113,6 +119,7 @@ const DASH_I18N = {
     tagline: 'Games for Android, PC and the web — and Unity editor extensions',
     metaTitle: 'AmirCollider — Games for Android, PC & Web, and Unity Editor Tools',
     metaDesc: 'AmirCollider builds games for Android, PC and the web such as Neon Katana, and Unity editor extensions such as Unity DocSnap and Unity DirectTMP.',
+    lede: 'I am AmirCollider — I make games, and I write the tools I need to make them. Everything I have built lives here: games such as Neon Katana for Android, and Unity editor extensions such as Unity DocSnap and Unity DirectTMP that take the repetition out of building them. All of it is free to try, and most of it is open source.',
     subtitle: 'OAuth authentication management',
     langName: 'English',
     themeToLight: 'Light mode',
@@ -162,6 +169,7 @@ const DASH_I18N = {
     tagline: 'Android・PC・ウェブ向けゲームと Unity エディタ拡張',
     metaTitle: 'AmirCollider — Android・PC・ウェブ向けゲームと Unity エディタツール',
     metaDesc: 'AmirCollider は Neon Katana などの Android・PC・ウェブ向けゲームと、Unity DocSnap・Unity DirectTMP などの Unity エディタ拡張を開発しています。',
+    lede: 'AmirCollider です。ゲームを作り、そのために必要なツールも自分で書いています。ここに置いてあるのは、Android 向けの Neon Katana のようなゲームと、制作の繰り返し作業を減らす Unity DocSnap・Unity DirectTMP のような Unity エディタ拡張です。どれも無料で試せて、ほとんどはソースを公開しています。',
     subtitle: 'OAuth 認証管理システム',
     langName: '日本語',
     themeToLight: 'ライトモード',
@@ -423,6 +431,14 @@ function getDashboardCSS() {
       -webkit-background-clip: text; background-clip: text; color: transparent;
     }
     .hero p { margin-block-start: 8px; color: var(--text-dim); font-size: 1.02em; }
+    /* The paragraph a search engine quotes. Held to a readable
+       measure and centred with the rest of the hero; everything
+       about it is ordinary except that it is the only run of prose
+       above the fold, which is the entire point of it. */
+    .hero .lede {
+      max-width: 62ch; margin-inline: auto; margin-block-start: 14px;
+      font-size: 1em; line-height: 1.9; color: var(--text-dim);
+    }
     .pill {
       display: inline-flex; align-items: center; gap: 8px; margin-block-start: 16px;
       padding: 7px 16px; border-radius: 20px; font-size: 0.85em; font-weight: 700;
@@ -625,12 +641,41 @@ function getDashboardCSS() {
 // so the brand mark, the language picker and the theme toggle are
 // in the same place, in the same style, on all of them.
 // ==========================================
+// ==========================================
+// renderHero
+//
+// The lede is not decoration, and it is the fix for a specific,
+// visible failure.
+//
+// Google's result for this domain used to read:
+//
+//   "قابل بازی بدون اینترنت ورود با گوگل ذخیره‌ی ابری جدول
+//    امتیازات خرید درون‌برنامه‌ای. خرید درون‌برنامه‌ای پرداخت با
+//    ارز دیجیتال ورود به حساب با حساب گوگل."
+//
+// which is not a description of anything. It is the capability
+// chips off the first game card, read left to right (Pages/GameCards.js).
+//
+// A search engine writes its own snippet when the page gives it
+// nothing better, and this page gave it nothing better: a one-word
+// heading, a six-word tagline, four stat tiles of digits, and then
+// cards made almost entirely of two-word labels. The
+// `<meta name="description">` was correct the whole time and was
+// ignored, because a description with no matching prose on the page
+// is a claim a snippet generator has no reason to trust.
+//
+// So the page now says, in one paragraph, in the reader's language,
+// what it is. It sits above everything else, it is the only run of
+// continuous text in the hero, and it says the same thing as the
+// meta description without being a copy of it.
+// ==========================================
 function renderHero(lang, version) {
   const p = pack(lang)
   return `
     <div class="hero">
       <h1>${escapeHtml(p.title)}</h1>
       <p>${escapeHtml(p.tagline)}</p>
+      <p class="lede">${escapeHtml(p.lede)}</p>
       <span class="pill"><span class="dot"></span>v${escapeHtml(version)}</span>
     </div>`
 }
@@ -671,7 +716,7 @@ function renderTools(lang) {
     }).join('')
 
     return `
-      <a class="tool-card" href="${escapeHtml(tool.href)}"
+      <a class="tool-card" href="${escapeHtml(localizedPath(tool.href, lang))}"
          style="--tool: ${accent}; --tool-2: ${accentSoft}">
         <span class="tool-ic" aria-hidden="true">${tool.mark}</span>
         <span class="tool-body">
@@ -687,7 +732,7 @@ function renderTools(lang) {
     <h2 class="section-title" id="tools">${escapeHtml(p.sectionTools)}</h2>
     <div class="tools-strip">${cards}</div>
     <div class="tools-more">
-      <a href="/tools">${escapeHtml(p.toolsAll)} &rarr;</a>
+      <a href="${escapeHtml(localizedPath('/tools', lang))}">${escapeHtml(p.toolsAll)} &rarr;</a>
     </div>`
 }
 
@@ -699,7 +744,8 @@ function renderSystemLinks(lang) {
     { href: '/release-notes', ic: 'notes', label: p.navReleaseNotes }
   ]
   return '<div class="syslinks">' + links.map(l =>
-    '<a class="syslink" href="' + escapeHtml(l.href) + '">' + icon(l.ic) + '<span>' + escapeHtml(l.label) + '</span></a>'
+    '<a class="syslink" href="' + escapeHtml(localizedPath(l.href, lang)) + '">'
+    + icon(l.ic) + '<span>' + escapeHtml(l.label) + '</span></a>'
   ).join('') + '</div>'
 }
 

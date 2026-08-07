@@ -56,6 +56,7 @@ import { createJsonResponse, createHtmlResponse } from '../Core/Http.js'
 import { logError } from '../Core/Logging.js'
 import { escapeHtml } from '../Core/Html.js'
 import { parseCookies, resolveLang, resolveRequestLang } from '../Core/RequestContext.js'
+import { localizedPath } from '../Core/Locale.js'
 import { chromeTheme, langHeader, page } from './GameChrome.js'
 
 const MIN_LIMIT = 1
@@ -351,21 +352,27 @@ function renderBoard(players, lang, gameName, accent) {
   return '<div class="lb-board">' + rows + '</div>'
 }
 
+// These three links used to append `?lang=` by hand so that the
+// language survived the click. The language is in the path now, so
+// carrying it is what localizedPath() already does - and the
+// hand-built query was the last place on a public page that still
+// produced one.
 function renderActions(lang, game, downloadable) {
   const p = pack(lang)
-  const q = '?lang=' + encodeURIComponent(resolveLang(lang))
+  const at = suffix => escapeHtml(localizedPath('/' + game.id + suffix, lang))
+
   const download = downloadable
-    ? `<a class="gbtn gbtn--ghost" href="/${escapeHtml(game.id)}/download">
+    ? `<a class="gbtn gbtn--ghost" href="${at('/download')}">
          ${icon('download')}<span>${escapeHtml(p.actionDownload)}</span></a>`
     : ''
 
   return `
     <div class="lb-actions">
-      <a class="gbtn" href="/${escapeHtml(game.id)}${q}">
+      <a class="gbtn" href="${at('')}">
         ${icon('gamepad')}<span>${escapeHtml(p.actionGame)}</span>
       </a>
       ${download}
-      <a class="gbtn gbtn--ghost" href="/${escapeHtml(game.id)}/leaderboard${q}">
+      <a class="gbtn gbtn--ghost" href="${at('/leaderboard')}">
         ${icon('refresh')}<span>${escapeHtml(p.actionRefresh)}</span>
       </a>
     </div>`

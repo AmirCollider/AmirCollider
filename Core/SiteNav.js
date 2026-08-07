@@ -35,9 +35,79 @@
 //     RTL (fa) and LTR (en/ja).
 // ==========================================
 
-import { CONFIG } from '../Config.js'
+import { CONFIG, LANGUAGES } from '../Config.js'
 import { escapeHtml } from './Html.js'
 import { resolveLang } from './RequestContext.js'
+import { localizedPath } from './Locale.js'
+
+
+// ==========================================
+// Where else this project exists.
+//
+// Read from CONFIG.SOCIAL so the footer, the About page and the
+// `sameAs` list in the structured data cannot drift apart - a
+// search engine deciding whether the GitHub account and this domain
+// are one entity is comparing exactly those three, and an account
+// listed in two of them and missing from the third is a weaker
+// claim than one listed nowhere.
+//
+// The marks are inline SVG paths rather than an icon font or an
+// image: the Content-Security-Policy on this site allows no remote
+// scripts and no remote stylesheets, and a footer icon is not worth
+// a network round trip in any case.
+// ==========================================
+const SOCIAL_MARKS = {
+  github: {
+    label: 'GitHub',
+    path: 'M12 2C6.48 2 2 6.58 2 12.25c0 4.53 2.87 8.37 6.84 9.73.5.1.68-.22.68-.49'
+      + 'l-.01-1.72c-2.78.62-3.37-1.37-3.37-1.37-.46-1.18-1.11-1.5-1.11-1.5-.91-.64.07-.62.07-.62'
+      + '1 .07 1.53 1.05 1.53 1.05.89 1.57 2.34 1.12 2.91.86.09-.66.35-1.12.63-1.38'
+      + '-2.22-.26-4.56-1.14-4.56-5.07 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.71'
+      + '0 0 .84-.28 2.75 1.05a9.3 9.3 0 0 1 5 0c1.91-1.33 2.75-1.05 2.75-1.05.55 1.41.2 2.45.1 2.71'
+      + '.64.72 1.03 1.63 1.03 2.75 0 3.94-2.34 4.81-4.57 5.06.36.32.68.94.68 1.9'
+      + 'l-.01 2.82c0 .27.18.6.69.49A10.03 10.03 0 0 0 22 12.25C22 6.58 17.52 2 12 2z'
+  },
+  youtube: {
+    label: 'YouTube',
+    path: 'M21.58 7.19a2.5 2.5 0 0 0-1.77-1.77C18.25 5 12 5 12 5s-6.25 0-7.81.42'
+      + 'A2.5 2.5 0 0 0 2.42 7.19 26 26 0 0 0 2 12a26 26 0 0 0 .42 4.81 2.5 2.5 0 0 0 1.77 1.77'
+      + 'C5.75 19 12 19 12 19s6.25 0 7.81-.42a2.5 2.5 0 0 0 1.77-1.77A26 26 0 0 0 22 12'
+      + 'a26 26 0 0 0-.42-4.81zM10 15.02V8.98L15.2 12 10 15.02z'
+  },
+  instagram: {
+    label: 'Instagram',
+    path: 'M12 2.16c3.2 0 3.58.01 4.85.07 1.17.05 1.8.25 2.23.41.56.22.96.48 1.38.9'
+      + '.42.42.68.82.9 1.38.16.42.36 1.06.41 2.23.06 1.27.07 1.65.07 4.85s-.01 3.58-.07 4.85'
+      + 'c-.05 1.17-.25 1.8-.41 2.23-.22.56-.48.96-.9 1.38-.42.42-.82.68-1.38.9-.42.16-1.06.36-2.23.41'
+      + '-1.27.06-1.65.07-4.85.07s-3.58-.01-4.85-.07c-1.17-.05-1.8-.25-2.23-.41a3.8 3.8 0 0 1-1.38-.9'
+      + 'c-.42-.42-.68-.82-.9-1.38-.16-.42-.36-1.06-.41-2.23-.06-1.27-.07-1.65-.07-4.85s.01-3.58.07-4.85'
+      + 'c.05-1.17.25-1.8.41-2.23.22-.56.48-.96.9-1.38.42-.42.82-.68 1.38-.9.42-.16 1.06-.36 2.23-.41'
+      + '1.27-.06 1.65-.07 4.85-.07zM12 7.84a4.16 4.16 0 1 0 0 8.32 4.16 4.16 0 0 0 0-8.32z'
+      + 'm0 6.86a2.7 2.7 0 1 1 0-5.4 2.7 2.7 0 0 1 0 5.4zm5.3-7.02a.97.97 0 1 1-1.94 0 .97.97 0 0 1 1.94 0z'
+  },
+  x: {
+    label: 'X',
+    path: 'M17.53 3h3.04l-6.64 7.59L21.75 21h-6.12l-4.8-6.27L5.35 21H2.31l7.1-8.12L2.25 3h6.27'
+      + 'l4.34 5.74L17.53 3zm-1.07 16.16h1.69L7.6 4.74H5.79l10.67 14.42z'
+  }
+}
+
+/** The accounts CONFIG.SOCIAL names, in the order it names them. */
+export function socialLinks() {
+  return Object.entries(CONFIG.SOCIAL || {})
+    .filter(([key, href]) => href && SOCIAL_MARKS[key])
+    .map(([key, href]) => ({ key, href, ...SOCIAL_MARKS[key] }))
+}
+
+/** One social icon link. `size` is the square edge in pixels. */
+export function socialIconLink(entry, size = 20) {
+  return '<a class="ac-soc" href="' + escapeHtml(entry.href) + '"'
+    + ' rel="me noopener" target="_blank"'
+    + ' aria-label="' + escapeHtml(entry.label) + '" title="' + escapeHtml(entry.label) + '">'
+    + '<svg viewBox="0 0 24 24" width="' + size + '" height="' + size + '"'
+    + ' fill="currentColor" aria-hidden="true"><path d="' + entry.path + '"/></svg>'
+    + '</a>'
+}
 
 
 // ==========================================
@@ -53,7 +123,10 @@ export const NAV_I18N = {
     games: 'بازی‌ها',
     tools: 'ابزارها',
     about: 'درباره‌ی من',
+    donate: 'حمایت مالی',
     releaseNotes: 'یادداشت‌های انتشار',
+    colFollow: 'دنبال کردن',
+    followNote: 'کارهای در جریان، تیزرها و به‌روزرسانی‌ها را این‌جا می‌گذارم.',
     docsnap: 'Unity DocSnap',
     directtmp: 'Unity DirectTMP',
     metrics: 'متریک‌ها',
@@ -84,7 +157,10 @@ export const NAV_I18N = {
     games: 'Games',
     tools: 'Tools',
     about: 'About',
+    donate: 'Donate',
     releaseNotes: 'Release notes',
+    colFollow: 'Follow',
+    followNote: 'Work in progress, trailers and updates go up here.',
     docsnap: 'Unity DocSnap',
     directtmp: 'Unity DirectTMP',
     metrics: 'Metrics',
@@ -115,7 +191,10 @@ export const NAV_I18N = {
     games: 'ゲーム',
     tools: 'ツール',
     about: '自己紹介',
+    donate: '支援する',
     releaseNotes: 'リリースノート',
+    colFollow: 'フォロー',
+    followNote: '制作中の様子やトレーラー、最新情報はこちらで公開しています。',
     docsnap: 'Unity DocSnap',
     directtmp: 'Unity DirectTMP',
     metrics: 'メトリクス',
@@ -141,6 +220,20 @@ export const NAV_I18N = {
 
 function pack(lang) {
   return NAV_I18N[resolveLang(lang)]
+}
+
+
+/**
+ * An href, in the language the surrounding page is rendering in.
+ *
+ * Only site-relative paths are touched. A `mailto:`, an absolute
+ * URL and an in-page anchor are all returned exactly as given -
+ * prefixing any of those with `/en` would break them.
+ */
+function navHref(href, lang) {
+  const value = String(href || '')
+  if (!value.startsWith('/')) return value
+  return localizedPath(value, lang)
 }
 
 
@@ -349,6 +442,27 @@ export function siteNavCss() {
     }
     .ac-foot-col a:hover { opacity: 1; color: color-mix(in srgb, var(--acn-accent) 55%, var(--acn-fg)); }
 
+    /* ---------- the accounts ----------
+       A row of marks rather than a list of names: four rows of
+       "Instagram", "YouTube" read as another link column, and this
+       is not one. Physical size is fixed so the row stays even
+       whichever glyph sits in it. */
+    .ac-soc-row { display: flex; flex-wrap: wrap; gap: 8px; margin-block-end: 10px; }
+    .ac-soc {
+      width: 38px; height: 38px; border-radius: 11px; flex: none;
+      display: grid; place-items: center; text-decoration: none;
+      color: var(--acn-fg); opacity: 0.78;
+      background: var(--acn-surface-2); border: 1px solid var(--acn-border);
+      transition: opacity 0.18s ease, transform 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+    }
+    .ac-soc:hover {
+      opacity: 1; transform: translateY(-2px);
+      color: color-mix(in srgb, var(--acn-accent) 55%, var(--acn-fg));
+      border-color: color-mix(in srgb, var(--acn-accent) 40%, var(--acn-border));
+    }
+    .ac-soc svg { display: block; }
+    .ac-foot-note { color: var(--acn-dim); font-size: 0.82em; line-height: 1.7; max-width: 30ch; }
+
     .ac-foot-bottom {
       display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
       gap: 10px; margin-block-start: 26px; padding-block-start: 18px;
@@ -448,8 +562,14 @@ export function siteHeader({ lang, active = '', extra = [], accent = '' } = {}) 
     (extra || []).filter(item => item && item.href && item.label)
   )
 
+  // Every internal href is rewritten into the language this page is
+  // rendering in, so a reader on /en/about who clicks Games lands on
+  // /en/games rather than being bounced through a redirect back into
+  // Persian. A crawler reading the English page follows English
+  // links and finds the whole English site - which is the other half
+  // of what makes an hreflang cluster real. See Core/Locale.js.
   const links = items.map(item =>
-    '<a href="' + escapeHtml(item.href) + '"'
+    '<a href="' + escapeHtml(navHref(item.href, code)) + '"'
     + (item.key && item.key === active ? ' aria-current="page"' : '')
     + '>' + escapeHtml(item.label) + '</a>'
   ).join('')
@@ -475,7 +595,7 @@ export function siteHeader({ lang, active = '', extra = [], accent = '' } = {}) 
     <a class="ac-skip" href="#main">${escapeHtml(p.skip)}</a>
     <header class="ac-nav"${accentStyle}>
       <div class="ac-nav-in">
-        <a class="ac-brand" href="/" aria-label="AmirCollider">
+        <a class="ac-brand" href="${escapeHtml(navHref('/', code))}" aria-label="AmirCollider">
           <span class="ac-brand-logo">
             <img src="${escapeHtml(CONFIG.AMIR_LOGO)}" alt="" width="46" height="46"
                  onerror="this.style.display='none'">
@@ -513,13 +633,14 @@ export function siteHeader({ lang, active = '', extra = [], accent = '' } = {}) 
 // ==========================================
 export function siteBreadcrumb({ lang, trail = [] } = {}) {
   if (!trail || trail.length === 0) return ''
-  const p = pack(lang)
+  const code = resolveLang(lang)
+  const p = pack(code)
 
   const parts = trail.map((item, index) => {
     const last = index === trail.length - 1
     const node = last || !item.href
       ? '<span aria-current="page">' + escapeHtml(item.label) + '</span>'
-      : '<a href="' + escapeHtml(item.href) + '">' + escapeHtml(item.label) + '</a>'
+      : '<a href="' + escapeHtml(navHref(item.href, code)) + '">' + escapeHtml(item.label) + '</a>'
     const sep = last ? '' : '<span class="ac-crumb-sep" aria-hidden="true">›</span>'
     return node + sep
   }).join('')
@@ -553,6 +674,7 @@ export function siteFooter({ lang, games = [] } = {}) {
         { href: '/about', label: p.about },
         { href: '/games', label: p.games },
         { href: '/tools', label: p.tools },
+        { href: '/donate', label: p.donate },
         { href: '/release-notes', label: p.releaseNotes },
         { href: '/metrics', label: p.metrics }
       ]
@@ -581,15 +703,31 @@ export function siteFooter({ lang, games = [] } = {}) {
       <div class="ac-foot-col">
         <h2>${escapeHtml(column.title)}</h2>
         <ul>${column.links.map(link =>
-          '<li><a href="' + escapeHtml(link.href) + '">' + escapeHtml(link.label) + '</a></li>'
+          '<li><a href="' + escapeHtml(navHref(link.href, code)) + '">' + escapeHtml(link.label) + '</a></li>'
         ).join('')}</ul>
       </div>`).join('')
+
+  // The accounts, on every page.
+  //
+  // `rel="me"` is the part that is not decoration: it is the
+  // machine-readable claim that the person who owns this domain is
+  // the person behind those accounts, and it is the same claim the
+  // `sameAs` list makes in the structured data. A search engine
+  // deciding whether a GitHub profile, a YouTube channel and this
+  // domain are one entity or three is reading exactly this.
+  const accounts = socialLinks()
+  const social = accounts.length ? `
+        <div class="ac-foot-col ac-foot-social">
+          <h2>${escapeHtml(p.colFollow)}</h2>
+          <div class="ac-soc-row">${accounts.map(entry => socialIconLink(entry)).join('')}</div>
+          <p class="ac-foot-note">${escapeHtml(p.followNote)}</p>
+        </div>` : ''
 
   return `
     <footer class="ac-foot">
       <div class="ac-foot-grid">
         <div class="ac-foot-brand">
-          <a class="ac-foot-mark" href="/">
+          <a class="ac-foot-mark" href="${escapeHtml(navHref('/', code))}">
             <img src="${escapeHtml(CONFIG.AMIR_LOGO)}" alt="" width="44" height="44"
                  onerror="this.style.display='none'">
             <b>AmirCollider</b>
@@ -597,13 +735,14 @@ export function siteFooter({ lang, games = [] } = {}) {
           <p class="ac-foot-tagline">${escapeHtml(p.tagline)}</p>
         </div>
         ${cols}
+        ${social}
       </div>
       <div class="ac-foot-bottom">
         <span>&copy; ${year} AmirCollider. ${escapeHtml(p.rights)}</span>
         <span class="ac-foot-legal">
-          <a href="/privacy">${escapeHtml(p.privacy)}</a>
+          <a href="${escapeHtml(navHref('/privacy', code))}">${escapeHtml(p.privacy)}</a>
           <span aria-hidden="true">&middot;</span>
-          <a href="/terms">${escapeHtml(p.terms)}</a>
+          <a href="${escapeHtml(navHref('/terms', code))}">${escapeHtml(p.terms)}</a>
           <span aria-hidden="true">&middot;</span>
           <span>${escapeHtml(p.poweredBy)} &middot; <b>v${escapeHtml(CONFIG.VERSION)}</b></span>
         </span>
@@ -651,11 +790,32 @@ export function siteChromeScript() {
         document.cookie = 'theme=' + next + ';path=/;max-age=31536000;samesite=lax';
       };
 
+      // The language lives in the path now, not in a query string.
+      // This rewrites the address rather than appending to it:
+      // strip whatever prefix is there, put the chosen one on, and
+      // let the server sort out the handful of paths that do not
+      // take one (it answers those with a 301 that moves the code
+      // back into ?lang=). See Core/Locale.js.
+      var AC_LANGS = ${JSON.stringify(LANGUAGES.supported)};
+      var AC_DEFAULT = ${JSON.stringify(LANGUAGES.default)};
+
       window.acSetLang = function (code) {
+        if (AC_LANGS.indexOf(code) === -1) return false;
         try { localStorage.setItem('ac_lang', code); } catch (e) {}
         document.cookie = 'lang=' + code + ';path=/;max-age=31536000;samesite=lax';
+
         var url = new URL(window.location.href);
-        url.searchParams.set('lang', code);
+        url.searchParams.delete('lang');
+
+        var parts = url.pathname.split('/');
+        if (parts.length > 1 && AC_LANGS.indexOf(parts[1]) !== -1) parts.splice(1, 1);
+        var bare = parts.join('/');
+        if (bare.charAt(0) !== '/') bare = '/' + bare;
+
+        url.pathname = code === AC_DEFAULT
+          ? bare
+          : '/' + code + (bare === '/' ? '' : bare);
+
         window.location.href = url.toString();
         return false;
       };

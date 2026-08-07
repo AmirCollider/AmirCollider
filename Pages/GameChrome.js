@@ -20,6 +20,7 @@ import { CONFIG } from '../Config.js'
 import { getPageHead } from '../Core/DesignSystem.js'
 import { escapeHtml, safeColor } from '../Core/Html.js'
 import { seoHead, breadcrumbLd } from '../Core/Seo.js'
+import { localizedPath } from '../Core/Locale.js'
 import {
   siteNavCss, siteHeader, siteBreadcrumb, siteFooter, siteBackToTop, siteChromeScript, NAV_I18N
 } from '../Core/SiteNav.js'
@@ -309,19 +310,19 @@ export function chromeTop(game, lang, active, { downloadable = true } = {}) {
   // other one is a sub-page of, and until it existed the brand
   // link in the corner went to the dashboard, which is a
   // different site's front page as far as a player is concerned.
-  items.push({ key: 'landing', href: `/${game.id}`, label: nav.landing })
+  items.push({ key: 'landing', href: localizedPath(`/${game.id}`, lang), label: nav.landing })
 
   if (game.capabilities.login) {
-    items.push({ key: 'account', href: `/${game.id}/account`, label: nav.account })
+    items.push({ key: 'account', href: localizedPath(`/${game.id}/account`, lang), label: nav.account })
   }
   if (game.capabilities.store) {
-    items.push({ key: 'store', href: `/${game.id}/store`, label: nav.store })
+    items.push({ key: 'store', href: localizedPath(`/${game.id}/store`, lang), label: nav.store })
   }
   if (game.capabilities.leaderboard) {
-    items.push({ key: 'board', href: `/${game.id}/leaderboard`, label: nav.board })
+    items.push({ key: 'board', href: localizedPath(`/${game.id}/leaderboard`, lang), label: nav.board })
   }
-  items.push({ key: 'versions', href: `/${game.id}/versions`, label: nav.versions })
-  items.push({ key: 'download', href: `/${game.id}/download`, label: nav.download, off: !downloadable })
+  items.push({ key: 'versions', href: localizedPath(`/${game.id}/versions`, lang), label: nav.versions })
+  items.push({ key: 'download', href: localizedPath(`/${game.id}/download`, lang), label: nav.download, off: !downloadable })
 
   const links = items.map(item =>
     `<a href="${escapeHtml(item.href)}"${item.key === active ? ' aria-current="page"' : ''}` +
@@ -334,7 +335,7 @@ export function chromeTop(game, lang, active, { downloadable = true } = {}) {
   // point of having a site header.
   return `
     <div class="gtop">
-      <a class="gbrand" href="/${escapeHtml(game.id)}">
+      <a class="gbrand" href="${escapeHtml(localizedPath(`/${game.id}`, lang))}">
         <span class="gbrand-logo">${escapeHtml(game.icon || '🎮')}${game.logo
           ? `<img src="${escapeHtml(game.logo)}" alt="" onerror="this.style.display='none'">` : ''}</span>
         <span>
@@ -359,13 +360,13 @@ export function chromeFoot(game, lang, games = []) {
 
   return `
     <div class="gfoot-game">
-      <a href="/${escapeHtml(game.id)}">${escapeHtml(game.name)}</a>
+      <a href="${escapeHtml(localizedPath(`/${game.id}`, lang))}">${escapeHtml(game.name)}</a>
       <span aria-hidden="true">&middot;</span>
-      <a href="/${escapeHtml(game.id)}/privacy">${escapeHtml((NAV_I18N[lang] || NAV_I18N.fa).privacy)}</a>
+      <a href="${escapeHtml(localizedPath(`/${game.id}/privacy`, lang))}">${escapeHtml((NAV_I18N[lang] || NAV_I18N.fa).privacy)}</a>
       <span aria-hidden="true">&middot;</span>
-      <a href="/${escapeHtml(game.id)}/terms">${escapeHtml((NAV_I18N[lang] || NAV_I18N.fa).terms)}</a>
+      <a href="${escapeHtml(localizedPath(`/${game.id}/terms`, lang))}">${escapeHtml((NAV_I18N[lang] || NAV_I18N.fa).terms)}</a>
       <span aria-hidden="true">&middot;</span>
-      <a href="/">${escapeHtml(nav.home)}</a>
+      <a href="${escapeHtml(localizedPath('/', lang))}">${escapeHtml(nav.home)}</a>
     </div>
     ${siteFooter({ lang, games: list })}`
 }
@@ -431,7 +432,7 @@ export function page({
     // review reads that page as the application's home page. Every
     // other page here is a section of the site and says so.
     ...(siteName ? { siteName } : {}),
-    graph: [breadcrumbLd(trail), ...(seoGraph || [])]
+    graph: [breadcrumbLd(trail, lang), ...(seoGraph || [])]
   })
 
   return `<!DOCTYPE html>
