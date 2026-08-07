@@ -39,8 +39,21 @@ export async function handleUserProfile(url, request, gameId, requestId, GAMES, 
       return createHtmlResponse(createErrorPage(t('userNotFound'), game, lang), 404)
     }
 
+    // ==========================================
+    // No email on a public page.
+    //
+    // This route takes no token and checks nothing: the
+    // header above says "public page" and means it. The
+    // id in the URL is derived from the address - the
+    // first fifteen characters of the local part,
+    // lowercased - so it is guessable rather than secret,
+    // and handing back the whole address for one turned a
+    // guess into a confirmed email.
+    //
+    // The player id is already as much of the address as
+    // this page has any business showing.
+    // ==========================================
     return createHtmlResponse(renderProfilePage({
-      email: player.email,
       username: player.username,
       displayName: player.username,
       photoURL: player.profile_pic_url,
@@ -85,8 +98,7 @@ function renderProfilePage(userData, game, gameId, lang, theme) {
       <img src="${escapeHtml(userData.photoURL || '/assets/DefaultGameLogo.png')}" alt=""
            style="width:120px;height:120px;border-radius:50%;border:4px solid var(--surface-2);object-fit:cover;"
            onerror="this.onerror=null;this.src='/assets/DefaultGameLogo.png';">
-      <h1 style="margin-block-start:16px;">${escapeHtml(userData.displayName || userData.username)}</h1>
-      <p class="ac-muted">${escapeHtml(userData.email || '')}</p>
+      <h1 style="margin-block-start:16px;">${escapeHtml(userData.displayName || userData.username || 'Player')}</h1>
       <span class="version-badge">${escapeHtml(game.name)}</span>
     </div>
 
