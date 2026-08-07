@@ -9,7 +9,7 @@
 // ==========================================
 
 import { createJsonResponse } from '../Core/Http.js'
-import { logWarning } from '../Core/Logging.js'
+import { logInfo, logWarning } from '../Core/Logging.js'
 import { playerIdFromEmail } from '../Core/PlayerIdentity.js'
 
 /**
@@ -234,6 +234,76 @@ export function buildProfileUpdate(data, includeGamesPlayed = false, currentData
 
 
 // ==========================================
+// A username that satisfies a NOT NULL column
+//
+// The live neon-katana database declares
+//
+//   username TEXT NOT NULL UNIQUE
+//
+// while migrations/neon-katana.sql and the panel's builder in
+// Games/Sql.js both declare it nullable. The live table predates
+// both files, and nothing reconciled them - so the INSERT below,
+// which named no username at all, violated NOT NULL on the only
+// database that matters. INSERT OR IGNORE does not raise that: it
+// skips the row. Silently. No exception for the try/catch to
+// catch, no error in the log, and no player row - which is why a
+// new account could sign in perfectly, score, and exist nowhere
+// on the server.
+//
+// So a name is always supplied now, and it satisfies
+// validateUsername() so the player can keep it: 3 to 12 English
+// letters and digits, nothing on the blocklist.
+//
+// NOT from the address. The player id is the local part of an
+// email and this column is printed on a public leaderboard; the
+// rest of this codebase refuses that trade deliberately, and so
+// does this. The Google account's own name if it can be made to
+// fit, and an anonymous "Player…" if it cannot.
+// ==========================================
+const USERNAME_MAX = 12
+const USERNAME_MIN = 3
+
+function sanitizeUsername(name) {
+  const stripped = String(name || '').replace(/[^A-Za-z0-9]/g, '').slice(0, USERNAME_MAX)
+  if (stripped.length < USERNAME_MIN) return null
+
+  return validateUsername(stripped) ? null : stripped
+}
+
+async function usernameIsFree(db, candidate) {
+  try {
+    const taken = await db.prepare('SELECT 1 FROM players WHERE LOWER(username) = LOWER(?) LIMIT 1')
+      .bind(candidate).first()
+    return !taken
+  } catch {
+    // A table with no username column at all answers this way. Nothing
+    // is taken on a column that does not exist.
+    return true
+  }
+}
+
+/**
+ * A free username for a brand new row: the Google account's name if
+ * it can be made to fit, otherwise an anonymous one. Never null, so
+ * a NOT NULL column is always satisfied.
+ */
+async function pickUsername(db, identity) {
+  const fromGoogle = sanitizeUsername(identity && identity.name)
+  if (fromGoogle && await usernameIsFree(db, fromGoogle)) return fromGoogle
+
+  // Numbered rather than random so two players signing in at the same
+  // moment do not collide any more often than they have to, and short
+  // enough to stay inside twelve characters.
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const candidate = `Player${Math.floor(Math.random() * 900000) + 100000}`
+    if (await usernameIsFree(db, candidate)) return candidate
+  }
+
+  return `P${Date.now().toString(36).slice(-11)}`
+}
+
+
+// ==========================================
 // ensurePlayerRow
 // Creates the caller's own row the first time they are seen.
 //
@@ -243,62 +313,68 @@ export function buildProfileUpdate(data, includeGamesPlayed = false, currentData
 // signed a player in, minted them a week-long session, welcomed
 // them by name - and left the players table untouched.
 //
-// What that looked like to somebody who visited the site before
-// they had played:
-//
-//   - the stats block and the whole profile form are rendered
-//     `record ? ... : ''`, so both simply were not on the page.
-//     There was no way to set a username or an avatar at all.
-//   - a save that did reach the server UPDATEd nothing and said
-//     it had worked, because setUsername() never looked at how
-//     many rows changed.
-//   - and then playing the game created the row for real, with
-//     a null username, quietly discarding whatever they thought
-//     they had set.
-//
-// So it lives here, next to everything else that knows the shape
-// of this table, and both sign-ins call it.
-//
-// INSERT OR IGNORE, so two first requests racing each other
-// produce one row rather than an error - and so an id that
-// already belongs to somebody else is left exactly as it is. The
-// collision guard in Core/PlayerIdentity.js is what refuses that
-// case, and it can only do its job on a row this has not
-// overwritten.
-//
-// `username` is deliberately left null. The column takes 3 to 12
-// English letters and digits and nothing else, which a Google
-// account name is under no obligation to be; the player chooses
-// one on the site, and until then the game shows their account
-// name instead.
+// It is called from both now, and it no longer fails in silence.
+// The old version was INSERT OR IGNORE and a try/catch around it,
+// which is two separate ways of discarding the reason a row was
+// not created - and it did not create one, on the live database,
+// for anybody. Every failure is logged now, and the caller is
+// told, because "the player does not exist" is the wrong answer
+// to give a player who does.
 // ==========================================
 export async function ensurePlayerRow(db, playerId, identity) {
-  if (!db || !playerId || !identity || !identity.email) return
+  if (!db || !playerId || !identity || !identity.email) return false
 
+  const now = Date.now()
+
+  let existing
   try {
-    const now = Date.now()
+    existing = await db.prepare('SELECT player_id, profile_pic_url FROM players WHERE player_id = ? LIMIT 1')
+      .bind(playerId).first()
+  } catch (error) {
+    logWarning('Could not look for a player row', { playerId, error: error.message })
+    return false
+  }
 
-    await db.prepare(
-      `INSERT OR IGNORE INTO players (player_id, email, profile_pic_url, created_at, last_login)
-       VALUES (?, ?, ?, ?, ?)`
-    ).bind(playerId, identity.email, identity.picture || null, now, now).run()
+  if (!existing) {
+    // Empty string, never null: profile_pic_url is NOT NULL on the live
+    // table, and an explicit null violates that even though the column
+    // has a default - a default only applies to a column left out.
+    const picture = String((identity && identity.picture) || '')
+    const username = await pickUsername(db, identity)
 
-    // ==========================================
-    // The picture, for a row that already existed.
-    //
-    // INSERT OR IGNORE fills profile_pic_url in exactly once -
-    // the moment the row is created. A player whose row was made
-    // before Google's picture was being read, or made by a path
-    // that had no identity to hand, therefore had no picture and
-    // no way of ever getting one: the game asked for the profile,
-    // the profile came back with photoURL empty, and the avatar
-    // stayed on its placeholder for good.
-    //
-    // Only when the column is empty. A picture the player chose
-    // on the site is theirs, and having Google overwrite it on
-    // every sign-in would be a worse bug than the one this fixes.
-    // ==========================================
-    if (identity.picture) {
+    try {
+      await db.prepare(
+        `INSERT INTO players (player_id, email, username, profile_pic_url, created_at, last_login)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      ).bind(playerId, identity.email, username, picture, now, now).run()
+
+      logInfo('Player row created', { playerId })
+      return true
+    } catch (error) {
+      // Two first requests racing each other is the ordinary case, and
+      // the loser has nothing to report: the row it wanted is there.
+      if (/UNIQUE|constraint failed/i.test(String(error && error.message))) return true
+
+      logWarning('Could not create a player row', { playerId, error: error.message })
+      return false
+    }
+  }
+
+  // ==========================================
+  // The picture, for a row that already existed.
+  //
+  // A player whose row was made before Google's picture was being
+  // read, or made by a path that had no identity to hand, had no
+  // picture and no way of ever getting one: the game asked for the
+  // profile, the profile came back with photoURL empty, and the
+  // avatar stayed on its placeholder for good.
+  //
+  // Only when the column is empty. A picture the player chose on the
+  // site is theirs, and having Google overwrite it on every sign-in
+  // would be a worse bug than the one this fixes.
+  // ==========================================
+  if (identity.picture) {
+    try {
       await db.prepare(
         `UPDATE players
             SET profile_pic_url = ?, last_login = ?
@@ -306,12 +382,12 @@ export async function ensurePlayerRow(db, playerId, identity) {
             AND email = ?
             AND (profile_pic_url IS NULL OR profile_pic_url = '')`
       ).bind(identity.picture, now, playerId, identity.email).run()
+    } catch (error) {
+      logWarning('Could not backfill a profile picture', { playerId, error: error.message })
     }
-  } catch {
-    // Not fatal on its own. Whatever the caller was doing is about to
-    // read or write the same row and will report the failure itself,
-    // with the status that actually describes it.
   }
+
+  return true
 }
 
 

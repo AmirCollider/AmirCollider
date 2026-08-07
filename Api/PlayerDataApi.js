@@ -345,9 +345,22 @@ export async function handleDatabaseSet(url, request, gameId, requestId, GAMES, 
     const highScoreMatch = dbPath.match(/^games\/([^/]+)\/users\/([^/]+)\/highScore$/)
     if (highScoreMatch) {
       // Before the guard, not after: an id that already belongs to
-      // somebody else is left untouched by INSERT OR IGNORE, so the
-      // guard still has the other person's row to refuse on.
-      await ensurePlayerRow(db, highScoreMatch[2], auth.identity)
+      // somebody else is left untouched, so the guard still has the
+      // other person's row to refuse on.
+      //
+      // The answer is checked now. This used to be fire-and-forget, and
+      // when it silently created nothing the write below answered 404
+      // "user_not_found" - which reads as "that player does not exist"
+      // to a player who very much does. A row we could not make is a
+      // fault on this side, and says so.
+      if (!(await ensurePlayerRow(db, highScoreMatch[2], auth.identity))) {
+        return createJsonResponse({
+          error: 'player_row_unavailable',
+          message: 'Your player record could not be created. Try again shortly.',
+          retryable: true,
+          requestId
+        }, 503)
+      }
 
       const conflict = await refuseIfSomebodyElses(db, highScoreMatch[2], auth.identity.email, requestId)
       if (conflict) return conflict
@@ -487,7 +500,14 @@ export async function handleDatabasePatch(url, request, gameId, requestId, GAMES
   if (!auth.ownerMatch) return unknownPath(requestId)
 
   try {
-    await ensurePlayerRow(db, auth.ownerMatch[1], auth.identity)
+    if (!(await ensurePlayerRow(db, auth.ownerMatch[1], auth.identity))) {
+      return createJsonResponse({
+        error: 'player_row_unavailable',
+        message: 'Your player record could not be created. Try again shortly.',
+        retryable: true,
+        requestId
+      }, 503)
+    }
 
     const conflict = await refuseIfSomebodyElses(db, auth.ownerMatch[1], auth.identity.email, requestId)
     if (conflict) return conflict
