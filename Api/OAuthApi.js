@@ -55,6 +55,37 @@ export function detectAndroid({ explicitPlatform, headerPlatform, redirectUri, u
  * one step later, with Google reporting "redirect_uri_mismatch"
  * against a redirect URI that was fine.
  */
+// ==========================================
+// Which prompt Google is asked for.
+//
+// `select_account` is the half that was missing, and its absence
+// is a bug a player sees rather than a subtlety. Without it Google
+// signs the caller straight back in as whichever account the
+// browser is already holding - so a player who pressed the button
+// a second time to switch accounts was returned, immediately and
+// without being asked anything, as the same person they were
+// already signed in as. From inside the game that looks exactly
+// like the button not working.
+//
+// `consent` stays alongside it. It is what makes Google issue a
+// refresh_token every time rather than only on the very first
+// authorisation, and a client that does not get one cannot keep
+// the player signed in across a restart.
+//
+// A caller may ask for something else, from this list only: these
+// values go into a URL a player is sent to, and an unchecked one
+// is somebody else's parameter injected into our authorisation
+// request.
+// ==========================================
+const ALLOWED_PROMPTS = new Set([
+  'none', 'consent', 'select_account', 'select_account consent', 'consent select_account'
+])
+
+function resolvePrompt(url) {
+  const asked = (url.searchParams.get('prompt') || '').trim()
+  return ALLOWED_PROMPTS.has(asked) ? asked : 'select_account consent'
+}
+
 function buildGoogleAuthUrl(url, game, stateValue, isAndroid, lang) {
   const requested = url.searchParams.get('client_id')
   const known = [game.oauth.web, game.oauth.android].filter(Boolean)
@@ -66,7 +97,7 @@ function buildGoogleAuthUrl(url, game, stateValue, isAndroid, lang) {
   authUrl.searchParams.set('response_type', url.searchParams.get('response_type') || 'code')
   authUrl.searchParams.set('scope', url.searchParams.get('scope') || 'openid profile email')
   authUrl.searchParams.set('access_type', 'offline')
-  authUrl.searchParams.set('prompt', 'consent')
+  authUrl.searchParams.set('prompt', resolvePrompt(url))
   authUrl.searchParams.set('hl', resolveLang(lang))
   authUrl.searchParams.set('state', stateValue)
   return authUrl
@@ -322,8 +353,40 @@ export async function handleRefreshToken(url, request, gameId, requestId, GAMES)
     const tokenData = await tokenResponse.json().catch(() => ({}))
 
     if (!tokenResponse.ok || tokenData.error) {
-      logWarning('Token refresh rejected', { requestId, gameId, providerError: tokenData.error || 'unknown' })
-      return createJsonResponse({ success: false, error: 'refresh_failed', message: 'Failed to refresh token', requestId }, 400)
+      const providerError = tokenData.error || 'unknown'
+
+      // ==========================================
+      // Two different failures, told apart.
+      //
+      // Every one of these used to be 400 "refresh_failed", and
+      // the game read any 4xx as "this player is no longer
+      // welcome": it deleted the stored session and drew itself
+      // signed out. So Google being briefly unreachable, or
+      // rate-limiting us, or a 500 on their side, signed the
+      // player out of the game - and because a game client asks
+      // for a refresh every time it comes back to the menu, one
+      // bad second was enough.
+      //
+      // invalid_grant is the only answer that actually means the
+      // session is over: revoked, expired, or already spent. It
+      // gets 401, which is a client's cue to send the player back
+      // through the browser. Everything else is 502, which means
+      // "not now, ask again" - and no client should ever throw a
+      // session away over one of those.
+      // ==========================================
+      const sessionIsOver = providerError === 'invalid_grant'
+
+      logWarning('Token refresh rejected', { requestId, gameId, providerError, sessionIsOver })
+
+      return createJsonResponse({
+        success: false,
+        error: sessionIsOver ? 'invalid_grant' : 'refresh_unavailable',
+        message: sessionIsOver
+          ? 'This sign-in has expired. Sign in again.'
+          : 'Could not refresh right now. Try again shortly.',
+        retryable: !sessionIsOver,
+        requestId
+      }, sessionIsOver ? 401 : 502)
     }
 
     logInfo('Token refreshed', { requestId, gameId })

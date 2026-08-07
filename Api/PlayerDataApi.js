@@ -409,8 +409,27 @@ async function writeHighScore(db, uid, body, gameId, requestId) {
     }, 200)
   }
 
+  // ==========================================
+  // The score, and only the score.
+  //
+  // This used to bump games_played too, which put the column
+  // under two owners that disagree. The client sends its own
+  // running total to /database/patch, where buildProfileUpdate
+  // takes the larger of the two - so a run that set a record was
+  // counted once by the client and once again here, and the
+  // inflated figure then won the MAX and was read back down to
+  // the device as the truth. The counter drifted upward by one
+  // for every record any player ever set, and nothing could bring
+  // it back: MAX only goes one way.
+  //
+  // Worse, it counted the wrong thing. Only a run that BEAT the
+  // record reached this line - a player's fiftieth run was
+  // counted if it was their best and ignored if it was not. The
+  // client counts runs because the client is the only side that
+  // sees them all.
+  // ==========================================
   await db.prepare(
-    'UPDATE players SET high_score = ?, games_played = games_played + 1, last_login = ? WHERE player_id = ?'
+    'UPDATE players SET high_score = ?, last_login = ? WHERE player_id = ?'
   ).bind(newScore, Date.now(), uid).run()
 
   logInfo('High score updated', { requestId, gameId })
