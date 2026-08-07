@@ -279,7 +279,7 @@ export const CONFIG = deepFreeze({
   // the PNG paints its corners is the value that makes the seam
   // between artwork and backdrop invisible; anything else leaves a
   // faint square edge visible inside the circle.
-  ICON_BG: '#0b0e16'
+  ICON_BG: '#f4c21e'
 })
 
 
