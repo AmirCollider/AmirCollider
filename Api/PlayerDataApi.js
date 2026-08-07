@@ -158,15 +158,57 @@ function unknownPath(requestId) {
 
 
 // ==========================================
+// Which game a /database/ request is about
+//
+// The path says so - every route under here is
+// `games/{gameId}/...` - and until now nothing read it. The game
+// came from Worker.js, which takes it from the X-Game-ID header,
+// then `?game=`, and failing both from Object.keys(GAMES)[0]:
+// the first game in the registry.
+//
+// So a client that did not send the header had its scores written
+// to whichever game happens to be declared first in Config.js,
+// no matter which game its own URL named. There is one game today
+// and it is that one, which is why nobody has noticed. The day a
+// second is added above it, every shipped build of this one
+// starts reading and writing another game's database - and the
+// builds already on people's phones cannot be corrected.
+//
+// The path wins when it names a game, because the path is the
+// request. This is also the stricter reading: `authenticate`
+// checks the token against THIS game's Google audiences, so a
+// token minted for one game can no longer be spent against
+// another game's path by omitting a header.
+// ==========================================
+function gameForPath(dbPath, headerGameId, GAMES) {
+  const named = dbPath.match(/^games\/([^/]+)(?:\/|$)/)
+  if (!named) return validateGameId(headerGameId, GAMES)
+
+  // decodeURIComponent throws on a lone '%', and a game id is whatever
+  // a caller put in the path. An id that will not decode is not a game
+  // we know either way, so the raw segment is what gets validated.
+  let id = named[1]
+  try {
+    id = decodeURIComponent(id)
+  } catch {
+    // Left as it arrived.
+  }
+
+  return validateGameId(id, GAMES)
+}
+
+
+// ==========================================
 // GET /database/get/...
 // ==========================================
 export async function handleDatabaseGet(url, request, gameId, requestId, GAMES, env) {
-  const game = validateGameId(gameId, GAMES)
+  const dbPath = url.pathname.replace('/database/get/', '')
+
+  const game = gameForPath(dbPath, gameId, GAMES)
   if (!game) {
     return createJsonResponse({ error: 'invalid_game', message: 'Database not configured for this game', requestId }, 400)
   }
 
-  const dbPath = url.pathname.replace('/database/get/', '')
   const isPublicPath = isPublicRead(dbPath)
 
   if (!game.d1Binding) {
@@ -184,7 +226,7 @@ export async function handleDatabaseGet(url, request, gameId, requestId, GAMES, 
     caller = auth
   }
 
-  logInfo('Database GET', { requestId, gameId, public: isPublicPath })
+  logInfo('Database GET', { requestId, gameId: game.id, public: isPublicPath })
 
   const { db, refusal } = database(env, game, requestId)
   if (refusal) return refusal
@@ -269,7 +311,7 @@ export async function handleDatabaseGet(url, request, gameId, requestId, GAMES, 
     return unknownPath(requestId)
 
   } catch (error) {
-    logError('Database GET error', { requestId, gameId, error: error.message })
+    logError('Database GET error', { requestId, gameId: game.id, error: error.message })
     return createJsonResponse({ error: 'database_error', message: 'Database operation failed', requestId }, 500)
   }
 }
@@ -280,12 +322,12 @@ export async function handleDatabaseGet(url, request, gameId, requestId, GAMES, 
 // Writes a high score or a profile. Only the token owner's rows.
 // ==========================================
 export async function handleDatabaseSet(url, request, gameId, requestId, GAMES, env) {
-  const game = validateGameId(gameId, GAMES)
+  const dbPath = url.pathname.replace('/database/set/', '')
+
+  const game = gameForPath(dbPath, gameId, GAMES)
   if (!game) {
     return createJsonResponse({ error: 'invalid_game', message: 'Database not configured for this game', requestId }, 400)
   }
-
-  const dbPath = url.pathname.replace('/database/set/', '')
   const auth = await authorizeOwner(request, game, dbPath, requestId)
   if (auth.refusal) return auth.refusal
 
@@ -294,7 +336,7 @@ export async function handleDatabaseSet(url, request, gameId, requestId, GAMES, 
     return createJsonResponse({ error: 'unsupported_game', message: 'This game does not support SET operations', requestId }, 400)
   }
 
-  logInfo('Database SET', { requestId, gameId, method: request.method })
+  logInfo('Database SET', { requestId, gameId: game.id, method: request.method })
 
   const { db, refusal } = database(env, game, requestId)
   if (refusal) return refusal
@@ -309,7 +351,7 @@ export async function handleDatabaseSet(url, request, gameId, requestId, GAMES, 
 
       const conflict = await refuseIfSomebodyElses(db, highScoreMatch[2], auth.identity.email, requestId)
       if (conflict) return conflict
-      return writeHighScore(db, highScoreMatch[2], body, gameId, requestId)
+      return writeHighScore(db, highScoreMatch[2], body, game.id, requestId)
     }
 
     const userMatch = dbPath.match(/^games\/([^/]+)\/users\/([^/]+)$/)
@@ -318,13 +360,13 @@ export async function handleDatabaseSet(url, request, gameId, requestId, GAMES, 
 
       const conflict = await refuseIfSomebodyElses(db, userMatch[2], auth.identity.email, requestId)
       if (conflict) return conflict
-      return writeProfile(db, userMatch[2], body, gameId, requestId, false)
+      return writeProfile(db, userMatch[2], body, game.id, requestId, false)
     }
 
     return unknownPath(requestId)
 
   } catch (error) {
-    logError('Database SET error', { requestId, gameId, error: error.message })
+    logError('Database SET error', { requestId, gameId: game.id, error: error.message })
     return createJsonResponse({ error: 'database_error', message: 'Database operation failed', requestId }, 500)
   }
 }
@@ -424,12 +466,12 @@ async function writeProfile(db, uid, body, gameId, requestId, isPatch) {
 // Partial profile update for the authenticated owner.
 // ==========================================
 export async function handleDatabasePatch(url, request, gameId, requestId, GAMES, env) {
-  const game = validateGameId(gameId, GAMES)
+  const dbPath = url.pathname.replace('/database/patch/', '')
+
+  const game = gameForPath(dbPath, gameId, GAMES)
   if (!game) {
     return createJsonResponse({ error: 'invalid_game', message: 'Database not configured for this game', requestId }, 400)
   }
-
-  const dbPath = url.pathname.replace('/database/patch/', '')
   const auth = await authorizeOwner(request, game, dbPath, requestId)
   if (auth.refusal) return auth.refusal
 
@@ -438,7 +480,7 @@ export async function handleDatabasePatch(url, request, gameId, requestId, GAMES
     return createJsonResponse({ error: 'unsupported_game', message: 'This game does not support PATCH operations', requestId }, 400)
   }
 
-  logInfo('Database PATCH', { requestId, gameId })
+  logInfo('Database PATCH', { requestId, gameId: game.id })
 
   const { db, refusal } = database(env, game, requestId)
   if (refusal) return refusal
@@ -449,9 +491,9 @@ export async function handleDatabasePatch(url, request, gameId, requestId, GAMES
 
     const conflict = await refuseIfSomebodyElses(db, auth.ownerMatch[1], auth.identity.email, requestId)
     if (conflict) return conflict
-    return await writeProfile(db, auth.ownerMatch[1], body, gameId, requestId, true)
+    return await writeProfile(db, auth.ownerMatch[1], body, game.id, requestId, true)
   } catch (error) {
-    logError('Database PATCH error', { requestId, gameId, error: error.message })
+    logError('Database PATCH error', { requestId, gameId: game.id, error: error.message })
     return createJsonResponse({ error: 'database_error', message: 'Database operation failed', requestId }, 500)
   }
 }
