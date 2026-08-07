@@ -196,8 +196,38 @@ export function buildProfileUpdate(data, includeGamesPlayed = false, currentData
   if (data.selectedColor !== undefined) push('selected_color', data.selectedColor)
   if (data.purchasedColors !== undefined) push('purchased_colors', JSON.stringify(data.purchasedColors))
   if (data.purchasedItems !== undefined) push('purchased_items', JSON.stringify(data.purchasedItems))
-  if (data.totalPlayTime !== undefined) push('total_play_time', data.totalPlayTime)
-  if (includeGamesPlayed && data.gamesPlayed !== undefined) push('games_played', data.gamesPlayed)
+
+  // ==========================================
+  // Lifetime counters only ever go UP.
+  //
+  // These two used to be plain assignments, and the game
+  // sends its own running totals - read out of the
+  // device's save file - rather than a delta. So the
+  // first sync from a device that had not played much
+  // REPLACED the server's totals with the smaller local
+  // ones, and a player's history was gone.
+  //
+  // It looked intermittent, which is what made it hard
+  // to place: it only happens on the first sync after a
+  // fresh install or a cleared save, because after that
+  // the local total is already the larger of the two and
+  // an assignment and a maximum are the same thing.
+  //
+  // A total that has been played cannot become unplayed,
+  // so the column is the maximum of what it held and
+  // what arrived. That makes the reset impossible from
+  // any client, including old builds and ones nobody
+  // here wrote.
+  // ==========================================
+  if (data.totalPlayTime !== undefined) {
+    updates.push('total_play_time = MAX(COALESCE(total_play_time, 0), ?)')
+    values.push(data.totalPlayTime)
+  }
+
+  if (includeGamesPlayed && data.gamesPlayed !== undefined) {
+    updates.push('games_played = MAX(COALESCE(games_played, 0), ?)')
+    values.push(data.gamesPlayed)
+  }
 
   return { updates, values }
 }

@@ -180,6 +180,33 @@ async function ensureOwnRow(db, playerId, identity) {
       `INSERT OR IGNORE INTO players (player_id, email, profile_pic_url, created_at, last_login)
        VALUES (?, ?, ?, ?, ?)`
     ).bind(playerId, identity.email, identity.picture || null, now, now).run()
+
+    // ==========================================
+    // The picture, for a row that already existed.
+    //
+    // INSERT OR IGNORE fills profile_pic_url in exactly
+    // once - the moment the row is created. A player
+    // whose row was made before Google's picture was
+    // being read, or made by a path that had no identity
+    // to hand, therefore had no picture and no way of
+    // ever getting one: the game asked for the profile,
+    // the profile came back with photoURL empty, and the
+    // avatar stayed on its placeholder for good.
+    //
+    // Only when the column is empty. A picture the player
+    // chose on the site is theirs, and having Google
+    // overwrite it on every sign-in would be a worse bug
+    // than the one this fixes.
+    // ==========================================
+    if (identity.picture) {
+      await db.prepare(
+        `UPDATE players
+            SET profile_pic_url = ?, last_login = ?
+          WHERE player_id = ?
+            AND email = ?
+            AND (profile_pic_url IS NULL OR profile_pic_url = '')`
+      ).bind(identity.picture, now, playerId, identity.email).run()
+    }
   } catch {
     // Not fatal on its own. Whatever the caller was doing is about to
     // read or write the same row and will report the failure itself,
