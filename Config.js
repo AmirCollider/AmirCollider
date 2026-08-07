@@ -140,7 +140,7 @@ export const CONFIG = deepFreeze({
   //   https://github.com/AmirCollider/UnityDirectTMP/blob/main/package.json
   DIRECTTMP: {
     REPO_URL: 'https://github.com/AmirCollider/UnityDirectTMP',
-    VERSION: '1.2.2',
+    VERSION: '2.1.10',
     GIT_URL: 'https://github.com/AmirCollider/UnityDirectTMP.git'
   },
 
