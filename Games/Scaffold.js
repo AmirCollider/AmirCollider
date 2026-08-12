@@ -166,6 +166,32 @@ ${platform.android ? `      android: ${js(names.env.android)},\n` : ''}      web
     : `    // No sign-in, so no Google client and no secrets to set.
     env: {}`
 
+  // The dashboard card's motifs. A few of the game's own objects,
+  // drifting behind the card - fruit for a game about slicing
+  // fruit, a rocket for a game about rockets.
+  //
+  // Left out entirely when none were given rather than written as
+  // an empty array: Pages/GameCards.js draws nothing for a game
+  // with no motifs, and an empty array in the source reads as a
+  // field somebody meant to fill in. There is no default, because
+  // a card decorated with somebody else's objects is worse than a
+  // plain one.
+  const motifs = (spec.cardMotifs || [])
+    .map(motif => String(motif || '').trim())
+    .filter(Boolean)
+    .slice(0, 6)
+
+  const cardBlock = motifs.length
+    ? `
+    // A few of this game's own objects, drifting and breathing
+    // behind its card on the dashboard. Decorative only: the
+    // layer is aria-hidden and cannot take a click.
+    card: {
+      motifs: [${motifs.map(motif => js(motif)).join(', ')}]
+    },
+`
+    : ''
+
   return `  '${names.id}': {
     name: ${js(spec.name || names.pascal)},
     icon: ${js(spec.icon || '🎮')},
@@ -182,7 +208,7 @@ ${platform.android ? `      android: ${js(names.env.android)},\n` : ''}      web
     tags: [
 ${tags}
     ],
-${androidBlock}    d1Binding: ${js(names.binding)},
+${cardBlock}${androidBlock}    d1Binding: ${js(names.binding)},
 
     // What this game asks the network for. The dashboard card is
     // built from this and nothing else, so a game that plays

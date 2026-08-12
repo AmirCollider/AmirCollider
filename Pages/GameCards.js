@@ -357,6 +357,80 @@ function getGamesCardsCSS() {
       color-mix(in srgb, var(--accent) 18%, transparent) 0%, transparent 70%);
   }
 
+  /* ---------- motifs ----------
+     A few of the game's own objects drifting behind the card.
+
+     Behind is the whole design. The layer is absolutely
+     positioned, aria-hidden and pointer-events:none, so it can
+     never take a click meant for the download button and a
+     screen reader never has to read four fruit out loud. It sits
+     under everything: .gc-head and the sections after it are
+     already in the normal flow above this absolute layer.
+
+     Two animations at once because the brief is "floating and
+     breathing" and those are different motions - one moves the
+     glyph, the other changes its size. Different durations per
+     motif, set inline from the index, so four of them never fall
+     into step and start reading as a pattern.
+
+     Position is inline and deterministic: no randomness, so the
+     same card looks the same on every render, which matters
+     because this HTML is also what a crawler and a link preview
+     see. */
+  .gc-motifs {
+    position: absolute; inset: 0; overflow: hidden;
+    pointer-events: none; z-index: 0;
+  }
+  .gc-motif {
+    position: absolute;
+    font-size: 1.9em; line-height: 1;
+    opacity: 0.16;
+    filter: saturate(1.15);
+    will-change: transform;
+  }
+  /* The content has to win against the layer above.
+
+     An absolutely positioned element paints over in-flow content
+     that has no position of its own, so every content block gets
+     one - and the three decorative layers are excluded by name
+     rather than by listing the seven blocks that are not them.
+     Excluded because they are already absolute: giving .gc-bar
+     position:relative would drop the top rule into the flow and
+     add 3px of height to every card. */
+  .gc-card > *:not(.gc-motifs):not(.gc-bar):not(.gc-glow) {
+    position: relative; z-index: 1;
+  }
+
+  @media (prefers-color-scheme: light) {
+    .gc-motif { opacity: 0.20; }
+  }
+  :root[data-theme="light"] .gc-motif { opacity: 0.20; }
+  :root[data-theme="dark"]  .gc-motif { opacity: 0.16; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .gc-motif {
+      animation:
+        gcDrift  var(--gc-drift, 7s)  ease-in-out infinite,
+        gcBreath var(--gc-breath, 4s) ease-in-out infinite;
+      animation-delay: var(--gc-delay, 0s), var(--gc-delay, 0s);
+    }
+  }
+  @keyframes gcDrift {
+    0%, 100% { transform: translate3d(0, 0, 0) rotate(-6deg); }
+    50%      { transform: translate3d(0, -14px, 0) rotate(6deg); }
+  }
+  @keyframes gcBreath {
+    0%, 100% { scale: 1; }
+    50%      { scale: 1.16; }
+  }
+
+  /* Decoration is a battery cost paid by every card on screen at
+     once, and on a narrow card there is less empty space for a
+     motif to sit in without crowding the text. */
+  @media (max-width: 480px) {
+    .gc-motif { font-size: 1.5em; opacity: 0.12; }
+  }
+
   .gc-head {
     display: flex; align-items: center; gap: 16px;
     margin-block-start: 8px;
@@ -711,6 +785,65 @@ function getGamesCardsCSS() {
 
 
 // ==========================================
+// Motifs
+// A few of the game's own objects, drifting behind the card.
+//
+// The list comes from Config.js (`card.motifs`), because it is a
+// fact about the game and not a decision about the view - which
+// is what lets a second game have its own without anybody
+// touching this file. A game that declares none renders nothing:
+// no default set, because a card decorated with somebody else's
+// objects is worse than a plain one.
+//
+// SLOTS is deliberately a fixed table rather than anything
+// random. The same card has to produce the same bytes on every
+// render - this HTML is what a crawler reads and what a link
+// preview screenshots - and the corners are chosen so the glyphs
+// sit in the card's empty margins rather than behind the title
+// or the buttons, whichever side the layout is written in.
+// ==========================================
+// All six stay in the top half and away from the reading edge.
+//
+// That is not decoration-for-its-own-sake: the lower half of a
+// card is the download button and the secondary links, both of
+// which are painted with their own solid backgrounds, so a motif
+// placed there is simply invisible - a slot spent on nothing.
+// The head block sits at the reading edge, which leaves the
+// opposite corner as the one genuinely empty region on every
+// card whatever its height.
+const MOTIF_SLOTS = [
+  { top: '8%', inlineEnd: '6%', drift: '7.5s', breath: '4.2s', delay: '0s' },
+  { top: '30%', inlineEnd: '16%', drift: '9s', breath: '5.1s', delay: '-1.6s' },
+  { top: '15%', inlineEnd: '30%', drift: '6.5s', breath: '3.7s', delay: '-3.1s' },
+  { top: '45%', inlineEnd: '8%', drift: '8.2s', breath: '4.8s', delay: '-2.3s' },
+  { top: '38%', inlineEnd: '36%', drift: '7s', breath: '5.6s', delay: '-4.4s' },
+  { top: '22%', inlineEnd: '46%', drift: '9.6s', breath: '4.4s', delay: '-0.9s' }
+]
+
+function createMotifs(game) {
+  const motifs = ((game && game.card && game.card.motifs) || [])
+    .map(motif => String(motif || '').trim())
+    .filter(Boolean)
+    .slice(0, MOTIF_SLOTS.length)
+
+  if (!motifs.length) return ''
+
+  const glyphs = motifs.map((motif, index) => {
+    const slot = MOTIF_SLOTS[index]
+    // inset-inline-end rather than right, so the motifs sit in the
+    // same visual place relative to the reading direction on the
+    // Persian dashboard as on the English one.
+    const style = `top:${slot.top};inset-inline-end:${slot.inlineEnd};`
+      + `--gc-drift:${slot.drift};--gc-breath:${slot.breath};--gc-delay:${slot.delay}`
+
+    return `<span class="gc-motif" style="${style}">${escapeHtml(motif)}</span>`
+  }).join('')
+
+  return `<div class="gc-motifs" aria-hidden="true">${glyphs}</div>`
+}
+
+
+// ==========================================
 // Status badge
 // One badge, whose wording says what is actually true.
 // ==========================================
@@ -968,6 +1101,7 @@ function createDefaultGameCard(id, game, baseUrl, lang, index, player) {
     <article class="gc-card" dir="${dirFor(lang)}" lang="${escapeHtml(resolveLang(lang))}" style="--accent: ${accent}; --i: ${Number(index) || 0};">
       <div class="gc-bar"></div>
       <div class="gc-glow"></div>
+      ${createMotifs(game)}
 
       <div class="gc-head">
         <div class="gc-logo">${fallback}${logoImg}</div>

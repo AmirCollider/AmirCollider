@@ -399,6 +399,10 @@ const I18N = {
     plLastSeen: 'آخرین ورود',
     plEmail: 'ایمیل',
     plId: 'شناسه',
+    plBoard: 'جدول امتیازات',
+    plBoardShown: 'در جدول دیده می‌شود',
+    plBoardHidden: 'خودش را پنهان کرده',
+    plBoardHiddenWhy: 'این تصمیم خودِ بازیکن است (از صفحه‌ی حساب) و از این‌جا عوض نمی‌شود.',
     plTotal: 'کل بازیکن‌ها',
     plManage: 'مدیریت',
     plRename: 'تغییر نام کاربری',
@@ -444,7 +448,41 @@ const I18N = {
     sqlBuild: 'ساختن SQL',
     sqlSettings: 'SQL تنظیمات فعلی',
     sqlPurge: 'SQL پاک کردن ردیف‌ها',
-    sqlNoRun: 'این‌جا هیچ SQL ای اجرا نمی‌شود — فقط ساخته می‌شود. خودت با wrangler اجرایش کن.',
+    sqlNoRun: 'ساختن SQL این‌جا هیچ چیزی را اجرا نمی‌کند — فقط متن می‌سازد و خودت با wrangler اجرایش می‌کنی. '
+            + 'تنها استثناء دکمه‌ی «تعمیر ساختار جدول» است که در همین صفحه گفته می‌شود و کارش را همان‌جا انجام می‌دهد.',
+
+    sqlWhat: 'هر دکمه چه چیزی می‌سازد',
+    sqlWhatSchema: 'ساختار جدول — این پایگاه‌داده واقعاً چه ستون‌هایی دارد. اول این را ببین؛ اگر ستونی کم باشد، هر چه در تب «صفحه‌ی بازی» بنویسی ذخیره نمی‌شود.',
+    sqlWhatBuild: 'ساختن SQL — فایل مهاجرت برای دیتابیس شخصی یک بازیِ تازه. برای بازی‌های موجود لازم نیست.',
+    sqlWhatSettings: 'SQL تنظیمات فعلی — دقیقاً همان چیزی که همین الآن در ردیف game_settings این بازی ذخیره شده، به شکل یک دستور قابل اجرا روی یک استقرار دیگر.',
+    sqlWhatPurge: 'SQL پاک کردن — دستوری که همه‌ی تغییرهای ذخیره‌شده‌ی این بازی را برمی‌دارد تا دوباره از روی Config.js خوانده شود.',
+
+    sqlSchema: 'ساختار جدول',
+    sqlSchemaTitle: 'ساختار جدول‌ها روی این استقرار',
+    sqlSchemaLede: 'این‌ها ستون‌هایی هستند که همین الآن واقعاً در پایگاه‌داده وجود دارند — نه آن‌چه فایل‌های migrations می‌گویند. '
+                 + 'اگر این دو با هم فرق داشته باشند، چیزی که اهمیت دارد همین فهرست است.',
+    sqlSchemaTable: 'جدول',
+    sqlSchemaColumn: 'ستون',
+    sqlSchemaFrom: 'از کدام مهاجرت',
+    sqlSchemaOk: 'کامل است — هر ستونی که پنل می‌نویسد در این پایگاه‌داده وجود دارد.',
+    sqlSchemaMissing: 'ستون کم دارد',
+    sqlSchemaMissingWhy: 'پنل نمی‌تواند این ستون‌ها را بنویسد. هر چیزی که در فیلدهای مربوط به آن‌ها وارد کنی، بی‌صدا از بین می‌رود.',
+    sqlSchemaRepair: 'تعمیر ساختار جدول',
+    sqlSchemaRepairAsk: 'ستون‌های کم‌بود به جدول game_settings اضافه شوند؟\n\n'
+                      + 'برای هر ستون یک ALTER TABLE ADD COLUMN اجرا می‌شود. همه‌ی این ستون‌ها nullable هستند و مقدار پیش‌فرض ندارند، '
+                      + 'پس هیچ ردیفی بازنویسی نمی‌شود، هیچ داده‌ای جابه‌جا یا حذف نمی‌شود و چیزی هم لازم نیست دوباره پر شود.\n\n'
+                      + 'این تنها جای پنل است که خودش SQL اجرا می‌کند.',
+    sqlSchemaRepaired: 'ستون اضافه شد',
+    sqlSchemaNothing: 'چیزی برای اضافه کردن نبود — ساختار از قبل کامل بود.',
+    sqlSchemaPresent: 'موجود',
+    sqlSchemaAbsent: 'ناموجود',
+    sqlSchemaLicence: 'پایگاه‌داده‌ی لایسنس (LICENSE_DB) — تنظیمات، قیمت‌ها و صفحه‌ی بازی',
+    sqlSchemaPlayer: 'پایگاه‌داده‌ی خود بازی — بازیکن‌ها، امتیازها و ذخیره‌ی ابری',
+    sqlSchemaUnbound: 'این اتصال روی این استقرار وصل نشده، پس چیزی برای خواندن نیست.',
+    sqlSchemaFeature: 'قابلیت',
+    sqlSchemaRow: 'ردیف ذخیره‌شده، بدون هیچ تغییری',
+    sqlSchemaRowLede: 'خروجی خام SELECT * از ردیف این بازی. اگر SQL پایین با این جدول فرق داشت، مشکل از تولیدکننده‌ی SQL است نه از داده.',
+    sqlNoRow: 'برای این بازی هنوز هیچ ردیفی در game_settings ساخته نشده. یعنی همه چیز از روی Config.js خوانده می‌شود.',
     copy: 'کپی',
     copied: 'کپی شد',
     download: 'دانلود فایل',
@@ -511,9 +549,42 @@ const I18N = {
     nDescEn: 'توضیح انگلیسی',
     nDescJa: 'توضیح ژاپنی',
     nBuild: 'ساختن کد',
+    nBuildHint: 'همین حالا هم می‌توانی بزنی. هر چیزی که پر نکنی مقدار پیش‌فرض معقولی می‌گیرد و بعداً بدون deploy از همین پنل قابل تغییر است.',
     nSteps: 'مراحل، به ترتیب',
     nIdTaken: 'این شناسه از قبل وجود دارد.',
     nIdBad: 'شناسه فقط حروف کوچک انگلیسی، عدد و خط تیره.',
+    nIdHint: 'در آدرس بازی، نام دیتابیس و نام متغیرها استفاده می‌شود. بعداً عوض کردنش یعنی عوض کردن آدرس عمومی بازی.',
+    nIdFixed: 'شناسه اصلاح شد به',
+
+    nEssentials: 'چیزهایی که حتماً لازم است',
+    nEssentialsHint: 'فقط همین سه مورد. بقیه‌ی فیلدها مقدار پیش‌فرض دارند و همه‌شان بعداً از همین پنل و بدون deploy عوض می‌شوند.',
+    nMore: 'تنظیمات بیشتر — همه اختیاری',
+    nMoreHint: 'هیچ‌کدام از این‌ها برای ساختن کد لازم نیست. اگر الآن پرشان کنی، داخل کدِ تولیدشده می‌آیند؛ '
+             + 'اگر نه، بعد از deploy از تب‌های «بازی‌ها» و «صفحه‌ی بازی» تنظیمشان می‌کنی.',
+    nLook: 'ظاهر کارت بازی',
+    nMotifs: 'المان‌های شناور کارت',
+    nMotifsHint: 'چند اموجی از خود بازی، جدا از هم با فاصله — مثل 🍎 🍑 🍉 برای بازی‌ای که در آن چیزی بریده می‌شود. '
+               + 'پشت کارت به‌صورت شناور و در حال تنفس نمایش داده می‌شوند. حداکثر ۶ تا. خالی بگذاری، هیچ چیزی اضافه نمی‌شود.',
+    nDescs: 'توضیح کوتاه بازی',
+    nDescsHint: 'یک جمله. روی کارت داشبورد و به‌عنوان توضیح صفحه در نتایج جست‌وجو استفاده می‌شود. بعداً از تب «بازی‌ها» قابل تغییر است.',
+    nCapsHint: 'هر قابلیت یک بخش از سایت را روشن می‌کند. این‌ها در کد ثبت می‌شوند چون هرکدام به یک اتصال یا secret وابسته‌اند و از پنل عوض نمی‌شوند.',
+
+    nPreview: 'چه چیزی ساخته می‌شود',
+    nPreviewEmpty: 'یک شناسه بنویس تا این‌جا ببینی چه چیزهایی از رویش ساخته می‌شود.',
+    nPreviewUrl: 'آدرس صفحه‌ی بازی',
+    nPreviewBinding: 'نام اتصال D1',
+    nPreviewDatabase: 'نام دیتابیس',
+    nPreviewConstants: 'فایل ثابت‌های یونیتی',
+    nPreviewSecrets: 'متغیرهایی که باید ست شوند',
+
+    nVerify: 'بررسی سلامت',
+    nVerifyLede: 'بعد از اینکه مراحل بالا را انجام دادی و deploy کردی، این را بزن. تا قبل از deploy این بازی هنوز وجود ندارد و جواب مفیدی نمی‌گیری.',
+    vfRun: 'بررسی کن',
+    vfLede: 'هر چیزی که همین الآن روی این استقرار یا درست است یا نیست: اتصال‌ها، جدول‌ها، secretها، لینک‌ها و صفحه‌ی بازی. هر ردیف می‌گوید اگر درست نیست باید چه کار کنی.',
+    vfFailed: 'مورد ایراد جدی دارد',
+    vfWarned: 'مورد هشدار دارد',
+    vfAllGood: 'همه چیز سر جایش است.',
+    vfPages: 'صفحه‌هایی که می‌توانی خودت باز کنی و ببینی',
 
     // unity tab
     unityLede: 'کیت کامل یونیتی برای وصل شدن این بازی به Worker: فایل ثابت‌ها، لایه‌ی شبکه، ورود با گوگل، '
@@ -564,6 +635,24 @@ const I18N = {
     pgEmpty: 'هنوز موردی اضافه نشده.',
     pgMigration: 'برای ذخیره‌ی این بخش‌ها باید migrations/0008_landing_extra.sql را اجرا کرده باشی.',
     pgPreviewImage: 'پیش‌نمایش',
+
+    pgMerge: 'هر بخش این صفحه دو منبع دارد: مقدار پایه که در Config.js نوشته شده، و مقداری که تو این‌جا ذخیره می‌کنی و روی آن می‌نشیند. '
+           + 'خالی بودن یک فیلد یعنی «همان مقدار کد استفاده شود» — نه «این بخش خالی است». '
+           + 'برچسب کنار هر عنوان می‌گوید همین حالا کدام‌یک روی صفحه‌ی عمومی دیده می‌شود.',
+    pgFromCode: 'از روی کد',
+    pgFromDb: 'ذخیره‌شده',
+    pgFromCodeShows: 'همین حالا صفحه این را نشان می‌دهد:',
+    pgFromCodeEmpty: 'در کد هم چیزی برای این بخش نوشته نشده، پس روی صفحه‌ی عمومی دیده نمی‌شود.',
+    pgFromCodeRows: 'مورد در کد',
+    pgCodeRowsNote: 'مورد از Config.js نمایش داده می‌شود. تا وقتی این‌جا چیزی اضافه نکنی همان‌ها می‌مانند؛ '
+                  + 'اولین ردیفی که این‌جا بسازی، جای کل فهرست کد را می‌گیرد.',
+    pgBlocked: 'قابل ذخیره نیست',
+    pgBlockedHint: 'ستون این بخش در پایگاه‌داده وجود ندارد، پس هر چیزی این‌جا بنویسی ذخیره نمی‌شود. '
+                 + 'در تب «ساخت SQL» دکمه‌ی «تعمیر ساختار جدول» را بزن.',
+    pgRepairHere: 'در تب «ساخت SQL» دکمه‌ی «تعمیر ساختار جدول» را بزن و بعد دوباره این‌جا ذخیره کن.',
+    pgReload: 'خواندن دوباره از پایگاه‌داده',
+    pgSaveHint: 'بعد از ذخیره، همین صفحه از روی چیزی که واقعاً در پایگاه‌داده نوشته شد دوباره ساخته می‌شود — '
+              + 'برچسب‌ها را نگاه کن تا ببینی کدام بخش‌ها ذخیره شدند.',
 
     // versions
     vsTitle: 'نسخه‌ها',
@@ -755,6 +844,10 @@ const I18N = {
     plLastSeen: 'Last seen',
     plEmail: 'Email',
     plId: 'Player id',
+    plBoard: 'Leaderboard',
+    plBoardShown: 'On the board',
+    plBoardHidden: 'Hidden by choice',
+    plBoardHiddenWhy: 'The player set this on their own account page. It is not changed from here.',
     plTotal: 'Players',
     plManage: 'Manage',
     plRename: 'Change username',
@@ -799,7 +892,42 @@ const I18N = {
     sqlBuild: 'Build the SQL',
     sqlSettings: 'SQL for the current settings',
     sqlPurge: 'SQL to delete the rows',
-    sqlNoRun: 'Nothing is executed here — only written. You run it with wrangler yourself.',
+    sqlNoRun: 'Generating SQL here executes nothing — it writes text, and you run it with wrangler yourself. '
+            + 'The one exception is the "Repair the schema" button, which says so where it is and does its work there.',
+
+    sqlWhat: 'What each button produces',
+    sqlWhatSchema: 'Schema — the columns this database actually has. Start here: if a column is missing, nothing you type into the Game page tab is kept.',
+    sqlWhatBuild: 'Build the SQL — the migration for a NEW game\'s own database. Existing games do not need it.',
+    sqlWhatSettings: 'Current settings — exactly what is stored in this game\'s game_settings row right now, as a statement you can run on another deployment.',
+    sqlWhatPurge: 'Delete the rows — removes every stored override for this game so it reads straight from Config.js again.',
+
+    sqlSchema: 'Schema',
+    sqlSchemaTitle: 'What these tables look like on this deployment',
+    sqlSchemaLede: 'These are the columns that actually exist right now — not what the files in migrations/ say. '
+                 + 'When the two disagree, this list is the one that matters.',
+    sqlSchemaTable: 'Table',
+    sqlSchemaColumn: 'Column',
+    sqlSchemaFrom: 'From',
+    sqlSchemaOk: 'Current — every column the panel writes exists in this database.',
+    sqlSchemaMissing: 'columns missing',
+    sqlSchemaMissingWhy: 'The panel cannot write these. Anything typed into the fields they hold is silently lost.',
+    sqlSchemaRepair: 'Repair the schema',
+    sqlSchemaRepairAsk: 'Add the missing columns to game_settings?\n\n'
+                      + 'One ALTER TABLE ADD COLUMN per column. Every one of them is nullable with no default, so '
+                      + 'no row is rewritten, nothing that is already stored moves or is deleted, and nothing needs '
+                      + 'a backfill.\n\n'
+                      + 'This is the only place in the panel that runs SQL itself.',
+    sqlSchemaRepaired: 'columns added',
+    sqlSchemaNothing: 'Nothing to add — the schema was already current.',
+    sqlSchemaPresent: 'present',
+    sqlSchemaAbsent: 'missing',
+    sqlSchemaLicence: 'Licence database (LICENSE_DB) — settings, prices and the game page',
+    sqlSchemaPlayer: 'The game\'s own database — players, scores and cloud saves',
+    sqlSchemaUnbound: 'This binding is not wired up on this deployment, so there is nothing to read.',
+    sqlSchemaFeature: 'Feature',
+    sqlSchemaRow: 'The stored row, untouched',
+    sqlSchemaRowLede: 'The raw SELECT * for this game. If the SQL below disagrees with this table, the generator is wrong and the data is not.',
+    sqlNoRow: 'There is no game_settings row for this game yet, which means everything is coming from Config.js.',
     copy: 'Copy',
     copied: 'Copied',
     download: 'Download file',
@@ -865,6 +993,39 @@ const I18N = {
     nDescEn: 'English description',
     nDescJa: 'Japanese description',
     nBuild: 'Write the code',
+    nBuildHint: 'You can press this now. Anything left blank gets a sensible default, and every one of those is editable from this panel later without a deploy.',
+    nIdHint: 'Used in the game\'s URL, its database name and its variable names. Changing it later changes the game\'s public address.',
+    nIdFixed: 'id corrected to',
+
+    nEssentials: 'What is actually required',
+    nEssentialsHint: 'These three, and nothing else. Every other field has a default, and all of them are editable from this panel later without a deploy.',
+    nMore: 'More settings — all optional',
+    nMoreHint: 'None of this is needed to generate the code. Fill it in now and it lands in the generated source; '
+             + 'leave it and you set it after the deploy from the Games and Game page tabs.',
+    nLook: 'How the card looks',
+    nMotifs: 'Floating card motifs',
+    nMotifsHint: 'A few emoji from the game itself, separated by spaces — 🍎 🍑 🍉 for a game where you cut things. '
+               + 'They drift and breathe behind the card on the dashboard. Six at most. Leave it empty and nothing is added.',
+    nDescs: 'One-line description',
+    nDescsHint: 'One sentence. Used on the dashboard card and as the page description in search results. Editable later from the Games tab.',
+    nCapsHint: 'Each capability switches on a part of the site. They live in code because each one depends on a binding or a secret, so the panel cannot change them.',
+
+    nPreview: 'What this will produce',
+    nPreviewEmpty: 'Type an id to see what gets derived from it.',
+    nPreviewUrl: 'Game page address',
+    nPreviewBinding: 'D1 binding name',
+    nPreviewDatabase: 'Database name',
+    nPreviewConstants: 'Unity constants file',
+    nPreviewSecrets: 'Secrets you will have to set',
+
+    nVerify: 'Health check',
+    nVerifyLede: 'Press this after you have done the steps above and deployed. Before the deploy the game does not exist yet, so it has nothing useful to report.',
+    vfRun: 'Run the check',
+    vfLede: 'Everything that is either true or false right now on this deployment: bindings, tables, secrets, links and the game page. Each row says what to do when it is not.',
+    vfFailed: 'things are genuinely broken',
+    vfWarned: 'things are worth a look',
+    vfAllGood: 'Everything is in place.',
+    vfPages: 'Pages you can open and look at yourself',
     nSteps: 'The steps, in order',
     nIdTaken: 'That id already exists.',
     nIdBad: 'Lowercase letters, digits and hyphens only.',
@@ -915,6 +1076,24 @@ const I18N = {
     pgAnswer: 'Answer',
     pgEmpty: 'Nothing added yet.',
     pgMigration: 'Saving these sections needs migrations/0008_landing_extra.sql to have been run.',
+
+    pgMerge: 'Every section here has two sources: the baseline written in Config.js, and whatever you save here on top of it. '
+           + 'An empty field means "use what the code says" — not "this section is empty". '
+           + 'The badge beside each heading tells you which of the two the public page is showing right now.',
+    pgFromCode: 'from code',
+    pgFromDb: 'saved here',
+    pgFromCodeShows: 'The page currently shows:',
+    pgFromCodeEmpty: 'The code has nothing for this either, so the section does not appear on the public page.',
+    pgFromCodeRows: 'in code',
+    pgCodeRowsNote: 'entries are coming from Config.js. They stay until you add something here — '
+                  + 'the first row you create replaces the whole code list, not just part of it.',
+    pgBlocked: 'cannot be saved',
+    pgBlockedHint: 'This section has no column in the database, so nothing typed here is kept. '
+                 + 'Press "Repair the schema" on the SQL tab.',
+    pgRepairHere: 'Press "Repair the schema" on the SQL tab, then save this screen again.',
+    pgReload: 'Re-read from the database',
+    pgSaveHint: 'After a save this screen is rebuilt from what actually reached the database — '
+              + 'read the badges to see which sections were stored.',
     pgPreviewImage: 'Preview',
 
     vsTitle: 'Versions',
@@ -1102,6 +1281,10 @@ const I18N = {
     plLastSeen: '最終ログイン',
     plEmail: 'メール',
     plId: 'プレイヤー ID',
+    plBoard: 'ランキング',
+    plBoardShown: 'ランキングに表示',
+    plBoardHidden: '本人が非表示に設定',
+    plBoardHiddenWhy: 'プレイヤー自身がアカウントページで設定したものです。ここからは変更しません。',
     plTotal: 'プレイヤー数',
     plManage: '管理',
     plRename: 'ユーザー名を変更',
@@ -1146,7 +1329,41 @@ const I18N = {
     sqlBuild: 'SQL を生成',
     sqlSettings: '現在の設定の SQL',
     sqlPurge: '行を削除する SQL',
-    sqlNoRun: 'ここでは実行しません。生成のみです。wrangler でご自身で実行してください。',
+    sqlNoRun: 'ここでの SQL 生成は何も実行しません。テキストを作るだけで、実行は wrangler でご自身が行います。'
+            + '例外は「スキーマを修復」ボタンだけで、その場で明示したうえで実際に実行します。',
+
+    sqlWhat: '各ボタンが生成するもの',
+    sqlWhatSchema: 'スキーマ — このデータベースに実際に存在する列。まずここを確認してください。列が欠けていると、「ゲームページ」タブに入力した内容は保存されません。',
+    sqlWhatBuild: 'SQL を生成 — 新しいゲーム専用データベースの移行 SQL。既存のゲームには不要です。',
+    sqlWhatSettings: '現在の設定 — このゲームの game_settings 行に今まさに保存されている内容を、別のデプロイでも実行できる文として出力します。',
+    sqlWhatPurge: '行を削除 — このゲームの保存済みの上書きをすべて取り除き、再び Config.js の内容で表示されるようにします。',
+
+    sqlSchema: 'スキーマ',
+    sqlSchemaTitle: 'このデプロイでのテーブル構造',
+    sqlSchemaLede: 'migrations/ のファイルではなく、今このデータベースに実際に存在する列の一覧です。'
+                 + '両者が食い違う場合は、この一覧が正です。',
+    sqlSchemaTable: 'テーブル',
+    sqlSchemaColumn: '列',
+    sqlSchemaFrom: '追加元',
+    sqlSchemaOk: '最新です。パネルが書き込むすべての列がこのデータベースに存在します。',
+    sqlSchemaMissing: '列が不足',
+    sqlSchemaMissingWhy: 'パネルはこれらの列に書き込めません。対応するフィールドに入力した内容は黙って失われます。',
+    sqlSchemaRepair: 'スキーマを修復',
+    sqlSchemaRepairAsk: '不足している列を game_settings に追加しますか?\n\n'
+                      + '列ごとに ALTER TABLE ADD COLUMN を 1 文ずつ実行します。すべて nullable でデフォルト値なしのため、'
+                      + '既存の行は書き換えられず、保存済みのデータが移動・削除されることも、埋め直しが必要になることもありません。\n\n'
+                      + 'パネルが自ら SQL を実行するのはここだけです。',
+    sqlSchemaRepaired: '列を追加しました',
+    sqlSchemaNothing: '追加するものはありません。スキーマはすでに最新でした。',
+    sqlSchemaPresent: 'あり',
+    sqlSchemaAbsent: 'なし',
+    sqlSchemaLicence: 'ライセンス DB (LICENSE_DB) — 設定・価格・ゲームページ',
+    sqlSchemaPlayer: 'ゲーム専用 DB — プレイヤー・スコア・クラウドセーブ',
+    sqlSchemaUnbound: 'このバインディングはこのデプロイに接続されていないため、読み取れる情報はありません。',
+    sqlSchemaFeature: '機能',
+    sqlSchemaRow: '保存されている行（そのまま）',
+    sqlSchemaRowLede: 'このゲームの SELECT * の生の結果です。下の SQL がこの表と食い違う場合、誤っているのは生成側でデータではありません。',
+    sqlNoRow: 'このゲームの game_settings 行はまだありません。つまりすべて Config.js から読まれています。',
     copy: 'コピー',
     copied: 'コピーしました',
     download: 'ファイルを保存',
@@ -1210,6 +1427,39 @@ const I18N = {
     nDescEn: '英語の説明',
     nDescJa: '日本語の説明',
     nBuild: 'コードを生成',
+    nBuildHint: '今すぐ押して構いません。未入力の項目には妥当な既定値が入り、いずれも後からデプロイなしでこのパネルから変更できます。',
+    nIdHint: 'ゲームの URL、データベース名、変数名に使われます。後から変更するとゲームの公開アドレスも変わります。',
+    nIdFixed: 'ID を修正しました：',
+
+    nEssentials: '本当に必要な項目',
+    nEssentialsHint: 'この 3 つだけです。他の項目には既定値があり、いずれも後からデプロイなしでこのパネルから変更できます。',
+    nMore: 'その他の設定 — すべて任意',
+    nMoreHint: 'コード生成にはどれも不要です。今入力すれば生成されるソースに含まれ、'
+             + '入力しなければデプロイ後に「ゲーム」「ゲームページ」タブから設定します。',
+    nLook: 'カードの見た目',
+    nMotifs: 'カードに浮かぶモチーフ',
+    nMotifsHint: 'ゲームに登場するものを絵文字で、スペース区切りで数個 — 何かを斬るゲームなら 🍎 🍑 🍉 など。'
+               + 'ダッシュボードのカード背面でふわふわと呼吸するように動きます。最大 6 個。空欄なら何も追加されません。',
+    nDescs: '一行の説明',
+    nDescsHint: '一文で。ダッシュボードのカードと検索結果のページ説明に使われます。後から「ゲーム」タブで変更できます。',
+    nCapsHint: '各機能はサイトの一部を有効にします。それぞれバインディングやシークレットに依存するためコード側で定義され、パネルからは変更できません。',
+
+    nPreview: '生成されるもの',
+    nPreviewEmpty: 'ID を入力すると、そこから導出される内容がここに表示されます。',
+    nPreviewUrl: 'ゲームページのアドレス',
+    nPreviewBinding: 'D1 バインディング名',
+    nPreviewDatabase: 'データベース名',
+    nPreviewConstants: 'Unity 定数ファイル',
+    nPreviewSecrets: '設定が必要なシークレット',
+
+    nVerify: 'ヘルスチェック',
+    nVerifyLede: '上の手順を実行してデプロイしたあとに押してください。デプロイ前はゲームがまだ存在しないため、有用な結果は得られません。',
+    vfRun: 'チェックを実行',
+    vfLede: 'このデプロイで今まさに成立しているか否かがはっきりする項目：バインディング、テーブル、シークレット、リンク、ゲームページ。各行に対処方法も表示されます。',
+    vfFailed: '件に重大な問題があります',
+    vfWarned: '件は確認をおすすめします',
+    vfAllGood: 'すべて揃っています。',
+    vfPages: '自分で開いて確認できるページ',
     nSteps: '手順（順番どおりに）',
     nIdTaken: 'その ID は既に存在します。',
     nIdBad: '小文字英字・数字・ハイフンのみ。',
@@ -1258,6 +1508,24 @@ const I18N = {
     pgAnswer: '回答',
     pgEmpty: 'まだ何も追加されていません。',
     pgMigration: 'これらの保存には migrations/0008_landing_extra.sql の実行が必要です。',
+
+    pgMerge: 'このページの各セクションには 2 つの供給元があります。Config.js に書かれたベースラインと、ここで保存してその上に重ねる値です。'
+           + 'フィールドが空なのは「このセクションが空」ではなく「コードの値を使う」という意味です。'
+           + '各見出し横のバッジが、公開ページに今どちらが表示されているかを示します。',
+    pgFromCode: 'コード由来',
+    pgFromDb: 'ここで保存',
+    pgFromCodeShows: '現在ページに表示されている内容：',
+    pgFromCodeEmpty: 'コード側にも内容がないため、公開ページには表示されません。',
+    pgFromCodeRows: '件（コード）',
+    pgCodeRowsNote: '件が Config.js から表示されています。ここに追加するまではそのままです。'
+                  + 'ここで 1 行でも作成すると、コード側のリスト全体が置き換わります。',
+    pgBlocked: '保存できません',
+    pgBlockedHint: 'このセクションの列がデータベースに存在しないため、入力しても保存されません。'
+                 + 'SQL タブの「スキーマを修復」を実行してください。',
+    pgRepairHere: 'SQL タブの「スキーマを修復」を実行してから、この画面をもう一度保存してください。',
+    pgReload: 'データベースから再読み込み',
+    pgSaveHint: '保存後、この画面は実際にデータベースへ書き込まれた内容から再構築されます。'
+              + 'バッジを見れば、どのセクションが保存されたか分かります。',
     pgPreviewImage: 'プレビュー',
 
     vsTitle: 'バージョン',
@@ -1587,6 +1855,41 @@ function panelCss() {
       font-family:var(--font-mono);font-size:.85em;line-height:1.65;overflow-x:auto;
       direction:ltr;unicode-bidi:isolate;text-align:left}
     .steps .hint{margin-block-start:6px}
+
+    /* The "what each button produces" list on the SQL tab, and
+       the field-origin badges on the Game page tab. */
+    .sqlwhat{margin:0;padding-inline-start:20px;line-height:1.9;font-size:.9em;color:var(--dim)}
+    .sqlwhat li{margin-block-end:8px}
+    .sqlwhat b{color:var(--text)}
+
+    /* Where a field's value is coming from right now: the code
+       baseline, or a row somebody saved on top of it. Small and
+       quiet - it belongs beside a label, not instead of one. */
+    .origin{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:999px;
+      font-size:.74em;font-weight:700;vertical-align:middle;margin-inline-start:8px;
+      background:var(--surface-2);border:1px solid var(--border);color:var(--dim)}
+    .origin.db{color:var(--brand);border-color:color-mix(in srgb,var(--brand) 40%,transparent);
+      background:color-mix(in srgb,var(--brand) 12%,transparent)}
+    .origin.blocked{color:var(--err);border-color:color-mix(in srgb,var(--err) 45%,transparent);
+      background:color-mix(in srgb,var(--err) 12%,transparent)}
+
+    /* A landing section whose column does not exist. Dimmed
+       rather than removed: knowing the section EXISTS and cannot
+       be saved yet is the useful state. */
+    .blocked-sec{opacity:.55}
+    .blocked-sec input,.blocked-sec textarea,.blocked-sec select,.blocked-sec button{
+      pointer-events:none}
+
+    /* game.verify */
+    .vf{display:flex;flex-direction:column;gap:8px}
+    .vf-row{display:flex;align-items:flex-start;gap:11px;padding:11px 13px;border-radius:12px;
+      background:var(--surface-2);border:1px solid var(--border)}
+    .vf-row.is-error{border-color:color-mix(in srgb,var(--err) 45%,transparent)}
+    .vf-row.is-warn{border-color:color-mix(in srgb,var(--warn) 45%,transparent)}
+    .vf-mark{font-size:1.05em;line-height:1.5;flex-shrink:0}
+    .vf-body{min-width:0;flex:1}
+    .vf-body b{display:block;font-size:.92em;margin-block-end:3px}
+    .vf-body span{display:block;font-size:.83em;color:var(--dim);line-height:1.7}
 
     .switch{display:inline-flex;align-items:center;gap:10px;cursor:pointer;font-size:.92em;font-weight:700;
       min-height:38px}
@@ -2303,6 +2606,19 @@ function tgRenderEditor() {
   +   '<div class="hint" style="margin-block-end:10px">' + tgEsc(TG.t.openHint) + '</div>'
   +   '<div class="row">' + tgPreviewLinks(game) + '</div>'
 
+  // The health check for a game that already exists. Same
+  // answer the "new game" tab shows after a deploy, asked
+  // here for the case that brings somebody to this panel
+  // more often: something is not behaving and it is not
+  // obvious which of the six moving parts is at fault.
+  +   '<h3 class="sub">' + tgEsc(TG.t.nVerify) + '</h3>'
+  +   '<div class="hint" style="margin-block-end:10px">' + tgEsc(TG.t.vfLede) + '</div>'
+  +   '<div class="row">'
+  +     '<button type="button" class="btn ghost" onclick="tgVerifyGame(\'' + tgEsc(game.id) + '\')">'
+  +       tgEsc(TG.t.vfRun) + '</button>'
+  +   '</div>'
+  +   '<div id="tg-verify-out"></div>'
+
   +   '<h3 class="sub">' + tgEsc(TG.t.purge) + '</h3>'
   +   '<div class="note warn">' + tgEsc(TG.t.purgeHint)
   +     '<div class="row" style="margin-block-start:10px">'
@@ -2588,21 +2904,82 @@ function tgRenderPage() {
 }
 
 
+// ==========================================
+// Where a field's value is coming from
+//
+// Three states, and telling them apart is most of what this tab
+// was missing. Games/Registry.js merges the stored row over the
+// Config.js baseline FIELD BY FIELD, so an empty box in this
+// editor does not mean an empty section on the site - it means
+// "whatever the code says". Every box on this screen was empty
+// for neon-katana while its public page was full, which is what
+// made the tab read as broken.
+//
+//   db       a row is stored and it is what the page shows
+//   code     the box is empty and Config.js is supplying it
+//   blocked  the column does not exist here, so nothing typed
+//            into this box can be saved at all
+// ==========================================
+function tgOriginBadge(state, baselineText) {
+  if (state === 'blocked') {
+    return '<span class="origin blocked" title="' + tgEsc(TG.t.pgBlockedHint) + '">'
+         + tgEsc(TG.t.pgBlocked) + '</span>';
+  }
+  if (state === 'db') return '<span class="origin db">' + tgEsc(TG.t.pgFromDb) + '</span>';
+
+  var hint = baselineText
+    ? TG.t.pgFromCodeShows + ' ' + baselineText
+    : TG.t.pgFromCodeEmpty;
+  return '<span class="origin" title="' + tgEsc(hint) + '">' + tgEsc(TG.t.pgFromCode) + '</span>';
+}
+
+// Which of the three a field is in. 'stored' is what the row
+// holds, 'baseline' is what Config.js holds.
+function tgOriginOf(stored, blocked) {
+  if (blocked) return 'blocked';
+  return stored ? 'db' : 'code';
+}
+
+// A short, single-line preview of what the code baseline would
+// show, for the tooltip on a "from code" badge.
+function tgPeek(value) {
+  if (!value) return '';
+  var text = typeof value === 'string' ? value : JSON.stringify(value);
+  text = String(text).replace(/\s+/g, ' ').trim();
+  return text.length > 120 ? text.slice(0, 119) + '…' : text;
+}
+
+
 // Three inputs, one per language, as one field group. Used for
 // the tagline and the long description, which are the two things
 // on this page that exist once per language.
-function tgLangFields(prefix, label, values, multiline) {
-  var out = '<h3 class="sub">' + tgEsc(label) + '</h3>';
+//
+// 'baseline' is the Config.js text for the same field, shown as
+// a placeholder rather than as a value: a placeholder disappears
+// the moment somebody types, and it is not submitted - so the
+// editor can show what the page currently says without that text
+// silently becoming a stored override on the next save.
+function tgLangFields(prefix, label, values, multiline, baseline, blocked) {
+  var stored = Boolean(values && (values.fa || values.en || values.ja));
+  var base = baseline || {};
+  var baseText = tgPeek(base[TG.lang] || base.en || base.fa);
+
+  var out = '<h3 class="sub">' + tgEsc(label)
+          + tgOriginBadge(tgOriginOf(stored, blocked), baseText) + '</h3>';
 
   for (var i = 0; i < TG_LANG_CODES.length; i++) {
     var code = TG_LANG_CODES[i];
     var value = (values && values[code]) || '';
+    var hint = (base && base[code]) || '';
     var dir = code === 'fa' ? 'rtl' : 'ltr';
+    var place = hint ? ' placeholder="' + tgEsc(tgPeek(hint)) + '"' : '';
 
     out += '<label class="f"><span>' + tgEsc(TG_LANG_NAMES[i]) + '</span>'
         + (multiline
-            ? '<textarea id="' + prefix + '-' + code + '" dir="' + dir + '" rows="5">' + tgEsc(value) + '</textarea>'
-            : '<input type="text" id="' + prefix + '-' + code + '" dir="' + dir + '" value="' + tgEsc(value) + '">')
+            ? '<textarea id="' + prefix + '-' + code + '" dir="' + dir + '" rows="5"' + place + '>'
+              + tgEsc(value) + '</textarea>'
+            : '<input type="text" id="' + prefix + '-' + code + '" dir="' + dir + '"' + place
+              + ' value="' + tgEsc(value) + '">')
         + '</label>';
   }
   return out;
@@ -2803,61 +3180,82 @@ function tgRepPreview(input) {
 // ==========================================
 function tgDrawPage(data) {
   var landing = data.landing || {};
+  var base = data.baseline || {};
+  var blocked = {};
+  (data.blockedSections || []).forEach(function (name) { blocked[name] = true; });
+
+  TG.pageBlocked = blocked;
+
+  // One list section: heading, origin badge, hint, and the rows.
+  // Wrapped so a section whose column is missing can be dimmed
+  // and made read-only as a unit rather than field by field.
+  var section = function (icon, title, hint, kind, rows, baseRows) {
+    var isBlocked = Boolean(blocked[kind]);
+    var stored = (rows || []).length > 0;
+    var baseCount = (baseRows || []).length;
+
+    return '<div class="card' + (isBlocked ? ' blocked-sec' : '') + '">'
+      + '<h2 class="sec">' + icon + ' ' + tgEsc(title)
+      +   tgOriginBadge(tgOriginOf(stored, isBlocked),
+            baseCount ? baseCount + ' ' + TG.t.pgFromCodeRows : '')
+      + '</h2>'
+      + '<div class="hint" style="margin-block-end:12px">' + tgEsc(hint) + '</div>'
+      + (isBlocked ? '<div class="note err">' + tgEsc(TG.t.pgBlockedHint) + '</div>' : '')
+      + (!stored && baseCount
+          ? '<div class="note info">' + baseCount + ' ' + tgEsc(TG.t.pgCodeRowsNote) + '</div>'
+          : '')
+      + tgRepList(kind, rows)
+      + '</div>';
+  };
+
+  var heroBlocked = Boolean(blocked.hero);
 
   tgById('tg-page-out').innerHTML =
-    '<div class="card">'
-  +   '<h2 class="sec">🖼️ ' + tgEsc(TG.t.pgHero) + '</h2>'
+    // What this screen is actually editing, said once at the top.
+    // The merge is the single thing about this tab that has to be
+    // understood before anything on it makes sense.
+    '<div class="note info">' + tgEsc(TG.t.pgMerge) + '</div>'
+  + ((data.missingColumns || []).length
+      ? '<div class="note err">' + (data.missingColumns || []).length + ' '
+        + tgEsc(TG.t.sqlSchemaMissing) + ' — ' + tgEsc((data.missingColumns || []).join(', '))
+        + ' · ' + tgEsc(TG.t.pgRepairHere) + '</div>'
+      : '')
+
+  + '<div class="card' + (heroBlocked ? ' blocked-sec' : '') + '">'
+  +   '<h2 class="sec">🖼️ ' + tgEsc(TG.t.pgHero)
+  +     tgOriginBadge(tgOriginOf(landing.hero, heroBlocked), tgPeek(base.hero)) + '</h2>'
   +   '<label class="f"><span>' + tgEsc(TG.t.pgUrl) + '</span>'
   +     '<input type="text" id="pg-hero" dir="ltr" value="' + tgEsc(landing.hero || '') + '"'
-  +       ' oninput="tgHeroPreview()" placeholder="https://…/banner.jpg">'
+  +       ' oninput="tgHeroPreview()" placeholder="' + tgEsc(base.hero || 'https://…/banner.jpg') + '">'
   +     '<span class="hint">' + tgEsc(TG.t.pgHeroHint) + '</span></label>'
   +   '<img class="thumb" id="pg-hero-preview" alt=""' + (landing.hero ? ' src="' + tgEsc(landing.hero) + '"' : ' hidden')
   +     ' onerror="this.hidden=true">'
 
-  +   tgLangFields('pg-tagline', TG.t.pgTagline, landing.tagline, false)
-  +   '<div class="hint" style="margin-block-start:-6px">' + tgEsc(TG.t.pgTaglineHint) + '</div>'
+  +   '<div' + (blocked.tagline ? ' class="blocked-sec"' : '') + '>'
+  +     tgLangFields('pg-tagline', TG.t.pgTagline, landing.tagline, false, base.tagline, blocked.tagline)
+  +     '<div class="hint" style="margin-block-start:-6px">' + tgEsc(TG.t.pgTaglineHint) + '</div>'
+  +   '</div>'
 
-  +   tgLangFields('pg-about', TG.t.pgAbout, landing.about, true)
-  +   '<div class="hint" style="margin-block-start:-6px">' + tgEsc(TG.t.pgAboutHint) + '</div>'
+  +   '<div' + (blocked.about ? ' class="blocked-sec"' : '') + '>'
+  +     tgLangFields('pg-about', TG.t.pgAbout, landing.about, true, base.about, blocked.about)
+  +     '<div class="hint" style="margin-block-start:-6px">' + tgEsc(TG.t.pgAboutHint) + '</div>'
+  +   '</div>'
   + '</div>'
 
-  + '<div class="card">'
-  +   '<h2 class="sec">✨ ' + tgEsc(TG.t.pgFeatures) + '</h2>'
-  +   '<div class="hint" style="margin-block-end:12px">' + tgEsc(TG.t.pgFeaturesHint) + '</div>'
-  +   tgRepList('features', landing.features)
-  + '</div>'
-
-  + '<div class="card">'
-  +   '<h2 class="sec">📷 ' + tgEsc(TG.t.pgScreens) + '</h2>'
-  +   '<div class="hint" style="margin-block-end:12px">' + tgEsc(TG.t.pgScreensHint) + '</div>'
-  +   tgRepList('screenshots', landing.screenshots)
-  + '</div>'
-
-  + '<div class="card">'
-  +   '<h2 class="sec">🎬 ' + tgEsc(TG.t.pgVideos) + '</h2>'
-  +   '<div class="hint" style="margin-block-end:12px">' + tgEsc(TG.t.pgVideosHint) + '</div>'
-  +   tgRepList('videos', landing.videos)
-  + '</div>'
-
-  + '<div class="card">'
-  +   '<h2 class="sec">📱 ' + tgEsc(TG.t.pgDevices) + '</h2>'
-  +   '<div class="hint" style="margin-block-end:12px">' + tgEsc(TG.t.pgDevicesHint) + '</div>'
-  +   tgRepList('devices', landing.devices)
-  + '</div>'
-
-  + '<div class="card">'
-  +   '<h2 class="sec">❓ ' + tgEsc(TG.t.pgFaq) + '</h2>'
-  +   '<div class="hint" style="margin-block-end:12px">' + tgEsc(TG.t.pgFaqHint) + '</div>'
-  +   tgRepList('faq', landing.faq)
-  + '</div>'
+  + section('✨', TG.t.pgFeatures, TG.t.pgFeaturesHint, 'features', landing.features, base.features)
+  + section('📷', TG.t.pgScreens, TG.t.pgScreensHint, 'screenshots', landing.screenshots, base.screenshots)
+  + section('🎬', TG.t.pgVideos, TG.t.pgVideosHint, 'videos', landing.videos, base.videos)
+  + section('📱', TG.t.pgDevices, TG.t.pgDevicesHint, 'devices', landing.devices, base.devices)
+  + section('❓', TG.t.pgFaq, TG.t.pgFaqHint, 'faq', landing.faq, base.faq)
 
   + '<div class="card">'
   +   '<div class="row">'
   +     '<button type="button" class="btn" id="pg-save" onclick="tgSavePage()">' + tgEsc(TG.t.save) + '</button>'
   +     '<a class="btn ghost" href="/' + tgEsc(TG.selected) + '" target="_blank" rel="noopener">'
   +       tgEsc(TG.t.pgOpen) + ' ↗</a>'
+  +     '<button type="button" class="btn ghost" onclick="tgRenderPage()">' + tgEsc(TG.t.pgReload) + '</button>'
   +   '</div>'
-  +   '<div class="hint" style="margin-block-start:10px">' + tgEsc(TG.t.pgMigration) + '</div>'
+  +   '<div class="hint" style="margin-block-start:10px">' + tgEsc(TG.t.pgSaveHint) + '</div>'
   + '</div>'
 
   + '<div id="tg-versions"></div>';
@@ -2913,6 +3311,27 @@ function tgSavePage() {
     // evening spent typing it again.
     if (data.warning) tgToast(data.warning, true);
     else tgToast(TG.t.saved);
+
+    // Redrawn from what came BACK, not from what was sent.
+    //
+    // The origin badges are the whole point of this screen and
+    // they are claims about the database, so they have to be
+    // rebuilt from the row as it now reads. It also answers the
+    // question the tab could never answer before - "did that
+    // actually save?" - without anybody having to open the
+    // public page and squint at it.
+    //
+    // Merged over what landing.get returned rather than used on
+    // its own: the save answer carries the landing fields and the
+    // schema, and nothing else. Replacing the whole object would
+    // redraw the release history from an empty list.
+    var merged = {};
+    var key;
+    for (key in TG.page) if (Object.prototype.hasOwnProperty.call(TG.page, key)) merged[key] = TG.page[key];
+    for (key in data) if (Object.prototype.hasOwnProperty.call(data, key)) merged[key] = data[key];
+
+    TG.page = merged;
+    tgDrawPage(merged);
   });
 }
 
@@ -3442,6 +3861,20 @@ function tgOpenPlayer(playerId) {
     +   '<div class="scroll"><table class="tbl"><tbody>'
     +     '<tr><td>' + tgEsc(TG.t.plEmail) + '</td><td dir="ltr"><code>' + tgEsc(p.email) + '</code></td></tr>'
     +     '<tr><td>' + tgEsc(TG.t.plId) + '</td><td dir="ltr"><code>' + tgEsc(p.playerId) + '</code></td></tr>'
+
+    // The player's own leaderboard decision. Here so that "why is
+    // this player not on the board?" has an answer, and read-only
+    // because it is theirs: an operator quietly putting somebody
+    // back onto a public list they chose to leave is not something
+    // this panel should make easy.
+    +     (p.boardOptOutSupported
+        ? '<tr><td>' + tgEsc(TG.t.plBoard) + '</td><td>'
+          + (p.boardHidden
+              ? '<span class="chip warn">' + tgEsc(TG.t.plBoardHidden) + '</span>'
+                + ' <span class="muted">' + tgEsc(TG.t.plBoardHiddenWhy) + '</span>'
+              : '<span class="chip ok">' + tgEsc(TG.t.plBoardShown) + '</span>')
+          + '</td></tr>'
+        : '')
     +     (p.state === 'banned'
         ? '<tr><td>' + tgEsc(TG.t.plBannedAt) + '</td><td>' + tgEsc(tgDate(p.bannedAt))
           + ' <span class="muted">' + tgEsc(p.banReason) + '</span></td></tr>' : '')
@@ -3595,6 +4028,24 @@ function tgRenderSql() {
   tgById('panel-sql').innerHTML =
     '<p class="lede">' + tgEsc(TG.t.sqlLede) + '</p>'
   + '<div class="note info">' + tgEsc(TG.t.sqlNoRun) + '</div>'
+
+  // What each button does, before the buttons.
+  //
+  // This tab used to be four unlabelled buttons over an empty
+  // box, and the only way to learn what one produced was to press
+  // it and read four hundred lines of generated SQL. The four
+  // outputs answer genuinely different questions and three of
+  // them are rarely what somebody actually came here for.
+  + '<div class="card">'
+  +   '<h2 class="sec">🧭 ' + tgEsc(TG.t.sqlWhat) + '</h2>'
+  +   '<ul class="sqlwhat">'
+  +     '<li><b>' + tgEsc(TG.t.sqlSchema) + '</b> — ' + tgEsc(TG.t.sqlWhatSchema) + '</li>'
+  +     '<li><b>' + tgEsc(TG.t.sqlSettings) + '</b> — ' + tgEsc(TG.t.sqlWhatSettings) + '</li>'
+  +     '<li><b>' + tgEsc(TG.t.sqlPurge) + '</b> — ' + tgEsc(TG.t.sqlWhatPurge) + '</li>'
+  +     '<li><b>' + tgEsc(TG.t.sqlBuild) + '</b> — ' + tgEsc(TG.t.sqlWhatBuild) + '</li>'
+  +   '</ul>'
+  + '</div>'
+
   + '<div class="card">'
   +   '<div class="grid two">'
   +     tgGamePicker('tgPickGame', TG.t.sqlGame)
@@ -3610,12 +4061,151 @@ function tgRenderSql() {
   +       '<span>' + tgEsc(TG.t.sqlSeed) + '</span></label>'
   +   '</div>'
   +   '<div class="row">'
-  +     '<button type="button" class="btn" onclick="tgBuildSql()">' + tgEsc(TG.t.sqlBuild) + '</button>'
+  +     '<button type="button" class="btn" onclick="tgLoadSchema()">' + tgEsc(TG.t.sqlSchema) + '</button>'
   +     '<button type="button" class="btn ghost" onclick="tgBuildSettingsSql()">' + tgEsc(TG.t.sqlSettings) + '</button>'
   +     '<button type="button" class="btn ghost" onclick="tgBuildPurgeSql()">' + tgEsc(TG.t.sqlPurge) + '</button>'
+  +     '<button type="button" class="btn ghost" onclick="tgBuildSql()">' + tgEsc(TG.t.sqlBuild) + '</button>'
   +   '</div>'
   + '</div>'
   + '<div id="tg-sql-out"></div>';
+
+  // The schema is the answer to "why did my edit not save?", so
+  // it is what the tab opens on rather than something to go
+  // looking for.
+  tgLoadSchema();
+}
+
+
+// ==========================================
+// The schema view
+//
+// One table per database, listing what is really there. Built
+// from PRAGMA table_info on the live D1 rather than from the
+// files in migrations/, because those two disagreed on this
+// deployment for months and only one of them decides whether a
+// save works.
+// ==========================================
+function tgLoadSchema() {
+  var game = tgSelected();
+  var out = tgById('tg-sql-out');
+  if (!out) return;
+
+  out.innerHTML = '<div class="card"><div class="empty">' + tgEsc(TG.t.loading) + '</div></div>';
+
+  tgCall('schema.get', { gameId: game ? game.id : '' }).then(function (data) {
+    if (!data) { out.innerHTML = '<div class="card"><div class="empty">' + tgEsc(TG.t.failed) + '</div></div>'; return; }
+    TG.schema = data;
+    out.innerHTML = tgSchemaCard(data);
+  });
+}
+
+function tgSchemaChip(present) {
+  return present
+    ? '<span class="chip ok">✓ ' + tgEsc(TG.t.sqlSchemaPresent) + '</span>'
+    : '<span class="chip err">✕ ' + tgEsc(TG.t.sqlSchemaAbsent) + '</span>';
+}
+
+function tgSchemaCard(data) {
+  var settings = data.licence.settings;
+  var missing = settings.missing || [];
+
+  // Every column the panel knows about, present ones first being
+  // useless - so they are listed in schema order with their state
+  // beside them. A missing column has to be findable at a glance,
+  // which is what the count and the banner above the table are
+  // for.
+  var rows = (settings.present || []).map(function (name) {
+    return { name: name, present: true, since: '' };
+  }).concat(missing.map(function (column) {
+    return { name: column.name, present: false, since: column.since };
+  }));
+
+  rows.sort(function (a, b) { return a.present === b.present ? 0 : (a.present ? -1 : 1); });
+
+  var table = '<div class="scroll"><table class="tbl"><thead><tr>'
+    + '<th>' + tgEsc(TG.t.sqlSchemaColumn) + '</th>'
+    + '<th>' + tgEsc(TG.t.sqlSchemaTable) + '</th>'
+    + '<th>' + tgEsc(TG.t.sqlSchemaFrom) + '</th>'
+    + '</tr></thead><tbody>'
+    + rows.map(function (row) {
+        return '<tr><td><code>' + tgEsc(row.name) + '</code></td>'
+             + '<td>' + tgSchemaChip(row.present) + '</td>'
+             + '<td class="muted" style="font-size:.85em">' + tgEsc(row.since || '—') + '</td></tr>';
+      }).join('')
+    + '</tbody></table></div>';
+
+  var banner = missing.length
+    ? '<div class="note err">' + missing.length + ' ' + tgEsc(TG.t.sqlSchemaMissing) + ' — '
+      + tgEsc(TG.t.sqlSchemaMissingWhy) + '</div>'
+    : '<div class="note ok">' + tgEsc(TG.t.sqlSchemaOk) + '</div>';
+
+  var repair = missing.length
+    ? '<div class="row" style="margin-block-start:12px">'
+      + '<button type="button" class="btn" onclick="tgRepairSchema()">'
+      +   tgEsc(TG.t.sqlSchemaRepair) + '</button>'
+      + '</div>'
+    : '';
+
+  // The game's own database. A different D1 entirely, and the
+  // distinction is the one thing about this system that is
+  // genuinely easy to get wrong: settings live in one, players
+  // live in the other, and a migration run against the wrong one
+  // succeeds and does nothing useful.
+  var player = data.player;
+  var playerCard = '';
+  if (player) {
+    var features = [
+      ['banned_at', TG.t.plModeration, player.moderation],
+      ['data_json', TG.t.pgAbout, player.document],
+      ['leaderboard_opt_out', TG.t.plBoard, player.leaderboardOptOut]
+    ];
+
+    playerCard = '<div class="card">'
+      + '<h2 class="sec">🎮 ' + tgEsc(TG.t.sqlSchemaPlayer) + '</h2>'
+      + '<div class="hint" style="margin-block-end:12px"><code>' + tgEsc(player.binding || '—') + '</code></div>'
+      + (player.bound
+          ? '<div class="scroll"><table class="tbl"><thead><tr>'
+            + '<th>' + tgEsc(TG.t.sqlSchemaFeature) + '</th>'
+            + '<th>' + tgEsc(TG.t.sqlSchemaColumn) + '</th>'
+            + '<th>' + tgEsc(TG.t.sqlSchemaTable) + '</th></tr></thead><tbody>'
+            + features.map(function (feature) {
+                return '<tr><td>' + tgEsc(feature[1]) + '</td>'
+                     + '<td><code>' + tgEsc(feature[0]) + '</code></td>'
+                     + '<td>' + tgSchemaChip(feature[2]) + '</td></tr>';
+              }).join('')
+            + '</tbody></table></div>'
+            + '<div class="hint" style="margin-block-start:10px">' + player.present.length + ' — <code>'
+            + tgEsc(player.present.join(', ')) + '</code></div>'
+          : '<div class="note err">' + tgEsc(TG.t.sqlSchemaUnbound) + '</div>')
+      + '</div>';
+  }
+
+  return '<div class="card">'
+    +   '<h2 class="sec">🗄️ ' + tgEsc(TG.t.sqlSchemaTitle) + '</h2>'
+    +   '<p class="lede">' + tgEsc(TG.t.sqlSchemaLede) + '</p>'
+    +   '<h3 class="sub">' + tgEsc(TG.t.sqlSchemaLicence) + '</h3>'
+    +   banner
+    +   table
+    +   repair
+    + '</div>'
+    + playerCard
+    + (missing.length ? tgCodeBlock('ALTER TABLE game_settings', '', data.repair) : '');
+}
+
+function tgRepairSchema() {
+  if (!window.confirm(TG.t.sqlSchemaRepairAsk)) return;
+
+  tgCall('schema.repair', {}).then(function (data) {
+    if (!data) return;
+
+    if (!data.added.length) tgToast(TG.t.sqlSchemaNothing);
+    else tgToast(data.added.length + ' ' + TG.t.sqlSchemaRepaired);
+
+    if (data.failed && data.failed.length) {
+      tgToast(data.failed.map(function (entry) { return entry.name; }).join(', '), true);
+    }
+    tgLoadSchema();
+  });
 }
 
 function tgBuildSql() {
@@ -3634,14 +4224,53 @@ function tgBuildSql() {
   });
 }
 
+// ==========================================
+// tgBuildSettingsSql
+// What is actually stored, twice: once as the raw row and once
+// as the statement that reproduces it.
+//
+// The raw row is above the SQL on purpose. This block is read to
+// answer "what is really in the database?", and a generator
+// standing between the reader and the answer is exactly what
+// made the old version untrustworthy - it printed a timestamp it
+// had invented and gave no way to tell a NULL column from one
+// that does not exist.
+// ==========================================
 function tgBuildSettingsSql() {
   var game = tgSelected();
   if (!game) return;
 
   tgCall('sql.settings', { gameId: game.id }).then(function (data) {
     if (!data) return;
+
+    var schema = data.schema || { missing: [] };
+    var missing = schema.missing || [];
+
+    var rowTable = data.row
+      ? '<div class="scroll"><table class="tbl"><thead><tr>'
+        + '<th>' + tgEsc(TG.t.sqlSchemaColumn) + '</th><th>' + tgEsc(TG.t.plId) + '</th>'
+        + '</tr></thead><tbody>'
+        + Object.keys(data.row).map(function (key) {
+            var value = data.row[key];
+            var shown = (value === null || value === undefined)
+              ? '<span class="muted">NULL</span>'
+              : '<code style="word-break:break-all">' + tgEsc(String(value)) + '</code>';
+            return '<tr><td><code>' + tgEsc(key) + '</code></td><td>' + shown + '</td></tr>';
+          }).join('')
+        + '</tbody></table></div>'
+      : '<div class="note info">' + tgEsc(TG.t.sqlNoRow) + '</div>';
+
     tgById('tg-sql-out').innerHTML =
-      tgCodeBlock('game_settings — ' + game.id, '', data.settings)
+      '<div class="card">'
+    +   '<h2 class="sec">📄 ' + tgEsc(TG.t.sqlSchemaRow) + ' — ' + tgEsc(game.id) + '</h2>'
+    +   '<p class="lede">' + tgEsc(TG.t.sqlSchemaRowLede) + '</p>'
+    +   (missing.length
+          ? '<div class="note err">' + missing.length + ' ' + tgEsc(TG.t.sqlSchemaMissing) + ' — '
+            + tgEsc(missing.map(function (column) { return column.name; }).join(', ')) + '</div>'
+          : '')
+    +   rowTable
+    + '</div>'
+    + tgCodeBlock('game_settings — ' + game.id, '', data.settings)
     + tgCodeBlock('game_product_overrides — ' + game.id, '', data.products);
   });
 }
@@ -3827,18 +4456,30 @@ function tgRenderNew() {
   tgById('panel-new').innerHTML =
     '<p class="lede">' + tgEsc(TG.t.newLede) + '</p>'
   + '<div class="note info">' + tgEsc(TG.t.newWhy) + '</div>'
+
+  // ==========================================
+  // Two blocks, not one long form.
+  //
+  // This screen used to ask sixteen questions in a row, all of
+  // them looking equally required, and only three of them are:
+  // an id, a name and what kind of game it is. Everything else
+  // has a working default and is editable from the panel later
+  // without a deploy - which is exactly the property that makes
+  // it wrong to demand up front.
+  //
+  // So: what the generator genuinely cannot invent is on screen,
+  // and the rest is behind one disclosure that says what it
+  // contains and what happens if it is skipped.
+  // ==========================================
   + '<div class="card">'
+  +   '<h2 class="sec">1️⃣ ' + tgEsc(TG.t.nEssentials) + '</h2>'
+  +   '<div class="hint" style="margin-block-end:14px">' + tgEsc(TG.t.nEssentialsHint) + '</div>'
   +   '<div class="grid two">'
   +     '<label class="f"><span>' + tgEsc(TG.t.nId) + '</span>'
-  +       '<input type="text" id="n-id" dir="ltr" placeholder="pixel-runner"></label>'
+  +       '<input type="text" id="n-id" dir="ltr" placeholder="pixel-runner" oninput="tgNewPreview()">'
+  +       '<span class="hint">' + tgEsc(TG.t.nIdHint) + '</span></label>'
   +     '<label class="f"><span>' + tgEsc(TG.t.nName) + '</span>'
-  +       '<input type="text" id="n-name" placeholder="Pixel Runner"></label>'
-  +   '</div>'
-  +   '<div class="grid two">'
-  +     '<label class="f"><span>' + tgEsc(TG.t.nIcon) + '</span>'
-  +       '<input type="text" id="n-icon" value="🎮"></label>'
-  +     '<label class="f"><span>' + tgEsc(TG.t.nColor) + '</span>'
-  +       '<input type="color" id="n-color" value="#6c63ff"></label>'
+  +       '<input type="text" id="n-name" placeholder="Pixel Runner" oninput="tgNewPreview()"></label>'
   +   '</div>'
 
   // The question that decides every other question on this form.
@@ -3851,6 +4492,40 @@ function tgRenderNew() {
   +     ' style="margin-block-end:10px">' + platformSeg + '</div>'
   +   '<div class="hint">' + tgEsc(TG.t.nPlatformHint) + '</div>'
   +   '<div class="note info" id="n-platform-note" style="margin-block-start:12px"></div>'
+
+  // What the generator will produce from what has been typed so
+  // far. It updates as you type, so "is this going to be right?"
+  // is answered before the button is pressed rather than by
+  // reading four hundred lines of generated source afterwards.
+  +   '<h3 class="sub">' + tgEsc(TG.t.nPreview) + '</h3>'
+  +   '<div class="scroll"><table class="tbl"><tbody id="n-preview"></tbody></table></div>'
+
+  +   '<div class="row" style="margin-block-start:16px">'
+  +     '<button type="button" class="btn" onclick="tgBuildScaffold()">' + tgEsc(TG.t.nBuild) + '</button>'
+  +   '</div>'
+  +   '<div class="hint" style="margin-block-start:10px">' + tgEsc(TG.t.nBuildHint) + '</div>'
+  + '</div>'
+
+  + '<details class="card">'
+  +   '<summary class="sec" style="cursor:pointer;list-style:none">⚙️ ' + tgEsc(TG.t.nMore) + '</summary>'
+  +   '<div class="hint" style="margin-block:10px 16px">' + tgEsc(TG.t.nMoreHint) + '</div>'
+
+  +   '<h3 class="sub">' + tgEsc(TG.t.nLook) + '</h3>'
+  +   '<div class="grid two">'
+  +     '<label class="f"><span>' + tgEsc(TG.t.nIcon) + '</span>'
+  +       '<input type="text" id="n-icon" value="🎮" oninput="tgNewPreview()"></label>'
+  +     '<label class="f"><span>' + tgEsc(TG.t.nColor) + '</span>'
+  +       '<input type="color" id="n-color" value="#6c63ff"></label>'
+  +   '</div>'
+
+  // The card's motifs. Asked for here because it is a fact about
+  // the game that nothing else can infer, and because "the card
+  // has no way to look like the game" was the specific gap this
+  // tab had: the generator wrote a registry entry with an icon
+  // and a colour and nothing that belongs to the game itself.
+  +   '<label class="f"><span>' + tgEsc(TG.t.nMotifs) + '</span>'
+  +     '<input type="text" id="n-motifs" dir="ltr" placeholder="🍎 🍑 🍉 ⚔️" oninput="tgNewPreview()">'
+  +     '<span class="hint">' + tgEsc(TG.t.nMotifsHint) + '</span></label>'
 
   +   '<h3 class="sub">' + tgEsc(TG.t.nDownloads) + '</h3>'
   +   '<div class="hint" style="margin-block-end:12px">' + tgEsc(TG.t.nDownloadsHint) + '</div>'
@@ -3865,7 +4540,8 @@ function tgRenderNew() {
   +     '<label class="f"><span>' + tgEsc(TG.t.nApk) + '</span>'
   +       '<input type="text" id="n-apk" dir="ltr" placeholder="https://…/game.apk"></label>'
   +     '<label class="f"><span>' + tgEsc(TG.t.nPackage) + '</span>'
-  +       '<input type="text" id="n-package" dir="ltr" placeholder="com.AmirColliderGames.PixelRunner"></label>'
+  +       '<input type="text" id="n-package" dir="ltr" placeholder="com.AmirColliderGames.PixelRunner"'
+  +         ' oninput="tgNewPreview()"></label>'
   +   '</div>'
 
   +   '<div id="n-web-fields">'
@@ -3877,6 +4553,8 @@ function tgRenderNew() {
   +     '<select id="n-primary"></select>'
   +     '<span class="hint">' + tgEsc(TG.t.nPrimaryHint) + '</span></label>'
 
+  +   '<h3 class="sub">' + tgEsc(TG.t.nDescs) + '</h3>'
+  +   '<div class="hint" style="margin-block-end:12px">' + tgEsc(TG.t.nDescsHint) + '</div>'
   +   '<label class="f"><span>' + tgEsc(TG.t.nDescFa) + '</span>'
   +     '<textarea id="n-desc-fa" dir="rtl"></textarea></label>'
   +   '<div class="grid two">'
@@ -3885,7 +4563,9 @@ function tgRenderNew() {
   +     '<label class="f"><span>' + tgEsc(TG.t.nDescJa) + '</span>'
   +       '<textarea id="n-desc-ja" dir="ltr"></textarea></label>'
   +   '</div>'
+
   +   '<h3 class="sub">' + tgEsc(TG.t.capabilities) + '</h3>'
+  +   '<div class="hint" style="margin-block-end:12px">' + tgEsc(TG.t.nCapsHint) + '</div>'
   +   '<div class="row" style="margin-block-end:16px">'
   +     tgCapSwitch('n-online', TG.t.capOnline, false)
   +     tgCapSwitch('n-login', TG.t.capLogin, true)
@@ -3893,11 +4573,82 @@ function tgRenderNew() {
   +     tgCapSwitch('n-board', TG.t.capBoard, true)
   +     tgCapSwitch('n-store', TG.t.capStore, true)
   +   '</div>'
-  +   '<button type="button" class="btn" onclick="tgBuildScaffold()">' + tgEsc(TG.t.nBuild) + '</button>'
-  + '</div>'
+  + '</details>'
+
   + '<div id="tg-new-out"></div>';
 
   tgSetPlatform(TG.newPlatform);
+  tgNewPreview();
+}
+
+
+// ==========================================
+// tgNewPreview
+// What the generator is going to write, as you type.
+//
+// Every one of these is derived rather than asked for - the
+// binding name, the database name, the environment variables,
+// the Android package, the URL the game will live at - and
+// getting one of them wrong is a confusing hour rather than an
+// error message. Showing them before the button is pressed turns
+// that into something you can read and correct.
+// ==========================================
+function tgNewPreview() {
+  var box = tgById('n-preview');
+  if (!box) return;
+
+  var raw = (tgById('n-id').value || '').trim().toLowerCase();
+  var id = raw.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+
+  if (!id) {
+    box.innerHTML = '<tr><td class="muted">' + tgEsc(TG.t.nPreviewEmpty) + '</td></tr>';
+    return;
+  }
+
+  var upper = id.replace(/-/g, '_').toUpperCase();
+  var pascal = id.split('-').filter(Boolean).map(function (part) {
+    return part.charAt(0).toUpperCase() + part.slice(1);
+  }).join('');
+
+  var android = TG.newPlatform !== 'web';
+  var pkg = (tgById('n-package') && tgById('n-package').value || '').trim()
+    || ('com.AmirColliderGames.' + pascal);
+
+  var motifs = tgNewMotifs();
+
+  var rows = [
+    [TG.t.nPreviewUrl, TG.origin + '/' + id],
+    [TG.t.nPreviewBinding, upper + '_DB'],
+    [TG.t.nPreviewDatabase, id + '-db'],
+    [TG.t.nPreviewConstants, pascal + 'Constants.cs']
+  ];
+
+  if (android) rows.push([TG.t.nPackage, pkg]);
+  if (tgById('n-login') && tgById('n-login').checked) {
+    rows.push([TG.t.nPreviewSecrets, upper + '_GOOGLE_CLIENT_ID_WEB, ' + upper + '_GOOGLE_CLIENT_SECRET']);
+  }
+  if (motifs.length) rows.push([TG.t.nMotifs, motifs.join(' ')]);
+
+  // The id was corrected on its way in. Saying so is cheaper than
+  // letting somebody discover it in the generated source.
+  var note = (raw && raw !== id)
+    ? '<tr><td colspan="2"><span class="chip warn">' + tgEsc(TG.t.nIdFixed) + '</span> <code>'
+      + tgEsc(id) + '</code></td></tr>'
+    : '';
+
+  box.innerHTML = note + rows.map(function (row) {
+    return '<tr><td>' + tgEsc(row[0]) + '</td>'
+         + '<td dir="ltr"><code style="word-break:break-all">' + tgEsc(row[1]) + '</code></td></tr>';
+  }).join('');
+}
+
+
+// The motif box, split into single glyphs. Spaces and commas are
+// both accepted because both are what somebody types.
+function tgNewMotifs() {
+  var field = tgById('n-motifs');
+  if (!field) return [];
+  return (field.value || '').split(/[\s,]+/).filter(Boolean).slice(0, 6);
 }
 
 
@@ -3982,6 +4733,7 @@ function tgBuildScaffold() {
       name: tgById('n-name').value || id,
       icon: tgById('n-icon').value || '🎮',
       color: tgById('n-color').value,
+      cardMotifs: tgNewMotifs(),
       platform: platform,
       package: android ? read('n-package') : '',
       descriptionFa: tgById('n-desc-fa').value,
@@ -4002,10 +4754,85 @@ function tgBuildScaffold() {
       return tgCodeBlock(file.name, file.hint, file.body);
     }).join('');
 
+    // The step this tab never had: after the deploy, is it
+    // actually working?
+    //
+    // Every file above is generated text, and a generator cannot
+    // know whether the binding was pasted into wrangler.jsonc,
+    // whether the migration ran, or whether the secrets were set.
+    // Those are the three things that go wrong, they all fail
+    // silently, and the only way to find out used to be opening
+    // five pages and reading them.
+    //
+    // The button is deliberately AFTER the steps and says why it
+    // will report nothing useful before the deploy: the game does
+    // not exist until Config.js says it does.
+    var verify = '<div class="card">'
+      + '<h2 class="sec">✅ ' + tgEsc(TG.t.nVerify) + '</h2>'
+      + '<p class="lede">' + tgEsc(TG.t.nVerifyLede) + '</p>'
+      + '<div class="row">'
+      +   '<button type="button" class="btn" onclick="tgVerifyGame(\'' + tgEsc(data.names.id) + '\')">'
+      +     tgEsc(TG.t.vfRun) + '</button>'
+      + '</div>'
+      + '<div id="tg-verify-out"></div>'
+      + '</div>';
+
     tgById('tg-new-out').innerHTML = blocks
-      + '<div class="card"><h2 class="sec">📋 ' + tgEsc(TG.t.nSteps) + '</h2>' + tgSteps(data.commands) + '</div>';
+      + '<div class="card"><h2 class="sec">📋 ' + tgEsc(TG.t.nSteps) + '</h2>' + tgSteps(data.commands) + '</div>'
+      + verify;
 
     tgById('tg-new-out').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+}
+
+
+// ==========================================
+// tgVerifyGame
+// Everything that is either true or false about this game right
+// now, on this deployment.
+//
+// Shared by the "new game" tab (where it answers "did the deploy
+// work?") and the games tab (where it answers "why is this not
+// behaving?"). Each row says what is wrong AND what to do about
+// it, because "playersTable: false" is not an instruction.
+// ==========================================
+function tgVerifyGame(gameId) {
+  var out = tgById('tg-verify-out');
+  if (!out) return;
+
+  out.innerHTML = '<div class="empty" style="margin-block-start:12px">' + tgEsc(TG.t.loading) + '</div>';
+
+  tgCall('game.verify', { gameId: gameId }).then(function (data) {
+    if (!data) { out.innerHTML = ''; return; }
+
+    var mark = { ok: '✅', error: '❌', warn: '⚠️', info: 'ℹ️' };
+
+    var rows = data.checks.map(function (check) {
+      var cls = check.level === 'error' ? ' is-error' : check.level === 'warn' ? ' is-warn' : '';
+      return '<div class="vf-row' + cls + '">'
+        + '<span class="vf-mark" aria-hidden="true">' + (mark[check.level] || '•') + '</span>'
+        + '<span class="vf-body"><b>' + tgEsc(check.label) + '</b>'
+        +   '<span>' + tgEsc(check.detail) + '</span></span>'
+        + '</div>';
+    }).join('');
+
+    var pages = data.pages.map(function (page) {
+      return '<a class="btn ghost small" href="' + tgEsc(page.url) + '" target="_blank" rel="noopener">'
+        + tgEsc(page.label) + ' ↗</a>';
+    }).join('');
+
+    var summary = data.summary.failed
+      ? '<div class="note err">' + data.summary.failed + ' ' + tgEsc(TG.t.vfFailed) + '</div>'
+      : data.summary.warned
+        ? '<div class="note warn">' + data.summary.warned + ' ' + tgEsc(TG.t.vfWarned) + '</div>'
+        : '<div class="note ok">' + tgEsc(TG.t.vfAllGood) + '</div>';
+
+    out.innerHTML = '<div style="margin-block-start:14px">'
+      + summary
+      + '<div class="vf">' + rows + '</div>'
+      + '<h3 class="sub">' + tgEsc(TG.t.vfPages) + '</h3>'
+      + '<div class="row">' + pages + '</div>'
+      + '</div>';
   });
 }
 

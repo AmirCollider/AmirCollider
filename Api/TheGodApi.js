@@ -36,19 +36,22 @@ import {
   saveLandingFields, listVersions, saveVersion, deleteVersion,
   listGameOrders, gameOrderStats, getGameOrder,
   findPlayers, listEntitlementsRaw, listEntitlementEvents,
-  revokeEntitlement, GAME_ORDER_STATE
+  revokeEntitlement, GAME_ORDER_STATE, readProductOverrides,
+  SETTINGS_SCHEMA, LANDING_COLUMNS, settingsSchemaReport, repairSettingsSchema,
+  invalidateSchemaCache, tableColumns
 } from '../Games/Store.js'
 import { grantForOrder, grantManually } from '../Games/Purchase.js'
 import {
   playerDb, listGamePlayers, getGamePlayer, setModeration,
   setUsername, deleteGamePlayer, moderationOf
 } from '../Games/Players.js'
+import { LEADERBOARD_OPT_OUT_COLUMN } from '../Games/PlayerRecord.js'
 import {
   gameSchemaSql, settingsSeedSql, productSeedSql, purgeSeedSql,
-  setupCommands, slug, namesFor
+  schemaRepairSql, setupCommands, slug, namesFor
 } from '../Games/Sql.js'
 import { scaffold } from '../Games/Scaffold.js'
-import { unityModules } from '../Content/UnityKit.js'
+import { unityModules, unityKitIndex } from '../Content/UnityKit.js'
 
 const LANGS = ['fa', 'en', 'ja']
 
@@ -142,6 +145,16 @@ function presentPlayer(row) {
     createdAt: Number(row.created_at) || 0,
     lastLogin: Number(row.last_login) || 0,
     state: moderationOf(row),
+
+    // The player's own leaderboard decision, shown here so that
+    // "why is this player not on the board?" has an answer in the
+    // panel. Read-only on this screen on purpose: it is the
+    // player's setting, and an operator quietly putting somebody
+    // back on a public list they left is not a moderation action
+    // this panel should make easy.
+    boardHidden: Number(row[LEADERBOARD_OPT_OUT_COLUMN]) === 1,
+    boardOptOutSupported: Object.prototype.hasOwnProperty.call(row, LEADERBOARD_OPT_OUT_COLUMN),
+
     bannedAt: Number(row.banned_at) || 0,
     banReason: row.ban_reason || '',
     restrictedUntil: Number(row.restricted_until) || 0,
@@ -437,6 +450,44 @@ function presentLanding(row) {
 }
 
 
+// ==========================================
+// presentBaseline
+// What Config.js says this game's page contains, before any
+// database row is laid on top of it.
+//
+// The editor needs both halves to be honest. Games/Registry.js
+// merges field by field - "empty database, real page; edited
+// database, edited page" - so a blank box in the panel does not
+// mean a blank section on the site, it means "whatever the code
+// says". Showing only the row made every one of those look like
+// something nobody had filled in yet.
+//
+// Takes the RAW registry entry, not the merged game: the merged
+// one already has the row folded into it, which is exactly the
+// thing this has to be separate from.
+// ==========================================
+function presentBaseline(configGame) {
+  const base = (configGame && configGame.landing) || {}
+  const list = value => (Array.isArray(value) ? value : [])
+  const lang3 = map => ({
+    fa: (map && map.fa) || '',
+    en: (map && map.en) || '',
+    ja: (map && map.ja) || ''
+  })
+
+  return {
+    hero: base.hero || '',
+    tagline: lang3(base.tagline),
+    about: lang3(base.about),
+    features: list(base.features),
+    screenshots: list(base.screenshots),
+    videos: list(base.videos),
+    devices: list(base.devices),
+    faq: list(base.faq)
+  }
+}
+
+
 function presentVersion(row) {
   return {
     version: row.version,
@@ -451,15 +502,48 @@ function presentVersion(row) {
 }
 
 
-// Which migrations a database is missing, phrased as the
-// sentence the panel shows. A save that could not write half its
-// fields must say so: "saved" over a section that did not save
-// is how somebody spends an evening re-typing a FAQ.
-function migrationWarning(missing) {
+// Which columns a database is missing, phrased as the sentence
+// the panel shows. A save that could not write half its fields
+// must say so: "saved" over a section that did not save is how
+// somebody spends an evening re-typing a FAQ.
+//
+// Columns, not migrations. "Run 0008" is not something an
+// operator can act on from inside a browser, and it was also not
+// specific enough to be true - a database can be missing one
+// column out of a migration's six. The panel has a repair button
+// now, so the sentence points at it.
+function columnWarning(missing) {
   if (!missing || !missing.length) return ''
-  return 'Some fields were not saved: this database has not run '
-       + missing.map(name => `migrations/${name}`).join(' or ')
-       + '. Everything else on this screen was saved.'
+
+  const migrations = [...new Set(
+    missing
+      .map(name => (SETTINGS_SCHEMA.find(column => column.name === name) || {}).since)
+      .filter(Boolean)
+  )]
+
+  return 'Everything else on this screen was saved, but these fields have no column in this '
+       + `database yet: ${missing.join(', ')}. `
+       + (migrations.length ? `They come from ${migrations.join(' and ')}. ` : '')
+       + 'Press "Repair the schema" on the SQL tab to add them — it is an ALTER TABLE per column '
+       + 'and touches no existing data — then save this screen again.'
+}
+
+
+// Which landing fields a missing column costs, so the panel can
+// grey out the sections that cannot be saved rather than letting
+// somebody fill one in and lose it.
+function landingSections(missing) {
+  const owner = {
+    hero_url: 'hero',
+    videos_json: 'videos',
+    devices_json: 'devices',
+    about_fa: 'about', about_en: 'about', about_ja: 'about',
+    tagline_fa: 'tagline', tagline_en: 'tagline', tagline_ja: 'tagline',
+    features_json: 'features',
+    screenshots_json: 'screenshots',
+    faq_json: 'faq'
+  }
+  return [...new Set((missing || []).map(name => owner[name]).filter(Boolean))]
 }
 
 
@@ -522,10 +606,10 @@ export async function handleTheGodApi(url, request, gameId, requestId, GAMES, en
       const clear = cleanClear(body.clear, allowed)
 
       // deeplink_scheme is written after the row exists and on
-      // its own, because it is the one column a deployment might
-      // not have yet: it arrived in migration 0004, and naming it
-      // in the main upsert would make a database that stopped at
-      // 0003 fail the whole save. See saveDeepLinkScheme.
+      // its own, because it is the one column with a resolution
+      // chain behind it: a cleared override falls back to the
+      // environment variable and then to Config.js, and the panel
+      // reports which of the three won.
       // The CLEANED value, not the one that arrived: cleanPatch
       // lower-cases the scheme, so writing body.patch through
       // would store a spelling that differs from the one every
@@ -535,9 +619,11 @@ export async function handleTheGodApi(url, request, gameId, requestId, GAMES, en
       const clearsScheme = clear.includes('deeplink_scheme')
       delete patch.deeplink_scheme
 
-      await saveSettings(database, game.id, patch, clear.filter(field => field !== 'deeplink_scheme'))
+      const savedSettings = await saveSettings(
+        database, game.id, patch, clear.filter(field => field !== 'deeplink_scheme')
+      )
 
-      let schemeWarning = ''
+      let schemeWarning = columnWarning(savedSettings.missing)
 
       // Sent, and thrown away by cleanPatch for not being a URL
       // scheme. The panel checks this before it asks, so this is
@@ -553,7 +639,7 @@ export async function handleTheGodApi(url, request, gameId, requestId, GAMES, en
         if (!written.ok) {
           schemeWarning = written.reason === 'no_column'
             ? 'The deep-link scheme was not saved: this database has no game_settings.deeplink_scheme '
-            + 'column yet. Run migrations/0004_deeplink.sql. Everything else on this screen was saved.'
+            + 'column yet. Press "Repair the schema" on the SQL tab. Everything else on this screen was saved.'
             : 'The deep-link scheme could not be saved. Everything else on this screen was saved.'
           logWarning('Deep-link scheme not written', { requestId, gameId: game.id, reason: written.reason })
         }
@@ -623,14 +709,37 @@ export async function handleTheGodApi(url, request, gameId, requestId, GAMES, en
       if (!game) return unknownGame()
 
       const database = db(env)
-      const [row, versions] = database
-        ? await Promise.all([readSettings(database, game.id), listVersions(database, game.id, 60)])
-        : [null, []]
+      const [row, versions, schema] = database
+        ? await Promise.all([
+            readSettings(database, game.id),
+            listVersions(database, game.id, 60),
+            settingsSchemaReport(database)
+          ])
+        : [null, [], { readable: false, present: [], missing: [], migrations: [] }]
+
+      const missing = (schema.missing || []).map(column => column.name)
 
       return createJsonResponse({
         ok: true,
         gameId: game.id,
         landing: presentLanding(row),
+
+        // What the page falls back to when a field here is empty.
+        // The editor used to show only the stored row, so every
+        // box was blank on a game whose landing page was in fact
+        // full - of the baseline in Config.js. Somebody typing a
+        // hero URL into that screen and pressing save had no way
+        // to tell which of the other nine sections they had just
+        // agreed to leave alone and which they were about to
+        // publish empty.
+        baseline: presentBaseline(GAMES[game.id]),
+
+        // Which of these sections cannot be saved on this
+        // database, so the editor can say so beside the fields
+        // rather than after the save.
+        missingColumns: missing,
+        blockedSections: landingSections(missing),
+
         versions: versions.map(presentVersion),
         // Where the page these fields feed actually is, so the
         // editor can link to the thing it is editing.
@@ -652,15 +761,10 @@ export async function handleTheGodApi(url, request, gameId, requestId, GAMES, en
 
       const { patch, clear } = cleanLanding(body.landing || {})
 
-      // saveLandingFields UPDATEs; a game whose settings row has
-      // never been written has nothing to update. An empty
-      // saveSettings upserts that row and changes nothing else.
-      await saveSettings(database, game.id, {}, [])
-
       const written = await saveLandingFields(database, game.id, patch, clear)
       invalidateSettingsCache()
 
-      if (!written.ok && written.reason !== 'no_column') {
+      if (!written.ok && written.reason !== 'no_column' && written.reason !== 'partial') {
         return createJsonResponse({
           ok: false, error: 'save_failed',
           message: 'The landing page could not be saved.'
@@ -673,7 +777,10 @@ export async function handleTheGodApi(url, request, gameId, requestId, GAMES, en
       return createJsonResponse({
         ok: true,
         landing: presentLanding(row),
-        warning: migrationWarning(written.missing)
+        baseline: presentBaseline(GAMES[game.id]),
+        missingColumns: written.missing,
+        blockedSections: landingSections(written.missing),
+        warning: columnWarning(written.missing)
       })
     }
 
@@ -878,6 +985,14 @@ export async function handleTheGodApi(url, request, gameId, requestId, GAMES, en
         // uses this to explain why the ban buttons are disabled
         // rather than letting them fail one at a time.
         moderation: page.moderation,
+
+        // Same idea for 0010: false means this game's players
+        // cannot take themselves off the leaderboard yet, so the
+        // panel shows nothing about board visibility rather than
+        // showing every player as "on the board" - which would be
+        // a claim it cannot actually check.
+        boardOptOut: page.optOut,
+
         players: page.rows.map(presentPlayer)
       })
     }
@@ -1132,18 +1247,297 @@ export async function handleTheGodApi(url, request, gameId, requestId, GAMES, en
 
     // -----------------------------------------------------------
     // sql.settings — the current overrides, as portable SQL
+    //
+    // "As they stand right now" has to be true of every line, or
+    // the block is worse than nothing: somebody reading it to
+    // answer "what is actually stored?" gets an answer that looks
+    // authoritative and is partly invented. Two things used to be
+    // invented — updated_at was Date.now() rather than the row's
+    // own timestamp, and a column the database does not have was
+    // indistinguishable from a column that is simply NULL.
     // -----------------------------------------------------------
     case 'sql.settings': {
       if (!game) return unknownGame()
 
       const database = db(env)
-      const raw = database ? await readSettings(database, game.id) : null
+      const [raw, schema, productRows] = database
+        ? await Promise.all([
+            readSettings(database, game.id),
+            settingsSchemaReport(database),
+            readProductOverrides(database, game.id)
+          ])
+        : [null, { readable: false, present: [], missing: [], migrations: [] }, {}]
+
+      const missing = (schema.missing || []).map(column => column.name)
 
       return createJsonResponse({
         ok: true,
-        settings: settingsSeedSql(game.id, raw || {}),
-        products: productSeedSql(game.id, effectiveProducts(game)),
-        purge: purgeSeedSql(game.id)
+        exists: Boolean(raw),
+        settings: settingsSeedSql(game.id, raw || {}, { missingColumns: missing, exists: Boolean(raw) }),
+        products: productSeedSql(game.id, effectiveProducts(game), productRows),
+        purge: purgeSeedSql(game.id),
+        repair: schemaRepairSql(schema),
+        schema: {
+          readable: schema.readable,
+          present: schema.present,
+          missing: schema.missing,
+          migrations: schema.migrations
+        },
+        // The row exactly as SELECT * returns it, so the tab can
+        // show the stored truth beside the SQL it generated from
+        // it and the two can be compared by eye.
+        row: raw || null
+      })
+    }
+
+    // -----------------------------------------------------------
+    // schema.get / schema.repair
+    //
+    // The panel writes to game_settings, and game_settings has
+    // grown a column at a time across five migrations. Until now
+    // nothing on this deployment could answer "which of them has
+    // this database actually run?" — the only way to find out was
+    // to fill a screen in, save it, and see what came back.
+    // -----------------------------------------------------------
+    case 'schema.get': {
+      const { database, refusal: noDb } = needDatabase(env)
+      if (noDb) return noDb
+
+      invalidateSchemaCache()
+      const schema = await settingsSchemaReport(database)
+
+      // The two other tables the panel writes. Neither has grown a
+      // column, so they are either there or they are not — which
+      // is still worth saying, because "the versions list is empty"
+      // and "there is no game_versions table" look identical from
+      // the outside.
+      const [products, versions] = await Promise.all([
+        tableColumns(database, 'game_product_overrides'),
+        tableColumns(database, 'game_versions')
+      ])
+
+      // And the game's own database, which is a different D1
+      // entirely and the one that holds the players.
+      const playersDb = game ? playerDb(env, game) : null
+      const players = playersDb ? await tableColumns(playersDb, 'players') : new Set()
+
+      return createJsonResponse({
+        ok: true,
+        gameId: game ? game.id : '',
+        licence: {
+          binding: 'LICENSE_DB',
+          settings: {
+            table: 'game_settings',
+            readable: schema.readable,
+            present: schema.present,
+            missing: schema.missing,
+            migrations: schema.migrations,
+            landingColumns: LANDING_COLUMNS
+          },
+          productOverrides: { table: 'game_product_overrides', present: [...products] },
+          versions: { table: 'game_versions', present: [...versions] }
+        },
+        player: game
+          ? {
+              binding: game.d1Binding || '',
+              bound: Boolean(playersDb),
+              table: 'players',
+              present: [...players],
+              moderation: players.has('banned_at'),
+              document: players.has('data_json'),
+              leaderboardOptOut: players.has(LEADERBOARD_OPT_OUT_COLUMN)
+            }
+          : null,
+        repair: schemaRepairSql(schema)
+      })
+    }
+
+    case 'schema.repair': {
+      const { database, refusal: noDb } = needDatabase(env)
+      if (noDb) return noDb
+
+      const result = await repairSettingsSchema(database)
+      invalidateSettingsCache()
+
+      logInfo('game_settings schema repaired', {
+        requestId, added: result.added.length, failed: result.failed.length
+      })
+
+      const schema = await settingsSchemaReport(database)
+
+      return createJsonResponse({
+        ok: result.ok,
+        reason: result.reason,
+        added: result.added,
+        failed: result.failed,
+        schema: {
+          readable: schema.readable,
+          present: schema.present,
+          missing: schema.missing,
+          migrations: schema.migrations
+        }
+      })
+    }
+
+    // -----------------------------------------------------------
+    // game.verify — is this game actually wired up?
+    //
+    // The "new game" flow ends in a deploy, and until now the only
+    // way to find out whether the deploy worked was to open five
+    // pages and read them. Every check below is something that is
+    // either true or false right now on this deployment, phrased
+    // as what to do about it when it is false.
+    // -----------------------------------------------------------
+    case 'game.verify': {
+      if (!game) return unknownGame()
+
+      const licence = db(env)
+      const playersDb = playerDb(env, game)
+      const spec = getGameEnvNames()[game.id] || { keys: {}, capabilities: game.capabilities }
+      const origin = String(url.origin || '').replace(/\/+$/, '')
+
+      const checks = []
+      const add = (id, ok, label, detail, level = 'error') =>
+        checks.push({ id, ok, level: ok ? 'ok' : level, label, detail })
+
+      add('registry', true, 'In GAME_REGISTRY',
+        `Config.js defines "${game.id}". This is what makes the game exist.`)
+
+      add('licenceDb', Boolean(licence), 'LICENSE_DB bound',
+        licence
+          ? 'Settings, orders and entitlements have somewhere to live.'
+          : 'Not bound on this deployment. Every panel save will refuse until it is in wrangler.jsonc.')
+
+      add('playerDb', Boolean(playersDb), `Player database (${game.d1Binding || 'unset'})`,
+        playersDb
+          ? 'Bound, so sign-in, cloud saves and the leaderboard have a table to write to.'
+          : `The binding "${game.d1Binding || 'unset'}" is not in wrangler.jsonc, or its name there does `
+            + 'not match d1Binding in Config.js. Every data endpoint answers db_not_bound until it does.')
+
+      // The players table itself, not just the binding: a database
+      // that was created and never migrated is bound and empty.
+      let playersTable = new Set()
+      if (playersDb) playersTable = await tableColumns(playersDb, 'players')
+
+      add('playersTable', playersTable.size > 0, 'players table',
+        playersTable.size
+          ? `${playersTable.size} columns.`
+          : 'The database is bound but has no players table. Run the migration the SQL tab generates.',
+        playersDb ? 'error' : 'warn')
+
+      if (playersTable.size) {
+        add('playersModeration', playersTable.has('banned_at'), 'Moderation columns',
+          playersTable.has('banned_at')
+            ? 'Bans and restrictions are enforceable.'
+            : 'No banned_at column, so the ban buttons on the players tab will refuse. '
+              + 'Run migrations/0006_player_moderation.sql against this game\'s database.', 'warn')
+
+        add('playersDocument', playersTable.has('data_json'), 'Free-form save document',
+          playersTable.has('data_json')
+            ? 'dataPatch writes land in data_json.'
+            : 'No data_json column, so a game that saves its own state has nowhere to put it. '
+              + 'Run migrations/0007_player_data.sql against this game\'s database.', 'warn')
+
+        add('playersOptOut', playersTable.has(LEADERBOARD_OPT_OUT_COLUMN), 'Leaderboard opt-out',
+          playersTable.has(LEADERBOARD_OPT_OUT_COLUMN)
+            ? 'Players can hide themselves from the public board.'
+            : `No ${LEADERBOARD_OPT_OUT_COLUMN} column. The checkbox on the account page will not appear. `
+              + 'Run migrations/0010_leaderboard_optout.sql against this game\'s database.', 'warn')
+      }
+
+      if (spec.capabilities && spec.capabilities.login) {
+        const hasWeb = Boolean(env && env[spec.keys.web])
+        const hasSecret = Boolean(env && env[spec.keys.secret])
+        add('oauthWeb', hasWeb, spec.keys.web || 'Google web client id',
+          hasWeb ? 'Set.' : 'Not set. Sign-in cannot start without it.')
+        add('oauthSecret', hasSecret, spec.keys.secret || 'Google client secret',
+          hasSecret ? 'Set.' : 'Not set. The token exchange will fail.')
+        add('oauthAndroid', Boolean(env && env[spec.keys.android]), spec.keys.android || 'Android client id',
+          env && env[spec.keys.android]
+            ? 'Set, so tokens minted by the APK are accepted.'
+            : 'Not set. Only browser sign-in will work; an APK\'s id_token will be refused.', 'warn')
+        add('redirect', true, 'Redirect URI to authorise',
+          `${origin}/oauth/callback must be on the Google web client's authorised list. `
+          + 'This one cannot be checked from here — the list lives on Google\'s side.', 'info')
+      }
+
+      if (gamePlatforms(game).android) {
+        const scheme = (game.deepLink && game.deepLink.scheme) || ''
+        add('deepLink', Boolean(scheme), 'Deep-link scheme',
+          scheme
+            ? `${scheme}://${(game.deepLink && game.deepLink.host) || 'oauth'} — this must match the `
+              + 'intent-filter in the APK\'s AndroidManifest.xml exactly.'
+            : 'Empty. A signed-in Android player has nowhere to be sent back to.')
+      }
+
+      const links = Object.keys((game.download && game.download.links) || {})
+      add('download', links.length > 0, 'Download links',
+        links.length
+          ? `${links.join(', ')} — the button uses "${game.download.primary}".`
+          : 'None. The download button will be greyed out.', 'warn')
+
+      add('downloadable', isDownloadable(game), 'Download button live',
+        isDownloadable(game)
+          ? 'A visitor can get the game.'
+          : 'Withdrawn — either the status is "soon", the offline switch is off, or there is no link.', 'warn')
+
+      if (game.capabilities.store) {
+        const sellable = effectiveProducts(game)
+        add('products', sellable.length > 0, 'Products on sale',
+          sellable.length
+            ? `${sellable.length} of ${(game.store.products || []).length} in the catalogue.`
+            : 'The store capability is on but nothing is for sale. Add entries to store.products in Config.js.',
+          'warn')
+      }
+
+      // The landing page, judged the way a visitor would: does the
+      // page say anything, from either source.
+      const landing = game.landing || {}
+      const hasText = map => Boolean(map && (map.fa || map.en || map.ja))
+      const filled = [
+        hasText(landing.tagline) && 'tagline',
+        hasText(landing.about) && 'about',
+        (landing.features || []).length && 'features',
+        (landing.screenshots || []).length && 'screenshots',
+        (landing.videos || []).length && 'videos',
+        (landing.faq || []).length && 'faq',
+        landing.hero && 'hero'
+      ].filter(Boolean)
+
+      add('landing', filled.length >= 3, 'Landing page has content',
+        `${filled.length} of 7 sections have something in them (${filled.join(', ') || 'none'}). `
+        + 'Sections come from Config.js first and the Game page tab on top of it.', 'warn')
+
+      const schema = licence ? await settingsSchemaReport(licence) : null
+      if (schema) {
+        add('settingsSchema', schema.missing.length === 0, 'game_settings is current',
+          schema.missing.length
+            ? `${schema.missing.length} columns missing (${schema.missing.map(c => c.name).join(', ')}). `
+              + 'Press "Repair the schema" on the SQL tab.'
+            : 'Every column the panel writes exists.')
+      }
+
+      const pages = [
+        { label: 'Landing page', url: `${origin}/${game.id}` },
+        { label: 'Versions', url: `${origin}/${game.id}/versions` },
+        game.capabilities.leaderboard && { label: 'Leaderboard', url: `${origin}/${game.id}/leaderboard` },
+        game.capabilities.store && { label: 'Store', url: `${origin}/${game.id}/store` },
+        game.capabilities.login && { label: 'Account', url: `${origin}/${game.id}/account` },
+        { label: 'Manifest (JSON)', url: `${origin}/games/${game.id}/manifest` },
+        { label: 'Health', url: `${origin}/${game.id}/health` }
+      ].filter(Boolean)
+
+      const failed = checks.filter(check => !check.ok && check.level === 'error').length
+      const warned = checks.filter(check => !check.ok && check.level === 'warn').length
+
+      logInfo('Game verified', { requestId, gameId: game.id, failed, warned })
+
+      return createJsonResponse({
+        ok: true,
+        gameId: game.id,
+        summary: { total: checks.length, failed, warned, passed: checks.filter(c => c.ok).length },
+        checks,
+        pages
       })
     }
 
@@ -1285,6 +1679,24 @@ export async function handleTheGodApi(url, request, gameId, requestId, GAMES, en
         ok: true,
         gameId: game.id,
         platform: gamePlatforms(game).kind,
+
+        // The kit as DATA, beside the kit as text.
+        //
+        // For whoever - or whatever - is asking this endpoint
+        // rather than reading the panel. Every module below is a
+        // finished client for one part of this Worker's API, with
+        // this game's ids and URLs already in it, and the failure
+        // this answers is an assistant inferring the request
+        // shapes from the routing table and writing its own. The
+        // index says what already exists, so "is there code for
+        // this?" has an answer that does not require reading
+        // twelve files.
+        index: unityKitIndex(game, url.origin, { envKeys: spec ? spec.keys : null }),
+        usage: 'Every entry in `index` is finished, generated code for this exact game. Use it '
+             + 'verbatim rather than writing a client from the route list, and say which modules '
+             + 'you are using. The `notes` on each module document the behaviours that are not '
+             + 'guessable from the endpoint shapes.',
+
         modules: modules.map(module => ({
           id: module.id,
           file: module.file,
@@ -1301,11 +1713,11 @@ export async function handleTheGodApi(url, request, gameId, requestId, GAMES, en
       return createJsonResponse({
         ok: false, error: 'bad_action',
         message: 'action must be one of: overview, game.get, game.save, game.reset, game.purge, '
-               + 'landing.get, landing.save, version.save, version.delete, '
+               + 'game.verify, landing.get, landing.save, version.save, version.delete, '
                + 'product.save, product.reset, orders.list, order.grant, players.search, '
                + 'player.get, player.grant, player.revoke, players.list, player.profile, '
-               + 'player.moderate, player.rename, player.delete, sql.game, sql.settings, env, '
-               + 'scaffold, unity.'
+               + 'player.moderate, player.rename, player.delete, sql.game, sql.settings, '
+               + 'schema.get, schema.repair, env, scaffold, unity.'
       }, 400)
   }
 }

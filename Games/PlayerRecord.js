@@ -27,6 +27,92 @@ export { playerIdFromEmail }
 
 
 // ==========================================
+// The leaderboard opt-out
+//
+// One column, one meaning: 1 means this player is not on the
+// public board at all.
+//
+// Not "shown anonymously", not "shown without a picture" - not
+// there. The row is excluded from every board query, from the
+// count above it and from the JSON the game client reads, so
+// there is no rank with a gap in it and nothing for anybody to
+// infer a hidden player from. A player who asks to be off a
+// public list has not asked to be an asterisk on it.
+//
+// It changes nothing else. The score keeps being recorded, the
+// account page keeps showing it, entitlements and purchases are
+// untouched, and turning the switch back on puts the player
+// straight back at whatever rank their score earns. This is a
+// visibility decision, not a deletion.
+//
+// The column is nullable with no default so that adding it to a
+// live table is a metadata-only change, and every read below
+// treats NULL and 0 identically: listed. Opting out has to be an
+// act.
+// ==========================================
+export const LEADERBOARD_OPT_OUT_COLUMN = 'leaderboard_opt_out'
+
+/**
+ * Whether this game's players table can hold the opt-out.
+ *
+ * Probed rather than assumed, exactly as hasModerationColumns()
+ * is, and for the same reason: a game whose database predates the
+ * migration must keep working - it simply has no player who can
+ * hide, which is the behaviour it had before the feature existed.
+ */
+export async function hasLeaderboardOptOut(db) {
+  if (!db) return false
+  try {
+    await db.prepare(`SELECT ${LEADERBOARD_OPT_OUT_COLUMN} FROM players LIMIT 1`).first()
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * The WHERE fragment that keeps opted-out players off a board,
+ * or '' when this database has no such column.
+ *
+ * Returned as text rather than applied here because the three
+ * board queries in this codebase are each shaped differently and
+ * all three have to agree about who is on the list. A shared
+ * fragment is the cheapest way to make disagreement impossible.
+ */
+export function optOutClause(supported) {
+  return supported ? `(${LEADERBOARD_OPT_OUT_COLUMN} IS NULL OR ${LEADERBOARD_OPT_OUT_COLUMN} = 0)` : ''
+}
+
+
+/**
+ * Who belongs on a public board, as SQL conditions.
+ *
+ * Three queries answer "who is on the leaderboard" - the page in
+ * Pages/Leaderboard.js, the count above it, and the JSON the game
+ * client reads from Api/PlayerDataApi.js - and they have to agree
+ * exactly. They did not: the page filtered on high_score > 0 and
+ * the game's copy did not, for long enough that the two boards
+ * visibly disagreed about who was on them.
+ *
+ * So the rule is written once. Both optional columns are probed
+ * rather than assumed, and a database that has neither gets the
+ * same board it had before either existed.
+ */
+export async function boardFilter(db) {
+  const [moderated, optOut] = await Promise.all([
+    hasModerationColumns(db),
+    hasLeaderboardOptOut(db)
+  ])
+
+  const conditions = ['high_score > 0']
+  if (moderated) conditions.push('banned_at IS NULL')
+  if (optOut) conditions.push(optOutClause(true))
+
+  return { conditions, where: conditions.join(' AND '), moderated, optOut }
+}
+
+
+// ==========================================
 // Username policy
 // Length and character rules plus a blocklist. Messages come back
 // in all three UI languages so a client can show one without a
@@ -141,6 +227,15 @@ export function mapPlayer(player) {
     createdAt: player.created_at,
     lastLogin: player.last_login,
 
+    // Whether this player has taken themselves off the public
+    // board. Reads as false on a database that has not run 0010,
+    // which is the behaviour that database already had.
+    //
+    // Sent to the game client as well as to the site so that a
+    // build can show the switch in its own settings screen and
+    // have it agree with the website.
+    leaderboardOptOut: Number(player[LEADERBOARD_OPT_OUT_COLUMN]) === 1,
+
     // Whatever this particular game decided to save. The Worker
     // stores it, merges it and has no opinion about its contents,
     // so a game that wants to keep an inventory adds a key here
@@ -194,6 +289,24 @@ export function buildProfileUpdate(data, includeGamesPlayed = false, currentData
 
   if (data.username !== undefined) push('username', data.username)
   if (data.selectedColor !== undefined) push('selected_color', data.selectedColor)
+
+  // The board opt-out, writable by the game as well as by the
+  // site. A player who turns it off inside the game should not
+  // have to open a browser to have it take effect, and the site's
+  // checkbox and the game's switch are then the same setting
+  // rather than two that can disagree.
+  //
+  // Written as a hard 1 or 0 rather than the value that arrived,
+  // because "true", 1 and "yes" all reach this line from clients
+  // nobody here wrote.
+  if (data.leaderboardOptOut !== undefined) {
+    const hide = data.leaderboardOptOut === true
+      || data.leaderboardOptOut === 1
+      || data.leaderboardOptOut === '1'
+      || String(data.leaderboardOptOut).toLowerCase() === 'true'
+    push(LEADERBOARD_OPT_OUT_COLUMN, hide ? 1 : 0)
+  }
+
   if (data.purchasedColors !== undefined) push('purchased_colors', JSON.stringify(data.purchasedColors))
   if (data.purchasedItems !== undefined) push('purchased_items', JSON.stringify(data.purchasedItems))
 

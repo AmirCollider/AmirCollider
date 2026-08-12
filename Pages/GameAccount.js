@@ -17,7 +17,7 @@ import { createHtmlResponse, createJsonResponse } from '../Core/Http.js'
 import { logInfo, logWarning, logError } from '../Core/Logging.js'
 import { resolveGame, isDownloadable, effectiveProducts } from '../Games/Registry.js'
 import { db, listEntitlements } from '../Games/Store.js'
-import { playerDb, getGamePlayer, setUsername } from '../Games/Players.js'
+import { playerDb, getGamePlayer, setUsername, setLeaderboardOptOut } from '../Games/Players.js'
 import { ensurePlayerRow } from '../Games/PlayerRecord.js'
 import { emailMatchesRow } from '../Core/PlayerIdentity.js'
 import {
@@ -70,6 +70,18 @@ const I18N = {
     saveProfile: 'ذخیره',
     avatarFromGoogle: 'برگرداندن تصویر گوگل',
     profileSaved: 'ذخیره شد.',
+
+    boardPrivacyLabel: 'حریم خصوصی جدول امتیازات',
+    boardHideLabel: 'من را در جدول امتیازات نشان نده',
+    boardHideHint: 'با روشن کردن این گزینه، به‌طور کامل از جدول امتیازات عمومی حذف می‌شوی: نه امتیازت، '
+                 + 'نه نامت و نه تصویرت جایی دیده نمی‌شود و رتبه‌ای هم به اسمت خالی نمی‌ماند — انگار اصلاً '
+                 + 'در جدول وجود نداری.',
+    boardHideKeeps: 'هیچ چیز دیگری عوض نمی‌شود: امتیازت مثل همیشه ثبت می‌شود، در همین صفحه می‌بینی‌اش، '
+                  + 'خریدها و ذخیره‌ی ابری‌ات دست‌نخورده می‌مانند، و هر وقت خواستی با خاموش کردن همین گزینه '
+                  + 'دقیقاً با همان امتیاز به جدول برمی‌گردی.',
+    boardHiddenNow: 'الان در جدول امتیازات دیده نمی‌شوی.',
+    boardShownNow: 'الان با امتیازت در جدول امتیازات دیده می‌شوی.',
+    boardUnavailable: 'این قابلیت روی پایگاه‌داده‌ی این بازی هنوز فعال نیست.',
     nameTaken: 'این نام کاربری قبلاً گرفته شده. یکی دیگر انتخاب کن.',
     nameBad: 'نام کاربری باید ۳ تا ۱۲ نویسه و فقط حروف انگلیسی و عدد باشد. آدرس تصویر هم باید با https شروع شود.',
     nameConflict: 'این شناسه‌ی بازیکن به حساب گوگل دیگری تعلق دارد. برای جدا کردن رکورد با پشتیبانی تماس بگیر.',
@@ -133,6 +145,18 @@ const I18N = {
     saveProfile: 'Save',
     avatarFromGoogle: 'Use my Google picture',
     profileSaved: 'Saved.',
+
+    boardPrivacyLabel: 'Leaderboard privacy',
+    boardHideLabel: 'Keep me off the leaderboard',
+    boardHideHint: 'Turn this on and you are removed from the public leaderboard completely — not your '
+                 + 'score, not your name, not your picture, and no gap in the ranking where you used to '
+                 + 'be. As far as the board is concerned you are not there.',
+    boardHideKeeps: 'Nothing else changes. Your score is still recorded and still shown on this page, '
+                  + 'your purchases and cloud save are untouched, and turning this back off puts you '
+                  + 'straight back at whatever rank that score earns.',
+    boardHiddenNow: 'You are currently hidden from the leaderboard.',
+    boardShownNow: 'You currently appear on the leaderboard with your score.',
+    boardUnavailable: 'This game\'s database does not support this yet.',
     nameTaken: 'That username is already taken. Pick another.',
     nameBad: 'A username is 3 to 12 characters, English letters and digits. A picture URL must start with https.',
     nameConflict: 'This player id already belongs to a different Google account. Contact support so the record can be separated.',
@@ -196,6 +220,16 @@ const I18N = {
     saveProfile: '保存',
     avatarFromGoogle: 'Google の画像に戻す',
     profileSaved: '保存しました。',
+
+    boardPrivacyLabel: 'ランキングの公開設定',
+    boardHideLabel: 'ランキングに表示しない',
+    boardHideKeeps: '他は何も変わりません。スコアはこれまでどおり記録され、このページでは確認できます。'
+                  + '購入内容とクラウドセーブもそのままで、この設定を戻せばスコアに応じた順位にそのまま復帰します。',
+    boardHideHint: 'オンにすると、公開ランキングから完全に外れます。スコアも名前も画像も表示されず、'
+                 + '順位に空きが残ることもありません。ランキング上は存在しない扱いになります。',
+    boardHiddenNow: '現在、ランキングには表示されていません。',
+    boardShownNow: '現在、スコアとともにランキングに表示されています。',
+    boardUnavailable: 'このゲームのデータベースはまだこの機能に対応していません。',
     nameTaken: 'そのユーザー名は既に使われています。',
     nameBad: 'ユーザー名は 3〜12 文字の英数字です。画像 URL は https で始まる必要があります。',
     nameConflict: 'このプレイヤー ID は別の Google アカウントのものです。記録を分けるにはサポートにご連絡ください。',
@@ -375,6 +409,34 @@ export async function handleGameAccountProfile(url, request, gameId, requestId, 
     if (!named.ok) {
       logWarning('Player rejected their own rename', { requestId, gameId: id, reason: named.reason })
       return Response.redirect(back(`?name_error=${named.reason === 'taken' ? 'taken' : 'bad'}`), 302)
+    }
+  }
+
+  // ==========================================
+  // The leaderboard opt-out.
+  //
+  // Only written when the form said it carried the field. An
+  // unchecked checkbox is absent from a POST body, which is
+  // indistinguishable from a form that never rendered one - and
+  // treating those the same would put a hidden player back on the
+  // public board the first time they corrected a typo in their
+  // name from a build of this page that predates the switch.
+  //
+  // A refusal here is not fatal. The column may be missing on a
+  // game database that has not run 0010, in which case there is
+  // no board privacy to set and the rest of the form is still
+  // what the player asked for.
+  if (form.get('has_board_privacy') === '1') {
+    const hidden = form.get('board_hidden') === '1'
+    const written = await setLeaderboardOptOut(database, player.playerId, hidden)
+    if (!written.ok) {
+      logWarning('Leaderboard opt-out not saved', {
+        requestId, gameId: id, playerId: player.playerId, reason: written.reason
+      })
+    } else {
+      logInfo('Player set their leaderboard visibility', {
+        requestId, gameId: id, playerId: player.playerId, hidden
+      })
     }
   }
 
@@ -678,6 +740,45 @@ function renderAccount(game, lang, theme, player, owned, record, flash = {}) {
            </div>` : ''}
     </div>` : ''
 
+  // ==========================================
+  // The leaderboard opt-out.
+  //
+  // Rendered inside the profile form rather than as a form of its
+  // own, so it is saved by the same button as the name and the
+  // picture and there is no second "save" to miss.
+  //
+  // The hidden `has_board_privacy` field is what tells the handler
+  // that an unchecked box means "shown" rather than "the browser
+  // did not send this field at all" - an unchecked checkbox is
+  // simply absent from a form post, which is indistinguishable
+  // from a form that never had one.
+  //
+  // Only rendered when the game's database actually has the
+  // column. A switch that cannot be saved is worse than no switch:
+  // it is a promise about a public page.
+  const boardPrivacy = !game.capabilities.leaderboard ? '' : (
+    record && Object.prototype.hasOwnProperty.call(record, 'leaderboard_opt_out')
+      ? `
+        <div class="acc-privacy">
+          <span class="acc-privacy-head">${escapeHtml(t.boardPrivacyLabel)}</span>
+          <input type="hidden" name="has_board_privacy" value="1">
+          <label class="acc-check">
+            <input type="checkbox" name="board_hidden" value="1"
+                   ${Number(record.leaderboard_opt_out) === 1 ? 'checked' : ''}>
+            <span>${escapeHtml(t.boardHideLabel)}</span>
+          </label>
+          <small>${escapeHtml(t.boardHideHint)}</small>
+          <small>${escapeHtml(t.boardHideKeeps)}</small>
+          <small class="acc-privacy-now">${escapeHtml(
+            Number(record.leaderboard_opt_out) === 1 ? t.boardHiddenNow : t.boardShownNow)}</small>
+        </div>`
+      : `
+        <div class="acc-privacy">
+          <span class="acc-privacy-head">${escapeHtml(t.boardPrivacyLabel)}</span>
+          <small>${escapeHtml(t.boardUnavailable)}</small>
+        </div>`
+  )
+
   const profileBlock = record ? `
     <div class="ghead" style="margin-block-start:26px">${escapeHtml(t.profileTitle)}</div>
     <div class="gcard">
@@ -703,6 +804,8 @@ function renderAccount(game, lang, theme, player, owned, record, flash = {}) {
           <small>${escapeHtml(t.avatarHint)}</small>
         </label>
 
+        ${boardPrivacy}
+
         <div class="acc-actions">
           <button type="submit" class="gbtn">${escapeHtml(t.saveProfile)}</button>
           <button type="submit" name="avatar_reset" value="1" class="gbtn gbtn--ghost">${escapeHtml(t.avatarFromGoogle)}</button>
@@ -724,6 +827,23 @@ function renderAccount(game, lang, theme, player, owned, record, flash = {}) {
       .acc-field input:focus{border-color:var(--accent)}
       .acc-field small{display:block;font-size:.76em;color:var(--dim);margin-block-start:5px;line-height:1.6}
       .acc-actions{display:flex;gap:10px;flex-wrap:wrap}
+
+      /* The board opt-out. Set apart from the two text fields
+         above it because it is a different kind of decision: those
+         change how you appear, this one decides whether you appear
+         at all. */
+      .acc-privacy{padding:16px;border-radius:14px;background:var(--surface-2);
+        border:1px solid var(--border)}
+      .acc-privacy-head{display:block;font-size:.8em;font-weight:700;color:var(--dim);
+        margin-block-end:10px}
+      .acc-privacy small{display:block;font-size:.78em;color:var(--dim);line-height:1.75;
+        margin-block-start:8px}
+      .acc-privacy-now{font-weight:700}
+      .acc-check{display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:.92em;
+        font-weight:600;line-height:1.5}
+      .acc-check input{inline-size:18px;block-size:18px;margin:1px 0 0;flex-shrink:0;
+        accent-color:var(--accent);cursor:pointer}
+
       @media (max-width:640px){ .acc-actions .gbtn{flex:1 1 100%} }
     </style>
     <div class="ghead">${escapeHtml(t.title)}</div>

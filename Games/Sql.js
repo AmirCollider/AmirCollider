@@ -8,8 +8,10 @@
 //   namesFor(gameId)                  -> binding / database / env names
 //   gameSchemaSql(gameId, options)    -> the game's own D1 schema
 //   settingsSeedSql(gameId, settings) -> an override row, as SQL
-//   productSeedSql(gameId, products)  -> product overrides, as SQL
+//   productSeedSql(gameId, ...)       -> product overrides, as SQL
 //   purgeSeedSql(gameId)              -> the DELETEs that clear both
+//   schemaRepairSql(report)           -> the ALTER TABLEs for a
+//                                        game_settings that is behind
 //   wranglerSnippet(gameId)           -> the d1_databases entry
 //   setupCommands(gameId, options)    -> the wrangler commands, in order
 //
@@ -184,7 +186,27 @@ CREATE TABLE IF NOT EXISTS players (
   ban_reason       TEXT,
   restricted_until INTEGER,
   restrict_reason  TEXT,
-  admin_note       TEXT
+  admin_note       TEXT,
+
+  -- The player's own decision about the public board.
+  --
+  -- 1 keeps them off it entirely: no score, no name, no picture,
+  -- and no gap in the ranking where they used to be. Set from
+  -- the account page at /${names.id}/account, and readable and
+  -- writable by the game client as \`leaderboardOptOut\` on the
+  -- profile endpoints, so a switch inside the game and the
+  -- checkbox on the site are the same setting.
+  --
+  -- NULL and 0 both mean listed. Opting out has to be an act, so
+  -- the absence of a decision is not one.
+  --
+  -- This is a visibility flag and nothing else. The score is
+  -- still recorded, the account page still shows it, and turning
+  -- it back off restores the player at whatever rank that score
+  -- earns. It is deliberately NOT part of the moderation block
+  -- above: those are things done TO a player and this is a thing
+  -- done BY one.
+  leaderboard_opt_out INTEGER
 );
 
 -- The leaderboard query, which is the only hot read in this
@@ -193,9 +215,11 @@ CREATE TABLE IF NOT EXISTS players (
 CREATE INDEX IF NOT EXISTS idx_players_score ON players (high_score DESC);
 CREATE INDEX IF NOT EXISTS idx_players_email ON players (email);
 
--- The board query is "highest scores, excluding banned", so the
--- index carries both columns.
-CREATE INDEX IF NOT EXISTS idx_players_active_score ON players (banned_at, high_score DESC);`
+-- The board query is "highest scores, excluding banned and
+-- excluding anybody who opted out", so the index carries all
+-- three columns in the order the WHERE clause narrows them.
+CREATE INDEX IF NOT EXISTS idx_players_board
+  ON players (banned_at, leaderboard_opt_out, high_score DESC);`
 
   const purchases = `
 
@@ -306,6 +330,25 @@ function sqlText(value) {
 
 
 // ==========================================
+// sqlExact
+// The same, except that an empty string stays an empty string.
+//
+// For `badge`, which has THREE states and not two: NULL means
+// "no override, use the catalogue" and '' means "the operator
+// chose No ribbon". Games/Registry.js is careful about that
+// distinction on read - collapsing the two there was a visible
+// bug once - and a generator that collapses them on write undoes
+// it: pasting the output into a second deployment would put the
+// "best value" ribbon back on a product somebody had removed it
+// from.
+// ==========================================
+function sqlExact(value) {
+  if (value === null || value === undefined) return 'NULL'
+  return "'" + String(value).replace(/'/g, "''") + "'"
+}
+
+
+// ==========================================
 // settingsSeedSql
 // The current overrides, as a statement somebody can run on
 // another deployment.
@@ -314,9 +357,26 @@ function sqlText(value) {
 // same. Without this, matching them means retyping every field
 // into a second panel and hoping.
 // ==========================================
-export function settingsSeedSql(gameId, settings = {}) {
+export function settingsSeedSql(gameId, settings = {}, options = {}) {
   const id = slug(gameId)
-  const at = Date.now()
+
+  // The row's OWN timestamp, not this moment.
+  //
+  // This used to be Date.now(), which made the block a lie in the
+  // one way that matters: it is titled "as they stand right now"
+  // and is read to answer "what is actually stored?". A timestamp
+  // invented at render time meant the SQL and the table disagreed
+  // about when the row was last touched, and pasting it into
+  // another deployment silently marked every field as edited
+  // today. A row that has never been written has no timestamp of
+  // its own, and only then is now() the honest answer.
+  const at = Number(settings.updated_at) || Date.now()
+
+  // Columns this database does not have. Named separately below
+  // rather than left out silently: "there is no value" and "there
+  // is nowhere to put a value" are different states, and only one
+  // of them is fixed by typing something into the panel.
+  const missing = new Set(Array.isArray(options.missingColumns) ? options.missingColumns : [])
 
   const columns = [
     ['display_name', sqlText(settings.display_name)],
@@ -353,21 +413,42 @@ export function settingsSeedSql(gameId, settings = {}) {
     ['faq_json', sqlText(settings.faq_json)]
   ]
 
-  // Every value NULL means there is no override to carry
-  // anywhere - the game is running entirely on Config.js. An
-  // INSERT of thirteen NULLs is not a useful thing to paste into
-  // another deployment, and reading one is genuinely confusing:
-  // it looks like a row that says something when it says
-  // nothing. So say that instead, and offer the DELETE that
-  // removes the row rather than an INSERT that recreates it
-  // empty.
+  // Only the columns that are actually SET are named. Two
+  // reasons, and the second is the one that bites: naming a NULL
+  // column adds nothing, and naming a column the target database
+  // does not have yet fails the whole statement over a field that
+  // was empty anyway.
   const set = columns.filter(([, value]) => value !== 'NULL')
 
+  // What is empty, split by WHY it is empty. A column that is
+  // NULL is a decision - "no override, use Config.js". A column
+  // that is not in the table is not a decision at all: the panel
+  // cannot write it, and anybody reading a block that showed the
+  // two identically would conclude they had simply not filled
+  // that field in yet.
+  const unset = columns
+    .filter(([name, value]) => value === 'NULL' && !missing.has(name))
+    .map(([name]) => name)
+  const absent = columns.filter(([name]) => missing.has(name)).map(([name]) => name)
+
+  const absentNote = absent.length
+    ? `--\n`
+      + `-- NOT IN THIS DATABASE (${absent.length}): ${wrapList(absent)}\n`
+      + `-- These columns do not exist in game_settings here, so the panel\n`
+      + `-- cannot write them and nothing you type into those fields will\n`
+      + `-- be kept. Run the repair on this tab to add them.\n`
+    : ''
+
   if (!set.length) {
-    return `-- '${id}' has no overrides. Every column in its game_settings row\n`
-         + `-- is NULL, which means the site is showing exactly what\n`
-         + `-- GAME_REGISTRY in config.js says - the name, the logo, the\n`
-         + `-- colour, the descriptions, all of it.\n`
+    return `-- '${id}' has no overrides stored.\n`
+         + `--\n`
+         + (options.exists
+              ? `-- The game_settings row exists and every column in it is NULL,\n`
+              : `-- There is no game_settings row for '${id}' at all,\n`)
+         + `-- which means the site is showing exactly what GAME_REGISTRY in\n`
+         + `-- Config.js says - the name, the logo, the colour, the\n`
+         + `-- descriptions, the landing page, all of it.\n`
+         + absentNote
          + `--\n`
          + `-- There is nothing to copy to another deployment: a row of\n`
          + `-- NULLs and no row at all render identically. If you want the\n`
@@ -377,19 +458,18 @@ export function settingsSeedSql(gameId, settings = {}) {
          + `-- DELETE FROM game_settings WHERE game_id = ${sqlText(id)};\n`
   }
 
-  // Only the columns that are actually SET are named. Two
-  // reasons, and the second is the one that bites: naming a NULL
-  // column adds nothing, and naming a column the target database
-  // does not have yet - a deployment that stopped at 0005 - fails
-  // the whole statement over a field that was empty anyway.
   const names = set.map(([name]) => name)
 
   return `-- Overrides for '${id}', as they stand right now.
 -- Safe to re-run: the ON CONFLICT clause updates in place.
 --
--- Only the fields that are actually set appear below. Everything
--- not named here is "no override" and comes from Config.js.
-INSERT INTO game_settings
+-- ${set.length} column${set.length === 1 ? '' : 's'} overridden. Everything not named below is
+-- "no override" and comes from Config.js.
+--
+-- updated_at is the row's own timestamp (${new Date(at).toISOString()}),
+-- not the moment this was generated - so pasting this elsewhere
+-- reproduces the state, including when it was last changed.
+${unset.length ? `--\n-- NO OVERRIDE (${unset.length}): ${wrapList(unset)}\n` : ''}${absentNote}INSERT INTO game_settings
   (game_id, ${names.join(', ')}, updated_at)
 VALUES (
   ${sqlText(id)},
@@ -399,6 +479,75 @@ ${set.map(([, value]) => `  ${value}`).join(',\n')},
 ON CONFLICT (game_id) DO UPDATE SET
 ${names.map(name => `  ${name} = excluded.${name}`).join(',\n')},
   updated_at = excluded.updated_at;
+`
+}
+
+
+// A long list of column names, wrapped so a comment line does
+// not run off the side of the code block it is printed in.
+function wrapList(names, width = 58) {
+  const lines = []
+  let line = ''
+  for (const name of names) {
+    const next = line ? `${line}, ${name}` : name
+    if (next.length > width) { lines.push(line); line = name } else line = next
+  }
+  if (line) lines.push(line)
+  return lines.join('\n--   ')
+}
+
+
+// ==========================================
+// schemaRepairSql
+// The ALTER TABLEs that bring game_settings up to date.
+//
+// Generated from what the database actually reported rather than
+// from a migration file, so it names the columns that are really
+// missing and nothing else. Running it twice is an error on the
+// second run ("duplicate column name") rather than a no-op,
+// which is why the panel's button is the better route - it skips
+// what is already there. This text exists for the case where
+// somebody would rather run it with wrangler and see it first.
+// ==========================================
+export function schemaRepairSql(report) {
+  const missing = (report && report.missing) || []
+
+  if (!report || !report.readable) {
+    return `-- game_settings could not be inspected on this deployment.\n`
+         + `--\n`
+         + `-- Either LICENSE_DB is not bound, or the table does not exist\n`
+         + `-- yet. Run migrations/0003_games.sql first; everything the\n`
+         + `-- panel saves lives in the tables it creates.\n`
+  }
+
+  if (!missing.length) {
+    return `-- game_settings is up to date.\n`
+         + `--\n`
+         + `-- Every column the panel writes exists in this database, so\n`
+         + `-- there is nothing to add. Anything that fails to save from\n`
+         + `-- here on is a real error and not a missing migration.\n`
+  }
+
+  const migrations = [...new Set(missing.map(column => column.since))]
+
+  return `-- Bring game_settings up to date.
+--
+-- ${missing.length} column${missing.length === 1 ? ' is' : 's are'} missing from this database:
+--   ${wrapList(missing.map(column => column.name))}
+--
+-- Introduced by: ${migrations.join(', ')}
+--
+-- Every one of them is nullable with no default, so adding it is
+-- a metadata-only change: no row is rewritten, nothing that is
+-- already stored moves, and nothing needs a backfill. The panel's
+-- "Repair the schema" button runs exactly these statements and
+-- skips any that are already applied.
+--
+-- ONE statement per column: SQLite's ALTER TABLE takes a single
+-- ADD COLUMN, and doing them separately means one that fails
+-- costs only itself.
+
+${missing.map(column => `ALTER TABLE game_settings ADD COLUMN ${column.name} ${column.type};`).join('\n')}
 `
 }
 
@@ -438,30 +587,70 @@ DELETE FROM game_settings          WHERE game_id = ${sqlText(id)};
 // ==========================================
 // productSeedSql
 // Price and availability overrides, as SQL.
+//
+// Built from the STORED ROWS, not from the merged catalogue.
+//
+// The merged catalogue is Config.js with the rows laid on top, so
+// generating from it produced statements that were true of the
+// site and false of the table: a product overridden only on price
+// came out with enabled = 1 and a sort_order copied from its
+// position in the array, neither of which is in the database.
+// Pasting that into a second deployment pinned an ordering
+// nobody had chosen and turned three NULLs into decisions.
+//
+// A NULL column here means "no override on this field". It is
+// written as NULL rather than omitted, because the ON CONFLICT
+// clause has to be able to REMOVE an override that the source
+// deployment has removed - otherwise re-running this after
+// clearing a price leaves the old one in place.
 // ==========================================
-export function productSeedSql(gameId, products = []) {
+export function productSeedSql(gameId, products = [], overrideRows = {}) {
   const id = slug(gameId)
-  const at = Date.now()
+  const rows = overrideRows && typeof overrideRows === 'object' ? overrideRows : {}
+  const known = new Set((products || []).map(product => product.id))
 
-  const rows = products
-    .filter(product => Array.isArray(product.overrides) && product.overrides.length > 0)
-    .map(product => `INSERT INTO game_product_overrides
+  const nullable = value => (value === null || value === undefined ? 'NULL' : value)
+
+  const statements = Object.keys(rows).sort().map(productId => {
+    const row = rows[productId] || {}
+    // A row for a product id that is not in Config.js is dead
+    // weight - Games/Registry.js ignores it, because no shipped
+    // client has ever heard of that id - and worth flagging where
+    // somebody will see it.
+    const orphan = known.has(productId)
+      ? ''
+      : `-- NOTE: '${productId}' is not in this game's store.products in Config.js.\n`
+        + `-- This row is ignored on read. It is either a leftover from a\n`
+        + `-- renamed product or a typo.\n`
+
+    return orphan + `INSERT INTO game_product_overrides
   (game_id, product_id, enabled, price_usd, sort_order, badge, updated_at)
-VALUES (${sqlText(id)}, ${sqlText(product.id)}, ${product.enabled === false ? 0 : 1}, ${sqlText(product.priceUsd)}, ${Number(product.sortOrder) || 0}, ${sqlText(product.badge)}, ${at})
+VALUES (${sqlText(id)}, ${sqlText(productId)}, ${nullable(row.enabled)}, ${sqlText(row.price_usd)}, ${nullable(row.sort_order)}, ${sqlExact(row.badge)}, ${Number(row.updated_at) || Date.now()})
 ON CONFLICT (game_id, product_id) DO UPDATE SET
   enabled = excluded.enabled,
   price_usd = excluded.price_usd,
   sort_order = excluded.sort_order,
   badge = excluded.badge,
-  updated_at = excluded.updated_at;`)
+  updated_at = excluded.updated_at;`
+  })
 
-  if (!rows.length) {
-    return `-- No product overrides are set for '${id}'.\n`
-         + `-- Everything is being sold at the price in config.js, which is\n`
-         + `-- the state you want unless there is a reason not to.\n`
+  if (!statements.length) {
+    return `-- No product overrides are stored for '${id}'.\n`
+         + `--\n`
+         + `-- All ${(products || []).length} product${(products || []).length === 1 ? '' : 's'} `
+         + `are being sold exactly as Config.js\n`
+         + `-- defines them: same price, same order, same ribbons. That is\n`
+         + `-- the state you want unless there is a reason not to, and there\n`
+         + `-- is nothing to copy to another deployment.\n`
   }
 
-  return `-- Product overrides for '${id}'.\n` + rows.join('\n\n') + '\n'
+  return `-- Product overrides for '${id}' — ${statements.length} row${statements.length === 1 ? '' : 's'}.\n`
+       + `--\n`
+       + `-- NULL means "no override on this field": the value comes from\n`
+       + `-- store.products in Config.js. It is written out rather than\n`
+       + `-- omitted so that re-running this also REMOVES an override that\n`
+       + `-- has since been cleared here.\n\n`
+       + statements.join('\n\n') + '\n'
 }
 
 

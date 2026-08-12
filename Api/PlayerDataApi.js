@@ -22,7 +22,8 @@ import {
   readPlayerData,
   buildProfileUpdate,
   validateProfileFields,
-  hasModerationColumns,
+  boardFilter,
+  hasLeaderboardOptOut,
   refuseIfBanned,
   ensurePlayerRow
 } from '../Games/PlayerRecord.js'
@@ -272,8 +273,6 @@ export async function handleDatabaseGet(url, request, gameId, requestId, GAMES, 
     }
 
     if (isPublicPath) {
-      const moderated = await hasModerationColumns(db)
-
       // ==========================================
       // The same board the website shows.
       //
@@ -286,15 +285,16 @@ export async function handleDatabaseGet(url, request, gameId, requestId, GAMES, 
       // everybody with a score and shown as "Unknown User" because a
       // username is null until somebody sets one on the site.
       //
-      // One board, one rule.
+      // One board, one rule — and now literally one expression, in
+      // boardFilter(). A player who has opted out is absent from
+      // both copies, so a game cannot show somebody the site hides.
       // ==========================================
-      const conditions = ['high_score > 0']
-      if (moderated) conditions.push('banned_at IS NULL')
+      const filter = await boardFilter(db)
 
       const { results } = await db.prepare(`
         SELECT username, username AS displayName, high_score AS highScore,
                profile_pic_url AS photoURL, selected_color AS selectedColor
-        FROM players WHERE ${conditions.join(' AND ')}
+        FROM players WHERE ${filter.where}
         ORDER BY high_score DESC LIMIT 100
       `).all()
 
@@ -454,6 +454,18 @@ async function writeProfile(db, uid, body, gameId, requestId, isPatch) {
   const fieldError = validateProfileFields(parsed.data)
   if (fieldError) {
     return createJsonResponse({ ...fieldError, requestId }, 400)
+  }
+
+  // The leaderboard opt-out is the one field a game database may
+  // not have a column for, and naming a missing column fails the
+  // WHOLE update - so a client that sends it against a database
+  // that has not run 0010 would lose the username and the play
+  // time in the same statement. Dropped rather than refused: the
+  // rest of the save is still what the player asked for, and a
+  // database with no such column has no player who can be hidden
+  // anyway.
+  if (parsed.data.leaderboardOptOut !== undefined && !(await hasLeaderboardOptOut(db))) {
+    delete parsed.data.leaderboardOptOut
   }
 
   const currentData = parsed.data.dataPatch !== undefined ? await readPlayerData(db, uid) : null

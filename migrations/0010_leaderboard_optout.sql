@@ -1,0 +1,89 @@
+-- ==========================================
+-- 0010_leaderboard_optout.sql
+--
+-- ############################################################
+-- RUN THIS AGAINST EACH GAME'S OWN DATABASE — NOT THE
+-- LICENCE DATABASE.
+-- ############################################################
+--
+-- The players table lives in the GAME's database, one per game,
+-- so this file is applied once per game:
+--
+--   npx wrangler d1 execute neon-katana-db --remote \
+--       --file=./migrations/0010_leaderboard_optout.sql
+--
+-- Running it against amircollider-licenses will fail with
+-- "no such table: players", which is the correct outcome and
+-- costs nothing.
+--
+-- ------------------------------------------------------------
+-- WHAT THIS IS FOR
+-- ------------------------------------------------------------
+-- A player can now take themselves off the public leaderboard
+-- from the account page at /{gameId}/account.
+--
+-- "Off" means off. Not shown anonymously, not shown without a
+-- picture, not shown greyed out: the row is excluded from the
+-- board query, from the count printed above it and from the JSON
+-- the game client reads, so there is no rank with a gap in it
+-- and nothing anybody can infer a hidden player from. Somebody
+-- who asks to be off a public list has not asked to be an
+-- asterisk on it.
+--
+-- Everything else is untouched. The score is still recorded, the
+-- account page still shows it, purchases and cloud saves are
+-- unaffected, and turning the switch back off puts the player
+-- straight back at whatever rank that score earns. This is a
+-- visibility decision, not a deletion — which is exactly why it
+-- is one nullable column and not a second table.
+--
+-- ------------------------------------------------------------
+-- WHY NULLABLE WITH NO DEFAULT
+-- ------------------------------------------------------------
+-- ADD COLUMN with no default is a metadata-only change in
+-- SQLite: no existing row is rewritten and nothing needs a
+-- backfill, which on a live table is the difference between an
+-- instant migration and a locked one.
+--
+-- Every read treats NULL and 0 identically — listed. Opting out
+-- has to be an act, so the absence of a decision is the same as
+-- deciding to stay.
+--
+-- ------------------------------------------------------------
+-- IF YOU DO NOT RUN THIS
+-- ------------------------------------------------------------
+-- Nothing breaks. Every query that touches this column probes
+-- for it first (boardFilter and hasLeaderboardOptOut in
+-- Games/PlayerRecord.js), so a database without it behaves
+-- exactly as it did before the feature existed: the checkbox
+-- does not appear on the account page, and the panel's schema
+-- screen reports the column as missing.
+--
+-- ------------------------------------------------------------
+-- RUNNING IT TWICE
+-- ------------------------------------------------------------
+-- SQLite has no ADD COLUMN IF NOT EXISTS, so a second run fails
+-- with "duplicate column name". That means it already ran.
+-- Nothing is lost and there is nothing to fix.
+-- ==========================================
+
+
+-- 1 = keep this player off the public leaderboard entirely.
+-- NULL or 0 = listed, which is the default for everybody who
+-- has never touched the setting.
+ALTER TABLE players ADD COLUMN leaderboard_opt_out INTEGER;
+
+
+-- The board's hot query is now
+--
+--   WHERE high_score > 0
+--     AND banned_at IS NULL
+--     AND (leaderboard_opt_out IS NULL OR leaderboard_opt_out = 0)
+--   ORDER BY high_score DESC
+--
+-- and it runs on every board view, from the site and from every
+-- copy of the game. idx_players_active_score already covers the
+-- first two columns; this one carries all three so the filter
+-- stays an index scan rather than becoming a full one.
+CREATE INDEX IF NOT EXISTS idx_players_board
+  ON players (banned_at, leaderboard_opt_out, high_score DESC);

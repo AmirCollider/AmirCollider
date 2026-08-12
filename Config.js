@@ -383,6 +383,32 @@ const GAME_REGISTRY = {
       { fa: 'اکشن', en: 'Action', ja: 'アクション' },
       { fa: 'اندروید', en: 'Android', ja: 'Android' }
     ],
+
+    // ==========================================
+    // The card's own motifs.
+    //
+    // A few of the game's own objects, drifting and breathing
+    // behind the card on the dashboard. Neon Katana is a game
+    // about cutting things out of the air, so the things it cuts
+    // are what belong there.
+    //
+    // Deliberately small: four glyphs at low opacity behind the
+    // content, never in front of it and never in the way of a
+    // button. The card is a place somebody decides whether to
+    // install a game, and a card that is busier than the game is
+    // a card that is harder to read.
+    //
+    // Emoji rather than art, and here rather than in
+    // Pages/GameCards.js, for the same reason `icon` is: it is a
+    // fact about the game, and a second game should be able to
+    // have its own without anybody editing a view. A game with no
+    // `card` entry renders exactly as every card did before this
+    // existed - Pages/GameCards.js draws nothing at all rather
+    // than inventing a default, because a wrong motif is worse
+    // than none.
+    card: {
+      motifs: ['🍎', '🍑', '🍉', '⚔️']
+    },
     // The landing page's baseline content.
     //
     // Every one of these fields is overridable from the /thegod
@@ -691,6 +717,18 @@ function buildGame(id, def, env) {
     description: def.description,
     i18n: def.i18n,
     tags: def.tags,
+
+    // The dashboard card's decorative motifs. Normalised to a
+    // short array of single glyphs here rather than trusted as
+    // written, so a view can render it without checking: at most
+    // six, each trimmed, anything empty dropped.
+    card: {
+      motifs: (((def.card && def.card.motifs) || []))
+        .map(motif => String(motif || '').trim())
+        .filter(Boolean)
+        .slice(0, 6)
+    },
+
     package: def.package,
     myketUrl: def.myketUrl || links[download.primary] || '',
     d1Binding: def.d1Binding,

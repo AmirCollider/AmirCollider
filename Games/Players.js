@@ -10,6 +10,7 @@
 //   setModeration(database, playerId, patch)
 //   setUsername(database, playerId, username)
 //   deleteGamePlayer(database, playerId)
+//   setLeaderboardOptOut(database, playerId, hidden)
 //   moderationOf(row)      -> 'active' | 'restricted' | 'banned'
 //   isBanned(row) / isRestricted(row)
 //
@@ -19,6 +20,8 @@
 // The panel joins the two: identity and behaviour from here,
 // money from there.
 // ==========================================
+
+import { LEADERBOARD_OPT_OUT_COLUMN } from './PlayerRecord.js'
 
 
 // ==========================================
@@ -84,22 +87,48 @@ const BASE_COLUMNS =
   'total_play_time, selected_color, created_at, last_login'
 
 
-// Runs the moderation-aware query and silently falls back to the
-// plain one, so the panel works on a game database that has not
-// run 0006 yet - it simply shows every player as active.
+// Every optional column, richest first. Each step is a migration
+// a deployment may or may not have run, and the query is retried
+// with one fewer group each time - so the panel works on a game
+// database at any point along that line, and says which of the
+// optional features it can actually offer rather than showing a
+// ban button that will refuse.
+//
+// Ordered richest-first on purpose: the common case is a current
+// database, which succeeds on the first attempt and costs
+// nothing.
+const OPTIONAL_GROUPS = [
+  { key: 'optOut', columns: LEADERBOARD_OPT_OUT_COLUMN },
+  { key: 'moderation', columns: MODERATION_COLUMNS }
+]
+
 async function selectPlayers(database, clause, binds) {
-  try {
-    const { results } = await database
-      .prepare(`SELECT ${BASE_COLUMNS}, ${MODERATION_COLUMNS} FROM players ${clause}`)
-      .bind(...binds).all()
-    return { rows: results || [], moderation: true }
-  } catch (error) {
-    if (!/no such column/i.test(String(error && error.message))) throw error
-    const { results } = await database
-      .prepare(`SELECT ${BASE_COLUMNS} FROM players ${clause}`)
-      .bind(...binds).all()
-    return { rows: results || [], moderation: false }
+  for (let drop = 0; drop <= OPTIONAL_GROUPS.length; drop++) {
+    const groups = OPTIONAL_GROUPS.slice(drop)
+    const columns = [BASE_COLUMNS, ...groups.map(group => group.columns)].join(', ')
+
+    try {
+      const { results } = await database
+        .prepare(`SELECT ${columns} FROM players ${clause}`)
+        .bind(...binds).all()
+
+      const present = new Set(groups.map(group => group.key))
+      return {
+        rows: results || [],
+        moderation: present.has('moderation'),
+        optOut: present.has('optOut')
+      }
+    } catch (error) {
+      if (!/no such column/i.test(String(error && error.message))) throw error
+      // …and round again with one group fewer.
+    }
   }
+
+  // Not reachable: the last iteration drops every optional group
+  // and selects only columns that have existed since 0001. If
+  // THAT fails the error is not about a missing column and was
+  // rethrown above.
+  return { rows: [], moderation: false, optOut: false }
 }
 
 
@@ -111,7 +140,7 @@ async function selectPlayers(database, clause, binds) {
 // entire point of this function existing.
 // ==========================================
 export async function listGamePlayers(database, { q = '', limit = 40, offset = 0, status = '' } = {}) {
-  if (!database) return { rows: [], total: 0, moderation: false }
+  if (!database) return { rows: [], total: 0, moderation: false, optOut: false }
 
   const where = []
   const binds = []
@@ -141,7 +170,7 @@ export async function listGamePlayers(database, { q = '', limit = 40, offset = 0
   try {
     out = await selectPlayers(database, clause, binds)
   } catch {
-    return { rows: [], total: 0, moderation: false }
+    return { rows: [], total: 0, moderation: false, optOut: false }
   }
 
   // Status is filtered here rather than in SQL because
@@ -151,7 +180,12 @@ export async function listGamePlayers(database, { q = '', limit = 40, offset = 0
     ? out.rows.filter(row => moderationOf(row) === status)
     : out.rows
 
-  return { rows, total, moderation: out.moderation }
+  // Both optional columns are reported, not just moderation. The
+  // panel uses these to explain why a control is not there rather
+  // than showing one that will refuse - which is the difference
+  // between "this game's database has not run that migration" and
+  // "the button is broken".
+  return { rows, total, moderation: out.moderation, optOut: out.optOut }
 }
 
 
@@ -173,6 +207,34 @@ export async function getGamePlayer(database, playerId) {
     return out.rows[0] || null
   } catch {
     return null
+  }
+}
+
+
+// ==========================================
+// setLeaderboardOptOut
+// The player's own decision about the public board.
+//
+// Written from the account page and readable by the panel, and
+// deliberately NOT a moderation action: setModeration() is for
+// things done TO a player and this is a thing done BY one. They
+// are separate functions so that lifting a ban cannot silently
+// put somebody back on a board they chose to leave, and so that
+// the panel's audit story stays honest about which is which.
+// ==========================================
+export async function setLeaderboardOptOut(database, playerId, hidden) {
+  if (!database || !playerId) return { ok: false, reason: 'bad_input' }
+
+  try {
+    const result = await database
+      .prepare(`UPDATE players SET ${LEADERBOARD_OPT_OUT_COLUMN} = ? WHERE player_id = ?`)
+      .bind(hidden ? 1 : 0, playerId).run()
+    return { ok: true, reason: '', changed: changed(result) }
+  } catch (error) {
+    return {
+      ok: false,
+      reason: /no such column/i.test(String(error && error.message)) ? 'no_column' : 'failed'
+    }
   }
 }
 

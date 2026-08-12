@@ -895,9 +895,11 @@ namespace AmirCollider
         // Load
         // The signed-in player's row.
         //
-        // A 404 here is not an error: it is a player who has
-        // signed in and never been written. Create the row with
-        // Save() the first time.
+        // The row is created server-side on this read, so a first
+        // sign-in returns a real profile rather than a 404 you
+        // have to handle. Null here means the request failed —
+        // no network, an expired token, or an id that is not the
+        // one the token resolves to.
         // ==========================================
         public static IEnumerator Load(Action<PlayerProfile> done)
         {
@@ -988,17 +990,17 @@ namespace AmirCollider
       fa: [
         'امتیاز کمتر از رکورد با ۲۰۰ و success:false برمی‌گردد، نه خطا — این را خطا حساب نکن وگرنه حلقه‌ی تلاش بی‌پایان می‌سازی.',
         'بدنه‌ی ارسال امتیاز فقط خود عدد است، نه JSON.',
-        '۴۰۴ روی خواندن پروفایل یعنی بازیکن هنوز ردیفی ندارد؛ اولین Save آن را می‌سازد.'
+        'ردیف بازیکن را خودِ سرور موقع اولین خواندن می‌سازد، پس ۴۰۴ روی خواندن پروفایلِ خودت عملاً پیش نمی‌آید. اگر دیدی‌اش، یعنی توکن مال آن شناسه نیست.'
       ],
       en: [
         'A score below the record returns 200 with success:false — not an error. Treating it as one produces a retry loop that can never succeed.',
         'The score body is the bare number, not JSON.',
-        'A 404 on the profile read means the player has no row yet; the first Save creates it.'
+        'The server creates the player row on the first read, so a 404 on your own profile is effectively unreachable. If you do see one, the token does not belong to that player id.'
       ],
       ja: [
         '記録未満のスコアは 200 と success:false を返します。エラー扱いすると無限リトライになります。',
         'スコア送信のボディは JSON ではなく数値そのものです。',
-        'プロフィール取得の 404 は「まだ行がない」の意味。最初の Save で作成されます。'
+        'プレイヤー行は初回読み取り時にサーバー側で作成されるため、自分のプロフィール取得で 404 になることは実質ありません。出た場合はトークンがその ID のものではありません。'
       ]
     },
     code
@@ -2437,4 +2439,137 @@ export function unityModules(game, origin, options = {}) {
 
 export function unityModule(game, origin, id, options = {}) {
   return unityModules(game, origin, options).find(module => module.id === id) || null
+}
+
+
+// ==========================================
+// UNITY_KIT_INDEX
+// What each file in the kit is for, as data.
+//
+// ------------------------------------------------------------
+// WHY THIS EXISTS
+// ------------------------------------------------------------
+// Every module below is a finished, tested client for one part
+// of this Worker's API. They are generated per game with that
+// game's id, URLs, deep-link scheme and product catalogue
+// already substituted in, which means they are not examples -
+// they are the code, and writing a second implementation of any
+// of them is writing a second thing that can disagree with the
+// server.
+//
+// It has happened. An assistant asked to "connect this offline
+// game to the server" read the ROUTES table in Worker.js,
+// inferred the request shapes from it, and wrote a fresh HTTP
+// layer, a fresh token cache and a fresh entitlements client -
+// none of which knew that a score below the record comes back
+// 200 with success:false rather than as an error, or that the
+// score body is a bare integer and not JSON, or that the
+// leaderboard returns a top-level array that JsonUtility cannot
+// parse. All three are documented in the `notes` of the module
+// that already solved them.
+//
+// So this index is the machine-readable answer to "is there
+// already code for this?". It is served by the panel's `unity`
+// action and named in CLAUDE.md. The rule it exists to support:
+//
+//   READ THIS FIRST. If a module covers the job, generate it
+//   with unityModules() and use it verbatim. Say which modules
+//   you are using and why. Only write new C# for something no
+//   module covers - and then follow the conventions of the ones
+//   beside it.
+// ==========================================
+export const UNITY_KIT_INDEX = [
+  {
+    id: 'readme', file: 'README.md', kind: 'doc',
+    covers: 'The install order, what each file does, and the troubleshooting table.',
+    endpoints: [], requires: [], gatedBy: null
+  },
+  {
+    id: 'constants', file: '<Pascal>Constants.cs', kind: 'code',
+    covers: 'Every URL, the game id, the Android package, the deep-link scheme and the product '
+          + 'ids, as compile-time constants. Nothing else in the kit hard-codes a URL.',
+    endpoints: ['all'], requires: [], gatedBy: null
+  },
+  {
+    id: 'api', file: 'AmirColliderApi.cs', kind: 'code',
+    covers: 'The HTTP layer: Get/Post/Put with the bearer token attached, timeouts, retry, and '
+          + 'ParseArray for the top-level JSON array JsonUtility refuses.',
+    endpoints: [], requires: ['constants'], gatedBy: null
+  },
+  {
+    id: 'auth', file: 'AmirColliderAuth.cs', kind: 'code',
+    covers: 'Google sign-in end to end: the browser hand-off, the deep-link return, the code '
+          + 'exchange, token storage and refresh-on-resume.',
+    endpoints: ['/oauth/auth', '/oauth/token', '/auth/refresh', '/auth/validate', '/auth/check'],
+    requires: ['constants', 'api'], gatedBy: 'capabilities.login'
+  },
+  {
+    id: 'player', file: 'AmirColliderPlayer.cs', kind: 'code',
+    covers: 'The player row: profile, high score, play time and the free-form save document. '
+          + 'Knows that the score body is a bare integer and that a score below the record is a '
+          + '200 with success:false rather than an error.',
+    endpoints: ['/database/get/games/:id/users/:uid', '/database/set/…', '/database/patch/…'],
+    requires: ['constants', 'api', 'auth'], gatedBy: 'capabilities.cloudSave'
+  },
+  {
+    id: 'leaderboard', file: 'AmirColliderLeaderboard.cs', kind: 'code',
+    covers: 'The public board. Handles the top-level array and the fact that opted-out and '
+          + 'banned players are simply absent rather than ranked and hidden.',
+    endpoints: ['/:gameId/leaderboard'], requires: ['constants', 'api'],
+    gatedBy: 'capabilities.leaderboard'
+  },
+  {
+    id: 'store', file: 'AmirColliderStore.cs', kind: 'code',
+    covers: 'Products, entitlements and consuming a consumable. The entitlements API is '
+          + 'authoritative over any local mirror.',
+    endpoints: ['/games/:id/products', '/games/:id/entitlements', '/games/:id/entitlements/consume'],
+    requires: ['constants', 'api', 'auth'], gatedBy: 'capabilities.store'
+  },
+  {
+    id: 'status', file: 'AmirColliderStatus.cs', kind: 'code',
+    covers: 'The manifest: whether the build is too old, whether the download has been '
+          + 'withdrawn, and which capabilities are switched on right now.',
+    endpoints: ['/games/:id/manifest'], requires: ['constants', 'api'], gatedBy: null
+  },
+  {
+    id: 'bootstrap', file: 'AmirColliderBootstrap.cs', kind: 'code',
+    covers: 'One MonoBehaviour that wires the rest together: check status, resume a returning '
+          + 'player, read the profile, submit a score, refresh entitlements. The file to read '
+          + 'to see how the others are meant to be called.',
+    endpoints: [], requires: ['constants', 'api', 'auth', 'status'], gatedBy: null
+  },
+  {
+    id: 'manifest', file: 'AndroidManifest.xml', kind: 'config',
+    covers: 'The intent-filter that lets Android deliver the sign-in code back to the game. '
+          + 'Without it the browser opens a blank tab and nothing reports an error anywhere.',
+    endpoints: [], requires: [], gatedBy: 'platform.android'
+  },
+  {
+    id: 'link', file: 'link.xml', kind: 'config',
+    covers: 'Keeps the IL2CPP stripper from removing the serialisable classes JsonUtility '
+          + 'reflects over in a release build.',
+    endpoints: [], requires: [], gatedBy: 'platform.android'
+  },
+  {
+    id: 'google', file: 'GOOGLE-SETUP.md', kind: 'doc',
+    covers: 'The Google Cloud console steps, the redirect URIs to authorise, and which Worker '
+          + 'secrets hold which client id.',
+    endpoints: [], requires: [], gatedBy: 'capabilities.login'
+  }
+]
+
+
+/**
+ * The index narrowed to what THIS game actually gets, so a
+ * caller does not have to re-derive the capability gates.
+ *
+ * Returned alongside the generated files by the panel's `unity`
+ * action; the two are always in step because both come from
+ * unityModules().
+ */
+export function unityKitIndex(game, origin, options = {}) {
+  const present = new Set(unityModules(game, origin, options).map(module => module.id))
+  return UNITY_KIT_INDEX
+    .filter(entry => present.has(entry.id))
+    .map(entry => ({ ...entry }))
 }

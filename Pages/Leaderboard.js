@@ -57,16 +57,12 @@ import { logError } from '../Core/Logging.js'
 import { escapeHtml } from '../Core/Html.js'
 import { parseCookies, resolveLang, resolveRequestLang } from '../Core/RequestContext.js'
 import { localizedPath } from '../Core/Locale.js'
+import { boardFilter } from '../Games/PlayerRecord.js'
 import { chromeTheme, langHeader, page } from './GameChrome.js'
 
 const MIN_LIMIT = 1
 const MAX_LIMIT = 1000
 const DEFAULT_LIMIT = 100
-
-// The lowest score that puts a player on the board. Above zero, so
-// an account that has signed in but never scored is absent rather
-// than ranked last with nothing.
-const MIN_RANKED_SCORE = 0
 
 
 // ==========================================
@@ -382,35 +378,31 @@ function renderActions(lang, game, downloadable) {
 // ==========================================
 // Data
 //
-// Both queries carry the same two filters, so the "ranked players"
-// figure and the rows underneath it can never disagree.
+// Both queries carry the same filter - boardFilter() in
+// Games/PlayerRecord.js - so the "ranked players" figure and the
+// rows underneath it can never disagree, and neither can this
+// page and the copy of the board the game client reads.
 //
-// Each is tried with the banned_at predicate and retried without
-// it, because a game database that has not run migration 0006 does
-// not have that column - and a leaderboard that 500s on an old
-// schema is worse than one that shows a banned player.
+// Two of its three conditions are optional columns, probed rather
+// than assumed: a game database that has not run 0006 has no
+// banned_at, and one that has not run 0010 has no
+// leaderboard_opt_out. A leaderboard that 500s on an older schema
+// is worse than one that shows a banned player, so an absent
+// column simply drops its condition.
+//
+// A player who has opted out is not ranked and then hidden - they
+// are not in the query at all. That is what keeps the ranks
+// contiguous and leaves nothing to infer a hidden player from.
 // ==========================================
-async function fetchTopPlayers(db, limit, gameId) {
-  let results
-  try {
-    ({ results } = await db.prepare(`
-      SELECT username AS displayName, high_score AS highScore,
-             profile_pic_url AS photoURL, selected_color AS selectedColor
-      FROM players
-      WHERE banned_at IS NULL AND high_score > ?
-      ORDER BY high_score DESC
-      LIMIT ?
-    `).bind(MIN_RANKED_SCORE, limit).all())
-  } catch {
-    ({ results } = await db.prepare(`
-      SELECT username AS displayName, high_score AS highScore,
-             profile_pic_url AS photoURL, selected_color AS selectedColor
-      FROM players
-      WHERE high_score > ?
-      ORDER BY high_score DESC
-      LIMIT ?
-    `).bind(MIN_RANKED_SCORE, limit).all())
-  }
+async function fetchTopPlayers(db, limit, gameId, filter) {
+  const { results } = await db.prepare(`
+    SELECT username AS displayName, high_score AS highScore,
+           profile_pic_url AS photoURL, selected_color AS selectedColor
+    FROM players
+    WHERE ${filter.where}
+    ORDER BY high_score DESC
+    LIMIT ?
+  `).bind(limit).all()
 
   return (results || []).map((row, index) => ({
     rank: index + 1,
@@ -423,16 +415,9 @@ async function fetchTopPlayers(db, limit, gameId) {
   }))
 }
 
-async function countRankedPlayers(db) {
-  const read = async sql => {
-    const row = await db.prepare(sql).bind(MIN_RANKED_SCORE).first()
-    return Number(row && row.total) || 0
-  }
-  try {
-    return await read('SELECT COUNT(*) AS total FROM players WHERE banned_at IS NULL AND high_score > ?')
-  } catch {
-    return await read('SELECT COUNT(*) AS total FROM players WHERE high_score > ?')
-  }
+async function countRankedPlayers(db, filter) {
+  const row = await db.prepare(`SELECT COUNT(*) AS total FROM players WHERE ${filter.where}`).first()
+  return Number(row && row.total) || 0
 }
 
 
@@ -567,8 +552,9 @@ export async function handleLeaderboardUnified(url, request, gameId, requestId, 
   const limit = parseLimit(url)
 
   try {
-    const players = await fetchTopPlayers(db, limit, game.id)
-    const total = await countRankedPlayers(db).catch(() => players.length)
+    const filter = await boardFilter(db)
+    const players = await fetchTopPlayers(db, limit, game.id, filter)
+    const total = await countRankedPlayers(db, filter).catch(() => players.length)
 
     if (wantsJson) {
       return createJsonResponse({

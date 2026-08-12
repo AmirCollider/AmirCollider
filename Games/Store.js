@@ -11,6 +11,10 @@
 //   readProductOverrides / saveProductOverride / resetProductOverride
 //   resetAllProductOverrides / purgeGameRows
 //
+//   -- the shape of the tables, checked rather than assumed --
+//   SETTINGS_SCHEMA / tableColumns / settingsSchemaReport
+//   repairSettingsSchema / invalidateSchemaCache
+//
 //   -- the landing page and the version history --
 //   saveLandingFields / listVersions / listAllVersions
 //   saveVersion / deleteVersion
@@ -85,6 +89,190 @@ const OPEN_ORDER_STATES = [
 
 
 // ==========================================================
+// The shape of the tables, checked rather than assumed
+//
+// game_settings has grown a column at a time across five
+// migrations, and a deployment can be at any point along that
+// line: the live licence database has run 0003, 0004, 0005 and
+// 0009, and has never run 0008. Every column 0008 added -
+// tagline_fa/en/ja, features_json, screenshots_json, faq_json -
+// is simply absent there.
+//
+// That absence used to be invisible in exactly the way that
+// costs an evening. saveLandingFields wrote its columns in two
+// grouped UPDATEs, and SQLite fails a statement as a whole: one
+// missing column in the group took the other five down with it,
+// so the operator typed a tagline, six features and a five-entry
+// FAQ, pressed save, and the panel wrote none of them - while
+// the hero image in the OTHER group saved fine, which is what
+// made it read as "the page editor half works" rather than as a
+// missing column.
+//
+// So nothing here guesses any more. The live column set is read
+// from the database, every write is filtered through it, and
+// what could not be written is named - by COLUMN, not by
+// migration, because "run 0008" is not an answer an operator can
+// act on from inside a browser and "faq_json is missing" is.
+// ==========================================================
+
+/**
+ * Every column game_settings is supposed to have, in the order
+ * a fresh CREATE TABLE would list them.
+ *
+ * `since` is the migration that introduced it and `type` is what
+ * an ALTER TABLE has to say to add it back. Together they are
+ * enough for repairSettingsSchema() to bring any older database
+ * up to the current shape without a deploy - which is the point:
+ * a column added by a migration nobody remembers running is not
+ * something an operator should have to discover from a save that
+ * silently did nothing.
+ */
+export const SETTINGS_SCHEMA = [
+  { name: 'display_name', type: 'TEXT', since: '0003_games.sql' },
+  { name: 'logo_url', type: 'TEXT', since: '0003_games.sql' },
+  { name: 'accent_color', type: 'TEXT', since: '0003_games.sql' },
+  { name: 'desc_fa', type: 'TEXT', since: '0003_games.sql' },
+  { name: 'desc_en', type: 'TEXT', since: '0003_games.sql' },
+  { name: 'desc_ja', type: 'TEXT', since: '0003_games.sql' },
+  { name: 'tags_json', type: 'TEXT', since: '0003_games.sql' },
+  { name: 'status', type: 'TEXT', since: '0003_games.sql' },
+  { name: 'download_enabled', type: 'INTEGER', since: '0003_games.sql' },
+  { name: 'download_json', type: 'TEXT', since: '0003_games.sql' },
+  { name: 'min_version', type: 'TEXT', since: '0003_games.sql' },
+  { name: 'note', type: 'TEXT', since: '0003_games.sql' },
+  { name: 'deeplink_scheme', type: 'TEXT', since: '0004_deeplink.sql' },
+  { name: 'hero_url', type: 'TEXT', since: '0005_game_pages.sql' },
+  { name: 'videos_json', type: 'TEXT', since: '0005_game_pages.sql' },
+  { name: 'devices_json', type: 'TEXT', since: '0005_game_pages.sql' },
+  { name: 'about_fa', type: 'TEXT', since: '0005_game_pages.sql' },
+  { name: 'about_en', type: 'TEXT', since: '0005_game_pages.sql' },
+  { name: 'about_ja', type: 'TEXT', since: '0005_game_pages.sql' },
+  { name: 'tagline_fa', type: 'TEXT', since: '0008_landing_extra.sql' },
+  { name: 'tagline_en', type: 'TEXT', since: '0008_landing_extra.sql' },
+  { name: 'tagline_ja', type: 'TEXT', since: '0008_landing_extra.sql' },
+  { name: 'features_json', type: 'TEXT', since: '0008_landing_extra.sql' },
+  { name: 'screenshots_json', type: 'TEXT', since: '0008_landing_extra.sql' },
+  { name: 'faq_json', type: 'TEXT', since: '0008_landing_extra.sql' }
+]
+
+/** The landing-page half of the above: what the "Game page" tab writes. */
+export const LANDING_COLUMNS = SETTINGS_SCHEMA
+  .filter(column => /^(hero_url|videos_json|devices_json|about_|tagline_|features_json|screenshots_json|faq_json)/.test(column.name))
+  .map(column => column.name)
+
+
+// A column set per table, for this isolate's lifetime. PRAGMA is
+// cheap but a save should not spend a round trip re-asking a
+// question whose answer only changes when somebody runs a
+// migration - and when somebody does, invalidateSchemaCache()
+// clears it.
+let schemaCache = new Map()
+
+export function invalidateSchemaCache() {
+  schemaCache = new Map()
+}
+
+
+/**
+ * The columns a table actually has, as a Set.
+ *
+ * An empty Set means "could not tell" - a table that does not
+ * exist, or a database that refused the read. Callers treat that
+ * as "write nothing and say so" rather than as "write
+ * everything", because a failed PRAGMA is not evidence that a
+ * column is there.
+ */
+export async function tableColumns(database, table) {
+  if (!database || !table) return new Set()
+
+  const cached = schemaCache.get(table)
+  if (cached) return cached
+
+  try {
+    const { results } = await database.prepare(`SELECT name FROM pragma_table_info(?)`).bind(table).all()
+    const columns = new Set((results || []).map(row => String(row.name)))
+    if (columns.size) schemaCache.set(table, columns)
+    return columns
+  } catch {
+    return new Set()
+  }
+}
+
+
+/**
+ * What game_settings looks like versus what it should look like.
+ *
+ * `readable` is false when the table could not be inspected at
+ * all, which is a different problem from a missing column and is
+ * reported as one.
+ */
+export async function settingsSchemaReport(database) {
+  const columns = await tableColumns(database, 'game_settings')
+
+  if (!columns.size) {
+    return {
+      readable: false,
+      present: [],
+      missing: SETTINGS_SCHEMA.map(column => ({ ...column })),
+      migrations: [...new Set(SETTINGS_SCHEMA.map(column => column.since))]
+    }
+  }
+
+  const missing = SETTINGS_SCHEMA.filter(column => !columns.has(column.name))
+
+  return {
+    readable: true,
+    present: SETTINGS_SCHEMA.filter(column => columns.has(column.name)).map(column => column.name),
+    missing: missing.map(column => ({ ...column })),
+    migrations: [...new Set(missing.map(column => column.since))]
+  }
+}
+
+
+/**
+ * Adds the missing game_settings columns, one ALTER TABLE each.
+ *
+ * Every column in SETTINGS_SCHEMA is nullable with no default,
+ * so adding one is a metadata-only change: no row is rewritten,
+ * nothing that was there moves, and a column that was already
+ * there is skipped rather than re-added. Running this twice is a
+ * no-op, and running it on a database that is already current
+ * does nothing at all.
+ *
+ * One statement per column on purpose. SQLite's ALTER TABLE
+ * takes exactly one ADD COLUMN, and doing them separately means
+ * a column that cannot be added for some unforeseen reason costs
+ * only itself.
+ */
+export async function repairSettingsSchema(database) {
+  const report = await settingsSchemaReport(database)
+  if (!report.readable) return { ok: false, reason: 'unreadable', added: [], failed: [] }
+  if (!report.missing.length) return { ok: true, reason: 'already_current', added: [], failed: [] }
+
+  const added = []
+  const failed = []
+
+  for (const column of report.missing) {
+    try {
+      await database.prepare(
+        `ALTER TABLE game_settings ADD COLUMN ${column.name} ${column.type}`
+      ).run()
+      added.push(column.name)
+    } catch (error) {
+      // "duplicate column name" means somebody else added it
+      // between the report and this statement, which is a
+      // success from where the caller stands.
+      if (/duplicate column/i.test(String(error && error.message))) added.push(column.name)
+      else failed.push({ name: column.name, error: String(error && error.message).slice(0, 200) })
+    }
+  }
+
+  invalidateSchemaCache()
+  return { ok: failed.length === 0, reason: '', added, failed }
+}
+
+
+// ==========================================================
 // Settings - the overrides an operator may change
 // ==========================================================
 
@@ -119,57 +307,116 @@ export async function readSettings(database, gameId) {
 
 
 // ==========================================
+// ensureSettingsRow
+// The row exists and nothing else changed.
+//
+// Names only game_id and updated_at, which every version of this
+// table has had, so this one statement is safe against a
+// database at any migration.
+// ==========================================
+async function ensureSettingsRow(database, gameId) {
+  await database.prepare(
+    `INSERT INTO game_settings (game_id, updated_at) VALUES (?, ?)
+     ON CONFLICT (game_id) DO UPDATE SET updated_at = excluded.updated_at`
+  ).bind(gameId, now()).run()
+}
+
+
+// ==========================================
+// writeSettingsColumns
+// The one write path into game_settings.
+//
+// Everything that edits this table goes through here - the games
+// tab, the deep-link field and the whole landing-page editor -
+// so there is one place that knows how a column is written and
+// one place that knows what to do about a column that is not
+// there.
+//
+// The contract:
+//   patch   a column named here is set to that value
+//   clear   a column named here is set to NULL
+//   neither left exactly as it was
+//
+// Columns the database does not have are dropped from the
+// statement and returned in `missing`, so the rest of the save
+// lands. That is the whole fix: a missing faq_json used to cost
+// the tagline, the features and the screenshots that were named
+// in the same statement.
+//
+// Returns { ok, missing, wrote } where `missing` is a list of
+// COLUMN NAMES - what an operator needs to know - and `wrote`
+// counts the columns that actually reached the table.
+// ==========================================
+async function writeSettingsColumns(database, gameId, patch = {}, clear = []) {
+  if (!database || !gameId) return { ok: false, reason: 'no_database', missing: [], wrote: 0 }
+
+  const wanted = new Map()
+  for (const name of Object.keys(patch)) wanted.set(name, { clear: false, value: patch[name] })
+  // clear wins over patch: a caller that named a column in both
+  // meant to empty it.
+  for (const name of clear) wanted.set(name, { clear: true, value: null })
+
+  try {
+    await ensureSettingsRow(database, gameId)
+  } catch (error) {
+    return { ok: false, reason: 'failed', missing: [], wrote: 0, error: String(error && error.message).slice(0, 200) }
+  }
+
+  if (!wanted.size) return { ok: true, reason: '', missing: [], wrote: 0 }
+
+  const columns = await tableColumns(database, 'game_settings')
+
+  // An unreadable table is not a licence to guess. Fall back to
+  // "every column this codebase knows about is present", which is
+  // what the code assumed before this function existed - so a
+  // deployment where PRAGMA is unavailable behaves exactly as it
+  // used to rather than refusing every save.
+  const has = name => (columns.size ? columns.has(name) : true)
+
+  const sets = []
+  const values = []
+  const missing = []
+
+  for (const [name, entry] of wanted) {
+    if (!has(name)) { missing.push(name); continue }
+    if (entry.clear) { sets.push(`${name} = NULL`); continue }
+    sets.push(`${name} = ?`)
+    values.push(entry.value)
+  }
+
+  if (!sets.length) {
+    return { ok: missing.length === 0, reason: missing.length ? 'no_column' : '', missing, wrote: 0 }
+  }
+
+  try {
+    await database.prepare(
+      `UPDATE game_settings SET ${sets.join(', ')}, updated_at = ? WHERE game_id = ?`
+    ).bind(...values, now(), gameId).run()
+  } catch (error) {
+    // A column that PRAGMA reported and the UPDATE then refused
+    // is worth surfacing rather than swallowing: it means the two
+    // disagree, which is not a state any amount of retrying fixes.
+    return {
+      ok: false, reason: 'failed', missing, wrote: 0,
+      error: String(error && error.message).slice(0, 200)
+    }
+  }
+
+  return { ok: true, reason: missing.length ? 'partial' : '', missing, wrote: sets.length }
+}
+
+
+// ==========================================
 // saveSettings
 // An upsert of only the fields the caller named.
+//
+// Returns { ok, missing, row }. `missing` is the columns this
+// database does not have; everything else was written.
 // ==========================================
 export async function saveSettings(database, gameId, patch = {}, clear = []) {
-  const at = now()
-  const field = name => (Object.prototype.hasOwnProperty.call(patch, name) ? patch[name] : null)
-  const cleared = name => (clear.includes(name) ? 1 : 0)
-
-  await database.prepare(
-    `INSERT INTO game_settings
-       (game_id, display_name, logo_url, accent_color, desc_fa, desc_en, desc_ja,
-        tags_json, status, download_enabled, download_json, min_version, note, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT (game_id) DO UPDATE SET
-       display_name     = CASE WHEN ?  THEN NULL ELSE COALESCE(?,  display_name)     END,
-       logo_url         = CASE WHEN ?  THEN NULL ELSE COALESCE(?,  logo_url)         END,
-       accent_color     = CASE WHEN ?  THEN NULL ELSE COALESCE(?,  accent_color)     END,
-       desc_fa          = CASE WHEN ?  THEN NULL ELSE COALESCE(?,  desc_fa)          END,
-       desc_en          = CASE WHEN ?  THEN NULL ELSE COALESCE(?,  desc_en)          END,
-       desc_ja          = CASE WHEN ?  THEN NULL ELSE COALESCE(?,  desc_ja)          END,
-       tags_json        = CASE WHEN ?  THEN NULL ELSE COALESCE(?,  tags_json)        END,
-       status           = CASE WHEN ?  THEN NULL ELSE COALESCE(?,  status)           END,
-       download_enabled = CASE WHEN ?  THEN NULL ELSE COALESCE(?,  download_enabled) END,
-       download_json    = CASE WHEN ?  THEN NULL ELSE COALESCE(?,  download_json)    END,
-       min_version      = CASE WHEN ?  THEN NULL ELSE COALESCE(?,  min_version)      END,
-       note             = CASE WHEN ?  THEN NULL ELSE COALESCE(?,  note)             END,
-       updated_at       = ?`
-  ).bind(
-    // INSERT
-    gameId,
-    field('display_name'), field('logo_url'), field('accent_color'),
-    field('desc_fa'), field('desc_en'), field('desc_ja'),
-    field('tags_json'), field('status'), field('download_enabled'),
-    field('download_json'), field('min_version'), field('note'), at,
-    // UPDATE - (clearFlag, value) per column, in the same order
-    cleared('display_name'), field('display_name'),
-    cleared('logo_url'), field('logo_url'),
-    cleared('accent_color'), field('accent_color'),
-    cleared('desc_fa'), field('desc_fa'),
-    cleared('desc_en'), field('desc_en'),
-    cleared('desc_ja'), field('desc_ja'),
-    cleared('tags_json'), field('tags_json'),
-    cleared('status'), field('status'),
-    cleared('download_enabled'), field('download_enabled'),
-    cleared('download_json'), field('download_json'),
-    cleared('min_version'), field('min_version'),
-    cleared('note'), field('note'),
-    at
-  ).run()
-
-  return readSettings(database, gameId)
+  const written = await writeSettingsColumns(database, gameId, patch, clear)
+  const row = await readSettings(database, gameId)
+  return { ok: written.ok, reason: written.reason, missing: written.missing, row }
 }
 
 
@@ -195,25 +442,16 @@ export async function resetSettings(database, gameId) {
 // saveDeepLinkScheme
 // The one settings column that is written on its own.
 //
-// Assumes the row exists: every caller runs saveSettings first,
-// which upserts it.
-//
 // Null clears the override and the resolution falls back to the
 // environment variable, then to the registry's own fallback.
 // ==========================================
 export async function saveDeepLinkScheme(database, gameId, scheme) {
-  if (!database || !gameId) return { ok: false, reason: 'no_database' }
+  const written = scheme
+    ? await writeSettingsColumns(database, gameId, { deeplink_scheme: scheme }, [])
+    : await writeSettingsColumns(database, gameId, {}, ['deeplink_scheme'])
 
-  try {
-    await database
-      .prepare('UPDATE game_settings SET deeplink_scheme = ?, updated_at = ? WHERE game_id = ?')
-      .bind(scheme || null, now(), gameId)
-      .run()
-    return { ok: true, reason: '' }
-  } catch (error) {
-    // Almost always "no such column: deeplink_scheme".
-    return { ok: false, reason: /no such column/i.test(String(error && error.message)) ? 'no_column' : 'failed' }
-  }
+  if (written.missing.includes('deeplink_scheme')) return { ok: false, reason: 'no_column' }
+  return { ok: written.ok, reason: written.ok ? '' : (written.reason || 'failed') }
 }
 
 
@@ -305,78 +543,33 @@ export async function purgeGameRows(database, gameId) {
 
 
 // ==========================================
-// LANDING_COLUMNS
-// The landing page's columns, in one place.
-//
-// Two migrations wrote them and a deployment may have run only
-// the first, so they are grouped rather than listed flat: a save
-// that names a 0008 column on a database that stopped at 0005
-// fails the WHOLE statement, taking the hero image and the about
-// text down with the FAQ. Writing each group in its own UPDATE
-// costs one extra round trip and means a partial migration
-// costs only the fields it actually lacks.
-// ==========================================
-const LANDING_GROUPS = [
-  {
-    migration: '0005_game_pages.sql',
-    columns: ['hero_url', 'videos_json', 'devices_json', 'about_fa', 'about_en', 'about_ja']
-  },
-  {
-    migration: '0008_landing_extra.sql',
-    columns: [
-      'tagline_fa', 'tagline_en', 'tagline_ja',
-      'features_json', 'screenshots_json', 'faq_json'
-    ]
-  }
-]
-
-export const LANDING_COLUMNS = LANDING_GROUPS.flatMap(group => group.columns)
-
-
-// ==========================================
 // saveLandingFields
 // Writes only the landing columns the caller named.
 //
-// Returns { ok, reason, missing } where `missing` lists the
-// migrations whose columns are not in this database. ok is true
-// when at least the applied groups were written, so the caller
-// can save what it can and say plainly what it could not.
+// One statement, filtered through the live column set, rather
+// than the two grouped statements this used to be. The grouping
+// existed to limit the blast radius of a missing column and did
+// the opposite: a database missing faq_json lost its tagline,
+// its features and its screenshots in the same failed UPDATE,
+// because all four are in the group 0008 added.
+//
+// Returns { ok, reason, missing } where `missing` names the
+// COLUMNS this database does not have. Everything else was
+// written, and `reason` is 'partial' when both are true.
 // ==========================================
 export async function saveLandingFields(database, gameId, patch = {}, clear = []) {
-  if (!database || !gameId) return { ok: false, reason: 'no_database', missing: [] }
+  const landing = new Set(LANDING_COLUMNS)
 
-  const missing = []
-  let wrote = false
-  let failed = ''
+  // Defence against a caller widening this by accident. The
+  // landing editor writes the landing page; the games tab writes
+  // the game. Keeping that boundary here means neither screen can
+  // reach into the other's fields through a crafted body.
+  const safePatch = {}
+  for (const [name, value] of Object.entries(patch)) if (landing.has(name)) safePatch[name] = value
+  const safeClear = (Array.isArray(clear) ? clear : []).filter(name => landing.has(name))
 
-  for (const group of LANDING_GROUPS) {
-    const sets = []
-    const values = []
-
-    for (const column of group.columns) {
-      if (clear.includes(column)) { sets.push(`${column} = NULL`); continue }
-      if (Object.prototype.hasOwnProperty.call(patch, column)) {
-        sets.push(`${column} = ?`)
-        values.push(patch[column])
-      }
-    }
-    if (!sets.length) continue
-
-    try {
-      await database
-        .prepare(`UPDATE game_settings SET ${sets.join(', ')}, updated_at = ? WHERE game_id = ?`)
-        .bind(...values, now(), gameId)
-        .run()
-      wrote = true
-    } catch (error) {
-      if (/no such column/i.test(String(error && error.message))) missing.push(group.migration)
-      else failed = 'failed'
-    }
-  }
-
-  if (failed) return { ok: false, reason: 'failed', missing }
-  if (missing.length && !wrote) return { ok: false, reason: 'no_column', missing }
-  return { ok: true, reason: missing.length ? 'partial' : '', missing }
+  const written = await writeSettingsColumns(database, gameId, safePatch, safeClear)
+  return { ok: written.ok, reason: written.reason, missing: written.missing }
 }
 
 

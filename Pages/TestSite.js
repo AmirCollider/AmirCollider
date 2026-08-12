@@ -212,7 +212,8 @@ const GROUP_ICONS = {
   db: ICONS.database,
   d1: ICONS.layers,
   checkout: ICONS.cart,
-  video: ICONS.video
+  video: ICONS.video,
+  thegod: ICONS.terminal
 }
 
 
@@ -285,6 +286,39 @@ const TEST_GROUPS = [
       { kind: 'vidPlay' }, { kind: 'vidRange' }, { kind: 'vidHead' },
       { kind: 'vidJa' }, { kind: 'vidFa' }, { kind: 'vidMissing' }
     ]
+  },
+  {
+    // ==========================================
+    // TheGod, the operator panel.
+    //
+    // Every check here is a READ or a refusal. Nothing in this
+    // group changes a price, writes a setting, bans anybody or
+    // creates a row - which is what makes it safe to leave in a
+    // sweep that anybody might press "run all" on. The one call
+    // that looks like a write, tgUnknownProduct, is asserting
+    // that the write is REFUSED.
+    //
+    // The group exists because this panel writes to five tables
+    // across two databases and had no coverage at all, and the
+    // failure that motivated it was silent: a column the
+    // database did not have, a save that answered "ok", and
+    // nothing on the site changing. tgSchema is the check that
+    // catches exactly that, and it fails rather than warns.
+    //
+    // Authorisation is the /thegod session cookie the browser is
+    // already carrying. Signed out, every one of these warns and
+    // says where to sign in.
+    // ==========================================
+    key: 'thegod',
+    titleKey: 'gTheGod',
+    tests: [
+      { kind: 'tgReachable' }, { kind: 'tgMethod' }, { kind: 'tgOverview' },
+      { kind: 'tgGameGet' }, { kind: 'tgUnknownGame' }, { kind: 'tgUnknownProduct' },
+      { kind: 'tgSchema' }, { kind: 'tgPlayerDb' }, { kind: 'tgLanding' },
+      { kind: 'tgSqlSettings' }, { kind: 'tgSqlGame' }, { kind: 'tgScaffold' },
+      { kind: 'tgUnity' }, { kind: 'tgEnv' }, { kind: 'tgOrders' },
+      { kind: 'tgPlayers' }, { kind: 'tgVerify' }
+    ]
   }
 ]
 
@@ -349,6 +383,7 @@ const I18N = {
     gD1: 'پایگاه‌داده D1',
     gCheckout: 'خرید با ارز دیجیتال',
     gVideo: 'ویدیوهای معرفی',
+    gTheGod: 'پنل TheGod',
     // detail fragments
     net: 'خطای شبکه',
     coOff: 'هنوز پیکربندی نشده (۵۰۳)',
@@ -356,6 +391,22 @@ const I18N = {
     coMissing: 'ناقص',
     coForged: '⚠ وبهوک بدون امضا پذیرفته شد — فوراً NOWPAYMENTS_IPN_SECRET را بررسی کن',
     vidNotInR2: 'فایل در R2 پیدا نشد',
+    d1Leak: '⚠ بدون توکن معتبر، وجود یا نبودِ آن بازیکن لو رفت — باید ۴۰۱ می‌داد',
+    tgNoAuth: 'اول در /thegod وارد شو',
+    tgError: 'پنل خطا داد',
+    tgNoGames: 'هیچ بازی‌ای ثبت نشده',
+    tgNoTable: 'جدول game_settings خوانده نشد — مهاجرت 0003_games.sql را اجرا کن',
+    tgMissingColumns: '⚠ این ستون‌ها در پایگاه‌داده نیستند؛ هرچه در آن فیلدها بنویسی ذخیره نمی‌شود. در تب «ساخت SQL» دکمه‌ی تعمیر را بزن',
+    tgNoBinding: 'اتصال D1 این بازی وصل نشده',
+    tgNoPlayers: 'جدول players ساخته نشده',
+    tgNoModeration: 'ستون‌های مسدودسازی نیستند (0006)',
+    tgNoOptOut: 'ستون پنهان‌شدن از جدول امتیازات نیست (0010)',
+    tgBlocked: 'این بخش‌های صفحه‌ی بازی قابل ذخیره نیستند',
+    tgStaleSql: 'SQL تولیدشده با ردیف واقعی نمی‌خواند',
+    tgEmptyModule: 'این فایل‌های یونیتی خالی برگشتند',
+    tgNoOauth: 'کلیدهای گوگل این بازی ست نشده',
+    tgVerifyFailed: 'بررسی سلامت این موارد را ناموفق گزارش کرد',
+    tgVerifyWarned: 'بررسی سلامت روی این موارد هشدار داد',
     expected: 'انتظار',
     missingField: 'فیلد غایب',
     badStruct: 'ساختار نامعتبر',
@@ -446,12 +497,30 @@ const I18N = {
     t_d1Connection: 'اتصال D1', d_d1Connection: 'leaderboard باید از D1 پاسخ دهد',
     t_d1Schema: 'ساختار D1', d_d1Schema: 'فیلدهای rank و username و highScore',
     t_d1Limit: 'محدودیت D1', d_d1Limit: 'limit=3 باید رعایت شود',
-    t_d1EmptyUser: 'کاربر ناموجود', d_d1EmptyUser: 'کاربر ناموجود باید 404 بدهد',
+    t_d1EmptyUser: 'کاربر ناموجود با توکن نامعتبر', d_d1EmptyUser: 'باید ۴۰۱ بدهد و نگوید آن کاربر هست یا نیست',
     t_d1GetUnauth: 'GET بدون توکن', d_d1GetUnauth: 'دسترسی کاربر باید 401 بدهد',
     t_d1SetUnauth: 'SET بدون توکن', d_d1SetUnauth: 'نوشتن کاربر باید 401 بدهد',
     t_d1PatchUnauth: 'PATCH بدون توکن', d_d1PatchUnauth: 'به‌روزرسانی کاربر باید 401 بدهد',
     t_d1ScoreInvalid: 'امتیاز نامعتبر', d_d1ScoreInvalid: 'امتیاز منفی باید رد شود',
     t_d1UnknownPath: 'مسیر ناشناخته', d_d1UnknownPath: 'نباید با 500 خطا بدهد',
+
+    t_tgReachable: 'در دسترس بودن پنل', d_tgReachable: 'اکشن ناشناخته باید ۴۰۰ bad_action بدهد',
+    t_tgMethod: 'فقط POST', d_tgMethod: 'GET روی /thegod/api باید ۴۰۵ بدهد',
+    t_tgOverview: 'فهرست بازی‌ها', d_tgOverview: 'overview باید همه‌ی بازی‌ها را با ساختار درست بدهد',
+    t_tgGameGet: 'خواندن یک بازی', d_tgGameGet: 'game.get باید همان بازی خواسته‌شده را بدهد',
+    t_tgUnknownGame: 'بازی ناموجود', d_tgUnknownGame: 'شناسه‌ای که در Config.js نیست باید ۴۰۴ بدهد، نه اینکه ساخته شود',
+    t_tgUnknownProduct: 'محصول ناموجود', d_tgUnknownProduct: 'قیمت‌گذاری محصولی که در کد نیست باید رد شود',
+    t_tgSchema: 'ساختار game_settings', d_tgSchema: 'هر ستونی که پنل می‌نویسد باید در پایگاه‌داده باشد — همین مورد است که «ذخیره شد ولی چیزی عوض نشد» را می‌گیرد',
+    t_tgPlayerDb: 'پایگاه‌داده‌ی خود بازی', d_tgPlayerDb: 'اتصال بازی و جدول players باید وصل و موجود باشند',
+    t_tgLanding: 'ویرایشگر صفحه‌ی بازی', d_tgLanding: 'باید هم مقدار ذخیره‌شده و هم مقدار پایه‌ی Config.js را برگرداند',
+    t_tgSqlSettings: 'صحت SQL تنظیمات', d_tgSqlSettings: 'SQL تولیدشده باید با ردیف واقعی بخواند، از جمله زمان آخرین تغییر',
+    t_tgSqlGame: 'SQL بازی جدید', d_tgSqlGame: 'باید جدول players و مراحل اجرا را تولید کند',
+    t_tgScaffold: 'ساخت کد بازی جدید', d_tgScaffold: 'باید هر چهار فایل را بدهد؛ چیزی هم ساخته یا ذخیره نمی‌شود',
+    t_tgUnity: 'کیت یونیتی', d_tgUnity: 'همه‌ی فایل‌ها باید کد واقعی داشته باشند، نه خالی',
+    t_tgEnv: 'متغیرها', d_tgEnv: 'کلیدهای لازم و آدرس بازگشت OAuth باید گزارش شوند',
+    t_tgOrders: 'پرداخت‌ها', d_tgOrders: 'orders.list باید فهرست و آمار بدهد',
+    t_tgPlayers: 'بازیکن‌ها', d_tgPlayers: 'players.list باید از پایگاه‌داده‌ی خود بازی بخواند',
+    t_tgVerify: 'بررسی سلامت بازی', d_tgVerify: 'همان بررسی داخل پنل، از بیرون — هر ایراد جدی این‌جا ناموفق است',
 
     t_coConfig: 'پیکربندی', d_coConfig: 'همه‌ی Secretها و جدول‌های لازم موجودند؟',
     t_coPage: 'صفحه‌ی خرید', d_coPage: '/checkout بالا می‌آید و دکمه فعال است',
@@ -515,12 +584,29 @@ const I18N = {
     gD1: 'D1 database',
     gCheckout: 'Crypto checkout',
     gVideo: 'Demo videos',
+    gTheGod: 'TheGod panel',
     net: 'Network error',
     coOff: 'Not configured yet (503)',
     coNoAuth: 'Sign in at /testsite first',
     coMissing: 'Missing',
     coForged: '⚠ An unsigned webhook was ACCEPTED — check NOWPAYMENTS_IPN_SECRET now',
     vidNotInR2: 'File not found in R2',
+    d1Leak: '⚠ The lookup ran without a verified token, revealing whether that player exists — it must be 401',
+    tgNoAuth: 'Sign in at /thegod first',
+    tgError: 'The panel refused',
+    tgNoGames: 'No games registered',
+    tgNoTable: 'game_settings could not be read — run migrations/0003_games.sql',
+    tgMissingColumns: '⚠ These columns are not in the database; anything typed into those fields is lost. Press Repair on the SQL tab',
+    tgNoBinding: 'This game\'s D1 binding is not bound',
+    tgNoPlayers: 'No players table',
+    tgNoModeration: 'No moderation columns (0006)',
+    tgNoOptOut: 'No leaderboard opt-out column (0010)',
+    tgBlocked: 'These Game page sections cannot be saved',
+    tgStaleSql: 'The generated SQL disagrees with the stored row',
+    tgEmptyModule: 'These Unity files came back empty',
+    tgNoOauth: 'Google client keys are not set for this game',
+    tgVerifyFailed: 'The health check reported these as broken',
+    tgVerifyWarned: 'The health check flagged these',
     expected: 'Expected',
     missingField: 'Missing field',
     badStruct: 'Invalid structure',
@@ -609,12 +695,30 @@ const I18N = {
     t_d1Connection: 'D1 connection', d_d1Connection: 'Leaderboard served from D1',
     t_d1Schema: 'D1 schema', d_d1Schema: 'rank, username & highScore fields',
     t_d1Limit: 'D1 limit', d_d1Limit: 'limit=3 must be respected',
-    t_d1EmptyUser: 'Missing user', d_d1EmptyUser: 'Unknown user should return 404',
+    t_d1EmptyUser: 'Unknown user, unusable token', d_d1EmptyUser: 'Must be 401 — and must not reveal whether the row exists',
     t_d1GetUnauth: 'GET (no token)', d_d1GetUnauth: 'User read should return 401',
     t_d1SetUnauth: 'SET (no token)', d_d1SetUnauth: 'User write should return 401',
     t_d1PatchUnauth: 'PATCH (no token)', d_d1PatchUnauth: 'User update should return 401',
     t_d1ScoreInvalid: 'Invalid score', d_d1ScoreInvalid: 'Negative score should be rejected',
     t_d1UnknownPath: 'Unknown path', d_d1UnknownPath: 'Must not error with 500',
+
+    t_tgReachable: 'Panel reachable', d_tgReachable: 'An unknown action must be 400 bad_action',
+    t_tgMethod: 'POST only', d_tgMethod: 'GET on /thegod/api must be 405',
+    t_tgOverview: 'Game list', d_tgOverview: 'overview must return every game in the expected shape',
+    t_tgGameGet: 'Read one game', d_tgGameGet: 'game.get must return the game that was asked for',
+    t_tgUnknownGame: 'Unknown game', d_tgUnknownGame: 'An id that is not in Config.js must be 404, never created',
+    t_tgUnknownProduct: 'Unknown product', d_tgUnknownProduct: 'Re-pricing a product that is not in code must be refused',
+    t_tgSchema: 'game_settings schema', d_tgSchema: 'Every column the panel writes must exist \u2014 this is the check that catches "it saved but nothing changed"',
+    t_tgPlayerDb: 'The game\'s own database', d_tgPlayerDb: 'The game binding and its players table must both be there',
+    t_tgLanding: 'Game page editor', d_tgLanding: 'Must return both the stored row and the Config.js baseline under it',
+    t_tgSqlSettings: 'Settings SQL is honest', d_tgSqlSettings: 'The generated SQL must match the stored row, timestamp included',
+    t_tgSqlGame: 'New-game SQL', d_tgSqlGame: 'Must produce the players table and the ordered setup steps',
+    t_tgScaffold: 'New-game scaffold', d_tgScaffold: 'Must return all four files; nothing is created or stored',
+    t_tgUnity: 'Unity kit', d_tgUnity: 'Every module must arrive with real code in it, not empty',
+    t_tgEnv: 'Environment', d_tgEnv: 'Must report the required keys and the OAuth redirect URI',
+    t_tgOrders: 'Payments', d_tgOrders: 'orders.list must return a page and its stats',
+    t_tgPlayers: 'Players', d_tgPlayers: 'players.list must read the game\'s own database',
+    t_tgVerify: 'Game health check', d_tgVerify: 'The panel\'s own check, run from outside \u2014 anything it calls broken fails here',
 
     t_coConfig: 'Configuration', d_coConfig: 'Every secret and table the checkout needs',
     t_coPage: 'Checkout page', d_coPage: '/checkout renders with the button enabled',
@@ -678,12 +782,29 @@ const I18N = {
     gD1: 'D1 データベース',
     gCheckout: '暗号資産チェックアウト',
     gVideo: 'デモ動画',
+    gTheGod: 'TheGod パネル',
     net: 'ネットワークエラー',
     coOff: '未設定です (503)',
     coNoAuth: 'まず /testsite にサインインしてください',
     coMissing: '不足',
     coForged: '⚠ 署名なしの Webhook が受理されました — NOWPAYMENTS_IPN_SECRET を確認してください',
     vidNotInR2: 'R2 にファイルが見つかりません',
+    d1Leak: '⚠ 検証済みトークンなしで参照が実行され、そのプレイヤーの有無が漏れています。401 であるべきです',
+    tgNoAuth: '先に /thegod でサインインしてください',
+    tgError: 'パネルが拒否しました',
+    tgNoGames: 'ゲームが登録されていません',
+    tgNoTable: 'game_settings を読めません — migrations/0003_games.sql を実行してください',
+    tgMissingColumns: '⚠ これらの列がデータベースにありません。該当フィールドの入力は失われます。SQL タブの「修復」を実行してください',
+    tgNoBinding: 'このゲームの D1 バインディングが未接続です',
+    tgNoPlayers: 'players テーブルがありません',
+    tgNoModeration: 'モデレーション列がありません (0006)',
+    tgNoOptOut: 'ランキング非表示の列がありません (0010)',
+    tgBlocked: 'これらのゲームページ項目は保存できません',
+    tgStaleSql: '生成された SQL が保存済みの行と一致しません',
+    tgEmptyModule: 'これらの Unity ファイルが空で返りました',
+    tgNoOauth: 'このゲームの Google クライアントキーが未設定です',
+    tgVerifyFailed: 'ヘルスチェックが失敗と報告した項目',
+    tgVerifyWarned: 'ヘルスチェックが警告した項目',
     expected: '期待',
     missingField: '欠落フィールド',
     badStruct: '不正な構造',
@@ -772,12 +893,30 @@ const I18N = {
     t_d1Connection: 'D1 接続', d_d1Connection: 'リーダーボードは D1 から提供される',
     t_d1Schema: 'D1 スキーマ', d_d1Schema: 'rank, username, highScore フィールド',
     t_d1Limit: 'D1 上限', d_d1Limit: 'limit=3 を守るべき',
-    t_d1EmptyUser: '存在しないユーザー', d_d1EmptyUser: '不明なユーザーは 404 を返すべき',
+    t_d1EmptyUser: '不明なユーザー・無効トークン', d_d1EmptyUser: '401 を返し、行の有無を明かさないこと',
     t_d1GetUnauth: 'GET (トークンなし)', d_d1GetUnauth: 'ユーザー読取は 401 を返すべき',
     t_d1SetUnauth: 'SET (トークンなし)', d_d1SetUnauth: 'ユーザー書込は 401 を返すべき',
     t_d1PatchUnauth: 'PATCH (トークンなし)', d_d1PatchUnauth: 'ユーザー更新は 401 を返すべき',
     t_d1ScoreInvalid: '不正なスコア', d_d1ScoreInvalid: 'マイナススコアは拒否されるべき',
     t_d1UnknownPath: '不明なパス', d_d1UnknownPath: '500 でエラーになってはいけない',
+
+    t_tgReachable: 'パネルへの到達', d_tgReachable: '不明なアクションは 400 bad_action を返すこと',
+    t_tgMethod: 'POST のみ', d_tgMethod: '/thegod/api への GET は 405 であること',
+    t_tgOverview: 'ゲーム一覧', d_tgOverview: 'overview が全ゲームを想定どおりの形で返すこと',
+    t_tgGameGet: '単一ゲームの取得', d_tgGameGet: 'game.get が要求したゲームを返すこと',
+    t_tgUnknownGame: '存在しないゲーム', d_tgUnknownGame: 'Config.js にない ID は 404。作成されないこと',
+    t_tgUnknownProduct: '存在しない商品', d_tgUnknownProduct: 'コードにない商品の価格変更は拒否されること',
+    t_tgSchema: 'game_settings のスキーマ', d_tgSchema: 'パネルが書き込む列がすべて存在すること — 「保存できたのに何も変わらない」を検出する項目です',
+    t_tgPlayerDb: 'ゲーム専用 DB', d_tgPlayerDb: 'ゲームのバインディングと players テーブルが揃っていること',
+    t_tgLanding: 'ゲームページ編集', d_tgLanding: '保存済みの行と Config.js のベースラインの両方を返すこと',
+    t_tgSqlSettings: '設定 SQL の正確さ', d_tgSqlSettings: '生成 SQL が保存済みの行（更新時刻を含む）と一致すること',
+    t_tgSqlGame: '新規ゲームの SQL', d_tgSqlGame: 'players テーブルと手順を生成すること',
+    t_tgScaffold: '新規ゲームの雛形', d_tgScaffold: '4 つのファイルをすべて返すこと。何も作成・保存されません',
+    t_tgUnity: 'Unity キット', d_tgUnity: '各モジュールに実際のコードが含まれていること',
+    t_tgEnv: '環境変数', d_tgEnv: '必要なキーと OAuth リダイレクト URI を報告すること',
+    t_tgOrders: '決済', d_tgOrders: 'orders.list が一覧と統計を返すこと',
+    t_tgPlayers: 'プレイヤー', d_tgPlayers: 'players.list がゲーム専用 DB を読むこと',
+    t_tgVerify: 'ゲームのヘルスチェック', d_tgVerify: 'パネル内蔵のチェックを外部から実行。重大な問題があれば失敗',
 
     t_coConfig: '設定', d_coConfig: '必要なシークレットとテーブルの有無',
     t_coPage: '購入ページ', d_coPage: '/checkout が表示されボタンが有効',
@@ -1762,7 +1901,326 @@ function dashClientScript() {
       });
     }
 
+    /* ==========================================
+       TheGod, from here
+       ==========================================
+       The operator panel has one endpoint and an action field, so
+       one helper covers every check below.
+
+       Authorisation is the cookie the browser is already holding.
+       /thegod's session cookie is scoped Path=/thegod and a
+       cookie's path is matched against the REQUEST url, not
+       against the page making the request - so a fetch from this
+       panel to /thegod/api carries it, and one to anywhere else
+       does not. That is the same property the two cookies were
+       separated for, and it is what lets these tests run here
+       without this panel holding TheGod's credential.
+
+       Not signed into /thegod: every call answers 401. That is a
+       correct refusal rather than a broken panel, so it is
+       reported as a warning that says where to sign in - exactly
+       how the checkout group already treats its 503s. */
+    function tgApi(action, payload) {
+      var body = payload || {};
+      body.action = action;
+
+      return postJson('/thegod/api', body).then(function (r) {
+        if (!r.ok) return { net: true };
+        if (r.status === 401 || r.status === 403) return { unauth: true, ping: r.ping, status: r.status };
+        return r.res.json()
+          .then(function (data) { return { data: data, status: r.status, ping: r.ping }; })
+          .catch(function () { return { bad: true, status: r.status, ping: r.ping }; });
+      });
+    }
+
+    /* The shape every TheGod runner shares: refuse cleanly, warn
+       when signed out, and hand the parsed body to the assertion.
+       'assert' returns a note key, or null when everything it
+       cares about held. */
+    function tgRunner(action, payload, assert) {
+      return tgApi(action, payload).then(function (out) {
+        if (out.net) return netFail();
+        if (out.unauth) return { status: 'warn', code: out.status, ping: out.ping, noteKey: 'tgNoAuth' };
+        if (out.bad) return { status: 'fail', code: out.status, ping: out.ping, noteKey: 'badStruct' };
+
+        var data = out.data;
+        if (!data || data.ok !== true) {
+          return {
+            status: 'fail', code: out.status, ping: out.ping,
+            noteKey: 'tgError', noteVal: (data && (data.error || data.message)) || '—'
+          };
+        }
+
+        var verdict = assert ? assert(data) : null;
+        if (!verdict) return { status: 'pass', code: out.status, ping: out.ping };
+
+        return {
+          status: verdict.status || 'fail',
+          code: out.status, ping: out.ping,
+          noteKey: verdict.noteKey, noteVal: verdict.noteVal
+        };
+      });
+    }
+
+    /* The game the panel tests run against: whichever one this
+       deployment lists first, read from the same registry the
+       per-game group above is built from. Hard-coding 'neon-katana'
+       here would make this whole group red on a deployment that
+       renames or retires it. */
+    function tgGameId() {
+      return (data.gameIds && data.gameIds[0]) || 'neon-katana';
+    }
+
     var RUNNERS = {
+      /* ---------- TheGod operator panel ---------- */
+
+      /* Does the endpoint exist, route, and refuse an action it
+         does not know? A 400 here means authorised and reachable;
+         the switch's default is what produces it. */
+      tgReachable: function () {
+        return tgApi('definitely-not-an-action', {}).then(function (out) {
+          if (out.net) return netFail();
+          if (out.unauth) return { status: 'warn', code: out.status, ping: out.ping, noteKey: 'tgNoAuth' };
+          if (out.status === 400 && out.data && out.data.error === 'bad_action') {
+            return { status: 'pass', code: 400, ping: out.ping };
+          }
+          return { status: 'fail', code: out.status, ping: out.ping, noteKey: 'expected', noteVal: '400 bad_action' };
+        });
+      },
+
+      tgOverview: function () {
+        return tgRunner('overview', {}, function (data) {
+          if (!Array.isArray(data.games)) return { noteKey: 'badStruct' };
+          if (!data.games.length) return { status: 'warn', noteKey: 'tgNoGames' };
+          var first = data.games[0];
+          var missing = ['id', 'name', 'status', 'capabilities', 'products'].filter(function (field) {
+            return !(field in first);
+          });
+          return missing.length ? { noteKey: 'missingField', noteVal: missing.join(', ') } : null;
+        });
+      },
+
+      tgGameGet: function () {
+        return tgRunner('game.get', { gameId: tgGameId() }, function (data) {
+          if (!data.game || data.game.id !== tgGameId()) return { noteKey: 'badStruct' };
+          return null;
+        });
+      },
+
+      /* ==========================================
+         The check that would have caught the bug.
+
+         game_settings has grown a column at a time across five
+         migrations, and the licence database had never run the
+         one that added the tagline, the features, the screenshots
+         and the FAQ. Nothing anywhere reported that. The panel
+         accepted those fields, the save answered ok, and the
+         columns silently went nowhere.
+
+         A missing column is a FAILURE and not a warning, because
+         everything typed into the fields it holds is lost with no
+         error - which is the most expensive kind of broken there
+         is. The panel's SQL tab has a repair button for it.
+         ========================================== */
+      tgSchema: function () {
+        return tgRunner('schema.get', { gameId: tgGameId() }, function (data) {
+          var settings = data.licence && data.licence.settings;
+          if (!settings) return { noteKey: 'badStruct' };
+          if (!settings.readable) return { noteKey: 'tgNoTable' };
+          if (settings.missing && settings.missing.length) {
+            return {
+              noteKey: 'tgMissingColumns',
+              noteVal: settings.missing.map(function (column) { return column.name; }).join(', ')
+            };
+          }
+          return null;
+        });
+      },
+
+      /* The game's own database is a different D1 entirely, and
+         the failure it produces - every data endpoint answering
+         db_not_bound - looks nothing like a schema problem from
+         the outside. */
+      tgPlayerDb: function () {
+        return tgRunner('schema.get', { gameId: tgGameId() }, function (data) {
+          var player = data.player;
+          if (!player) return { noteKey: 'badStruct' };
+          if (!player.bound) return { noteKey: 'tgNoBinding', noteVal: player.binding || '—' };
+          if (!player.present || !player.present.length) return { noteKey: 'tgNoPlayers' };
+          if (!player.moderation) return { status: 'warn', noteKey: 'tgNoModeration' };
+          if (!player.leaderboardOptOut) return { status: 'warn', noteKey: 'tgNoOptOut' };
+          return null;
+        });
+      },
+
+      /* The landing editor has to hand back both halves - what is
+         stored and what Config.js supplies underneath it - or
+         every field on that screen looks empty on a game whose
+         page is full. */
+      tgLanding: function () {
+        return tgRunner('landing.get', { gameId: tgGameId() }, function (data) {
+          var missing = ['landing', 'baseline', 'versions', 'preview'].filter(function (field) {
+            return !(field in data);
+          });
+          if (missing.length) return { noteKey: 'missingField', noteVal: missing.join(', ') };
+          if (!data.landing || typeof data.landing.hero !== 'string') return { noteKey: 'badStruct' };
+          if (data.blockedSections && data.blockedSections.length) {
+            return { noteKey: 'tgBlocked', noteVal: data.blockedSections.join(', ') };
+          }
+          return null;
+        });
+      },
+
+      /* The generated SQL claims to be "as they stand right now".
+         The one way to check that from out here is to compare the
+         timestamp it prints against the row it printed it from. */
+      tgSqlSettings: function () {
+        return tgRunner('sql.settings', { gameId: tgGameId() }, function (data) {
+          if (typeof data.settings !== 'string' || !data.settings.length) return { noteKey: 'badStruct' };
+          if (typeof data.products !== 'string' || typeof data.purge !== 'string') return { noteKey: 'badStruct' };
+          if (data.row && data.settings.indexOf(String(data.row.updated_at)) === -1
+              && data.settings.indexOf('no overrides stored') === -1) {
+            return { noteKey: 'tgStaleSql' };
+          }
+          return null;
+        });
+      },
+
+      tgSqlGame: function () {
+        return tgRunner('sql.game', { gameId: tgGameId() }, function (data) {
+          if (!data.sql || data.sql.indexOf('CREATE TABLE IF NOT EXISTS players') === -1) {
+            return { noteKey: 'badStruct' };
+          }
+          if (!Array.isArray(data.commands) || !data.commands.length) return { noteKey: 'badStruct' };
+          return null;
+        });
+      },
+
+      /* The Unity kit. Every module has to arrive with real code
+         in it: an empty module is a file somebody pastes into a
+         project and only discovers is empty at compile time. */
+      tgUnity: function () {
+        return tgRunner('unity', { gameId: tgGameId(), lang: 'en' }, function (data) {
+          if (!Array.isArray(data.modules) || !data.modules.length) return { noteKey: 'badStruct' };
+          var empty = data.modules.filter(function (module) {
+            return !module.code || module.code.length < 40 || !module.file;
+          });
+          if (empty.length) {
+            return { noteKey: 'tgEmptyModule', noteVal: empty.map(function (m) { return m.file || '?'; }).join(', ') };
+          }
+          return { status: 'pass', noteKey: 'records', noteVal: data.modules.length };
+        });
+      },
+
+      /* The "new game" generator, run against an id that cannot
+         collide with a real one. Nothing is created: scaffold
+         returns source text and writes nothing anywhere. */
+      tgScaffold: function () {
+        return tgRunner('scaffold', {
+          spec: { id: 'testsite-probe-game', name: 'Probe', platform: 'android', login: true }
+        }, function (data) {
+          if (!Array.isArray(data.files) || data.files.length < 4) return { noteKey: 'badStruct' };
+          var ids = data.files.map(function (file) { return file.id; });
+          var wanted = ['registry', 'wrangler', 'sql', 'unity'];
+          var absent = wanted.filter(function (id) { return ids.indexOf(id) === -1; });
+          if (absent.length) return { noteKey: 'missingField', noteVal: absent.join(', ') };
+          return null;
+        });
+      },
+
+      tgEnv: function () {
+        return tgRunner('env', {}, function (data) {
+          if (!Array.isArray(data.games) || !data.shared) return { noteKey: 'badStruct' };
+          if (!data.redirectUri || data.redirectUri.indexOf('/oauth/callback') === -1) {
+            return { noteKey: 'badStruct' };
+          }
+          var unset = data.games.filter(function (game) {
+            return game.login && (!game.web.set || !game.secret.set);
+          });
+          if (unset.length) {
+            return { noteKey: 'tgNoOauth', noteVal: unset.map(function (g) { return g.id; }).join(', ') };
+          }
+          return null;
+        });
+      },
+
+      tgOrders: function () {
+        return tgRunner('orders.list', { limit: 1 }, function (data) {
+          if (!Array.isArray(data.orders) || !data.stats) return { noteKey: 'badStruct' };
+          return { status: 'pass', noteKey: 'records', noteVal: data.total || 0 };
+        });
+      },
+
+      tgPlayers: function () {
+        return tgRunner('players.list', { gameId: tgGameId(), limit: 1 }, function (data) {
+          if (!Array.isArray(data.players)) return { noteKey: 'badStruct' };
+          if (data.moderation === false) return { status: 'warn', noteKey: 'tgNoModeration' };
+          return { status: 'pass', noteKey: 'records', noteVal: data.total || 0 };
+        });
+      },
+
+      /* The panel's own health check, run from out here. Anything
+         it calls an error is an error. */
+      tgVerify: function () {
+        return tgRunner('game.verify', { gameId: tgGameId() }, function (data) {
+          if (!data.summary || !Array.isArray(data.checks)) return { noteKey: 'badStruct' };
+          if (data.summary.failed) {
+            var broken = data.checks.filter(function (check) { return check.level === 'error'; });
+            return { noteKey: 'tgVerifyFailed', noteVal: broken.map(function (c) { return c.label; }).join(', ') };
+          }
+          if (data.summary.warned) {
+            var warned = data.checks.filter(function (check) { return check.level === 'warn'; });
+            return {
+              status: 'warn', noteKey: 'tgVerifyWarned',
+              noteVal: warned.map(function (c) { return c.label; }).join(', ')
+            };
+          }
+          return null;
+        });
+      },
+
+      /* A game id that is not in Config.js must be a 404 and not
+         a row somebody's request brought into existence. This is
+         the rule the whole panel rests on: code decides which
+         games exist. */
+      tgUnknownGame: function () {
+        return tgApi('game.get', { gameId: 'no-such-game-xyz-99' }).then(function (out) {
+          if (out.net) return netFail();
+          if (out.unauth) return { status: 'warn', code: out.status, ping: out.ping, noteKey: 'tgNoAuth' };
+          if (out.status === 404 && out.data && out.data.error === 'unknown_game') {
+            return { status: 'pass', code: 404, ping: out.ping };
+          }
+          return { status: 'fail', code: out.status, ping: out.ping, noteKey: 'expected', noteVal: '404 unknown_game' };
+        });
+      },
+
+      /* The panel writes prices; a product id that is not in the
+         catalogue must be refused rather than invented. */
+      tgUnknownProduct: function () {
+        return tgApi('product.save', {
+          gameId: tgGameId(), productId: 'no-such-product-xyz-99', patch: { price_usd: '1.00' }
+        }).then(function (out) {
+          if (out.net) return netFail();
+          if (out.unauth) return { status: 'warn', code: out.status, ping: out.ping, noteKey: 'tgNoAuth' };
+          if (out.status === 404 && out.data && out.data.error === 'unknown_product') {
+            return { status: 'pass', code: 404, ping: out.ping };
+          }
+          return { status: 'fail', code: out.status, ping: out.ping, noteKey: 'expected', noteVal: '404 unknown_product' };
+        });
+      },
+
+      /* GET is not a verb this endpoint has. Worth asserting
+         because every action behind it changes something, and a
+         panel action reachable by GET is reachable from an <img>
+         tag on another site. */
+      tgMethod: function () {
+        return fetchTest('/thegod/api').then(function (r) {
+          if (!r.ok) return netFail();
+          if (r.status === 405) return { status: 'pass', code: 405, ping: r.ping };
+          return expectFail(r, '405');
+        });
+      },
+
       /* ---------- checkout ---------- */
       coConfig: function () {
         return postJson('/testsite/checkout', { action: 'config' }).then(function (r) {
@@ -2085,12 +2543,37 @@ function dashClientScript() {
           }).catch(function () { return { status: 'fail', code: 200, ping: r.ping, noteKey: 'badStruct' }; });
         });
       },
+      // ==========================================
+      // An unknown player id, asked for with an unusable token.
+      //
+      // This test used to expect 404 and warn on the 401 it always
+      // got, which made a correct endpoint look permanently
+      // broken. The expectation was written when
+      // /database/get/games/:id/users/:uid checked only that an
+      // Authorization HEADER existed - "Bearer x" satisfied it -
+      // so the request reached the lookup and the lookup answered
+      // "no such row".
+      //
+      // That is no longer the order things happen in, and the
+      // change was the point: the token is verified with Google
+      // BEFORE anything is looked up, so an unusable one is
+      // refused at the door. 401 is not a near miss here, it is
+      // the correct answer and the safer one - a 404 would be this
+      // endpoint confirming which player ids exist to anybody who
+      // can send a malformed token, and player ids are the local
+      // part of an email address.
+      //
+      // So the assertion is now the property that actually
+      // matters: an unverified caller learns nothing. 401 passes;
+      // 404 or 200 is a real failure, because either means the
+      // lookup ran.
       d1EmptyUser: function () {
-        return fetchTest('/database/get/games/neon-katana/users/nonexistentuser99999xyz', { headers: { Accept: 'application/json', Authorization: 'Bearer fake_token_for_404_test' } }).then(function (r) {
+        return fetchTest('/database/get/games/neon-katana/users/nonexistentuser99999xyz', { headers: { Accept: 'application/json', Authorization: 'Bearer not_a_real_google_id_token' } }).then(function (r) {
           if (!r.ok) return netFail();
-          if (r.status === 404) return { status: 'pass', code: 404, ping: r.ping };
-          if (r.status === 401) return { status: 'warn', code: 401, ping: r.ping };
-          return { status: 'warn', code: r.status, ping: r.ping, noteKey: 'expected', noteVal: '404' };
+          if (r.status === 401) return { status: 'pass', code: 401, ping: r.ping };
+          if (r.status === 404) return { status: 'fail', code: 404, ping: r.ping, noteKey: 'd1Leak' };
+          if (r.status === 200) return { status: 'fail', code: 200, ping: r.ping, noteKey: 'd1Leak' };
+          return { status: 'warn', code: r.status, ping: r.ping, noteKey: 'expected', noteVal: '401' };
         });
       },
       d1GetUnauth: function () { return statusRunner('/database/get/games/neon-katana/users/testuser', {}, [400, 401], 'pass'); },
