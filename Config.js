@@ -527,8 +527,8 @@ const GAME_REGISTRY = {
       ]
     },
 
-    package: 'com.AmirColliderGames.NeonKatana',
-    myketUrl: 'https://myket.ir/app/com.AmirColliderGames.NeonKatana',
+    package: 'com.amircollider.neonkatana',
+    myketUrl: 'https://myket.ir/app/com.amircollider.neonkatana',
     d1Binding: 'NEON_KATANA_DB',
     deepLink: { host: 'oauth' },
 
@@ -550,7 +550,7 @@ const GAME_REGISTRY = {
     download: {
       primary: 'myket',
       links: {
-        myket: 'https://myket.ir/app/com.AmirColliderGames.NeonKatana'
+        myket: 'https://myket.ir/app/com.amircollider.neonkatana'
       }
     },
 
@@ -670,7 +670,7 @@ const GAME_REGISTRY = {
       deepLinkScheme: 'NEON_KATANA_DEEPLINK_SCHEME'
     },
     fallback: {
-      deepLinkScheme: 'com.amircollidergames.neonkatana'
+      deepLinkScheme: 'com.amircollider.neonkatana'
     }
   }
 }
