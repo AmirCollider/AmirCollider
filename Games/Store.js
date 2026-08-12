@@ -1142,6 +1142,40 @@ export async function findPlayers(database, { gameId = '', q = '', limit = 30 } 
 // to check - see the catch in claimPlayerIdentity.
 // ==========================================
 
+/**
+ * Releases a player id's claim, for a player deleting their own
+ * account.
+ *
+ * This row holds an email address, so it is personal data and has
+ * to go with the rest of it — a "delete my account" that leaves
+ * the address behind in a second table has not deleted the
+ * account.
+ *
+ * Keyed on the address as well as the id for the same reason
+ * deletePlayerByEmail is: two people can derive one player id,
+ * and releasing the wrong person's claim would hand their
+ * purchases to the next arrival.
+ *
+ * Releasing it is safe. The id is derived from the email, so the
+ * same person signing in again re-derives it, re-claims it, and
+ * finds the entitlements their orders paid for still there.
+ */
+export async function releasePlayerIdentity(database, gameId, playerUid, email) {
+  const address = String(email || '').trim().toLowerCase()
+  if (!database || !gameId || !playerUid || !address) return false
+
+  try {
+    const result = await database.prepare(
+      'DELETE FROM player_identity WHERE game_id = ? AND player_uid = ? AND LOWER(email) = ?'
+    ).bind(gameId, playerUid, address).run()
+    return changed(result)
+  } catch {
+    // A database that has not run 0009 has no claims to release.
+    return false
+  }
+}
+
+
 /** The address that owns a player id, or null when unclaimed. */
 export async function readPlayerIdentity(database, gameId, playerUid) {
   try {

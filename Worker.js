@@ -96,7 +96,8 @@ import {
   handleGameAccount,
   handleGameAccountSignIn,
   handleGameAccountLogout,
-  handleGameAccountProfile
+  handleGameAccountProfile,
+  handleGameAccountDelete
 } from './Pages/GameAccount.js'
 import {
   handleGameStore,
@@ -308,6 +309,13 @@ const ROUTES = [
   { path: '/:gameId/account/signin', method: 'GET', handler: handleGameAccountSignIn, dynamic: true },
   { path: '/:gameId/account/logout', method: 'POST', handler: handleGameAccountLogout, dynamic: true },
   { path: '/:gameId/account/profile', method: 'POST', handler: handleGameAccountProfile, dynamic: true },
+
+  // A player deleting their own record. POST only, and never GET:
+  // a prefetching extension, a crawler following links or a chat
+  // app unfurling a pasted URL would otherwise delete somebody's
+  // account for them. Same reason /account/logout is a POST, with
+  // considerably more at stake.
+  { path: '/:gameId/account/delete', method: 'POST', handler: handleGameAccountDelete, dynamic: true },
   { path: '/:gameId/store', method: 'GET', handler: handleGameStore, dynamic: true },
   { path: '/:gameId/store/buy', method: 'POST', handler: handleGameStoreBuy, dynamic: true },
   { path: '/:gameId/store/order', method: 'GET', handler: handleGameStoreOrder, dynamic: true },

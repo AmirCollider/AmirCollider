@@ -137,10 +137,7 @@ const I18N = {
     offline: 'بدون نیاز به اینترنت',
     online: 'بازی آنلاین',
 
-    purposeHead: 'این برنامه چیست',
-    platformNoun: { android: 'اندرویدی', web: 'تحت‌وب', both: 'اندرویدی و تحت‌وب' },
     titleKind: { android: 'بازی اندرویدی', web: 'بازی تحت‌وب', both: 'بازی اندرویدی و تحت‌وب' },
-    appIs: (name, kind) => `«${name}» یک بازی ${kind} است که AmirCollider آن را ساخته و منتشر می‌کند.`,
     googleHead: 'ورود با گوگل در این بازی برای چیست',
     googleLede: 'بازی بدون ورود هم کامل کار می‌کند. اگر وارد شوی، فقط این سه چیز از حساب گوگلت خوانده می‌شود: نام، نشانی ایمیل و تصویر پروفایل — یعنی همان scopeهای openid، profile و email. هیچ دسترسی دیگری به حساب گوگلت خواسته نمی‌شود.',
     googleUses: {
@@ -186,10 +183,7 @@ const I18N = {
     offline: 'Plays offline',
     online: 'Online play',
 
-    purposeHead: 'What this app is',
-    platformNoun: { android: 'an Android', web: 'a browser', both: 'an Android and browser' },
     titleKind: { android: 'Android game', web: 'browser game', both: 'Android and browser game' },
-    appIs: (name, kind) => `${name} is ${kind} game built and published by AmirCollider.`,
     googleHead: 'What Google sign-in is used for here',
     googleLede: 'The game works fully without signing in. If you do sign in, exactly three things are read from your Google account: your name, your email address and your profile picture — the openid, profile and email scopes. No other access to your Google account is requested.',
     googleUses: {
@@ -235,10 +229,7 @@ const I18N = {
     offline: 'オフライン対応',
     online: 'オンラインプレイ',
 
-    purposeHead: 'このアプリについて',
-    platformNoun: { android: 'Android 向け', web: 'ブラウザ', both: 'Android およびブラウザ向け' },
     titleKind: { android: 'Android ゲーム', web: 'ブラウザゲーム', both: 'Android・ブラウザゲーム' },
-    appIs: (name, kind) => `${name} は、AmirCollider が開発・公開している${kind}ゲームです。`,
     googleHead: 'Google サインインの用途',
     googleLede: 'サインインしなくてもゲームはすべて遊べます。サインインした場合に Google アカウントから読み取るのは、お名前・メールアドレス・プロフィール画像の 3 つだけです(openid・profile・email スコープ)。それ以外のアクセス権は一切要求しません。',
     googleUses: {
@@ -365,20 +356,12 @@ function landingCss() {
     .ln-sec{margin-block-end:20px}
     .ln-about{white-space:pre-wrap;line-height:1.95;color:var(--text);font-size:1em;max-width:72ch}
 
-    /* ---------- what this app is ----------
+    /* ---------- what Google sign-in is used for ----------
        Deliberately plain. This block is read by two audiences who
        want the same thing from it - somebody deciding whether to
-       install, and a reviewer checking that the page says what the
-       application does - and neither is served by styling that
+       sign in, and a reviewer checking that the page discloses what
+       the scopes are for - and neither is served by styling that
        makes it look like marketing. */
-    .ln-purpose{line-height:1.95;font-size:1.02em;max-width:72ch}
-    .ln-purpose-name{font-weight:700}
-    .ln-purpose p+p{margin-block-start:12px}
-    .ln-en{margin-block-start:14px;padding-inline-start:12px;font-size:.9em;color:var(--dim);
-      border-inline-start:2px solid var(--border);line-height:1.8}
-    .ln-google{margin-block-start:20px;padding:18px;border-radius:14px;
-      background:var(--surface-2);border:1px solid var(--border)}
-    .ln-google h3{font-size:1.02em;font-weight:800;margin-block-end:10px}
     .ln-google>p{color:var(--dim);font-size:.94em;line-height:1.85}
     .ln-google ul{margin:12px 0;padding-inline-start:20px;line-height:1.85;font-size:.94em}
     .ln-google li{margin-block-end:6px}
@@ -571,51 +554,40 @@ function getBlock(game, lang) {
 
 
 // ==========================================
-// purposeBlock
-// What this application is, and what a Google account is used
-// for in it.
+// googleBlock
+// What a Google account is used for in this game.
 //
-// The one section on this page that is not database-driven, and
-// the one that always renders. Everything else here degrades to
-// nothing when its row is empty, which is right for a trailer
-// and wrong for this: an OAuth review reads /{gameId} as the
-// application's home page, and a home page that does not name
-// the app or say what it does fails verification - which is
-// exactly the two objections that came back the first time.
+// This used to be the tail of a larger "what this app is"
+// section that also printed a generated sentence naming the game
+// and a paragraph from Config.js. Both of those were removed:
+// this page is written in the panel now, and a section that
+// appeared on it without anybody adding it - and that no screen
+// could edit - is the opposite of that.
 //
-// So the prose comes from Config.js (i18n.purpose), the list of
-// what sign-in is FOR is derived from the same capabilities
-// flags that decide whether the account, store and leaderboard
-// pages exist at all, and neither can be emptied from the panel.
+// The Google half stays, and stays outside the panel, because it
+// is not marketing copy. It is the disclosure an OAuth review
+// looks for: which scopes are requested, what each one is
+// actually used for, and how to withdraw access. It is derived
+// from the same `capabilities` flags that decide whether the
+// account, store and leaderboard pages exist at all, so it
+// cannot drift from what the game really does and cannot be
+// emptied by mistake.
 //
-// The English paragraph on a non-English page is not a
-// translation widget - it is one sentence, for the reader (or
-// reviewer) who does not read the page's language and would
-// otherwise have to guess. The page still declares its own
-// language, so the fragment carries lang="en" and its own dir.
+// A game with no sign-in renders nothing here.
 // ==========================================
-function purposeBlock(game, lang) {
+function googleBlock(game, lang) {
   const d = dict(lang)
-  const en = I18N.en
-  const platform = gamePlatforms(game).kind
-
-  const purpose = pickLang(game.i18n && game.i18n.purpose, lang)
-  const description = pickLang(game.i18n && game.i18n.description, lang) || game.description || ''
-
-  // A game whose registry entry has no purpose paragraph yet still
-  // gets a page that names it and says what it is, built from what
-  // the card already knows. Shorter, and still an answer.
-  const body = purpose || description
+  if (!game.capabilities.login) return ''
 
   const uses = []
-  if (game.capabilities.login) uses.push(d.googleUses.account)
+  uses.push(d.googleUses.account)
   if (game.capabilities.cloudSave) uses.push(d.googleUses.cloudSave)
   if (game.capabilities.leaderboard) uses.push(d.googleUses.leaderboard)
   if (game.capabilities.store) uses.push(d.googleUses.store)
 
-  const google = game.capabilities.login
-    ? `<div class="ln-google">
-        <h3>${escapeHtml(d.googleHead)}</h3>
+  return `<section class="gcard ln-sec">
+      <h2 class="ghead">${escapeHtml(d.googleHead)}</h2>
+      <div class="ln-google">
         <p>${escapeHtml(d.googleLede)}</p>
         <ul>${uses.map(use => `<li>${escapeHtml(use)}</li>`).join('')}</ul>
         <p>${escapeHtml(d.googleAfter)}</p>
@@ -625,24 +597,7 @@ function purposeBlock(game, lang) {
           <a class="gbtn gbtn--ghost" style="padding:8px 14px;font-size:.84em"
              href="${escapeHtml(localizedPath(`/${game.id}/terms`, lang))}">${escapeHtml(d.readTerms)}</a>
         </div>
-      </div>`
-    : ''
-
-  const englishAside = lang === 'en'
-    ? ''
-    : `<p class="ln-en" lang="en" dir="ltr">${escapeHtml(
-        en.appIs(game.name, en.platformNoun[platform] || en.platformNoun.android)
-      )} ${escapeHtml(pickLang(game.i18n && game.i18n.purpose, 'en') || game.description || '')}</p>`
-
-  return `<section class="gcard ln-sec">
-      <h2 class="ghead">${escapeHtml(d.purposeHead)}</h2>
-      <div class="ln-purpose" dir="auto">
-        <p class="ln-purpose-name">${escapeHtml(
-          d.appIs(game.name, d.platformNoun[platform] || d.platformNoun.android))}</p>
-        ${body ? `<p>${escapeHtml(body)}</p>` : ''}
-        ${englishAside}
       </div>
-      ${google}
     </section>`
 }
 
@@ -927,18 +882,38 @@ export async function handleGameLanding(url, request, gameId, requestId, GAMES, 
     || game.description
     || game.name
 
+  // ==========================================
+  // The order of the page.
+  //
+  // "Where to get it" is LAST, under the FAQ. It used to sit
+  // third, directly under the hero, which put the download button
+  // above every reason to press it - the features, the
+  // screenshots, the trailer and the answers to the questions
+  // people ask before they install. A visitor who has read all of
+  // that is the one ready to decide, so the decision belongs at
+  // the point they reach it.
+  //
+  // Nothing is lost by moving it: the hero's own buttons, the top
+  // navigation and the dashboard card all still link straight to
+  // the download for anybody who arrived already decided.
+  //
+  // Every block between the hero and the Google disclosure
+  // renders '' when the panel has nothing in it, so a page with
+  // an empty settings row is the hero, the sign-in disclosure and
+  // the download - and nothing that nobody wrote.
+  // ==========================================
   const body = `
     <style>${landingCss()}</style>
     ${heroBlock(game, lang, current)}
-    ${purposeBlock(game, lang)}
-    ${getBlock(game, lang)}
     ${featuresBlock(game, lang)}
     ${shotsBlock(game, lang)}
     ${videosBlock(game, lang)}
     ${aboutBlock(game, lang)}
     ${devicesBlock(game, lang)}
     ${productsBlock(game, lang)}
-    ${faqBlock(game, lang)}`
+    ${faqBlock(game, lang)}
+    ${googleBlock(game, lang)}
+    ${getBlock(game, lang)}`
 
   // "Neon Katana — Android game by AmirCollider" rather than
   // "Neon Katana — AmirCollider". The title is the first thing a

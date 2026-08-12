@@ -16,8 +16,10 @@
 import { createHtmlResponse, createJsonResponse } from '../Core/Http.js'
 import { logInfo, logWarning, logError } from '../Core/Logging.js'
 import { resolveGame, isDownloadable, effectiveProducts } from '../Games/Registry.js'
-import { db, listEntitlements } from '../Games/Store.js'
-import { playerDb, getGamePlayer, setUsername, setLeaderboardOptOut } from '../Games/Players.js'
+import { db, listEntitlements, releasePlayerIdentity } from '../Games/Store.js'
+import {
+  playerDb, getGamePlayer, setUsername, setLeaderboardOptOut, deletePlayerByEmail
+} from '../Games/Players.js'
 import { ensurePlayerRow } from '../Games/PlayerRecord.js'
 import { emailMatchesRow } from '../Core/PlayerIdentity.js'
 import {
@@ -100,6 +102,28 @@ const I18N = {
     toStore: 'رفتن به فروشگاه',
     toBoard: 'جدول امتیازات',
 
+    dangerTitle: 'حذف حساب',
+    dangerLede: 'حساب بازیکن‌ات و همه‌ی چیزهایی که به آن بسته است، از روی سرور پاک می‌شود.',
+    dangerGone: 'این‌ها برای همیشه پاک می‌شوند و برگشتی ندارند:',
+    dangerGoneList: [
+      'نام کاربری و تصویر پروفایلت',
+      'بالاترین امتیاز، تعداد بازی‌ها و مدت بازی',
+      'ذخیره‌ی ابری و هر چیزی که بازی روی سرور نگه داشته',
+      'حضورت در جدول امتیازات'
+    ],
+    dangerKept: 'این‌ها می‌مانند:',
+    dangerKeptList: [
+      'سوابق پرداخت‌هایت — یک سند مالی است و پاک کردنش یعنی اگر شش هفته بعد سؤالی درباره‌ی یک پرداخت پیش بیاید، جوابی برایش نیست.',
+      'چیزهایی که خریده‌ای. اگر دوباره با همان حساب گوگل وارد شوی، همان خریدها سر جایشان هستند — یعنی برای چیزی که یک بار پول داده‌ای، دوباره پول نمی‌دهی.'
+    ],
+    dangerGoogle: 'دسترسی این برنامه به حساب گوگلت جدا از این است و با این دکمه پس گرفته نمی‌شود. آن را از myaccount.google.com/permissions بردار.',
+    dangerConfirm: 'می‌دانم که امتیاز، نام و ذخیره‌ی ابری‌ام برای همیشه پاک می‌شود.',
+    dangerButton: 'حساب من را پاک کن',
+    dangerNeedConfirm: 'برای ادامه باید تیک تأیید را بزنی.',
+    dangerDone: 'حساب بازیکن‌ات پاک شد. اگر دوباره وارد شوی، یک حساب تازه ساخته می‌شود.',
+    dangerFailed: 'حذف انجام نشد. کمی بعد دوباره امتحان کن؛ چیزی پاک نشده است.',
+    dangerRestart: 'دوباره از اول شروع می‌کنی — با ورود دوباره، یک حساب خالی ساخته می‌شود.',
+
     failTitle: 'ورود کامل نشد',
     failBody: 'گوگل ما را برگرداند اما چیزی که لازم بود همراهش نبود. یک بار دیگر امتحان کن.',
     tryAgain: 'تلاش دوباره',
@@ -175,6 +199,28 @@ const I18N = {
     toStore: 'Go to the store',
     toBoard: 'Leaderboard',
 
+    dangerTitle: 'Delete your account',
+    dangerLede: 'Your player account, and everything attached to it, is removed from the server.',
+    dangerGone: 'These go, permanently, and cannot be brought back:',
+    dangerGoneList: [
+      'your username and profile picture',
+      'your high score, your run count and your play time',
+      'your cloud save and anything else the game keeps on the server',
+      'your place on the leaderboard'
+    ],
+    dangerKept: 'These stay:',
+    dangerKeptList: [
+      'Your payment records. They are a financial document, and deleting them means that if a question about a payment comes up six weeks later there is nothing left to answer it with.',
+      'What you have bought. Sign in again with the same Google account and your purchases are still there — you never pay twice for something you already paid for.'
+    ],
+    dangerGoogle: 'This app\'s access to your Google account is separate and this button does not withdraw it. Remove that at myaccount.google.com/permissions.',
+    dangerConfirm: 'I understand my score, my name and my cloud save are deleted for good.',
+    dangerButton: 'Delete my account',
+    dangerNeedConfirm: 'Tick the confirmation box to continue.',
+    dangerDone: 'Your player account has been deleted. Signing in again creates a fresh one.',
+    dangerFailed: 'The deletion did not go through. Try again shortly — nothing has been removed.',
+    dangerRestart: 'You start over — signing in again creates an empty account.',
+
     failTitle: 'Sign-in did not finish',
     failBody: 'Google sent us back without what we needed. Please try once more.',
     tryAgain: 'Try again',
@@ -248,6 +294,28 @@ const I18N = {
     toStore: 'ストアへ',
     toBoard: 'ランキング',
 
+    dangerTitle: 'アカウントの削除',
+    dangerLede: 'プレイヤーアカウントと、それに紐づくものがサーバーから削除されます。',
+    dangerGone: '以下は完全に削除され、元に戻せません：',
+    dangerGoneList: [
+      'ユーザー名とプロフィール画像',
+      'ハイスコア・プレイ回数・プレイ時間',
+      'クラウドセーブなど、ゲームがサーバーに保存している内容',
+      'ランキングへの掲載'
+    ],
+    dangerKept: '以下は残ります：',
+    dangerKeptList: [
+      '購入記録。これは会計上の記録であり、削除してしまうと数週間後に支払いについて問い合わせがあったとき、回答する材料が残りません。',
+      '購入した内容。同じ Google アカウントで再度サインインすれば購入は残っています。一度支払ったものに二度払うことはありません。'
+    ],
+    dangerGoogle: '本アプリの Google アカウントへのアクセスは別扱いで、このボタンでは取り消されません。myaccount.google.com/permissions から解除してください。',
+    dangerConfirm: 'スコア・名前・クラウドセーブが完全に削除されることを理解しています。',
+    dangerButton: 'アカウントを削除する',
+    dangerNeedConfirm: '続けるには確認のチェックを入れてください。',
+    dangerDone: 'プレイヤーアカウントを削除しました。再度サインインすると新しいアカウントが作成されます。',
+    dangerFailed: '削除できませんでした。しばらくしてからもう一度お試しください。何も削除されていません。',
+    dangerRestart: '最初からのやり直しになります。再サインインで空のアカウントが作成されます。',
+
     failTitle: 'サインインが完了しませんでした',
     failBody: 'Google からの応答に必要な情報がありませんでした。もう一度お試しください。',
     tryAgain: 'もう一度',
@@ -296,8 +364,14 @@ export async function handleGameAccount(url, request, gameId, requestId, GAMES, 
   const player = await readPlayerSession(env, GAMES, request)
   const failed = url.searchParams.get('error') === '1'
 
+  // Somebody who has just deleted their account lands here with no
+  // session, so this is the only place the confirmation can be
+  // shown. Without it the delete button appears to sign them out
+  // and nothing else, which reads as a failure.
+  const deleted = url.searchParams.get('deleted') === '1'
+
   if (!player) {
-    return createHtmlResponse(renderSignIn(game, lang, theme, failed), 200, headers)
+    return createHtmlResponse(renderSignIn(game, lang, theme, failed, deleted), 200, headers)
   }
 
   const database = db(env)
@@ -336,11 +410,97 @@ export async function handleGameAccount(url, request, gameId, requestId, GAMES, 
 
   const saved = url.searchParams.get('saved') === '1'
   const nameError = url.searchParams.get('name_error') || ''
+  const deleteError = url.searchParams.get('delete_error') || ''
 
   return createHtmlResponse(
-    renderAccount(game, lang, theme, player, owned, record, { saved, nameError }),
+    renderAccount(game, lang, theme, player, owned, record, { saved, nameError, deleteError }),
     200, headers
   )
+}
+
+
+// ==========================================
+// handleGameAccountDelete
+// POST /:gameId/account/delete
+//
+// A player deleting their own record.
+//
+// POST, and never GET: a prefetching extension, a crawler
+// following links or a link pasted into a chat that unfurls it
+// would otherwise delete somebody's account for them. The same
+// reason /account/logout is a POST, with far more at stake.
+//
+// What goes: the players row — username, picture, high score,
+// run count, play time, cloud save — and the player_identity
+// claim, which holds an email address and is therefore personal
+// data too.
+//
+// What stays: game_orders. An order is a financial record, and
+// deleting the money along with the account is how a chargeback
+// six weeks later becomes unanswerable — the same rule the
+// panel's own delete follows. Entitlements stay with it, so
+// somebody who deletes and signs in again is not asked to buy
+// what they already paid for. The page says all of this above
+// the button rather than leaving it to be discovered.
+//
+// The session is cleared either way. Leaving somebody signed in
+// as a row that no longer exists means the next page they open
+// silently creates it again.
+// ==========================================
+export async function handleGameAccountDelete(url, request, gameId, requestId, GAMES, env) {
+  const id = gameIdFrom(url)
+  const game = await resolveGame(env, GAMES, id)
+  if (!game) return createJsonResponse({ ok: false, error: 'unknown_game', requestId }, 404)
+
+  const player = await readPlayerSession(env, GAMES, request)
+  if (!player) return Response.redirect(`${url.origin}/${id}/account`, 302)
+
+  const back = state => `${url.origin}/${id}/account${state}`
+
+  let form
+  try {
+    form = new URLSearchParams(await request.text())
+  } catch {
+    return Response.redirect(back('?delete_error=1'), 302)
+  }
+
+  // The checkbox is `required` in the markup, which stops the
+  // ordinary submit. This is the same check on the server, for
+  // everything that is not an ordinary submit.
+  if (form.get('confirm') !== '1') {
+    return Response.redirect(back('?delete_error=confirm'), 302)
+  }
+
+  const database = playerDb(env, game)
+  if (!database) return Response.redirect(back('?delete_error=1'), 302)
+
+  // Keyed on the address as well as the id. A player id is
+  // fifteen characters of an email's local part and two people
+  // can derive the same one, so "the id matches" is not "the row
+  // is yours" — and this is the worst possible place to conflate
+  // them.
+  const removed = await deletePlayerByEmail(database, player.playerId, player.email)
+  if (!removed.ok) {
+    logError('Player account deletion failed', {
+      requestId, gameId: id, playerId: player.playerId, reason: removed.reason
+    })
+    return Response.redirect(back('?delete_error=1'), 302)
+  }
+
+  // The identity claim, which is the other place the address is
+  // stored. Best-effort: a deployment that has not run 0009 has
+  // no claims table, and the row above is already gone.
+  const licence = db(env)
+  if (licence) await releasePlayerIdentity(licence, game.id, player.playerId, player.email)
+
+  logInfo('Player deleted their own account', {
+    requestId, gameId: id, playerId: player.playerId, removed: removed.removed
+  })
+
+  return new Response(null, {
+    status: 302,
+    headers: { 'Location': back('?deleted=1'), 'Set-Cookie': clearPlayerSession() }
+  })
 }
 
 
@@ -626,12 +786,16 @@ export async function handleGameAccountLogout(url, request, gameId, requestId, G
 // ==========================================
 // Views
 // ==========================================
-function renderSignIn(game, lang, theme, failed) {
+function renderSignIn(game, lang, theme, failed, deleted) {
   const t = pack(lang)
 
   const body = `
     <div class="ghead">${escapeHtml(t.title)}</div>
     <p class="glede">${escapeHtml(t.lede)}</p>
+
+    ${deleted ? `<div class="gnote is-ok" style="margin-block-end:18px">
+      ${escapeHtml(t.dangerDone)}
+    </div>` : ''}
 
     ${failed ? `<div class="gnote is-err" style="margin-block-end:18px">
       <b>${escapeHtml(t.failTitle)}</b><br>${escapeHtml(t.failBody)}
@@ -779,6 +943,62 @@ function renderAccount(game, lang, theme, player, owned, record, flash = {}) {
         </div>`
   )
 
+  // ==========================================
+  // Deleting the account.
+  //
+  // Last on the page, behind a <details> that is closed by
+  // default, behind a checkbox that has to be ticked, and posting
+  // to its own route. Four small frictions, because this is the
+  // one control here that cannot be undone and the three above it
+  // are all "change my mind later" edits.
+  //
+  // The copy says what goes AND what stays, in that order. A
+  // delete button that only lists what it destroys is the one
+  // people press and then write in about, because "you said you
+  // deleted everything, why do you still have my email on an
+  // invoice?" is a fair question and the answer has to be on the
+  // page before the button, not in a reply afterwards.
+  //
+  // <details> rather than a modal: no script, works with the
+  // keyboard, and the browser's own find-in-page reaches inside a
+  // closed one.
+  const deleteBlock = `
+    <div class="ghead" style="margin-block-start:26px">${escapeHtml(t.dangerTitle)}</div>
+    <div class="gcard">
+      ${flash.deleteError
+        ? `<div class="gnote is-err" style="margin-block-end:14px">${escapeHtml(
+            flash.deleteError === 'confirm' ? t.dangerNeedConfirm : t.dangerFailed)}</div>` : ''}
+
+      <p style="color:var(--dim);font-size:.92em;line-height:1.8;margin-block-end:6px">
+        ${escapeHtml(t.dangerLede)}
+      </p>
+
+      <details class="acc-danger">
+        <summary>${escapeHtml(t.dangerButton)}</summary>
+
+        <p class="acc-danger-head">${escapeHtml(t.dangerGone)}</p>
+        <ul class="acc-danger-list is-gone">
+          ${t.dangerGoneList.map(line => `<li>${escapeHtml(line)}</li>`).join('')}
+        </ul>
+
+        <p class="acc-danger-head">${escapeHtml(t.dangerKept)}</p>
+        <ul class="acc-danger-list">
+          ${t.dangerKeptList.map(line => `<li>${escapeHtml(line)}</li>`).join('')}
+        </ul>
+
+        <p class="acc-danger-note">${escapeHtml(t.dangerGoogle)}</p>
+        <p class="acc-danger-note">${escapeHtml(t.dangerRestart)}</p>
+
+        <form method="POST" action="/${escapeHtml(game.id)}/account/delete" style="margin-block-start:16px">
+          <label class="acc-check" style="margin-block-end:14px">
+            <input type="checkbox" name="confirm" value="1" required>
+            <span>${escapeHtml(t.dangerConfirm)}</span>
+          </label>
+          <button type="submit" class="gbtn gbtn--danger">${escapeHtml(t.dangerButton)}</button>
+        </form>
+      </details>
+    </div>`
+
   const profileBlock = record ? `
     <div class="ghead" style="margin-block-start:26px">${escapeHtml(t.profileTitle)}</div>
     <div class="gcard">
@@ -844,6 +1064,24 @@ function renderAccount(game, lang, theme, player, owned, record, flash = {}) {
       .acc-check input{inline-size:18px;block-size:18px;margin:1px 0 0;flex-shrink:0;
         accent-color:var(--accent);cursor:pointer}
 
+      /* Deleting the account. Red, closed by default, and it does
+         not borrow the accent colour — this is the one control on
+         the page that is not a preference. */
+      .acc-danger summary{cursor:pointer;padding:11px 16px;border-radius:12px;font-weight:700;
+        font-size:.92em;list-style:none;display:inline-flex;align-items:center;gap:8px;
+        color:var(--err,#e5484d);background:color-mix(in srgb,var(--err,#e5484d) 10%,transparent);
+        border:1px solid color-mix(in srgb,var(--err,#e5484d) 40%,transparent)}
+      .acc-danger summary::-webkit-details-marker{display:none}
+      .acc-danger summary::before{content:'⚠';font-size:1.05em}
+      .acc-danger[open] summary{margin-block-end:16px}
+      .acc-danger-head{font-size:.86em;font-weight:700;margin-block:14px 6px}
+      .acc-danger-list{margin:0;padding-inline-start:20px;color:var(--dim);font-size:.86em;
+        line-height:1.85}
+      .acc-danger-list.is-gone{color:var(--err,#e5484d)}
+      .acc-danger-list li{margin-block-end:5px}
+      .acc-danger-note{font-size:.82em;color:var(--dim);line-height:1.8;margin-block-start:12px}
+      .gbtn--danger{background:var(--err,#e5484d);border-color:transparent;color:#fff}
+
       @media (max-width:640px){ .acc-actions .gbtn{flex:1 1 100%} }
     </style>
     <div class="ghead">${escapeHtml(t.title)}</div>
@@ -885,7 +1123,9 @@ function renderAccount(game, lang, theme, player, owned, record, flash = {}) {
         ${game.capabilities.leaderboard
           ? `<a class="gbtn gbtn--ghost" href="/${escapeHtml(game.id)}/leaderboard">${escapeHtml(t.toBoard)}</a>` : ''}
       </div>
-    </div>`
+    </div>
+
+    ${deleteBlock}`
 
   return page({
     game, lang, theme, active: 'account',

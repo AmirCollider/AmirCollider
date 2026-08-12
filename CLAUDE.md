@@ -91,7 +91,7 @@ only whether they are set and their length.
 ## 3. Repository map
 
 ```
-Worker.js              Entry point. ROUTES table (82 entries), route matching,
+Worker.js              Entry point. ROUTES table (83 entries), route matching,
                        canonical-host redirect, language redirect, CORS +
                        security headers, cron handler.
 Config.js              THE source of truth. CONFIG, SECURITY, LANGUAGES, THEME,
@@ -138,7 +138,8 @@ Pages/                 Everything a browser renders (one file per page)
   GameCards.js         the card grid (pure view; motifs live here)
   GameLanding.js       /:gameId  and  /:gameId/versions
   GameChrome.js        shared shell for all per-game pages
-  GameAccount.js       /:gameId/account  (+ profile POST, leaderboard opt-out)
+  GameAccount.js       /:gameId/account  (+ profile POST, leaderboard opt-out,
+                       and account deletion at POST /:gameId/account/delete)
   GameStore.js         /:gameId/store
   Leaderboard.js       /:gameId/leaderboard  (HTML or JSON by Accept header)
   TheGod.js            /thegod  — the operator panel (4,300 lines: i18n, CSS, client JS)
@@ -252,11 +253,35 @@ game_product_overrides    name, logo, colour, description, tags, status,
 falls through to `Config.js`. This is why the panel's Game page tab shows a
 `from code` / `saved here` badge on every heading.
 
+**`neon-katana` has no `landing` baseline any more.** Its whole page — banner,
+tagline, long description, features, screenshots, videos, devices, FAQ — is
+written in the panel, so an empty field there renders as nothing rather than
+falling through to code. A `landing` block is still supported and still merged
+field by field; a new game may ship one so its page says something before
+anybody opens the panel.
+
 `GAMESTORE.SETTINGS_CACHE_MS` (30 s) caches the merge per isolate.
 `invalidateSettingsCache()` after any write; the panel always reads
 `{ fresh: true }`.
 
 Current registry: **one game, `neon-katana`.**
+
+### The landing page's section order (`Pages/GameLanding.js`)
+
+```
+hero → features → screenshots → videos → about → devices → products
+     → faq → google disclosure → where to get it
+```
+
+"Where to get it" is **last**, under the FAQ: the download button belongs at the
+point a reader has finished the reasons to press it. Every block between the
+hero and the Google disclosure returns `''` when the panel has nothing in it.
+
+The Google disclosure is the one section that is not panel-driven and does not
+degrade to nothing. It is not copy — it is the OAuth disclosure (which scopes,
+what each is for, how to withdraw access), derived from the same `capabilities`
+flags that decide whether the account, store and leaderboard pages exist. A game
+without `capabilities.login` renders nothing there.
 
 ---
 
@@ -416,6 +441,8 @@ nothing else breaks — a confusing hour.
 | Change the merge of code ↔ database | `Games/Registry.js` `mergeGame()` |
 | Add a `game_settings` column | `SETTINGS_SCHEMA` in `Games/Store.js` + a migration file. Nothing else — the writer, the repair, the SQL generator and the panel all read that array. |
 | Change leaderboard membership | `boardFilter()` in `Games/PlayerRecord.js` — **one place**, read by the page, its count, and the game's JSON copy |
+| Change what account deletion removes | `handleGameAccountDelete` in `Pages/GameAccount.js` + `deletePlayerByEmail` / `releasePlayerIdentity`. Orders and entitlements are kept on purpose — say so on the page if that changes |
+| Reorder the landing page | the `body` template in `handleGameLanding` — one list, in render order |
 | Add a panel action | `Api/TheGodApi.js` switch + the `bad_action` list + UI in `Pages/TheGod.js` |
 | Add a panel test | `Pages/TestSite.js` — see §8 |
 | Change the Unity client | `Content/UnityKit.js` |
@@ -438,13 +465,15 @@ nothing else breaks — a confusing hour.
    missing; `/thegod` → SQL → **Repair the schema** adds them. Check whether
    this has been run before diagnosing a related report.
 
-3. **Deep-link scheme mismatch.** `game_settings.deeplink_scheme` holds
-   `com.amircollider.neonkatana`, while `GAME_REGISTRY.fallback.deepLinkScheme`
-   holds `com.amircollidergames.neonkatana` and the Android package is
-   `com.AmirColliderGames.NeonKatana`. The database value wins. It must match
-   the `intent-filter` in the shipped APK's `AndroidManifest.xml` exactly; if it
-   does not, Google sign-in on Android dead-ends on a blank browser tab with no
-   error anywhere. Confirm against the APK before changing either.
+3. **Deep-link scheme — resolved, and worth re-checking after any change.**
+   `game_settings.deeplink_scheme` and `GAME_REGISTRY.fallback.deepLinkScheme`
+   both hold `com.amircollider.neonkatana` now; they disagreed until 2026-08-12,
+   which meant clearing the database row would silently change the scheme. The
+   Android package is `com.AmirColliderGames.NeonKatana` and is a different
+   string on purpose. Whatever these hold must match the `intent-filter` in the
+   shipped APK's `AndroidManifest.xml` exactly; if it does not, Google sign-in
+   on Android dead-ends on a blank browser tab with no error anywhere.
+   `/thegod` → Variables shows which of the three layers is in force.
 
 4. **`0010_leaderboard_optout.sql` is new** and must be run against each game's
    own database. Until it is, the opt-out checkbox does not render and
@@ -471,6 +500,10 @@ nothing else breaks — a confusing hour.
   inside the payload, plus login rate limiting in `panel_attempts`.
 - Panel cookies are path-scoped (`/thegod`, `/testsite`) so signing into one
   does not hand over the other.
+- Anything a player can delete about themselves is keyed on **player id AND
+  email**, never the id alone (`deletePlayerByEmail`, `releasePlayerIdentity`).
+  Two people can derive one player id, and a self-service delete is the worst
+  possible place to conflate "the id matches" with "the row is yours".
 
 ---
 

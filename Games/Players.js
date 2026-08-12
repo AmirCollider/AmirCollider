@@ -340,3 +340,44 @@ export async function deleteGamePlayer(database, playerId) {
     return false
   }
 }
+
+
+// ==========================================
+// deletePlayerByEmail
+// The player deleting their OWN account.
+//
+// Keyed on the email as well as the player id, and that is the
+// whole reason this is not just deleteGamePlayer() with a
+// different caller.
+//
+// A player id is fifteen characters of an email's local part, so
+// it is not unique to a person: ali@gmail.com and ali@yahoo.com
+// both derive "ali". Everywhere else in this codebase that
+// collision is handled by comparing the row's `email` before
+// acting, and a self-service delete is the single worst place to
+// forget it - the second person to sign in with a colliding
+// address would erase the first one's account, score and cloud
+// save by pressing a button on their own settings page.
+//
+// So the WHERE clause carries both. A mismatch deletes nothing
+// and reports that it deleted nothing, which the caller turns
+// into a refusal rather than a cheerful "done".
+// ==========================================
+export async function deletePlayerByEmail(database, playerId, email) {
+  const address = String(email || '').trim().toLowerCase()
+  if (!database || !playerId || !address) return { ok: false, reason: 'bad_input' }
+
+  try {
+    const result = await database
+      .prepare('DELETE FROM players WHERE player_id = ? AND LOWER(email) = ?')
+      .bind(playerId, address).run()
+
+    // No row matched. Either it was already gone - a double
+    // submit, or a second tab - or the row belongs to somebody
+    // else. Both are "there is nothing of yours left here", and
+    // neither is an error worth showing a person mid-deletion.
+    return { ok: true, reason: '', removed: changed(result) }
+  } catch (error) {
+    return { ok: false, reason: 'failed', error: String(error && error.message).slice(0, 200) }
+  }
+}
