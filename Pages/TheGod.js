@@ -654,6 +654,34 @@ const I18N = {
     pgSaveHint: 'بعد از ذخیره، همین صفحه از روی چیزی که واقعاً در پایگاه‌داده نوشته شد دوباره ساخته می‌شود — '
               + 'برچسب‌ها را نگاه کن تا ببینی کدام بخش‌ها ذخیره شدند.',
 
+    // game page tab — per-language lists
+    pgShared: 'مشترک',
+    pgLangHint: 'اگر بازی متنی است یا روی تصویرها نوشته هست، برای هر زبان فهرست جدا بساز. '
+              + 'هر زبانی که فهرست خودش خالی باشد، همان فهرست «مشترک» را نشان می‌دهد — '
+              + 'پس اگر همه‌ی زبان‌ها یک تصویر دارند، فقط «مشترک» را پر کن.',
+    pgLangOwn: 'این زبان فهرست خودش را دارد و «مشترک» را نادیده می‌گیرد.',
+    pgLangFallback: 'این زبان فهرست خودش را ندارد، پس همان «مشترک» نمایش داده می‌شود.',
+
+    // game page tab — the Google sign-in disclosure
+    pgGoogle: 'متن «ورود با گوگل برای چیست»',
+    pgGoogleHint: 'این بخش پایین صفحه‌ی بازی می‌آید و می‌گوید ورود با گوگل چه چیزی می‌خواند و برای چه. '
+                + 'تا وقتی این‌جا چیزی ننویسی، متن استانداردی نمایش داده می‌شود که از روی قابلیت‌های همین بازی ساخته می‌شود.',
+    pgGoogleOn: 'این بخش روی صفحه‌ی بازی نمایش داده می‌شود',
+    pgGoogleOff: 'این بخش نمایش داده نمی‌شود',
+    pgGoogleSwitchHint: 'خاموش کنی، هیچ توضیحی درباره‌ی ورود با گوگل روی صفحه نمی‌ماند.',
+    pgGoogleWarn: 'این بازی ورود با گوگل دارد. بازبینی OAuth گوگل دنبال همین بخش می‌گردد؛ '
+                + 'خاموش کردنش می‌تواند تأیید برنامه را به خطر بیندازد.',
+    pgGoogleNoLogin: 'این بازی ورود با گوگل ندارد، پس این بخش در هر حالتی روی صفحه دیده نمی‌شود. '
+                   + 'هرچه این‌جا بنویسی ذخیره می‌شود و اگر روزی login روشن شود، همان نمایش داده خواهد شد.',
+    pgGoogleHead: 'عنوان بخش',
+    pgGoogleBody: 'متن بخش',
+    pgGoogleBodyHint: 'خط خالی یعنی پاراگراف تازه. خطی که با «- » شروع شود، به‌صورت یک آیتم فهرست نمایش داده می‌شود. '
+                    + 'هیچ HTML‌ای اجرا نمی‌شود.',
+    pgGoogleDefault: 'گذاشتن متن پیش‌فرض داخل کادرها',
+    pgGoogleDefaultHint: 'متن استاندارد را داخل هر سه کادر می‌گذارد تا بتوانی ویرایشش کنی. '
+                       + 'کادر را خالی کنی، دوباره همان متن پیش‌فرض روی صفحه می‌آید.',
+    pgGoogleFilled: 'متن پیش‌فرض داخل کادرها گذاشته شد. برای ثبت، ذخیره کن.',
+
     // versions
     vsTitle: 'نسخه‌ها',
     vsLede: 'هر انتشار یک ردیف. جدیدترین تاریخ یعنی «نسخه‌ی فعلی» — روی صفحه‌ی بازی و روی کارت داشبورد.',
@@ -1096,6 +1124,32 @@ const I18N = {
               + 'read the badges to see which sections were stored.',
     pgPreviewImage: 'Preview',
 
+    pgShared: 'Shared',
+    pgLangHint: 'If the game is text-heavy, or the artwork has words on it, give each language its own list. '
+              + 'A language whose own list is empty shows the "Shared" one instead — '
+              + 'so if every language uses the same images, fill in "Shared" and nothing else.',
+    pgLangOwn: 'This language has its own list and ignores "Shared".',
+    pgLangFallback: 'This language has no list of its own, so the "Shared" one is what visitors see.',
+
+    pgGoogle: 'The "what Google sign-in is for" text',
+    pgGoogleHint: 'The section near the bottom of the game\'s page saying what a Google sign-in reads and why. '
+                + 'Until you write something here it shows a standard text built from this game\'s own capabilities.',
+    pgGoogleOn: 'This section appears on the game\'s page',
+    pgGoogleOff: 'This section does not appear',
+    pgGoogleSwitchHint: 'Switched off, the page says nothing at all about the Google sign-in.',
+    pgGoogleWarn: 'This game signs players in with Google. A Google OAuth review looks for exactly this section, '
+                + 'so switching it off can cost the app its verification.',
+    pgGoogleNoLogin: 'This game has no Google sign-in, so the section never appears whatever this switch says. '
+                   + 'Anything written here is still saved, and would be used if login were ever turned on.',
+    pgGoogleHead: 'Heading',
+    pgGoogleBody: 'Body text',
+    pgGoogleBodyHint: 'A blank line starts a new paragraph. A line beginning with "- " becomes a bullet. '
+                    + 'No HTML is run.',
+    pgGoogleDefault: 'Put the standard text in the boxes',
+    pgGoogleDefaultHint: 'Copies the standard text into all three boxes so you can edit it. '
+                       + 'Empty a box and the standard text comes back on the page by itself.',
+    pgGoogleFilled: 'The standard text is in the boxes. Save to keep it.',
+
     vsTitle: 'Versions',
     vsLede: 'One row per release. The newest date is "the current version" — on the game\'s page and on its dashboard card.',
     vsVersion: 'Version',
@@ -1528,6 +1582,31 @@ const I18N = {
               + 'バッジを見れば、どのセクションが保存されたか分かります。',
     pgPreviewImage: 'プレビュー',
 
+    pgShared: '共通',
+    pgLangHint: 'テキスト中心のゲームや、画像に文字が入っている場合は、言語ごとにリストを作れます。'
+              + '自分のリストが空の言語は「共通」のリストを表示します。'
+              + 'すべての言語で同じ画像を使うなら「共通」だけ入力してください。',
+    pgLangOwn: 'この言語は独自のリストを持ち、「共通」は使いません。',
+    pgLangFallback: 'この言語は独自のリストがないため、「共通」が表示されます。',
+
+    pgGoogle: '「Google サインインの用途」の文章',
+    pgGoogleHint: 'ゲームページ下部の、Google サインインで何を読み取り何に使うかを説明するセクションです。'
+                + 'ここに何も書かない間は、このゲームの機能から組み立てられた標準の文章が表示されます。',
+    pgGoogleOn: 'このセクションをゲームページに表示する',
+    pgGoogleOff: 'このセクションを表示しない',
+    pgGoogleSwitchHint: 'オフにすると、Google サインインについての説明がページから一切なくなります。',
+    pgGoogleWarn: 'このゲームは Google サインインを使います。Google の OAuth 審査はまさにこのセクションを確認するため、'
+                + 'オフにすると認証に影響する可能性があります。',
+    pgGoogleNoLogin: 'このゲームには Google サインインがないため、このセクションは表示されません。'
+                   + 'ここに書いた内容は保存され、将来 login を有効にした場合に使われます。',
+    pgGoogleHead: '見出し',
+    pgGoogleBody: '本文',
+    pgGoogleBodyHint: '空行で段落が変わります。「- 」で始まる行は箇条書きになります。HTML は実行されません。',
+    pgGoogleDefault: '標準の文章を入力欄に入れる',
+    pgGoogleDefaultHint: '標準の文章を 3 つの欄にコピーして編集できるようにします。'
+                       + '欄を空にすると、ページには再び標準の文章が表示されます。',
+    pgGoogleFilled: '標準の文章を入力欄に入れました。保存すると反映されます。',
+
     vsTitle: 'バージョン',
     vsLede: 'リリースごとに 1 行。最新の日付が「現在のバージョン」です。',
     vsVersion: 'バージョン',
@@ -1927,6 +2006,14 @@ function panelCss() {
       border:1px solid color-mix(in srgb,var(--info) 36%,transparent);
       transition:background .15s ease,transform .15s ease}
     .storekeys code:hover{background:color-mix(in srgb,var(--info) 22%,transparent);transform:translateY(-1px)}
+
+    /* The row count on a per-language list tab. Deliberately not
+       a .chip: a chip keeps its own dim colour, which is
+       unreadable on the gradient a pressed tab paints behind it. */
+    .seg .seg-n{display:inline-block;min-width:1.5em;padding:1px 6px;border-radius:999px;
+      font-size:.85em;font-weight:800;background:color-mix(in srgb,var(--dim) 24%,transparent)}
+    .seg button[aria-pressed="true"] .seg-n{background:rgba(255,255,255,.26)}
+    .seg button:disabled{opacity:.5;cursor:not-allowed}
 
     /* ---- repeating rows (features, screenshots, videos, FAQ) ----
        Every list on the game-page tab is the same shape: a stack
@@ -2959,10 +3046,11 @@ function tgPeek(value) {
 // the moment somebody types, and it is not submitted - so the
 // editor can show what the page currently says without that text
 // silently becoming a stored override on the next save.
-function tgLangFields(prefix, label, values, multiline, baseline, blocked) {
+function tgLangFields(prefix, label, values, multiline, baseline, blocked, rowCount) {
   var stored = Boolean(values && (values.fa || values.en || values.ja));
   var base = baseline || {};
   var baseText = tgPeek(base[TG.lang] || base.en || base.fa);
+  var rows = rowCount || 5;
 
   var out = '<h3 class="sub">' + tgEsc(label)
           + tgOriginBadge(tgOriginOf(stored, blocked), baseText) + '</h3>';
@@ -2976,7 +3064,7 @@ function tgLangFields(prefix, label, values, multiline, baseline, blocked) {
 
     out += '<label class="f"><span>' + tgEsc(TG_LANG_NAMES[i]) + '</span>'
         + (multiline
-            ? '<textarea id="' + prefix + '-' + code + '" dir="' + dir + '" rows="5"' + place + '>'
+            ? '<textarea id="' + prefix + '-' + code + '" dir="' + dir + '" rows="' + rows + '"' + place + '>'
               + tgEsc(value) + '</textarea>'
             : '<input type="text" id="' + prefix + '-' + code + '" dir="' + dir + '"' + place
               + ' value="' + tgEsc(value) + '">')
@@ -3025,6 +3113,15 @@ function tgRepRemove(button) {
 function tgRepRenumber(list) {
   var rows = list.querySelectorAll('.rep-row .rep-num');
   for (var i = 0; i < rows.length; i++) rows[i].textContent = String(i + 1);
+
+  // A list that is one tab of a per-language section carries its
+  // count on that tab, so "which languages did I actually fill
+  // in?" is answerable without clicking through all four. Only
+  // those lists have a counter, so a missing element is the
+  // ordinary case rather than a fault.
+  var kind = (list.id || '').replace(/^rep-/, '');
+  var counter = kind ? tgById('cnt-' + kind) : null;
+  if (counter) counter.textContent = String(rows.length);
 }
 
 function tgRepAdd(kind) {
@@ -3064,6 +3161,38 @@ function tgRepRead(kind) {
   return out;
 }
 
+// ==========================================
+// Per-language list tabs
+//
+// Two of the sections on this tab - the screenshots and the
+// videos - exist once per language on top of one shared list,
+// because a text-heavy game is a different picture in Persian,
+// English and Japanese. The four lists are ALL in the DOM at
+// once and one is visible, rather than one list redrawn per tab:
+// a half-typed row in the Japanese gallery has to survive a look
+// at the Persian one, and it has to still be there when the save
+// reads all four.
+// ==========================================
+var TG_LIST_TABS = ['shared', 'fa', 'en', 'ja'];
+
+// The list id one tab owns: the plain kind for the shared list,
+// and kind-fa / kind-en / kind-ja for a language's own. Every
+// read, every counter and every add button is keyed on this, so
+// there is one place that decides how the two are spelled.
+function repKindOf(kind, code) {
+  return code === 'shared' ? kind : kind + '-' + code;
+}
+
+function tgListLang(kind, which) {
+  for (var i = 0; i < TG_LIST_TABS.length; i++) {
+    var code = TG_LIST_TABS[i];
+    var pane = tgById('pane-' + kind + '-' + code);
+    var tab = tgById('tab-' + kind + '-' + code);
+    if (pane) pane.hidden = code !== which;
+    if (tab) tab.setAttribute('aria-pressed', code === which ? 'true' : 'false');
+  }
+}
+
 function tgRepList(kind, rows) {
   var body = (rows || []).map(function (row, index) {
     return tgRepBody(kind, index, row);
@@ -3076,8 +3205,13 @@ function tgRepList(kind, rows) {
   +   tgEsc(TG.t.pgAdd) + '</button>';
 }
 
-function tgRepBody(kind, index, row) {
+function tgRepBody(repKind, index, row) {
   var value = function (key) { return tgEsc((row && row[key]) || ''); };
+
+  // 'screenshots-ja' is a screenshots row. The suffix names which
+  // list the row belongs to and says nothing about its shape, so
+  // it is stripped once here rather than checked in five places.
+  var kind = String(repKind).replace(/-(fa|en|ja)$/, '');
 
   if (kind === 'features') {
     return tgRepShell(kind, index,
@@ -3208,6 +3342,82 @@ function tgDrawPage(data) {
       + '</div>';
   };
 
+  // ==========================================
+  // A list section that exists once per language.
+  //
+  // Screenshots and videos only. Everything else on this tab is
+  // the same in all three languages either because it already has
+  // per-language fields inside every row (features, FAQ) or
+  // because it is not language-specific at all (devices, the
+  // banner).
+  //
+  // The shared list is the first tab and stays the one most games
+  // will ever use: a language with nothing of its own shows it.
+  // The count on each tab is what makes that legible - "fa 4 /
+  // en 4 / ja 0" says at a glance that the Japanese page is
+  // showing the shared gallery.
+  // ==========================================
+  var langSection = function (icon, title, hint, kind, rows, baseRows, byLang) {
+    var isBlocked = Boolean(blocked[kind]);
+    var langBlocked = Boolean(blocked[kind + 'Lang']);
+    var lists = byLang || {};
+    var baseCount = (baseRows || []).length;
+
+    var anyLang = false;
+    for (var l = 0; l < TG_LANG_CODES.length; l++) {
+      if ((lists[TG_LANG_CODES[l]] || []).length) anyLang = true;
+    }
+    var stored = (rows || []).length > 0 || anyLang;
+
+    // The tab strip. 'shared' first, then the three languages in
+    // the order everything else on this screen uses them.
+    var tabs = '';
+    var panes = '';
+
+    var tab = function (code, label, count, disabled) {
+      return '<button type="button" id="tab-' + kind + '-' + code + '"'
+        + ' aria-pressed="' + (code === 'shared' ? 'true' : 'false') + '"'
+        + (disabled ? ' disabled' : '')
+        + ' onclick="tgListLang(\'' + kind + '\',\'' + code + '\')">'
+        + tgEsc(label) + ' <span class="seg-n" id="cnt-' + repKindOf(kind, code) + '">' + count + '</span>'
+        + '</button>';
+    };
+
+    tabs += tab('shared', TG.t.pgShared, (rows || []).length, false);
+    for (var i = 0; i < TG_LANG_CODES.length; i++) {
+      tabs += tab(TG_LANG_CODES[i], TG_LANG_NAMES[i], (lists[TG_LANG_CODES[i]] || []).length, langBlocked);
+    }
+
+    panes += '<div id="pane-' + kind + '-shared">' + tgRepList(kind, rows) + '</div>';
+    for (var j = 0; j < TG_LANG_CODES.length; j++) {
+      var code = TG_LANG_CODES[j];
+      var own = lists[code] || [];
+      panes += '<div id="pane-' + kind + '-' + code + '" hidden>'
+        + '<div class="note ' + (own.length ? 'ok' : 'info') + '">'
+        +   tgEsc(own.length ? TG.t.pgLangOwn : TG.t.pgLangFallback)
+        + '</div>'
+        + tgRepList(repKindOf(kind, code), own)
+        + '</div>';
+    }
+
+    return '<div class="card' + (isBlocked ? ' blocked-sec' : '') + '">'
+      + '<h2 class="sec">' + icon + ' ' + tgEsc(title)
+      +   tgOriginBadge(tgOriginOf(stored, isBlocked),
+            baseCount ? baseCount + ' ' + TG.t.pgFromCodeRows : '')
+      + '</h2>'
+      + '<div class="hint" style="margin-block-end:12px">' + tgEsc(hint) + '</div>'
+      + (isBlocked ? '<div class="note err">' + tgEsc(TG.t.pgBlockedHint) + '</div>' : '')
+      + (!stored && baseCount
+          ? '<div class="note info">' + baseCount + ' ' + tgEsc(TG.t.pgCodeRowsNote) + '</div>'
+          : '')
+      + '<div class="seg" role="group" aria-label="' + tgEsc(title) + '"'
+      +   ' style="margin-block-end:10px;flex-wrap:wrap">' + tabs + '</div>'
+      + '<div class="hint" style="margin-block-end:12px">' + tgEsc(TG.t.pgLangHint) + '</div>'
+      + (langBlocked ? '<div class="note err">' + tgEsc(TG.t.pgBlockedHint) + '</div>' : '')
+      + panes
+      + '</div>';
+  };
+
   var heroBlocked = Boolean(blocked.hero);
 
   tgById('tg-page-out').innerHTML =
@@ -3243,10 +3453,13 @@ function tgDrawPage(data) {
   + '</div>'
 
   + section('✨', TG.t.pgFeatures, TG.t.pgFeaturesHint, 'features', landing.features, base.features)
-  + section('📷', TG.t.pgScreens, TG.t.pgScreensHint, 'screenshots', landing.screenshots, base.screenshots)
-  + section('🎬', TG.t.pgVideos, TG.t.pgVideosHint, 'videos', landing.videos, base.videos)
+  + langSection('📷', TG.t.pgScreens, TG.t.pgScreensHint, 'screenshots',
+      landing.screenshots, base.screenshots, landing.screenshotsByLang)
+  + langSection('🎬', TG.t.pgVideos, TG.t.pgVideosHint, 'videos',
+      landing.videos, base.videos, landing.videosByLang)
   + section('📱', TG.t.pgDevices, TG.t.pgDevicesHint, 'devices', landing.devices, base.devices)
   + section('❓', TG.t.pgFaq, TG.t.pgFaqHint, 'faq', landing.faq, base.faq)
+  + tgGoogleCard(landing.google || {}, base.google || {}, Boolean(blocked.google))
 
   + '<div class="card">'
   +   '<div class="row">'
@@ -3262,6 +3475,100 @@ function tgDrawPage(data) {
 
   tgDrawVersions(data.versions || []);
 }
+
+// ==========================================
+// tgGoogleCard
+// The "what Google sign-in is used for" section, as content.
+//
+// This block used to be three paragraphs hard-coded inside
+// Pages/GameLanding.js, and the only way to change a word of it -
+// or to leave it off a game that does not want it - was a deploy.
+//
+// The default still comes from code and is still assembled from
+// the game's own capabilities, so a game with no store never
+// claims purchases are tied to an account. What this screen adds
+// is the two things code could not do: an operator's own wording,
+// and a switch.
+//
+// The switch is the one control on this tab that can make the
+// public page say LESS than it did, so it says so out loud on a
+// game that signs players in. Google's OAuth review reads this
+// section; a page that no longer has it is a verification
+// problem, not a layout one.
+// ==========================================
+function tgGoogleCard(google, base, blocked) {
+  var game = tgSelected();
+  var hasLogin = Boolean(game && game.capabilities && game.capabilities.login);
+  var on = google.enabled !== false;
+
+  return '<div class="card' + (blocked ? ' blocked-sec' : '') + '">'
+  +   '<h2 class="sec">🔐 ' + tgEsc(TG.t.pgGoogle)
+  +     tgOriginBadge(
+          tgOriginOf(Boolean(google.body && (google.body.fa || google.body.en || google.body.ja)), blocked),
+          tgPeek((base.body && (base.body[TG.lang] || base.body.en || base.body.fa)) || ''))
+  +   '</h2>'
+  +   '<div class="hint" style="margin-block-end:12px">' + tgEsc(TG.t.pgGoogleHint) + '</div>'
+  +   (blocked ? '<div class="note err">' + tgEsc(TG.t.pgBlockedHint) + '</div>' : '')
+  +   (hasLogin ? '' : '<div class="note info">' + tgEsc(TG.t.pgGoogleNoLogin) + '</div>')
+
+  +   '<div class="note ' + (on ? 'ok' : 'warn') + '" id="pg-google-note">'
+  +     '<label class="switch"><input type="checkbox" id="pg-google-on"' + (on ? ' checked' : '')
+  +       ' onchange="tgGoogleToggle(this.checked)"><span class="track"></span>'
+  +       '<span id="pg-google-state">' + tgEsc(on ? TG.t.pgGoogleOn : TG.t.pgGoogleOff) + '</span></label>'
+  +     '<div class="hint">' + tgEsc(TG.t.pgGoogleSwitchHint) + '</div>'
+  +   '</div>'
+  +   (hasLogin
+        ? '<div class="note warn" id="pg-google-warn"' + (on ? ' hidden' : '') + '>'
+          + tgEsc(TG.t.pgGoogleWarn) + '</div>'
+        : '')
+
+  +   '<div id="pg-google-fields"' + (on ? '' : ' hidden') + '>'
+  +     tgLangFields('pg-google-head', TG.t.pgGoogleHead, google.head, false, base.head, blocked)
+  +     tgLangFields('pg-google-body', TG.t.pgGoogleBody, google.body, true, base.body, blocked, 9)
+  +     '<div class="hint" style="margin-block-start:-6px">' + tgEsc(TG.t.pgGoogleBodyHint) + '</div>'
+  +     '<div class="row" style="margin-block-start:12px">'
+  +       '<button type="button" class="btn ghost small" onclick="tgGoogleDefault()">'
+  +         tgEsc(TG.t.pgGoogleDefault) + '</button>'
+  +     '</div>'
+  +     '<div class="hint" style="margin-block-start:8px">' + tgEsc(TG.t.pgGoogleDefaultHint) + '</div>'
+  +   '</div>'
+  + '</div>';
+}
+
+
+function tgGoogleToggle(on) {
+  var fields = tgById('pg-google-fields');
+  var state = tgById('pg-google-state');
+  var note = tgById('pg-google-note');
+  var warn = tgById('pg-google-warn');
+
+  if (fields) fields.hidden = !on;
+  if (state) state.textContent = on ? TG.t.pgGoogleOn : TG.t.pgGoogleOff;
+  if (note) note.className = 'note ' + (on ? 'ok' : 'warn');
+  if (warn) warn.hidden = on;
+}
+
+
+// The standard text, put in the boxes so it can be edited.
+//
+// It is not saved by pressing this - the save button is still the
+// save button - and clearing a box still means "use the standard
+// text", so this is a starting point rather than a commitment.
+function tgGoogleDefault() {
+  var base = ((TG.page || {}).baseline || {}).google || {};
+  var filled = false;
+
+  for (var i = 0; i < TG_LANG_CODES.length; i++) {
+    var code = TG_LANG_CODES[i];
+    var head = tgById('pg-google-head-' + code);
+    var body = tgById('pg-google-body-' + code);
+    if (head && base.head) { head.value = base.head[code] || ''; filled = true; }
+    if (body && base.body) { body.value = base.body[code] || ''; filled = true; }
+  }
+
+  if (filled) tgToast(TG.t.pgGoogleFilled);
+}
+
 
 function tgHeroPreview() {
   var image = tgById('pg-hero-preview');
@@ -3289,6 +3596,20 @@ function tgSavePage() {
     };
   });
 
+  // The three per-language lists of one section, read whether or
+  // not their tab is the visible one. All four are in the DOM the
+  // whole time precisely so a save is not "whatever was on
+  // screen".
+  var byLang = function (kind) {
+    var out = {};
+    for (var i = 0; i < TG_LANG_CODES.length; i++) {
+      out[TG_LANG_CODES[i]] = tgRepRead(kind + '-' + TG_LANG_CODES[i]);
+    }
+    return out;
+  };
+
+  var googleSwitch = tgById('pg-google-on');
+
   tgCall('landing.save', {
     gameId: game.id,
     landing: {
@@ -3297,9 +3618,16 @@ function tgSavePage() {
       about: tgLangRead('pg-about'),
       features: tgRepRead('features'),
       screenshots: tgRepRead('screenshots'),
+      screenshotsByLang: byLang('screenshots'),
       videos: tgRepRead('videos'),
+      videosByLang: byLang('videos'),
       devices: tgRepRead('devices'),
-      faq: faq
+      faq: faq,
+      google: {
+        enabled: googleSwitch ? googleSwitch.checked : true,
+        head: tgLangRead('pg-google-head'),
+        body: tgLangRead('pg-google-body')
+      }
     }
   }).then(function (data) {
     button.disabled = false;

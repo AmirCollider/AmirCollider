@@ -152,12 +152,46 @@ export const SETTINGS_SCHEMA = [
   { name: 'tagline_ja', type: 'TEXT', since: '0008_landing_extra.sql' },
   { name: 'features_json', type: 'TEXT', since: '0008_landing_extra.sql' },
   { name: 'screenshots_json', type: 'TEXT', since: '0008_landing_extra.sql' },
-  { name: 'faq_json', type: 'TEXT', since: '0008_landing_extra.sql' }
+  { name: 'faq_json', type: 'TEXT', since: '0008_landing_extra.sql' },
+
+  // A gallery and a trailer list PER LANGUAGE. The shared lists
+  // above stay exactly what they were and are what a language
+  // with nothing of its own falls back to; these exist because a
+  // screenshot of a text-heavy game is a different picture in
+  // Persian, English and Japanese, and one list cannot be all
+  // three.
+  { name: 'screenshots_fa_json', type: 'TEXT', since: '0011_landing_languages.sql' },
+  { name: 'screenshots_en_json', type: 'TEXT', since: '0011_landing_languages.sql' },
+  { name: 'screenshots_ja_json', type: 'TEXT', since: '0011_landing_languages.sql' },
+  { name: 'videos_fa_json', type: 'TEXT', since: '0011_landing_languages.sql' },
+  { name: 'videos_en_json', type: 'TEXT', since: '0011_landing_languages.sql' },
+  { name: 'videos_ja_json', type: 'TEXT', since: '0011_landing_languages.sql' },
+
+  // The Google sign-in disclosure, which used to be hard-coded in
+  // Pages/GameLanding.js. INTEGER and three-state on purpose:
+  // NULL is "nobody decided", which reads as on.
+  { name: 'google_enabled', type: 'INTEGER', since: '0011_landing_languages.sql' },
+  { name: 'google_head_fa', type: 'TEXT', since: '0011_landing_languages.sql' },
+  { name: 'google_head_en', type: 'TEXT', since: '0011_landing_languages.sql' },
+  { name: 'google_head_ja', type: 'TEXT', since: '0011_landing_languages.sql' },
+  { name: 'google_body_fa', type: 'TEXT', since: '0011_landing_languages.sql' },
+  { name: 'google_body_en', type: 'TEXT', since: '0011_landing_languages.sql' },
+  { name: 'google_body_ja', type: 'TEXT', since: '0011_landing_languages.sql' }
 ]
 
-/** The landing-page half of the above: what the "Game page" tab writes. */
+/**
+ * The landing-page half of the above: what the "Game page" tab
+ * writes.
+ *
+ * Prefixes rather than exact names, so `videos_` covers both the
+ * shared list and the three per-language ones and a fourth
+ * language would need nothing here. The only column this must
+ * NOT let through is one the Games tab owns - the name, the
+ * colour, the download links - which is why it is a whitelist of
+ * prefixes and not "everything except".
+ */
 export const LANDING_COLUMNS = SETTINGS_SCHEMA
-  .filter(column => /^(hero_url|videos_json|devices_json|about_|tagline_|features_json|screenshots_json|faq_json)/.test(column.name))
+  .filter(column => /^(hero_url|videos_|devices_json|about_|tagline_|features_json|screenshots_|faq_json|google_)/.test(column.name))
   .map(column => column.name)
 
 

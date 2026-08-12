@@ -43,6 +43,7 @@ import {
   resolveGame, isDownloadable, effectiveProducts, landingVideo, gamePlatforms
 } from '../Games/Registry.js'
 import { db, listVersions } from '../Games/Store.js'
+import { googleDisclosureFor, POLICY_LABELS } from '../Content/GoogleDisclosure.js'
 import { chromeTheme, langHeader, page, localeFor } from './GameChrome.js'
 import { escapeHtml } from '../Core/Html.js'
 import { matchRequestLang } from '../Core/RequestContext.js'
@@ -137,18 +138,7 @@ const I18N = {
     offline: 'بدون نیاز به اینترنت',
     online: 'بازی آنلاین',
 
-    titleKind: { android: 'بازی اندرویدی', web: 'بازی تحت‌وب', both: 'بازی اندرویدی و تحت‌وب' },
-    googleHead: 'ورود با گوگل در این بازی برای چیست',
-    googleLede: 'بازی بدون ورود هم کامل کار می‌کند. اگر وارد شوی، فقط این سه چیز از حساب گوگلت خوانده می‌شود: نام، نشانی ایمیل و تصویر پروفایل — یعنی همان scopeهای openid، profile و email. هیچ دسترسی دیگری به حساب گوگلت خواسته نمی‌شود.',
-    googleUses: {
-      account: 'حساب بازیکن: صفحه‌ی حساب همین سایت با همان حساب باز می‌شود و اسم نمایشی و تصویرت را از آن‌جا تنظیم می‌کنی.',
-      cloudSave: 'ذخیره‌ی ابری: پیشرفت بازی روی سرور نگه داشته می‌شود تا روی دستگاه بعدی از همان‌جا ادامه بدهی.',
-      leaderboard: 'جدول امتیازات: امتیاز و نام نمایشی‌ات در جدول عمومی ثبت می‌شود.',
-      store: 'خریدهای درون‌برنامه‌ای: هر خرید به همان حساب بسته می‌شود تا بعد از نصب دوباره برگردد.'
-    },
-    googleAfter: 'دسترسی این برنامه به حساب گوگلت را هر وقت خواستی می‌توانی از myaccount.google.com/permissions پس بگیری. حذف کامل حساب و داده‌هایش هم از صفحه‌ی حساب بازیکن انجام می‌شود.',
-    readPrivacy: 'سیاست حریم خصوصی',
-    readTerms: 'شرایط استفاده'
+    titleKind: { android: 'بازی اندرویدی', web: 'بازی تحت‌وب', both: 'بازی اندرویدی و تحت‌وب' }
   },
   en: {
     play: 'Play',
@@ -183,18 +173,7 @@ const I18N = {
     offline: 'Plays offline',
     online: 'Online play',
 
-    titleKind: { android: 'Android game', web: 'browser game', both: 'Android and browser game' },
-    googleHead: 'What Google sign-in is used for here',
-    googleLede: 'The game works fully without signing in. If you do sign in, exactly three things are read from your Google account: your name, your email address and your profile picture — the openid, profile and email scopes. No other access to your Google account is requested.',
-    googleUses: {
-      account: 'Player account: the account page on this site opens with that same account, and your display name and picture are set from there.',
-      cloudSave: 'Cloud save: your progress is kept on the server so you can carry on from the same place on your next device.',
-      leaderboard: 'Leaderboard: your score and display name appear on the public board.',
-      store: 'In-app purchases: each purchase is tied to that account, so it comes back after a reinstall.'
-    },
-    googleAfter: 'You can withdraw this app’s access to your Google account at any time at myaccount.google.com/permissions. Deleting the account and its data outright is done from the player account page.',
-    readPrivacy: 'Privacy policy',
-    readTerms: 'Terms of service'
+    titleKind: { android: 'Android game', web: 'browser game', both: 'Android and browser game' }
   },
   ja: {
     play: 'プレイ',
@@ -229,18 +208,7 @@ const I18N = {
     offline: 'オフライン対応',
     online: 'オンラインプレイ',
 
-    titleKind: { android: 'Android ゲーム', web: 'ブラウザゲーム', both: 'Android・ブラウザゲーム' },
-    googleHead: 'Google サインインの用途',
-    googleLede: 'サインインしなくてもゲームはすべて遊べます。サインインした場合に Google アカウントから読み取るのは、お名前・メールアドレス・プロフィール画像の 3 つだけです(openid・profile・email スコープ)。それ以外のアクセス権は一切要求しません。',
-    googleUses: {
-      account: 'プレイヤーアカウント：同じアカウントでこのサイトのアカウントページにログインでき、表示名と画像もそこで設定します。',
-      cloudSave: 'クラウドセーブ：進行状況をサーバーに保存し、次の端末でも同じ場所から続けられます。',
-      leaderboard: 'ランキング：スコアと表示名が公開ランキングに掲載されます。',
-      store: 'アプリ内購入：購入はそのアカウントに紐づくため、再インストール後も復元されます。'
-    },
-    googleAfter: '本アプリの Google アカウントへのアクセスは myaccount.google.com/permissions でいつでも取り消せます。アカウントとデータの完全な削除は、プレイヤーアカウントページから行えます。',
-    readPrivacy: 'プライバシーポリシー',
-    readTerms: '利用規約'
+    titleKind: { android: 'Android ゲーム', web: 'ブラウザゲーム', both: 'Android・ブラウザゲーム' }
   }
 }
 
@@ -308,6 +276,29 @@ function rows(value, limit) {
 
 
 // ==========================================
+// langRows
+// A list that may have been written per language.
+//
+// Screenshots and trailers are the two sections where the same
+// game is genuinely a different picture in each language: a
+// text-heavy game shot in Persian is unreadable on the English
+// page, and a Japanese trailer is the wrong video to put in front
+// of a Persian visitor. Both are edited per language in the panel
+// now, on top of one shared list.
+//
+// The rule is REPLACE, not merge. A language with its own list
+// gets exactly that list; a language with an empty one gets the
+// shared list. Merging two galleries of different lengths would
+// produce an order nobody chose, and an operator who filled in
+// three Japanese screenshots meant those three.
+// ==========================================
+function langRows(byLang, shared, lang, limit) {
+  const own = (byLang && byLang[lang]) || []
+  return rows(Array.isArray(own) && own.length ? own : shared, limit)
+}
+
+
+// ==========================================
 // landingCss
 // Everything specific to these two pages.
 //
@@ -362,7 +353,9 @@ function landingCss() {
        sign in, and a reviewer checking that the page discloses what
        the scopes are for - and neither is served by styling that
        makes it look like marketing. */
-    .ln-google>p{color:var(--dim);font-size:.94em;line-height:1.85}
+    /* pre-wrap because the text is edited in a textarea now: a
+       line break somebody typed is a line break they meant. */
+    .ln-google p{color:var(--dim);font-size:.94em;line-height:1.85;white-space:pre-wrap}
     .ln-google ul{margin:12px 0;padding-inline-start:20px;line-height:1.85;font-size:.94em}
     .ln-google li{margin-block-end:6px}
     .ln-google .ln-policy{display:flex;flex-wrap:wrap;gap:8px;margin-block-start:14px}
@@ -554,6 +547,55 @@ function getBlock(game, lang) {
 
 
 // ==========================================
+// disclosureHtml
+// One block of plain text as paragraphs and a bullet list.
+//
+// The disclosure is stored and edited as TEXT - blank lines
+// separate paragraphs, a line starting with "- ", "* " or "• " is
+// a bullet - and this is the whole parser. It runs over the
+// default copy and over an operator's own text alike, which is
+// the point: what the panel shows in the box is exactly what the
+// page renders, so editing the default is copy, paste, change a
+// word, rather than guessing at markup that is not there.
+//
+// Nothing here interprets HTML. Every line goes through
+// escapeHtml() before it reaches the document, because this is
+// operator input on a public page.
+// ==========================================
+function disclosureHtml(text) {
+  const out = []
+  let paragraph = []
+  let bullets = []
+
+  const flushParagraph = () => {
+    if (!paragraph.length) return
+    out.push(`<p dir="auto">${escapeHtml(paragraph.join('\n'))}</p>`)
+    paragraph = []
+  }
+  const flushBullets = () => {
+    if (!bullets.length) return
+    out.push(`<ul dir="auto">${bullets.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`)
+    bullets = []
+  }
+
+  for (const raw of String(text || '').split('\n')) {
+    const line = raw.trim()
+    if (!line) { flushBullets(); flushParagraph(); continue }
+
+    const bullet = line.match(/^[-*•]\s+(.+)$/)
+    if (bullet) { flushParagraph(); bullets.push(bullet[1].trim()); continue }
+
+    flushBullets()
+    paragraph.push(line)
+  }
+
+  flushBullets()
+  flushParagraph()
+  return out.join('')
+}
+
+
+// ==========================================
 // googleBlock
 // What a Google account is used for in this game.
 //
@@ -564,38 +606,49 @@ function getBlock(game, lang) {
 // appeared on it without anybody adding it - and that no screen
 // could edit - is the opposite of that.
 //
-// The Google half stays, and stays outside the panel, because it
-// is not marketing copy. It is the disclosure an OAuth review
-// looks for: which scopes are requested, what each one is
-// actually used for, and how to withdraw access. It is derived
-// from the same `capabilities` flags that decide whether the
-// account, store and leaderboard pages exist at all, so it
-// cannot drift from what the game really does and cannot be
-// emptied by mistake.
+// The Google half was the last thing on the page still holding
+// its own words. It stayed outside the panel because it is not
+// marketing copy - it is the disclosure an OAuth review looks
+// for: which scopes are requested, what each one is actually used
+// for, and how to withdraw access - and deriving it from the same
+// `capabilities` flags that decide whether the account, store and
+// leaderboard pages exist meant it could not drift from what the
+// game really does.
 //
-// A game with no sign-in renders nothing here.
+// That derivation is still where the text comes from. What
+// changed is who can edit it: the words now live in
+// Content/GoogleDisclosure.js, the panel shows them as the
+// baseline behind three empty boxes, and a game may be given its
+// own heading and body or have the section switched off outright.
+// The generated default is still what an untouched game renders,
+// so nothing about this section moved by anybody not editing it.
+//
+// Two things are still not settings. A game with no sign-in
+// renders nothing here whatever the row says, because there is
+// nothing to disclose; and the two policy links stay, because
+// they name pages that exist regardless of what the text above
+// them says.
 // ==========================================
 function googleBlock(game, lang) {
-  const d = dict(lang)
   if (!game.capabilities.login) return ''
 
-  const uses = []
-  uses.push(d.googleUses.account)
-  if (game.capabilities.cloudSave) uses.push(d.googleUses.cloudSave)
-  if (game.capabilities.leaderboard) uses.push(d.googleUses.leaderboard)
-  if (game.capabilities.store) uses.push(d.googleUses.store)
+  const disclosure = googleDisclosureFor(game, lang)
+  if (!disclosure.enabled) return ''
+
+  const body = disclosureHtml(disclosure.body)
+  if (!disclosure.head && !body) return ''
+
+  const labels = POLICY_LABELS[lang] || POLICY_LABELS.fa
 
   return `<section class="gcard ln-sec">
-      <h2 class="ghead">${escapeHtml(d.googleHead)}</h2>
+      ${disclosure.head ? `<h2 class="ghead" dir="auto">${escapeHtml(disclosure.head)}</h2>` : ''}
       <div class="ln-google">
-        <p>${escapeHtml(d.googleLede)}</p>
-        <ul>${uses.map(use => `<li>${escapeHtml(use)}</li>`).join('')}</ul>
-        <p>${escapeHtml(d.googleAfter)}</p>
+        ${body}
         <div class="ln-policy">
           <a class="gbtn gbtn--ghost" style="padding:8px 14px;font-size:.84em"
-             href="${escapeHtml(localizedPath(`/${game.id}/privacy`, lang))}">${escapeHtml(d.readPrivacy)}</a>
+             href="${escapeHtml(localizedPath(`/${game.id}/privacy`, lang))}">${escapeHtml(labels.privacy)}</a>
           <a class="gbtn gbtn--ghost" style="padding:8px 14px;font-size:.84em"
-             href="${escapeHtml(localizedPath(`/${game.id}/terms`, lang))}">${escapeHtml(d.readTerms)}</a>
+             href="${escapeHtml(localizedPath(`/${game.id}/terms`, lang))}">${escapeHtml(labels.terms)}</a>
         </div>
       </div>
     </section>`
@@ -625,7 +678,7 @@ function featuresBlock(game, lang) {
 
 function shotsBlock(game, lang) {
   const d = dict(lang)
-  const shots = rows(game.landing.screenshots, 12)
+  const shots = langRows(game.landing.screenshotsByLang, game.landing.screenshots, lang, 12)
     .map(shot => {
       const url = String(shot.url || '')
       if (!/^(https?:\/\/|\/)/i.test(url)) return ''
@@ -651,7 +704,7 @@ function shotsBlock(game, lang) {
 
 function videosBlock(game, lang) {
   const d = dict(lang)
-  const videos = rows(game.landing.videos, 8)
+  const videos = langRows(game.landing.videosByLang, game.landing.videos, lang, 8)
 
   const items = videos.map(entry => {
     const url = typeof entry === 'string' ? entry : (entry && entry.url)

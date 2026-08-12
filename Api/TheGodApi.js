@@ -52,6 +52,7 @@ import {
 } from '../Games/Sql.js'
 import { scaffold } from '../Games/Scaffold.js'
 import { unityModules, unityKitIndex } from '../Content/UnityKit.js'
+import { googleDisclosureDefaults, googleDisclosureFor } from '../Content/GoogleDisclosure.js'
 
 const LANGS = ['fa', 'en', 'ja']
 
@@ -382,10 +383,27 @@ function cleanLanding(landing = {}) {
   put('tagline_en', tagline.en)
   put('tagline_ja', tagline.ja)
 
-  put('videos_json', cleanList(landing.videos, 8, row => {
+  // Screenshots and videos exist twice: one shared list, and one
+  // per language for the games whose artwork carries words. The
+  // cleaner is the same function in both cases - a per-language
+  // gallery is a gallery, and a rule that held for the shared list
+  // and not for the Japanese one would be a hole in exactly the
+  // place operator input reaches a public page.
+  const cleanVideoList = value => cleanList(value, 8, row => {
     const url = cleanUrl(row.url)
     return url ? { url, title: cleanText(row.title, 120) } : null
-  }))
+  })
+
+  const cleanShotList = value => cleanList(value, 12, row => {
+    const url = cleanImage(row.url)
+    return url ? { url, caption: cleanText(row.caption, 140) } : null
+  })
+
+  const videosByLang = (landing.videosByLang && typeof landing.videosByLang === 'object') ? landing.videosByLang : {}
+  const shotsByLang = (landing.screenshotsByLang && typeof landing.screenshotsByLang === 'object') ? landing.screenshotsByLang : {}
+
+  put('videos_json', cleanVideoList(landing.videos))
+  for (const code of LANGS) put(`videos_${code}_json`, cleanVideoList(videosByLang[code]))
 
   put('devices_json', cleanList(landing.devices, 12, row => {
     const kind = DEVICE_KINDS.includes(String(row.kind || '').toLowerCase())
@@ -401,16 +419,37 @@ function cleanLanding(landing = {}) {
     return { icon: cleanText(row.icon, 8), ...text }
   }))
 
-  put('screenshots_json', cleanList(landing.screenshots, 12, row => {
-    const url = cleanImage(row.url)
-    return url ? { url, caption: cleanText(row.caption, 140) } : null
-  }))
+  put('screenshots_json', cleanShotList(landing.screenshots))
+  for (const code of LANGS) put(`screenshots_${code}_json`, cleanShotList(shotsByLang[code]))
 
   put('faq_json', cleanList(landing.faq, 12, row => {
     const question = cleanI18n(row.q, 200)
     const answer = cleanI18n(row.a, 1200)
     return hasAnyText(question) && hasAnyText(answer) ? { q: question, a: answer } : null
   }))
+
+  // The Google sign-in disclosure.
+  //
+  // The switch is written as 1 or 0 rather than left NULL when it
+  // is on, because "on" here is a decision an operator made on a
+  // screen that showed them the switch. NULL keeps meaning
+  // "nobody has decided", which the merge layer also reads as on -
+  // the two agree, and only one of them is a record of anything.
+  //
+  // The heading and body are ordinary landing text: empty falls
+  // back to the generated default, exactly like the tagline falls
+  // back to Config.js. That is what makes "clear the box" mean
+  // "put the standard disclosure back" rather than "publish a
+  // page with no disclosure on it".
+  const google = (landing.google && typeof landing.google === 'object') ? landing.google : {}
+  patch.google_enabled = google.enabled === false ? 0 : 1
+
+  const googleHead = cleanI18n(google.head, 120)
+  const googleBody = cleanI18n(google.body, 4000)
+  for (const code of LANGS) {
+    put(`google_head_${code}`, googleHead[code])
+    put(`google_body_${code}`, googleBody[code])
+  }
 
   return { patch, clear }
 }
@@ -429,23 +468,39 @@ function presentLanding(row) {
     }
   }
 
+  const lang3 = suffix => ({
+    fa: (row && row[`${suffix}_fa`]) || '',
+    en: (row && row[`${suffix}_en`]) || '',
+    ja: (row && row[`${suffix}_ja`]) || ''
+  })
+
+  const listByLang = prefix => ({
+    fa: list(row && row[`${prefix}_fa_json`]),
+    en: list(row && row[`${prefix}_en_json`]),
+    ja: list(row && row[`${prefix}_ja_json`])
+  })
+
   return {
     hero: (row && row.hero_url) || '',
-    about: {
-      fa: (row && row.about_fa) || '',
-      en: (row && row.about_en) || '',
-      ja: (row && row.about_ja) || ''
-    },
-    tagline: {
-      fa: (row && row.tagline_fa) || '',
-      en: (row && row.tagline_en) || '',
-      ja: (row && row.tagline_ja) || ''
-    },
+    about: lang3('about'),
+    tagline: lang3('tagline'),
     videos: list(row && row.videos_json),
+    videosByLang: listByLang('videos'),
     devices: list(row && row.devices_json),
     features: list(row && row.features_json),
     screenshots: list(row && row.screenshots_json),
-    faq: list(row && row.faq_json)
+    screenshotsByLang: listByLang('screenshots'),
+    faq: list(row && row.faq_json),
+
+    // The disclosure. `enabled` is the only three-state field on
+    // this screen, and it is flattened to a boolean here on the
+    // same rule the merge layer uses: an unwritten column, and a
+    // database that has no such column at all, both read as on.
+    google: {
+      enabled: !(row && Number(row.google_enabled) === 0),
+      head: lang3('google_head'),
+      body: lang3('google_body')
+    }
   }
 }
 
@@ -475,15 +530,50 @@ function presentBaseline(configGame) {
     ja: (map && map.ja) || ''
   })
 
+  const listByLang = map => ({
+    fa: list(map && map.fa),
+    en: list(map && map.en),
+    ja: list(map && map.ja)
+  })
+
+  // The disclosure's baseline is GENERATED rather than read out
+  // of Config.js, because that is what the page renders when the
+  // boxes are empty: the lede, one bullet per capability this
+  // game actually has, and the closing paragraph. Handing the
+  // panel the finished text is what lets it show the real default
+  // as a placeholder - and lets "use the standard text" be a
+  // button rather than an instruction to go and find the file.
+  const googleBase = googleDisclosureDefaults(configGame)
+  const googleOverride = base.google || {}
+
   return {
     hero: base.hero || '',
     tagline: lang3(base.tagline),
     about: lang3(base.about),
     features: list(base.features),
     screenshots: list(base.screenshots),
+    screenshotsByLang: listByLang(base.screenshotsByLang),
     videos: list(base.videos),
+    videosByLang: listByLang(base.videosByLang),
     devices: list(base.devices),
-    faq: list(base.faq)
+    faq: list(base.faq),
+    google: {
+      enabled: googleOverride.enabled !== false,
+      head: overBase(googleOverride.head, googleBase.head),
+      body: overBase(googleOverride.body, googleBase.body)
+    }
+  }
+}
+
+
+// A registry entry's own text over the generated default, one
+// language at a time - the same field-by-field rule the stored
+// row gets laid on top of both.
+function overBase(override, generated) {
+  return {
+    fa: (override && override.fa) || generated.fa,
+    en: (override && override.en) || generated.en,
+    ja: (override && override.ja) || generated.ja
   }
 }
 
@@ -532,16 +622,30 @@ function columnWarning(missing) {
 // Which landing fields a missing column costs, so the panel can
 // grey out the sections that cannot be saved rather than letting
 // somebody fill one in and lose it.
+// The per-language lists get their OWN keys rather than being
+// folded into 'screenshots' and 'videos'. A database that stopped
+// at 0008 can still save a shared gallery perfectly well, and
+// greying out the whole section over the three columns it is
+// missing would report a working field as broken - which is the
+// same mistake, in the other direction, that this map exists to
+// stop.
 function landingSections(missing) {
   const owner = {
     hero_url: 'hero',
     videos_json: 'videos',
+    videos_fa_json: 'videosLang', videos_en_json: 'videosLang', videos_ja_json: 'videosLang',
     devices_json: 'devices',
     about_fa: 'about', about_en: 'about', about_ja: 'about',
     tagline_fa: 'tagline', tagline_en: 'tagline', tagline_ja: 'tagline',
     features_json: 'features',
     screenshots_json: 'screenshots',
-    faq_json: 'faq'
+    screenshots_fa_json: 'screenshotsLang',
+    screenshots_en_json: 'screenshotsLang',
+    screenshots_ja_json: 'screenshotsLang',
+    faq_json: 'faq',
+    google_enabled: 'google',
+    google_head_fa: 'google', google_head_en: 'google', google_head_ja: 'google',
+    google_body_fa: 'google', google_body_en: 'google', google_body_ja: 'google'
   }
   return [...new Set((missing || []).map(name => owner[name]).filter(Boolean))]
 }
@@ -1507,6 +1611,31 @@ export async function handleTheGodApi(url, request, gameId, requestId, GAMES, en
       add('landing', filled.length >= 3, 'Landing page has content',
         `${filled.length} of 7 sections have something in them (${filled.join(', ') || 'none'}). `
         + 'Sections come from Config.js first and the Game page tab on top of it.', 'warn')
+
+      // Which languages have artwork of their own. Not a pass or a
+      // fail - one shared gallery is the right answer for a game
+      // whose art carries no words - but it is the only place an
+      // operator can see at a glance that they translated the
+      // Japanese screenshots and forgot the Persian ones.
+      const shotLangs = LANGS.filter(code => ((landing.screenshotsByLang || {})[code] || []).length)
+      const videoLangs = LANGS.filter(code => ((landing.videosByLang || {})[code] || []).length)
+      if (shotLangs.length || videoLangs.length) {
+        add('landingLangs', true, 'Per-language artwork',
+          `${shotLangs.length ? `Screenshots written for ${shotLangs.join(', ')}. ` : ''}`
+          + `${videoLangs.length ? `Videos written for ${videoLangs.join(', ')}. ` : ''}`
+          + 'Every other language falls back to the shared list.', 'info')
+      }
+
+      if (game.capabilities.login) {
+        const disclosure = googleDisclosureFor(game, 'en')
+        add('googleDisclosure', disclosure.enabled, 'Google sign-in disclosure',
+          disclosure.enabled
+            ? (disclosure.custom
+                ? 'On, with text written in the Game page tab. Check it still names every scope the game asks for.'
+                : 'On, using the standard text built from this game\'s capabilities.')
+            : 'Switched off in the Game page tab. This game asks for a Google sign-in and its page now '
+              + 'discloses nothing about it, which is what an OAuth review looks for first.', 'warn')
+      }
 
       const schema = licence ? await settingsSchemaReport(licence) : null
       if (schema) {

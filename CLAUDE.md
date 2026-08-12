@@ -154,6 +154,9 @@ Commerce/              The DocSnap checkout: Orders, Provider (NOWPayments),
 Licensing/             Licence keys: Store, Tokens, Keys
 Content/               Large static content
   UnityKit.js          THE UNITY CLIENT GENERATOR — see §9
+  GoogleDisclosure.js  the "what Google sign-in is for" text (fa/en/ja) and the
+                       per-game default built from `capabilities`. Read by
+                       Pages/GameLanding.js AND Api/TheGodApi.js — one copy.
   ToolsCatalog.js, AboutMe.js, DocSnapVideos.js, SupportTemplates.js
 migrations/            SQL. NOT authoritative — see §12.
 Docs/                  Checkout.md, Games.md, Licensing.md, Seo.md
@@ -209,6 +212,7 @@ NULL means "no override, use `Config.js`". Full expected column set is
 | deep link | `deeplink_scheme` | 0004 |
 | landing A | `hero_url, videos_json, devices_json, about_fa, about_en, about_ja` | 0005 |
 | landing B | `tagline_fa, tagline_en, tagline_ja, features_json, screenshots_json, faq_json` | 0008 |
+| landing C | `screenshots_{fa,en,ja}_json, videos_{fa,en,ja}_json, google_enabled, google_head_{fa,en,ja}, google_body_{fa,en,ja}` | 0011 |
 
 ### A game's own D1 (`neon-katana-db`)
 
@@ -277,11 +281,37 @@ hero → features → screenshots → videos → about → devices → products
 point a reader has finished the reasons to press it. Every block between the
 hero and the Google disclosure returns `''` when the panel has nothing in it.
 
-The Google disclosure is the one section that is not panel-driven and does not
-degrade to nothing. It is not copy — it is the OAuth disclosure (which scopes,
-what each is for, how to withdraw access), derived from the same `capabilities`
-flags that decide whether the account, store and leaderboard pages exist. A game
-without `capabilities.login` renders nothing there.
+**Screenshots and videos exist twice: shared, and per language.** A text-heavy
+game is a different picture in each language, so `screenshots_{lang}_json` and
+`videos_{lang}_json` override `screenshots_json` / `videos_json` — **replacing
+the list, never merging it**. A language with an empty list of its own shows the
+shared one. `langRows()` in `Pages/GameLanding.js` is the only place that
+resolves this. Every other section is either language-neutral (devices, the
+banner) or already carries `fa/en/ja` inside each row (features, FAQ).
+
+**The Google disclosure is content now, with a switch.** It is still not
+marketing copy — it is the OAuth disclosure (which scopes, what each is for, how
+to withdraw access) — and its default is still *generated* from the same
+`capabilities` flags that decide whether the account, store and leaderboard
+pages exist, so a game with no store can never claim purchases are tied to an
+account. What changed:
+
+- The words live in `Content/GoogleDisclosure.js`, imported by both the page
+  (which renders them) and `Api/TheGodApi.js` (which hands them to the panel as
+  the baseline). **Not** in `Pages/GameLanding.js` any more.
+- `google_head_*` / `google_body_*` override the default **per language** —
+  falling back to that language's default, deliberately *not* to another
+  language's stored text the way `pickLang()` does elsewhere. An English
+  disclosure on a Persian page is worse than the correct Persian one.
+- `google_body_*` is **plain text**: a blank line starts a paragraph, a line
+  starting with `- `, `* ` or `• ` becomes a bullet. `disclosureHtml()` in
+  `Pages/GameLanding.js` is the whole parser, and it runs over the default and
+  over operator text alike — so what the panel shows is exactly what renders.
+- `google_enabled` is three-state: `NULL` = nobody decided = **on**. A database
+  that has not run 0011 keeps showing the section.
+- A game without `capabilities.login` renders nothing there whatever the row
+  says, and `game.verify` warns when a game that *does* sign in has it off —
+  turning it off is a Google verification risk, not a layout choice.
 
 ---
 
@@ -435,6 +465,9 @@ nothing else breaks — a confusing hour.
 | Add/change a game's fixed facts | `Config.js` → `GAME_REGISTRY` |
 | Change how a game is presented | `/thegod` Games tab (no deploy) |
 | Change a game's landing page | `/thegod` Game page tab (no deploy) |
+| Give one language its own screenshots/videos | `/thegod` Game page tab → the language strip on that section |
+| Change the Google sign-in disclosure's DEFAULT text | `Content/GoogleDisclosure.js` — one file, read by the page and the panel |
+| Change one game's disclosure, or switch it off | `/thegod` Game page tab (no deploy) |
 | Change how the landing page RENDERS | `Pages/GameLanding.js` |
 | Change the dashboard card | `Pages/GameCards.js` (+ `card.motifs` in `Config.js`) |
 | Add a route | `Worker.js` `ROUTES` + a handler in `Pages/` or `Api/` |
@@ -478,6 +511,15 @@ nothing else breaks — a confusing hour.
 4. **`0010_leaderboard_optout.sql` is new** and must be run against each game's
    own database. Until it is, the opt-out checkbox does not render and
    `game.verify` reports the column as missing. Nothing breaks without it.
+
+5. **`0011_landing_languages.sql` is new** and belongs to `LICENSE_DB`, not to a
+   game's database. Thirteen columns: the six per-language screenshot/video
+   lists and the seven the Google disclosure needs. Until it is run, the Game
+   page tab greys out the language strip and the disclosure card, names the
+   missing columns, and saves everything else — and the public page keeps
+   showing the shared galleries and the standard disclosure, because both
+   degrade to exactly what they did before. `/thegod` → SQL →
+   **Repair the schema** adds all thirteen, same as the file.
 
 ---
 

@@ -240,9 +240,29 @@ function mergeGame(game, row, productRows) {
         ja: ja || fallback.ja || ''
       })
 
+      // A list that exists once per language, on top of a list
+      // that exists once. Each language reads its own column and
+      // falls back to the registry's per-language baseline; what
+      // it does NOT do here is fall back to the shared list -
+      // that decision belongs to the page, which knows which
+      // language it is rendering, and doing it here would make
+      // "this language has its own gallery" unanswerable.
+      //
+      // Reads as undefined on a database that stopped at 0008,
+      // which jsonArray() turns into [] and the page then reads
+      // as "use the shared list".
+      const perLang = (prefix, fallback = {}) => ({
+        fa: pick(jsonArray(row && row[`${prefix}_fa_json`]), fallback.fa),
+        en: pick(jsonArray(row && row[`${prefix}_en_json`]), fallback.en),
+        ja: pick(jsonArray(row && row[`${prefix}_ja_json`]), fallback.ja)
+      })
+
+      const baseGoogle = base.google || {}
+
       return {
         hero: text(row && row.hero_url) || base.hero || '',
         videos: pick(jsonArray(row && row.videos_json), base.videos),
+        videosByLang: perLang('videos', base.videosByLang),
         devices: pick(jsonArray(row && row.devices_json), base.devices),
         about: lang3(
           text(row && row.about_fa), text(row && row.about_en), text(row && row.about_ja),
@@ -254,7 +274,29 @@ function mergeGame(game, row, productRows) {
         ),
         features: pick(jsonArray(row && row.features_json), base.features),
         screenshots: pick(jsonArray(row && row.screenshots_json), base.screenshots),
-        faq: pick(jsonArray(row && row.faq_json), base.faq)
+        screenshotsByLang: perLang('screenshots', base.screenshotsByLang),
+        faq: pick(jsonArray(row && row.faq_json), base.faq),
+
+        // The Google sign-in disclosure. `enabled` defaults to ON
+        // through bool()'s fallback, so a database that has not
+        // run 0011 - where this column reads as undefined - keeps
+        // showing the section rather than quietly dropping the one
+        // block on the page an OAuth review looks for.
+        google: {
+          enabled: bool(row && row.google_enabled, baseGoogle.enabled !== false),
+          head: lang3(
+            text(row && row.google_head_fa),
+            text(row && row.google_head_en),
+            text(row && row.google_head_ja),
+            baseGoogle.head
+          ),
+          body: lang3(
+            text(row && row.google_body_fa),
+            text(row && row.google_body_en),
+            text(row && row.google_body_ja),
+            baseGoogle.body
+          )
+        }
       }
     })(),
 

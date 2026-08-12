@@ -410,7 +410,33 @@ export function settingsSeedSql(gameId, settings = {}, options = {}) {
     ['tagline_ja', sqlText(settings.tagline_ja)],
     ['features_json', sqlText(settings.features_json)],
     ['screenshots_json', sqlText(settings.screenshots_json)],
-    ['faq_json', sqlText(settings.faq_json)]
+    ['faq_json', sqlText(settings.faq_json)],
+
+    // The per-language galleries and the Google disclosure (0011).
+    // Same reasoning as the block above, and one more: a game
+    // whose Japanese screenshots exist only on the live site is a
+    // game nobody can test a layout change against.
+    ['screenshots_fa_json', sqlText(settings.screenshots_fa_json)],
+    ['screenshots_en_json', sqlText(settings.screenshots_en_json)],
+    ['screenshots_ja_json', sqlText(settings.screenshots_ja_json)],
+    ['videos_fa_json', sqlText(settings.videos_fa_json)],
+    ['videos_en_json', sqlText(settings.videos_en_json)],
+    ['videos_ja_json', sqlText(settings.videos_ja_json)],
+
+    // Carried as 1/0/NULL rather than through sqlText, for the
+    // reason download_enabled above is: this is a switch, and
+    // "off" is a decision that has to survive the copy. A seed
+    // that dropped a 0 would put a disclosure back on a game
+    // somebody had deliberately taken it off.
+    ['google_enabled', settings.google_enabled === null || settings.google_enabled === undefined
+      ? 'NULL'
+      : (Number(settings.google_enabled) ? '1' : '0')],
+    ['google_head_fa', sqlText(settings.google_head_fa)],
+    ['google_head_en', sqlText(settings.google_head_en)],
+    ['google_head_ja', sqlText(settings.google_head_ja)],
+    ['google_body_fa', sqlText(settings.google_body_fa)],
+    ['google_body_en', sqlText(settings.google_body_en)],
+    ['google_body_ja', sqlText(settings.google_body_ja)]
   ]
 
   // Only the columns that are actually SET are named. Two
