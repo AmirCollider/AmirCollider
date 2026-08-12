@@ -31,7 +31,7 @@ import { CONFIG, validateGameId } from '../Config.js'
 import { getPageHead } from '../Core/DesignSystem.js'
 import { createErrorPage } from '../Core/ErrorPage.js'
 import { createHtmlResponse } from '../Core/Http.js'
-import { escapeHtml } from '../Core/Html.js'
+import { escapeHtml, sortListItems } from '../Core/Html.js'
 import { themeBootScript } from '../Core/PageChrome.js'
 import { seoHead, breadcrumbLd } from '../Core/Seo.js'
 import { localizedPath } from '../Core/Locale.js'
@@ -175,13 +175,22 @@ function icon(name, cls) {
 // ==========================================
 // Section Order (data-driven; reorder or remove here)
 // ==========================================
-// `googledata` and `deletion` are not decoration. Google's OAuth
-// verification reviews this page against the API Services User Data
-// Policy, and it looks for two things by name: an explicit
-// statement of which Google scopes are requested and what is done
-// with what they return, and a route for a user to have that data
-// deleted. A policy that covers everything except those two is a
-// policy that fails review.
+// `googledata` is not decoration. Google's OAuth verification
+// reviews this page against the API Services User Data Policy and
+// looks for an explicit statement of which scopes are requested,
+// what is done with what they return, and the Limited Use wording
+// verbatim. A policy missing that section is a policy that fails
+// review, which is why it survives even though it repeats a little
+// of `collect` - it is written for a reviewer, not for a player,
+// and its opening line says so.
+//
+// The standalone "account and data deletion" section that used to
+// sit between `sharing` and `cookies` was removed at the owner's
+// request. The deletion route itself did not go anywhere: it is a
+// line in `rights` and a real button on /:gameId/account. Google's
+// review also looks for a deletion route by name, so if a review
+// ever comes back asking for one, the shortest fix is to say more
+// in `rights` rather than to bring the whole section back.
 const SECTION_ORDER = [
   { key: 'intro',      ic: 'doc' },
   { key: 'collect',    ic: 'clipboard' },
@@ -189,7 +198,6 @@ const SECTION_ORDER = [
   { key: 'usage',      ic: 'chart' },
   { key: 'security',   ic: 'shield' },
   { key: 'sharing',    ic: 'lock' },
-  { key: 'deletion',   ic: 'user' },
   { key: 'cookies',    ic: 'cookie' },
   { key: 'rights',     ic: 'user' },
   { key: 'children',   ic: 'heart' },
@@ -213,111 +221,74 @@ const I18N = {
     brandAll: 'همه‌ی بازی‌ها و ابزارها',
     'sec.intro.title': 'مقدمه',
     'sec.intro.body':
-      '<p>ما در <strong>AmirCollider Games</strong> به حریم خصوصی شما اهمیت می‌دهیم. این سند توضیح می‌دهد چه اطلاعاتی از شما جمع‌آوری می‌شود و چگونه از آن استفاده می‌کنیم.</p>'
-      + '<div class="callout callout-good"><p><strong>تعهد ما:</strong> ما هرگز اطلاعات شخصی شما را بدون رضایت شما به اشخاص ثالث نمی‌فروشیم.</p></div>',
-    'sec.collect.title': 'اطلاعات جمع‌آوری شده',
+      '<p>این سند توضیح می‌دهد <strong>AmirCollider</strong> چه اطلاعاتی از شما دریافت می‌کند و آن‌ها را برای چه کاری به کار می‌برد.</p>',
+    'sec.collect.title': 'اطلاعات جمع‌آوری شده از حساب Gmail',
     'sec.collect.body':
-      '<p>هنگام استفاده از سرویس احراز هویت ما، اطلاعات زیر را دریافت می‌کنیم:</p>'
+      '<p>این بخش فقط درباره‌ی بازی‌هایی است که سیستم ورود دارند و با «ورود با گوگل» کار می‌کنند. بازی‌هایی که سیستم ورود ندارند، هیچ اطلاعاتی از حساب گوگل شما دریافت نمی‌کنند.</p>'
+      + '<p>هنگام ورود، این موارد را از حساب گوگل شما دریافت می‌کنیم:</p>'
       + '<ul>'
-      + '<li><strong>آدرس ایمیل:</strong> آدرس ایمیل گوگل شما</li>'
-      + '<li><strong>عکس پروفایل:</strong> عکس پروفایل گوگل شما</li>'
-      + '<li><strong>نام:</strong> نامی که در حساب گوگل شما ثبت شده است</li>'
-      + '<li><strong>آمار بازی:</strong> امتیازات، سطح و دستاوردهای شما</li>'
+      + '<li><strong>نام:</strong> نام نمایشی حساب گوگل شما</li>'
+      + '<li><strong>ایمیل:</strong> آدرس ایمیل حساب گوگل شما</li>'
+      + '<li><strong>عکس پروفایل:</strong> تصویر حساب گوگل شما</li>'
       + '</ul>',
     'sec.googledata.title': 'داده‌های حساب گوگل و سیاست Google API Services',
     'sec.googledata.body':
-      '<p>ورود به این سرویس از طریق «ورود با گوگل» انجام می‌شود. تنها دامنه‌های دسترسی (scope) زیر درخواست می‌شوند:</p>'
-      + '<ul>'
-      + '<li><code>openid</code> — شناسه‌ی یکتای حساب شما برای تشخیص اینکه همان کاربر دوباره وارد شده است</li>'
-      + '<li><code>email</code> — آدرس ایمیل، برای شناسایی حساب و ارتباط در موارد ضروری</li>'
-      + '<li><code>profile</code> — نام نمایشی و عکس پروفایل، برای نمایش در حساب کاربری و جدول امتیازات</li>'
-      + '</ul>'
+      '<p>این بخش مخصوص الزامات خود گوگل است و برای بررسی سرویس در Google API Services نوشته شده. دامنه‌های دسترسی درخواستی همان‌هایی هستند که در بخش بالا آمد: <code>openid</code>، <code>email</code> و <code>profile</code>.</p>'
       + '<div class="callout callout-good">'
       + '<p><strong>Limited Use:</strong> استفاده و انتقال اطلاعات دریافت‌شده از Google APIs توسط این سرویس، از '
       + '<a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API Services User Data Policy</a> '
       + 'از جمله الزامات Limited Use پیروی می‌کند.</p>'
       + '</div>'
       + '<ul>'
-      + '<li>این داده‌ها <strong>فروخته نمی‌شوند</strong> و برای تبلیغات یا تبلیغات هدفمند استفاده نمی‌شوند.</li>'
-      + '<li>این داده‌ها برای آموزش مدل‌های هوش مصنوعی یا یادگیری ماشین به کار نمی‌روند.</li>'
-      + '<li>هیچ انسانی این داده‌ها را نمی‌خواند، مگر با اجازه‌ی صریح شما، برای امنیت، یا در صورت الزام قانونی.</li>'
-      + '<li>ما به محتوای Gmail، Drive، مخاطبین یا تقویم شما <strong>دسترسی نداریم و درخواست هم نمی‌کنیم</strong>.</li>'
-      + '</ul>',
-    'sec.deletion.title': 'حذف حساب و داده‌ها',
-    'sec.deletion.body':
-      '<p>می‌توانید هر زمان بخواهید حساب و همه‌ی داده‌های مرتبط با آن را حذف کنید:</p>'
-      + '<ul>'
-      + '<li>یک ایمیل با موضوع «Delete my account» از همان آدرس ایمیلی که با آن وارد شده‌اید به '
-      + '<a href="mailto:' + CONFIG.SUPPORT_EMAIL + '">' + CONFIG.SUPPORT_EMAIL + '</a> بفرستید.</li>'
-      + '<li>درخواست حداکثر ظرف <strong>۳۰ روز</strong> انجام می‌شود و تأیید آن برایتان ارسال می‌گردد.</li>'
-      + '<li>با حذف حساب، پروفایل، امتیازها، رکورد جدول امتیازات و ذخیره‌ی ابری شما پاک می‌شود.</li>'
-      + '<li>دسترسی این برنامه به حساب گوگل خود را هر زمان می‌توانید از '
-      + '<a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a> لغو کنید.</li>'
+      + '<li>این داده‌ها به شخص ثالث منتقل نمی‌شوند.</li>'
+      + '<li>این داده‌ها برای تبلیغات یا تبلیغات هدفمند به کار نمی‌روند.</li>'
+      + '<li>این داده‌ها برای آموزش مدل‌های هوش مصنوعی یا یادگیری ماشین استفاده نمی‌شوند.</li>'
+      + '<li>ما به محتوای Gmail، Drive، مخاطبین یا تقویم شما دسترسی نداریم و درخواست هم نمی‌کنیم.</li>'
+      + '<li>هیچ انسانی این داده‌ها را نمی‌خواند، مگر با اجازه‌ی شما، برای امنیت، یا در صورت الزام قانونی.</li>'
       + '</ul>',
     'sec.usage.title': 'نحوه استفاده از اطلاعات',
     'sec.usage.body':
-      '<p>ما از اطلاعات شما برای موارد زیر استفاده می‌کنیم:</p>'
+      '<p>از این اطلاعات برای موارد زیر استفاده می‌شود:</p>'
       + '<ul>'
-      + '<li>تحلیل و بهبود خدمات</li>'
-      + '<li>نمایش امتیاز شما در جدول برترین‌ها</li>'
       + '<li>ذخیره پیشرفت و امتیازات بازی</li>'
-      + '<li>بهبود تجربه کاربری و عملکرد بازی</li>'
+      + '<li>نمایش امتیاز شما در جدول برترین‌ها</li>'
       + '<li>احراز هویت و مدیریت حساب کاربری</li>'
-      + '<li>ارسال اطلاعیه‌های مهم در صورت نیاز</li>'
       + '</ul>',
     'sec.security.title': 'امنیت اطلاعات',
     'sec.security.body':
-      '<p>ما از پروتکل‌های امنیتی استاندارد برای محافظت از اطلاعات شما استفاده می‌کنیم:</p>'
-      + '<ul>'
-      + '<li><strong>پایش مستمر:</strong> نظارت ۲۴ ساعته بر امنیت سیستم</li>'
-      + '<li><strong>محدودیت دسترسی:</strong> تنها کارکنان مجاز به داده‌ها دسترسی دارند</li>'
-      + '<li><strong>رمزگذاری اتصالات:</strong> انتقال تمام داده‌ها با پروتکل HTTPS/TLS رمزگذاری می‌شود</li>'
-      + '<li><strong>پایگاه داده Cloudflare D1:</strong> ذخیره‌سازی امن داده‌ها با پایگاه داده Cloudflare D1</li>'
-      + '</ul>',
+      '<p>ارتباط با سرور روی HTTPS/TLS رمزگذاری می‌شود و داده‌ها در پایگاه داده‌ی Cloudflare D1 نگهداری می‌شوند.</p>'
+      + '<p>هیچ سرویسی روی اینترنت کاملاً امن نیست و امنیت مطلق داده‌ها تضمین نمی‌شود.</p>',
     'sec.sharing.title': 'عدم اشتراک‌گذاری اطلاعات',
     'sec.sharing.body':
       '<div class="callout callout-warn">'
-      + '<p><strong>مهم:</strong> ما هرگز اطلاعات شخصی شما را به اشخاص ثالث نمی‌فروشیم یا به اشتراک نمی‌گذاریم. تنها در موارد محدود زیر ممکن است اطلاعاتی افشا شود:</p>'
-      + '<ul>'
-      + '<li><strong>الزام قانونی:</strong> در صورتی که قانون یا یک دستور قانونی معتبر آن را ایجاب کند</li>'
-      + '<li><strong>جلوگیری از سوءاستفاده:</strong> برای حفاظت از امنیت و یکپارچگی خدمات</li>'
-      + '<li><strong>با رضایت شما:</strong> هنگامی که خودتان به‌صراحت اجازه دهید</li>'
-      + '</ul>'
+      + '<p>ما اطلاعات شما را با هیچ شخص ثالثی به اشتراک نمی‌گذاریم. تنها استثنا، درخواست رسمی و قانونی مقامات دولتی ایالات متحده‌ی آمریکاست.</p>'
+      + '<p>اطلاعات شما به مقامات دولتی هیچ کشور دیگری تحویل داده نمی‌شود.</p>'
       + '</div>',
-    'sec.cookies.title': 'کوکی‌ها و ذخیره‌سازی محلی',
+    'sec.cookies.title': 'کوکی‌ها',
     'sec.cookies.body':
-      '<p>ما از کوکی‌ها برای حفظ نشست شما استفاده می‌کنیم. این کوکی‌ها:</p>'
-      + '<ul>'
-      + '<li>به مدت ۷ روز معتبر هستند</li>'
-      + '<li>هر زمان که بخواهید قابل حذف هستند</li>'
-      + '<li>هیچ اطلاعات حساسی ذخیره نمی‌کنند</li>'
-      + '<li>تنها برای احراز هویت استفاده می‌شوند</li>'
-      + '</ul>',
+      '<p>کوکی‌ها فقط برای نگه داشتن وضعیت ورود شما و به خاطر سپردن زبان و حالت نمایش سایت به کار می‌روند. هیچ اطلاعات حساسی در آن‌ها ذخیره نمی‌شود و هر زمان بخواهید می‌توانید از مرورگر خودتان پاکشان کنید.</p>',
     'sec.rights.title': 'حقوق شما',
     'sec.rights.body':
-      '<p>شما حق دارید:</p>'
+      '<p>هر زمان بخواهید می‌توانید:</p>'
       + '<ul>'
-      + '<li><strong>حذف:</strong> حساب خود را به‌طور کامل حذف کنید</li>'
-      + '<li><strong>انصراف:</strong> هر زمان از خدمات ما انصراف دهید</li>'
-      + '<li><strong>انتقال داده:</strong> یک نسخه از داده‌های خود را دریافت کنید</li>'
       + '<li><strong>اصلاح:</strong> اطلاعات نادرست را اصلاح کنید</li>'
-      + '<li><strong>محدودیت:</strong> پردازش داده‌های خود را محدود کنید</li>'
-      + '<li><strong>دسترسی:</strong> به تمام اطلاعاتی که از شما داریم دسترسی داشته باشید</li>'
+      + '<li><strong>حذف:</strong> حساب خود را به‌طور کامل حذف کنید</li>'
+      + '<li><strong>دسترسی:</strong> اطلاعاتی که از شما داریم را ببینید</li>'
       + '</ul>',
     'sec.children.title': 'کودکان',
     'sec.children.body':
-      '<p>بازی ما برای کاربران بالای <strong>۵ سال</strong> طراحی شده است. ما عمداً اطلاعات کودکان زیر ۵ سال را جمع‌آوری نمی‌کنیم. اگر متوجه شویم کودکی زیر ۵ سال ثبت‌نام کرده است، حساب او را فوراً حذف خواهیم کرد.</p>',
+      '<p>هر بازی رده‌ی سنی خودش را دارد و همان چیزی است که در صفحه‌ی آن بازی و در جایی که بازی از آن دریافت شده اعلام می‌شود. حسابی که با محدودیت سنی آن بازی مغایرت داشته باشد حذف می‌شود.</p>',
     'sec.intl.title': 'انتقال بین‌المللی داده',
     'sec.intl.body':
-      '<p>اطلاعات شما ممکن است روی سرورهایی در کشورهای مختلف ذخیره شود. ما اطمینان می‌دهیم تمام انتقال‌های داده مطابق با استانداردهای بین‌المللی حفاظت از داده انجام می‌شود.</p>',
+      '<p>این سرویس روی زیرساخت Cloudflare اجرا می‌شود، بنابراین اطلاعات شما ممکن است روی سرورهایی در کشورهای مختلف ذخیره یا پردازش شود.</p>',
     'sec.changes.title': 'تغییرات در سیاست',
     'sec.changes.body':
-      '<div class="callout callout-info"><p>ممکن است این سیاست را در هر زمان به‌روزرسانی کنیم. تغییرات مهم از طریق ایمیل یا اعلان درون‌بازی به اطلاع شما خواهد رسید. ادامه استفاده از سرویس پس از هر به‌روزرسانی به‌منزله پذیرش سیاست جدید است.</p></div>',
+      '<div class="callout callout-info"><p>ممکن است این سیاست به‌روزرسانی شود. نسخه‌ی معتبر همیشه همین صفحه است و ادامه‌ی استفاده از سرویس پس از هر به‌روزرسانی به‌منزله‌ی پذیرش آن است.</p></div>',
     'contact.title': 'تماس با ما',
     'contact.intro': 'در صورت هرگونه سوال درباره این سیاست، با ما تماس بگیرید:',
     'contact.game': 'بازی',
-    'contact.myket': 'صفحه مایکت',
-    'contact.myketLink': 'مشاهده در مایکت',
+    'contact.gamePage': 'صفحه بازی',
+    'contact.gamePageLink': 'مشاهده صفحه بازی',
     'contact.email': 'ایمیل پشتیبانی',
     'contact.web': 'وب‌سایت',
     'footer.updated': 'آخرین به‌روزرسانی:',
@@ -338,111 +309,74 @@ const I18N = {
     brandAll: 'All games & tools',
     'sec.intro.title': 'Introduction',
     'sec.intro.body':
-      '<p>At <strong>AmirCollider Games</strong>, we take your privacy seriously. This document explains what information we collect from you and how we use it.</p>'
-      + '<div class="callout callout-good"><p><strong>Our commitment:</strong> We will never sell your personal information to third parties without your consent.</p></div>',
-    'sec.collect.title': 'Information We Collect',
+      '<p>This document explains what information <strong>AmirCollider</strong> receives from you and what it is used for.</p>',
+    'sec.collect.title': 'Information Collected from Your Gmail Account',
     'sec.collect.body':
-      '<p>When you use our authentication service, we receive the following information:</p>'
+      '<p>This section covers only the games that have a sign-in system and use "Sign in with Google". Games without a sign-in system receive nothing from your Google account.</p>'
+      + '<p>When you sign in, we receive the following from your Google account:</p>'
       + '<ul>'
-      + '<li><strong>Email address:</strong> Your Google account email address</li>'
-      + '<li><strong>Profile photo:</strong> Your Google account profile photo</li>'
-      + '<li><strong>Name:</strong> The name associated with your Google account</li>'
-      + '<li><strong>Game stats:</strong> Your scores, level, and achievements</li>'
+      + '<li><strong>Name:</strong> your Google account display name</li>'
+      + '<li><strong>Email:</strong> your Google account email address</li>'
+      + '<li><strong>Profile photo:</strong> your Google account picture</li>'
       + '</ul>',
     'sec.googledata.title': 'Google Account Data and the Google API Services Policy',
     'sec.googledata.body':
-      '<p>Signing in to this service is done through "Sign in with Google". Only the following scopes are requested:</p>'
-      + '<ul>'
-      + '<li><code>openid</code> — the stable identifier for your account, so we can tell that the same person has signed in again</li>'
-      + '<li><code>email</code> — your email address, used to identify your account and to contact you when something requires it</li>'
-      + '<li><code>profile</code> — your display name and profile photo, shown on your account page and on the leaderboard</li>'
-      + '</ul>'
+      '<p>This section exists for Google\'s own requirements and is written for review under Google API Services. The scopes requested are the ones named above: <code>openid</code>, <code>email</code> and <code>profile</code>.</p>'
       + '<div class="callout callout-good">'
       + '<p><strong>Limited Use:</strong> This application\'s use and transfer of information received from Google APIs adheres to the '
       + '<a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API Services User Data Policy</a>, '
       + 'including the Limited Use requirements.</p>'
       + '</div>'
       + '<ul>'
-      + '<li>This data is <strong>never sold</strong>, and is never used for advertising or ad targeting.</li>'
-      + '<li>This data is never used to train artificial intelligence or machine learning models.</li>'
-      + '<li>No human reads this data, except with your explicit permission, for security purposes, or where the law requires it.</li>'
-      + '<li>We do <strong>not</strong> request or receive access to your Gmail, Drive, Contacts or Calendar content.</li>'
-      + '</ul>',
-    'sec.deletion.title': 'Account and Data Deletion',
-    'sec.deletion.body':
-      '<p>You can have your account and every piece of data attached to it deleted at any time:</p>'
-      + '<ul>'
-      + '<li>Email <a href="mailto:' + CONFIG.SUPPORT_EMAIL + '">' + CONFIG.SUPPORT_EMAIL + '</a> '
-      + 'with the subject "Delete my account", from the same address you signed in with.</li>'
-      + '<li>The request is carried out within <strong>30 days</strong> and you are sent a confirmation when it is done.</li>'
-      + '<li>Deletion removes your profile, your scores, your leaderboard entry and your cloud save.</li>'
-      + '<li>You can revoke this application\'s access to your Google account at any time at '
-      + '<a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a>.</li>'
+      + '<li>This data is not transferred to third parties.</li>'
+      + '<li>This data is not used for advertising or ad targeting.</li>'
+      + '<li>This data is not used to train artificial intelligence or machine learning models.</li>'
+      + '<li>We do not request or receive access to your Gmail, Drive, Contacts or Calendar content.</li>'
+      + '<li>No human reads this data, except with your permission, for security purposes, or where the law requires it.</li>'
       + '</ul>',
     'sec.usage.title': 'How We Use Your Information',
     'sec.usage.body':
-      '<p>We use your information for the following purposes:</p>'
+      '<p>This information is used for:</p>'
       + '<ul>'
-      + '<li>Analyzing and improving our services</li>'
-      + '<li>Displaying your score on leaderboards</li>'
       + '<li>Saving your game progress and scores</li>'
-      + '<li>Improving user experience and game performance</li>'
-      + '<li>User authentication and account management</li>'
-      + '<li>Sending important notifications when necessary</li>'
+      + '<li>Showing your score on the leaderboard</li>'
+      + '<li>Authentication and account management</li>'
       + '</ul>',
     'sec.security.title': 'Data Security',
     'sec.security.body':
-      '<p>We use industry-standard security protocols to protect your information:</p>'
-      + '<ul>'
-      + '<li><strong>Continuous monitoring:</strong> 24/7 monitoring of system security</li>'
-      + '<li><strong>Access control:</strong> Only authorized personnel can access your data</li>'
-      + '<li><strong>Connection encryption:</strong> All data is encrypted in transit using HTTPS/TLS</li>'
-      + '<li><strong>Cloudflare D1 database:</strong> Secure data storage powered by Cloudflare D1</li>'
-      + '</ul>',
+      '<p>Traffic to the server is encrypted with HTTPS/TLS, and data is kept in a Cloudflare D1 database.</p>'
+      + '<p>No service on the internet is completely secure, and absolute security cannot be guaranteed.</p>',
     'sec.sharing.title': 'No Data Sharing',
     'sec.sharing.body':
       '<div class="callout callout-warn">'
-      + '<p><strong>Important:</strong> We never sell or share your personal data with third parties. Information may only be disclosed in the following limited cases:</p>'
-      + '<ul>'
-      + '<li><strong>Legal compliance:</strong> When required by law or a valid legal request</li>'
-      + '<li><strong>Abuse prevention:</strong> To protect the security and integrity of our services</li>'
-      + '<li><strong>With your consent:</strong> When you explicitly authorize it</li>'
-      + '</ul>'
+      + '<p>We do not share your information with any third party. The only exception is a formal, lawful request from United States government authorities.</p>'
+      + '<p>Your information is not handed over to the government authorities of any other country.</p>'
       + '</div>',
-    'sec.cookies.title': 'Cookies & Local Storage',
+    'sec.cookies.title': 'Cookies',
     'sec.cookies.body':
-      '<p>We use cookies to maintain your session. These cookies:</p>'
-      + '<ul>'
-      + '<li>Remain valid for 7 days</li>'
-      + '<li>Can be deleted by you at any time</li>'
-      + '<li>Do not store any sensitive personal information</li>'
-      + '<li>Are used exclusively for authentication</li>'
-      + '</ul>',
+      '<p>Cookies are used only to keep you signed in and to remember your language and theme. Nothing sensitive is stored in them, and you can clear them from your browser whenever you like.</p>',
     'sec.rights.title': 'Your Rights',
     'sec.rights.body':
-      '<p>You have the right to:</p>'
+      '<p>Whenever you like, you can:</p>'
       + '<ul>'
-      + '<li><strong>Deletion:</strong> Delete your account entirely</li>'
-      + '<li><strong>Opt-out:</strong> Opt out of our services at any time</li>'
-      + '<li><strong>Portability:</strong> Receive a copy of your personal data</li>'
-      + '<li><strong>Correction:</strong> Correct any inaccurate information</li>'
-      + '<li><strong>Restriction:</strong> Restrict the processing of your data</li>'
-      + '<li><strong>Access:</strong> Access all information we hold about you</li>'
+      + '<li><strong>Access:</strong> see the information we hold about you</li>'
+      + '<li><strong>Correction:</strong> correct anything that is inaccurate</li>'
+      + '<li><strong>Deletion:</strong> delete your account entirely</li>'
       + '</ul>',
     'sec.children.title': 'Children',
     'sec.children.body':
-      '<p>Our game is designed for users over the age of <strong>5</strong>. We do not knowingly collect data from children under 5. If we discover that a child under 5 has registered, we will immediately delete their account.</p>',
+      '<p>Every game has its own age rating, stated on that game\'s page and wherever the game was obtained from. An account that does not match that game\'s age limit is deleted.</p>',
     'sec.intl.title': 'International Data Transfer',
     'sec.intl.body':
-      '<p>Your data may be stored on servers located in different countries. We ensure all data transfers comply with international data protection standards.</p>',
+      '<p>This service runs on Cloudflare infrastructure, so your data may be stored or processed on servers in different countries.</p>',
     'sec.changes.title': 'Policy Changes',
     'sec.changes.body':
-      '<div class="callout callout-info"><p>We may update this policy at any time. Important changes will be communicated via email or in-game notification. Continued use of the service after any update constitutes acceptance of the revised policy.</p></div>',
+      '<div class="callout callout-info"><p>This policy may be updated. The version on this page is always the current one, and continued use of the service after an update means you accept it.</p></div>',
     'contact.title': 'Contact Us',
     'contact.intro': 'For any questions about this policy, please reach out to us:',
     'contact.game': 'Game',
-    'contact.myket': 'Myket page',
-    'contact.myketLink': 'View on Myket',
+    'contact.gamePage': 'Game page',
+    'contact.gamePageLink': 'View game page',
     'contact.email': 'Support email',
     'contact.web': 'Website',
     'footer.updated': 'Last updated:',
@@ -463,111 +397,74 @@ const I18N = {
     brandAll: 'すべてのゲームとツール',
     'sec.intro.title': 'はじめに',
     'sec.intro.body':
-      '<p><strong>AmirCollider Games</strong>は、お客様のプライバシーを重視しています。本ポリシーでは、収集する情報とその利用方法について説明します。</p>'
-      + '<div class="callout callout-good"><p><strong>お約束：</strong>お客様の同意なく、個人情報を第三者に販売することは決してありません。</p></div>',
-    'sec.collect.title': '収集する情報',
+      '<p>本ポリシーでは、<strong>AmirCollider</strong> がお客様から受け取る情報と、その用途について説明します。</p>',
+    'sec.collect.title': 'Gmail アカウントから収集する情報',
     'sec.collect.body':
-      '<p>認証サービスをご利用の際、当社は以下の情報を取得します。</p>'
+      '<p>本セクションは、ログイン機能があり「Google でログイン」を使用するゲームにのみ該当します。ログイン機能のないゲームでは、Google アカウントから情報を取得することはありません。</p>'
+      + '<p>ログイン時、Google アカウントから以下を受け取ります。</p>'
       + '<ul>'
-      + '<li><strong>メールアドレス：</strong>Googleアカウントのメールアドレス</li>'
-      + '<li><strong>プロフィール写真：</strong>Googleアカウントのプロフィール写真</li>'
-      + '<li><strong>お名前：</strong>Googleアカウントに登録された名前</li>'
-      + '<li><strong>ゲーム統計：</strong>スコア、レベル、実績</li>'
+      + '<li><strong>お名前：</strong>Google アカウントの表示名</li>'
+      + '<li><strong>メール：</strong>Google アカウントのメールアドレス</li>'
+      + '<li><strong>プロフィール写真：</strong>Google アカウントの画像</li>'
       + '</ul>',
     'sec.googledata.title': 'Google アカウントデータと Google API サービスポリシー',
     'sec.googledata.body':
-      '<p>本サービスへのログインは「Google でログイン」で行われます。要求するスコープは以下のみです。</p>'
-      + '<ul>'
-      + '<li><code>openid</code> — 同一のユーザーが再度ログインしたことを判別するためのアカウント識別子</li>'
-      + '<li><code>email</code> — アカウントの識別と、必要な場合のご連絡に使用するメールアドレス</li>'
-      + '<li><code>profile</code> — アカウントページとリーダーボードに表示する表示名とプロフィール写真</li>'
-      + '</ul>'
+      '<p>本セクションは Google 自身の要件のためのもので、Google API サービスの審査に向けて記載しています。要求するスコープは上記と同じく <code>openid</code>、<code>email</code>、<code>profile</code> です。</p>'
       + '<div class="callout callout-good">'
       + '<p><strong>限定的な使用：</strong>本アプリケーションによる Google API から受け取った情報の使用および転送は、'
       + '<a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API サービスのユーザーデータに関するポリシー</a>'
       + '（限定的な使用の要件を含む）に準拠します。</p>'
       + '</div>'
       + '<ul>'
-      + '<li>このデータを<strong>販売することはありません</strong>。広告や広告ターゲティングにも使用しません。</li>'
+      + '<li>このデータを第三者に移転することはありません。</li>'
+      + '<li>このデータを広告や広告ターゲティングに使用することはありません。</li>'
       + '<li>このデータを AI・機械学習モデルの学習に使用することはありません。</li>'
-      + '<li>お客様の明示的な許可、セキュリティ上の必要、法令による要求がある場合を除き、人がこのデータを読むことはありません。</li>'
-      + '<li>Gmail、Drive、連絡先、カレンダーの内容への<strong>アクセスは要求も取得もしていません</strong>。</li>'
-      + '</ul>',
-    'sec.deletion.title': 'アカウントとデータの削除',
-    'sec.deletion.body':
-      '<p>アカウントと関連するすべてのデータは、いつでも削除を依頼できます。</p>'
-      + '<ul>'
-      + '<li>ログインに使用したメールアドレスから、件名「Delete my account」で '
-      + '<a href="mailto:' + CONFIG.SUPPORT_EMAIL + '">' + CONFIG.SUPPORT_EMAIL + '</a> 宛にご連絡ください。</li>'
-      + '<li>ご依頼は<strong>30 日以内</strong>に実行し、完了時に確認をお送りします。</li>'
-      + '<li>削除により、プロフィール、スコア、リーダーボードの記録、クラウドセーブが消去されます。</li>'
-      + '<li>本アプリケーションの Google アカウントへのアクセスは '
-      + '<a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a> でいつでも取り消せます。</li>'
+      + '<li>Gmail、Drive、連絡先、カレンダーの内容へのアクセスは要求も取得もしていません。</li>'
+      + '<li>お客様の許可、セキュリティ上の必要、法令による要求がある場合を除き、人がこのデータを読むことはありません。</li>'
       + '</ul>',
     'sec.usage.title': '情報の利用方法',
     'sec.usage.body':
-      '<p>当社は以下の目的でお客様の情報を利用します。</p>'
+      '<p>この情報は以下の目的で利用します。</p>'
       + '<ul>'
-      + '<li>サービスの分析と改善</li>'
-      + '<li>リーダーボードへのスコア表示</li>'
       + '<li>ゲームの進行状況とスコアの保存</li>'
-      + '<li>ユーザー体験とゲーム性能の向上</li>'
+      + '<li>リーダーボードへのスコア表示</li>'
       + '<li>認証およびアカウント管理</li>'
-      + '<li>必要な場合の重要なお知らせの送信</li>'
       + '</ul>',
     'sec.security.title': 'データセキュリティ',
     'sec.security.body':
-      '<p>当社は、お客様の情報を保護するために業界標準のセキュリティ対策を講じています。</p>'
-      + '<ul>'
-      + '<li><strong>常時監視：</strong>システムセキュリティを24時間体制で監視</li>'
-      + '<li><strong>アクセス制限：</strong>権限を持つ担当者のみがデータにアクセス可能</li>'
-      + '<li><strong>通信の暗号化：</strong>すべてのデータはHTTPS/TLSで暗号化して送信</li>'
-      + '<li><strong>Cloudflare D1：</strong>Cloudflare D1データベースによる安全なデータ保管</li>'
-      + '</ul>',
+      '<p>サーバーとの通信は HTTPS/TLS で暗号化され、データは Cloudflare D1 データベースに保管されます。</p>'
+      + '<p>インターネット上のサービスに完全な安全はなく、絶対的な安全性を保証するものではありません。</p>',
     'sec.sharing.title': 'データの非共有',
     'sec.sharing.body':
       '<div class="callout callout-warn">'
-      + '<p><strong>重要：</strong>当社はお客様の個人情報を第三者に販売・共有しません。以下の限られた場合にのみ情報を開示することがあります。</p>'
-      + '<ul>'
-      + '<li><strong>法令の遵守：</strong>法律または正当な法的手続きにより求められた場合</li>'
-      + '<li><strong>不正利用の防止：</strong>サービスの安全性と健全性を保護するため</li>'
-      + '<li><strong>お客様の同意：</strong>お客様が明示的に許可した場合</li>'
-      + '</ul>'
+      + '<p>当社はお客様の情報をいかなる第三者とも共有しません。唯一の例外は、アメリカ合衆国政府当局からの正式かつ適法な要請です。</p>'
+      + '<p>他のいかなる国の政府当局にも、お客様の情報を引き渡すことはありません。</p>'
       + '</div>',
-    'sec.cookies.title': 'Cookieとローカルストレージ',
+    'sec.cookies.title': 'Cookie',
     'sec.cookies.body':
-      '<p>当社はセッションを維持するためにCookieを使用します。これらのCookieは：</p>'
-      + '<ul>'
-      + '<li>7日間有効です</li>'
-      + '<li>いつでも削除できます</li>'
-      + '<li>機密性の高い個人情報は保存しません</li>'
-      + '<li>認証目的のみに使用されます</li>'
-      + '</ul>',
+      '<p>Cookie は、ログイン状態の維持と、言語および表示テーマの記憶のためだけに使用します。機密性の高い情報は保存されず、いつでもブラウザから削除できます。</p>',
     'sec.rights.title': 'お客様の権利',
     'sec.rights.body':
-      '<p>お客様には以下の権利があります。</p>'
+      '<p>お客様はいつでも次のことができます。</p>'
       + '<ul>'
-      + '<li><strong>削除：</strong>アカウントを完全に削除する</li>'
-      + '<li><strong>オプトアウト：</strong>いつでもサービスの利用を停止する</li>'
-      + '<li><strong>データポータビリティ：</strong>個人データの写しを受け取る</li>'
       + '<li><strong>訂正：</strong>誤った情報を訂正する</li>'
-      + '<li><strong>制限：</strong>個人データの処理を制限する</li>'
-      + '<li><strong>アクセス：</strong>当社が保有する情報にアクセスする</li>'
+      + '<li><strong>削除：</strong>アカウントを完全に削除する</li>'
+      + '<li><strong>アクセス：</strong>当社が保有する情報を確認する</li>'
       + '</ul>',
     'sec.children.title': '子どもについて',
     'sec.children.body':
-      '<p>当ゲームは<strong>5歳</strong>以上の利用者を対象としています。当社は5歳未満の子どもの情報を意図的に収集しません。5歳未満の子どもが登録していると判明した場合、直ちにそのアカウントを削除します。</p>',
+      '<p>各ゲームには対象年齢があり、そのゲームのページおよび入手元に表示されています。そのゲームの年齢制限に合致しないアカウントは削除されます。</p>',
     'sec.intl.title': '国際的なデータ移転',
     'sec.intl.body':
-      '<p>お客様のデータは、さまざまな国に所在するサーバーに保管される場合があります。当社は、すべてのデータ移転が国際的なデータ保護基準に準拠して行われることを保証します。</p>',
+      '<p>本サービスは Cloudflare の基盤上で動作するため、お客様のデータはさまざまな国のサーバーに保管または処理される場合があります。</p>',
     'sec.changes.title': 'ポリシーの変更',
     'sec.changes.body':
-      '<div class="callout callout-info"><p>当社は本ポリシーをいつでも更新することがあります。重要な変更は、メールまたはゲーム内通知でお知らせします。更新後も継続してサービスをご利用された場合、改定後のポリシーに同意したものとみなされます。</p></div>',
+      '<div class="callout callout-info"><p>本ポリシーは更新されることがあります。常にこのページの内容が有効であり、更新後も継続してご利用された場合は同意したものとみなされます。</p></div>',
     'contact.title': 'お問い合わせ',
     'contact.intro': '本ポリシーに関するご質問は、以下までご連絡ください。',
     'contact.game': 'ゲーム',
-    'contact.myket': 'Myketページ',
-    'contact.myketLink': 'Myketで見る',
+    'contact.gamePage': 'ゲームページ',
+    'contact.gamePageLink': 'ゲームページを見る',
     'contact.email': 'サポートメール',
     'contact.web': 'ウェブサイト',
     'footer.updated': '最終更新：',
@@ -901,6 +798,11 @@ function renderHero(lang, game, amirLogo, gameLogo) {
     </div>`
 }
 
+// Every bullet list on this page is reordered shortest line first
+// by sortListItems(). The content dictionaries above are therefore
+// authored for meaning, not for shape - do not spend time hand-
+// sorting them, and do not be surprised when the rendered order
+// differs from the source order.
 function renderSections(lang) {
   const p = pack(lang)
   return `
@@ -908,7 +810,7 @@ function renderSections(lang) {
       ${SECTION_ORDER.map(sec => `
       <section class="panel">
         <h2><span class="sec-ic">${icon(sec.ic, 'p-ic')}</span><span>${escapeHtml(p['sec.' + sec.key + '.title'])}</span></h2>
-        <div>${p['sec.' + sec.key + '.body']}</div>
+        <div>${sortListItems(p['sec.' + sec.key + '.body'])}</div>
       </section>`).join('')}
       ${renderContact(lang)}
     </div>`
@@ -923,9 +825,15 @@ function renderContact(lang) {
   // name one are left out rather than filled with the first game
   // in the registry - which is what made /privacy read as Neon
   // Katana's policy to anyone who reached it from the footer.
+  //
+  // The second row used to be the game's Myket listing. It points
+  // at the game's own page here instead: the store a build came
+  // from is one of several and changes, while the game's page on
+  // this site is the address that is always right and always
+  // carries the current download links.
   const gameRows = CONTEXT.siteLevel ? '' : `
           <li><span class="c-ic">${icon('user', 'p-ic')}</span><span class="c-key">${escapeHtml(p['contact.game'])}</span><span class="c-val">${escapeHtml(game.name)}</span></li>
-          ${game.myketUrl ? `<li><span class="c-ic">${icon('external', 'p-ic')}</span><span class="c-key">${escapeHtml(p['contact.myket'])}</span><span class="c-val"><a href="${escapeHtml(game.myketUrl)}" target="_blank" rel="noopener">${escapeHtml(p['contact.myketLink'])}</a></span></li>` : ''}`
+          <li><span class="c-ic">${icon('external', 'p-ic')}</span><span class="c-key">${escapeHtml(p['contact.gamePage'])}</span><span class="c-val"><a href="${escapeHtml(baseUrl + localizedPath('/' + game.id, lang))}">${escapeHtml(p['contact.gamePageLink'])}</a></span></li>`
 
   return `
       <section class="panel">

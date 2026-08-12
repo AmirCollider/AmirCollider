@@ -657,6 +657,16 @@ export function siteBreadcrumb({ lang, trail = [] } = {}) {
 // when a caller has the games map it is listed by name, and when it
 // does not the column simply omits those rows rather than guessing.
 // ==========================================
+// Shortest label first; equal lengths keep the order they were
+// declared in. Counts code points, not UTF-16 units, so a Japanese
+// label is measured in characters rather than bytes.
+function byLabelLength(links) {
+  return (links || [])
+    .map((link, index) => ({ link, index, len: [...String(link.label || '')].length }))
+    .sort((a, b) => (a.len - b.len) || (a.index - b.index))
+    .map(entry => entry.link)
+}
+
 export function siteFooter({ lang, games = [] } = {}) {
   const code = resolveLang(lang)
   const p = pack(code)
@@ -699,10 +709,17 @@ export function siteFooter({ lang, games = [] } = {}) {
     }
   ]
 
+  // Each column is sorted shortest label first, the same rule the
+  // policy pages apply to their bullet lists. A footer column is
+  // read as a shape before it is read as words, and a one-word link
+  // sitting between two long ones is what makes the block look
+  // unfinished. Sorting happens here rather than in the arrays above
+  // because the labels are translated: a hand-sorted order would be
+  // correct in one language and wrong in the other two.
   const cols = columns.map(column => `
       <div class="ac-foot-col">
         <h2>${escapeHtml(column.title)}</h2>
-        <ul>${column.links.map(link =>
+        <ul>${byLabelLength(column.links).map(link =>
           '<li><a href="' + escapeHtml(navHref(link.href, code)) + '">' + escapeHtml(link.label) + '</a></li>'
         ).join('')}</ul>
       </div>`).join('')

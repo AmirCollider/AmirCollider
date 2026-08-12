@@ -387,9 +387,15 @@ choice for a client that is not about one particular game.
   and `profile` and says what each is used for.
 - **The Limited Use statement.** Same section, verbatim, linking to
   the Google API Services User Data Policy.
-- **A data deletion route.** Privacy policy → *Account and data
-  deletion*: email `SUPPORT_EMAIL` with the subject "Delete my
-  account", carried out within 30 days.
+- **A data deletion route.** Privacy policy → *Your rights* →
+  *Deletion*, and the self-service button on `/:gameId/account`.
+
+  > This used to be a section of its own — *Account and data
+  > deletion*, with the email route and a 30-day promise — removed
+  > at the owner's request in favour of the one line in *Your
+  > rights*. Google's review looks for a deletion route by name, so
+  > this is the sentence to strengthen first if a verification ever
+  > comes back asking for one.
 - **Domain ownership.** Verified in Search Console (step 2 above).
   Cloud Console reads that verification.
 

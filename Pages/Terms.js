@@ -31,7 +31,7 @@ import { CONFIG, validateGameId } from '../Config.js'
 import { getPageHead } from '../Core/DesignSystem.js'
 import { createErrorPage } from '../Core/ErrorPage.js'
 import { createHtmlResponse } from '../Core/Http.js'
-import { escapeHtml } from '../Core/Html.js'
+import { escapeHtml, sortListItems } from '../Core/Html.js'
 import { themeBootScript } from '../Core/PageChrome.js'
 import { seoHead, breadcrumbLd } from '../Core/Seo.js'
 import { localizedPath } from '../Core/Locale.js'
@@ -233,43 +233,42 @@ const I18N = {
       + '</ul></div>',
     'sec.ownership.title': 'مالکیت محتوا',
     'sec.ownership.body':
-      '<p>بخش اصلی محتوای بازی شامل کد، طراحی، گرافیک و نام تجاری متعلق به <strong>AmirCollider Games</strong> است و تحت حمایت قوانین مالکیت فکری قرار دارد. با این حال، برخی عناصر مانند موسیقی، جلوه‌های صوتی، برخی منوها و اشیاء ممکن است از منابع Asset استفاده شده باشند یا دارای کپی‌رایت اشخاص ثالث باشند؛ در این موارد نام و اعتبار مالک اصلی ذکر می‌شود.</p>'
-      + '<div class="callout callout-info"><p><strong>توجه:</strong> شما مجاز به کپی، تکثیر، توزیع یا ایجاد اثر مشتق از محتوای اصلی بازی بدون اجازه کتبی ما نیستید. محتوای دارای کپی‌رایت ثالث تابع شرایط مالک مربوطه است.</p></div>',
+      '<p>کد، طراحی، گرافیک و نام تجاری بازی متعلق به <strong>AmirCollider</strong> است.</p>'
+      + '<ul>'
+      + '<li>ابزارهای به‌کاررفته در ساخت بازی یا رایگان‌اند یا به‌صورت قانونی تهیه شده‌اند</li>'
+      + '<li>انتشار مجدد خودِ بازی به نام یا با هویت شخص دیگری مجاز نیست</li>'
+      + '<li>ممکن است بعضی ایده‌ها و مکانیزم‌های بازی از بازی‌های دیگر الهام گرفته شده باشند، اما هیچ‌کدام غیرقانونی نیستند</li>'
+      + '<li>تمام صداها و Assetهای به‌کاررفته آزادند و کپی‌رایتی روی آن‌ها وجود ندارد؛ می‌توانید ویدیوی بازی را در یوتیوب یا هر جای دیگری منتشر کنید</li>'
+      + '</ul>',
     'sec.purchases.title': 'خریدهای درون‌برنامه‌ای',
     'sec.purchases.body':
       '<p>بازی ممکن است شامل خریدهای درون‌برنامه‌ای با شرایط زیر باشد:</p>'
       + '<ul>'
+      + '<li>تمام خریدها نهایی هستند و استرداد وجه انجام نمی‌شود</li>'
       + '<li>قیمت‌ها ممکن است بدون اطلاع قبلی تغییر کنند</li>'
-      + '<li>استرداد وجه تنها در موارد خاص و طبق قوانین مایکت انجام می‌شود</li>'
-      + '<li>تمام خریدها نهایی و غیرقابل استرداد هستند (مگر در موارد استثنایی)</li>'
-      + '<li>مسئولیت حفظ امنیت روش پرداخت با شما یا فروشگاه طرف قرارداد است (مانند مایکت، بازار یا پلی‌استور)</li>'
+      + '<li>پرداخت از طریق درگاه پرداخت رمزارز انجام می‌شود و امنیت کیف پول و روش پرداخت با خود شماست</li>'
       + '</ul>',
     'sec.liability.title': 'محدودیت مسئولیت',
     'sec.liability.body':
       '<div class="callout callout-warn">'
       + '<p><strong>مهم:</strong> بازی «همان‌گونه که هست» ارائه می‌شود. ما مسئولیتی در قبال خسارات ناشی از استفاده یا عدم استفاده از سرویس نداریم، از جمله:</p>'
       + '<ul>'
-      + '<li>خرابی نرم‌افزار <em>(در سریع‌ترین حالت ممکن از طریق آپدیت برطرف می‌شود)</em></li>'
-      + '<li>از دست رفتن داده‌ها یا پیشرفت بازی <em>(در صورتی که مشکل از طرف ما نباشد)</em></li>'
-      + '<li>خسارات مالی یا غیرمالی <em>(در صورتی که کاربر برخلاف قرارداد عمل کرده باشد)</em></li>'
-      + '<li>مشکلات فنی یا قطعی کامل سرویس <em>(در سریع‌ترین حالت ممکن از طریق آپدیت برطرف می‌شود)</em></li>'
+      + '<li>خرابی نرم‌افزار</li>'
+      + '<li>خسارات مالی یا غیرمالی</li>'
+      + '<li>مشکلات فنی یا قطعی سرویس</li>'
+      + '<li>از دست رفتن داده‌ها یا پیشرفت بازی</li>'
       + '</ul></div>',
     'sec.account.title': 'حساب کاربری',
     'sec.account.body':
       '<ul>'
       + '<li><strong>اطلاعات صحیح:</strong> باید اطلاعات دقیق و به‌روز ارائه دهید</li>'
-      + '<li><strong>حذف حساب:</strong> شما می‌توانید هر زمان حساب خود را حذف کنید</li>'
-      + '<li><strong>تعلیق حساب:</strong> ما می‌توانیم حساب‌های مشکوک را تعلیق یا حذف کنیم</li>'
-      + '<li><strong>مسئولیت امنیت:</strong> شما مسئول حفظ امنیت حساب خود هستید و ما نیز متعهد به حفاظت از داده‌های شما هستیم</li>'
+      + '<li><strong>حذف حساب:</strong> هر زمان بخواهید می‌توانید حساب خود را حذف کنید</li>'
+      + '<li><strong>تعلیق حساب:</strong> حساب‌های مشکوک ممکن است تعلیق یا حذف شوند</li>'
+      + '<li><strong>مسئولیت امنیت:</strong> حفظ امنیت حساب و دستگاه شما بر عهده‌ی خودتان است</li>'
       + '</ul>',
     'sec.permissions.title': 'دسترسی‌های مورد نیاز',
     'sec.permissions.body':
-      '<p>بازی ممکن است به دسترسی‌های زیر روی دستگاه نیاز داشته باشد:</p>'
-      + '<ul>'
-      + '<li><strong>حافظه:</strong> برای ذخیره داده‌های بازی روی دستگاه</li>'
-      + '<li><strong>اطلاعات دستگاه:</strong> برای بهینه‌سازی عملکرد</li>'
-      + '<li><strong>اینترنت:</strong> برای احراز هویت و همگام‌سازی داده‌ها</li>'
-      + '</ul>',
+      '<p>هر بازی دسترسی‌های خودش را دارد و این دسترسی‌ها از یک بازی به بازی دیگر فرق می‌کند. فهرست دقیق آن‌ها پیش از نصب، در همان جایی که بازی را از آن دریافت می‌کنید نمایش داده می‌شود و هر بازی تنها همان دسترسی‌هایی را می‌خواهد که برای اجرای خودش لازم است.</p>',
     'sec.service.title': 'تغییرات در سرویس',
     'sec.service.body':
       '<p>ما حق داریم هر زمان سرویس را تغییر دهیم، به‌روزرسانی کنیم یا متوقف کنیم. این شامل موارد زیر است:</p>'
@@ -281,7 +280,7 @@ const I18N = {
       + '</ul>',
     'sec.law.title': 'قانون حاکم',
     'sec.law.body':
-      '<p>این شرایط و قوانین تحت قوانین جمهوری اسلامی ایران اجرا می‌شود. هرگونه اختلاف ابتدا از طریق مذاکره حل خواهد شد و در صورت عدم توافق، به مراجع قضایی صالح ارجاع می‌شود.</p>',
+      '<p>این شرایط دقیقاً همان‌گونه که در این صفحه نوشته شده اجرا می‌شود. هرگونه اختلاف ابتدا از طریق مذاکره حل می‌شود و اگر رسیدگی رسمی الزامی شود، قوانین ایالات متحده‌ی آمریکا مبنا قرار می‌گیرد.</p>',
     'sec.changes.title': 'تغییرات در شرایط',
     'sec.changes.body':
       '<div class="callout callout-info"><p>ما ممکن است این شرایط را هر زمان به‌روزرسانی کنیم. تغییرات از لحظه انتشار لازم‌الاجرا خواهند بود. ادامه استفاده از سرویس پس از هر به‌روزرسانی به‌منزله پذیرش شرایط جدید است.</p></div>',
@@ -290,16 +289,16 @@ const I18N = {
       '<div class="callout callout-good">'
       + '<p><strong>با استفاده از بازی، شما تأیید می‌کنید که:</strong></p>'
       + '<ul>'
-      + '<li>بالای ۵ سال سن دارید</li>'
-      + '<li>این شرایط و قوانین را خوانده و به‌طور کامل فهمیده‌اید</li>'
       + '<li>با تمام شرایط ذکرشده موافقت می‌کنید</li>'
+      + '<li>شرایط سنی اعلام‌شده برای آن بازی را دارید</li>'
+      + '<li>این شرایط و قوانین را خوانده و به‌طور کامل فهمیده‌اید</li>'
       + '<li>مسئولیت استفاده صحیح از سرویس را طبق این شرایط می‌پذیرید</li>'
       + '</ul></div>',
     'contact.title': 'پشتیبانی و تماس',
     'contact.intro': 'در صورت بروز هرگونه مشکل یا سوال، با ما تماس بگیرید:',
     'contact.game': 'بازی',
-    'contact.myket': 'صفحه مایکت',
-    'contact.myketLink': 'مشاهده در مایکت',
+    'contact.gamePage': 'صفحه بازی',
+    'contact.gamePageLink': 'مشاهده صفحه بازی',
     'contact.email': 'ایمیل پشتیبانی',
     'contact.web': 'وب‌سایت',
     'footer.updated': 'آخرین به‌روزرسانی:',
@@ -345,43 +344,42 @@ const I18N = {
       + '</ul></div>',
     'sec.ownership.title': 'Content Ownership',
     'sec.ownership.body':
-      '<p>Core content — code, design, graphics, and brand name — belongs to <strong>AmirCollider Games</strong> and is protected under intellectual property law. However, some elements such as music, sound effects, menus, or objects may come from third-party asset packs or carry third-party copyrights; in such cases the original owner\'s credit is duly acknowledged.</p>'
-      + '<div class="callout callout-info"><p><strong>Note:</strong> You may not copy, reproduce, distribute, or create derivative works from original game content without our written consent. Third-party content is subject to its respective owner\'s terms.</p></div>',
+      '<p>The game\'s code, design, graphics and brand name belong to <strong>AmirCollider</strong>.</p>'
+      + '<ul>'
+      + '<li>The tools used to build the games are either free or legally licensed</li>'
+      + '<li>Republishing the game itself under someone else\'s name or identity is not allowed</li>'
+      + '<li>Some ideas and mechanics may be inspired by other games, but none of them are unlawful</li>'
+      + '<li>All sounds and assets used are free of copyright; you are welcome to publish gameplay footage on YouTube or anywhere else</li>'
+      + '</ul>',
     'sec.purchases.title': 'In-App Purchases',
     'sec.purchases.body':
       '<p>The game may include in-app purchases subject to the following:</p>'
       + '<ul>'
+      + '<li>All purchases are final and are not refunded</li>'
       + '<li>Prices may change at any time without prior notice</li>'
-      + '<li>Refunds are processed only in special cases, per Myket\'s refund policy</li>'
-      + '<li>All purchases are considered final and non-refundable (except in exceptional cases)</li>'
-      + '<li>Payment security is the responsibility of you or the contracted store (e.g. Myket, Bazaar, or Google Play)</li>'
+      + '<li>Payment goes through a crypto payment gateway, and the security of your wallet and payment method is your own</li>'
       + '</ul>',
     'sec.liability.title': 'Limitation of Liability',
     'sec.liability.body':
       '<div class="callout callout-warn">'
       + '<p><strong>Important:</strong> The game is provided "as is". We are not liable for damages arising from use or inability to use the service, including:</p>'
       + '<ul>'
-      + '<li>Software malfunction <em>(addressed as quickly as possible via update)</em></li>'
-      + '<li>Loss of game data or progress <em>(only where the issue does not originate from our side)</em></li>'
-      + '<li>Financial or non-financial damages <em>(where the user has acted in breach of this agreement)</em></li>'
-      + '<li>Technical issues or full service outages <em>(resolved in the shortest time possible through an update)</em></li>'
+      + '<li>Software malfunction</li>'
+      + '<li>Loss of game data or progress</li>'
+      + '<li>Financial or non-financial damages</li>'
+      + '<li>Technical issues or service outages</li>'
       + '</ul></div>',
     'sec.account.title': 'User Account',
     'sec.account.body':
       '<ul>'
       + '<li><strong>Accurate info:</strong> You must provide accurate and up-to-date information</li>'
-      + '<li><strong>Account deletion:</strong> You may request deletion of your account at any time</li>'
-      + '<li><strong>Account suspension:</strong> We reserve the right to suspend or delete accounts that appear suspicious</li>'
-      + '<li><strong>Security responsibility:</strong> You are responsible for your account security, and we are equally committed to safeguarding your data</li>'
+      + '<li><strong>Account deletion:</strong> You may delete your account whenever you like</li>'
+      + '<li><strong>Account suspension:</strong> Accounts that appear suspicious may be suspended or deleted</li>'
+      + '<li><strong>Security responsibility:</strong> Keeping your account and your device secure is your own responsibility</li>'
       + '</ul>',
     'sec.permissions.title': 'Required Permissions',
     'sec.permissions.body':
-      '<p>The game may require the following device permissions:</p>'
-      + '<ul>'
-      + '<li><strong>Storage:</strong> For storing game data locally on device</li>'
-      + '<li><strong>Device info:</strong> For optimizing performance on your device</li>'
-      + '<li><strong>Internet:</strong> For user authentication and cloud data synchronization</li>'
-      + '</ul>',
+      '<p>Every game asks for its own permissions, and they differ from one game to the next. The exact list is shown before installation, wherever you obtain the game from, and a game asks only for what it needs in order to run.</p>',
     'sec.service.title': 'Changes to Service',
     'sec.service.body':
       '<p>We reserve the right to modify, update, or discontinue the service at any time. This includes:</p>'
@@ -393,7 +391,7 @@ const I18N = {
       + '</ul>',
     'sec.law.title': 'Governing Law',
     'sec.law.body':
-      '<p>These terms are governed by the laws of the Islamic Republic of Iran. Any disputes shall first be resolved through mutual negotiation; failing that, the matter will be referred to the appropriate judicial authorities.</p>',
+      '<p>These terms apply exactly as they are written on this page. Any dispute is first resolved through negotiation; if formal proceedings become unavoidable, the laws of the United States of America apply.</p>',
     'sec.changes.title': 'Changes to Terms',
     'sec.changes.body':
       '<div class="callout callout-info"><p>We may update these terms at any time. All changes take effect immediately upon publication. Continued use of the service following any update constitutes acceptance of the revised terms.</p></div>',
@@ -402,16 +400,16 @@ const I18N = {
       '<div class="callout callout-good">'
       + '<p><strong>By using the game, you confirm that:</strong></p>'
       + '<ul>'
-      + '<li>You are over 5 years of age</li>'
-      + '<li>You have read and fully understood these terms and conditions</li>'
+      + '<li>You meet the age rating stated for that game</li>'
       + '<li>You agree to comply with all of the conditions stated above</li>'
+      + '<li>You have read and fully understood these terms and conditions</li>'
       + '<li>You accept full responsibility for using the service in accordance with these terms</li>'
       + '</ul></div>',
     'contact.title': 'Support & Contact',
     'contact.intro': 'For any issues or questions, please reach out to us:',
     'contact.game': 'Game',
-    'contact.myket': 'Myket page',
-    'contact.myketLink': 'View on Myket',
+    'contact.gamePage': 'Game page',
+    'contact.gamePageLink': 'View game page',
     'contact.email': 'Support email',
     'contact.web': 'Website',
     'footer.updated': 'Last updated:',
@@ -457,43 +455,42 @@ const I18N = {
       + '</ul></div>',
     'sec.ownership.title': 'コンテンツの所有権',
     'sec.ownership.body':
-      '<p>コード、デザイン、グラフィック、ブランド名などの主要なコンテンツは <strong>AmirCollider Games</strong> に帰属し、知的財産権法によって保護されています。ただし、音楽、効果音、一部のメニューやオブジェクトなどの要素は、第三者のアセットパックに由来する場合や第三者の著作権が及ぶ場合があり、その場合は原権利者のクレジットを明記します。</p>'
-      + '<div class="callout callout-info"><p><strong>注意：</strong>当社の書面による許可なく、ゲームのオリジナルコンテンツを複製、再配布、または二次的著作物として作成することはできません。第三者のコンテンツは、それぞれの権利者の規約に従います。</p></div>',
+      '<p>ゲームのコード、デザイン、グラフィック、ブランド名は <strong>AmirCollider</strong> に帰属します。</p>'
+      + '<ul>'
+      + '<li>ゲーム制作に使用したツールは、無償のものか正規に取得したものです</li>'
+      + '<li>ゲームそのものを他者の名義で再配布することは認められません</li>'
+      + '<li>一部のアイデアやゲームメカニクスは他のゲームから着想を得ている場合がありますが、違法なものは一つもありません</li>'
+      + '<li>使用しているサウンドとアセットはすべて著作権フリーです。YouTube などでのプレイ動画の公開は自由に行えます</li>'
+      + '</ul>',
     'sec.purchases.title': 'アプリ内購入',
     'sec.purchases.body':
       '<p>本ゲームには、以下の条件に従うアプリ内購入が含まれる場合があります。</p>'
       + '<ul>'
       + '<li>価格は予告なく変更される場合があります</li>'
-      + '<li>返金は特別な場合に限り、Myket の返金ポリシーに従って処理されます</li>'
-      + '<li>すべての購入は最終的なものであり、原則として返金できません（例外的な場合を除く）</li>'
-      + '<li>支払い方法の安全管理は、お客様または契約先ストア（Myket、Bazaar、Google Play など）の責任となります</li>'
+      + '<li>すべての購入は最終的なものであり、返金は行われません</li>'
+      + '<li>支払いは暗号資産の決済ゲートウェイを通じて行われ、ウォレットおよび支払い方法の安全管理はお客様の責任となります</li>'
       + '</ul>',
     'sec.liability.title': '責任の制限',
     'sec.liability.body':
       '<div class="callout callout-warn">'
       + '<p><strong>重要：</strong>本ゲームは「現状有姿」で提供されます。当社は、サービスの利用または利用不能に起因する損害について、以下を含め一切の責任を負いません。</p>'
       + '<ul>'
-      + '<li>ソフトウェアの不具合 <em>（可能な限り迅速にアップデートで対応します）</em></li>'
-      + '<li>ゲームデータまたは進行状況の損失 <em>（当社に起因しない場合に限る）</em></li>'
-      + '<li>金銭的または非金銭的損害 <em>（お客様が本規約に違反した場合）</em></li>'
-      + '<li>技術的な問題またはサービスの全面的な停止 <em>（可能な限り迅速にアップデートで解決します）</em></li>'
+      + '<li>ソフトウェアの不具合</li>'
+      + '<li>金銭的または非金銭的損害</li>'
+      + '<li>ゲームデータまたは進行状況の損失</li>'
+      + '<li>技術的な問題またはサービスの停止</li>'
       + '</ul></div>',
     'sec.account.title': 'ユーザーアカウント',
     'sec.account.body':
       '<ul>'
       + '<li><strong>正確な情報：</strong>正確かつ最新の情報を提供する必要があります</li>'
-      + '<li><strong>アカウントの削除：</strong>いつでもアカウントの削除を請求できます</li>'
-      + '<li><strong>アカウントの停止：</strong>当社は不審なアカウントを停止または削除する権利を有します</li>'
-      + '<li><strong>セキュリティ責任：</strong>お客様はアカウントの安全管理に責任を負い、当社もお客様のデータ保護に努めます</li>'
+      + '<li><strong>アカウントの削除：</strong>いつでもアカウントを削除できます</li>'
+      + '<li><strong>アカウントの停止：</strong>不審なアカウントは停止または削除される場合があります</li>'
+      + '<li><strong>セキュリティ責任：</strong>アカウントおよびデバイスの安全管理はお客様の責任です</li>'
       + '</ul>',
     'sec.permissions.title': '必要な権限',
     'sec.permissions.body':
-      '<p>本ゲームは、デバイスの以下の権限を必要とする場合があります。</p>'
-      + '<ul>'
-      + '<li><strong>ストレージ：</strong>ゲームデータをデバイスに保存するため</li>'
-      + '<li><strong>デバイス情報：</strong>パフォーマンスを最適化するため</li>'
-      + '<li><strong>インターネット：</strong>認証およびデータの同期のため</li>'
-      + '</ul>',
+      '<p>必要な権限はゲームごとに異なります。正確な一覧はインストール前に、ゲームを入手する場所に表示されます。各ゲームは、動作に必要な権限のみを要求します。</p>',
     'sec.service.title': 'サービスの変更',
     'sec.service.body':
       '<p>当社は、いつでもサービスを変更、更新、または終了する権利を有します。これには以下が含まれます。</p>'
@@ -505,7 +502,7 @@ const I18N = {
       + '</ul>',
     'sec.law.title': '準拠法',
     'sec.law.body':
-      '<p>本規約は、イラン・イスラム共和国の法律に準拠します。紛争はまず相互の協議によって解決されるものとし、解決に至らない場合は、適切な司法機関に付託されます。</p>',
+      '<p>本規約は、このページに記載されているとおりに適用されます。紛争はまず協議によって解決するものとし、正式な手続きが避けられない場合は、アメリカ合衆国の法律が適用されます。</p>',
     'sec.changes.title': '規約の変更',
     'sec.changes.body':
       '<div class="callout callout-info"><p>当社は、いつでも本規約を更新することがあります。すべての変更は公開時点で効力を生じます。更新後もサービスの利用を継続した場合、改訂された規約に同意したものとみなされます。</p></div>',
@@ -514,16 +511,16 @@ const I18N = {
       '<div class="callout callout-good">'
       + '<p><strong>ゲームを利用することで、お客様は以下を確認したものとします。</strong></p>'
       + '<ul>'
-      + '<li>5歳以上であること</li>'
       + '<li>本規約を読み、十分に理解したこと</li>'
+      + '<li>そのゲームの対象年齢を満たしていること</li>'
       + '<li>上記のすべての条件に従うことに同意すること</li>'
       + '<li>本規約に従ってサービスを利用する全責任を負うこと</li>'
       + '</ul></div>',
     'contact.title': 'サポート・お問い合わせ',
     'contact.intro': 'ご不明な点やお困りのことがございましたら、お問い合わせください。',
     'contact.game': 'ゲーム',
-    'contact.myket': 'Myket ページ',
-    'contact.myketLink': 'Myket で見る',
+    'contact.gamePage': 'ゲームページ',
+    'contact.gamePageLink': 'ゲームページを見る',
     'contact.email': 'サポートメール',
     'contact.web': 'ウェブサイト',
     'footer.updated': '最終更新日：',
@@ -855,6 +852,11 @@ function renderHero(lang, game, amirLogo, gameLogo) {
     </div>`
 }
 
+// Every bullet list on this page is reordered shortest line first
+// by sortListItems(). The content dictionaries above are therefore
+// authored for meaning, not for shape - do not spend time hand-
+// sorting them, and do not be surprised when the rendered order
+// differs from the source order.
 function renderSections(lang) {
   const p = pack(lang)
   return `
@@ -862,7 +864,7 @@ function renderSections(lang) {
       ${SECTION_ORDER.map(sec => `
       <section class="panel">
         <h2><span class="sec-ic">${icon(sec.ic, 'p-ic')}</span><span>${escapeHtml(p['sec.' + sec.key + '.title'])}</span></h2>
-        <div>${p['sec.' + sec.key + '.body']}</div>
+        <div>${sortListItems(p['sec.' + sec.key + '.body'])}</div>
       </section>`).join('')}
       ${renderContact(lang)}
     </div>`
@@ -877,9 +879,15 @@ function renderContact(lang) {
   // name one are left out rather than filled with the first game
   // in the registry - which is what made /privacy read as Neon
   // Katana's policy to anyone who reached it from the footer.
+  //
+  // The second row used to be the game's Myket listing. It points
+  // at the game's own page here instead: the store a build came
+  // from is one of several and changes, while the game's page on
+  // this site is the address that is always right and always
+  // carries the current download links.
   const gameRows = CONTEXT.siteLevel ? '' : `
           <li><span class="c-ic">${icon('user', 'p-ic')}</span><span class="c-key">${escapeHtml(p['contact.game'])}</span><span class="c-val">${escapeHtml(game.name)}</span></li>
-          ${game.myketUrl ? `<li><span class="c-ic">${icon('external', 'p-ic')}</span><span class="c-key">${escapeHtml(p['contact.myket'])}</span><span class="c-val"><a href="${escapeHtml(game.myketUrl)}" target="_blank" rel="noopener">${escapeHtml(p['contact.myketLink'])}</a></span></li>` : ''}`
+          <li><span class="c-ic">${icon('external', 'p-ic')}</span><span class="c-key">${escapeHtml(p['contact.gamePage'])}</span><span class="c-val"><a href="${escapeHtml(baseUrl + localizedPath('/' + game.id, lang))}">${escapeHtml(p['contact.gamePageLink'])}</a></span></li>`
 
   return `
       <section class="panel">
