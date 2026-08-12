@@ -2064,6 +2064,18 @@ function dashClientScript() {
           });
           if (missing.length) return { noteKey: 'missingField', noteVal: missing.join(', ') };
           if (!data.landing || typeof data.landing.hero !== 'string') return { noteKey: 'badStruct' };
+
+          /* The per-language halves and the disclosure have to
+             come back as objects even on a game that has never
+             used them, because the editor reads three keys off
+             each without checking - and an undefined there is a
+             tab that silently renders no rows rather than an
+             error anybody would notice. */
+          var shaped = ['screenshotsByLang', 'videosByLang', 'google'].filter(function (field) {
+            return !data.landing[field] || typeof data.landing[field] !== 'object';
+          });
+          if (shaped.length) return { noteKey: 'missingField', noteVal: shaped.join(', ') };
+
           if (data.blockedSections && data.blockedSections.length) {
             return { noteKey: 'tgBlocked', noteVal: data.blockedSections.join(', ') };
           }
