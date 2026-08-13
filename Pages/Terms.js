@@ -83,13 +83,39 @@ function pack(lang) {
 
 
 // ==========================================
-// Date Helpers (CF Workers safe, no Intl locale dependency)
+// Last Updated — a fact about the text, not a reading of the clock
+//
+// The footer used to call localizedDate(lang) with its default
+// argument, and that default was new Date(). So the page told every
+// visitor these terms had last been revised on the day they happened
+// to open it: on 12 August it said 12 August, on the 13th it said
+// the 13th, and not one word of the document had changed in between.
+// That is worse than printing no date at all. The date is the only
+// handle a reader has on "has this changed since I agreed to it?",
+// and terms of use are exactly the kind of document a reader is
+// entitled to check that question against.
+//
+// So the date is data now, and only a human moves it. Bump it in the
+// same commit that changes the wording of THIS page. Privacy.js
+// keeps its own copy on purpose: the two documents are revised
+// independently, and a single shared constant would silently re-date
+// whichever one had not changed.
+//
+// [year, month, day] — Gregorian, month 1-12, day 1-31.
 // ==========================================
-function getJalaliDate(date = new Date()) {
-  const gy = date.getFullYear()
-  const gm = date.getMonth() + 1
-  const gd = date.getDate()
+const LAST_UPDATED = [2026, 8, 12]
 
+
+// ==========================================
+// Date Helpers (CF Workers safe, no Intl locale dependency)
+//
+// Every renderer below takes that plain [y, m, d] triple rather than
+// a Date, deliberately. A Date is a point in time and each getter on
+// it resolves in the runtime's timezone, so "12 August" built as a
+// Date and read back west of Greenwich is 11 August — a published
+// date has no time and no zone, and it never acquires one here.
+// ==========================================
+function getJalaliDate([gy, gm, gd]) {
   const gy2 = gy - 1600
   const gm2 = gm - 1
   const gd2 = gd - 1
@@ -128,18 +154,33 @@ function getJalaliDate(date = new Date()) {
   return `${toFa(jd)} ${months[jm]} ${toFa(jy)}`
 }
 
-function getEnglishDate(date = new Date()) {
-  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+function getEnglishDate([gy, gm, gd]) {
+  // Written out instead of handed to toLocaleDateString: Intl would
+  // format the day in the runtime's timezone, and twelve month names
+  // that will never change are not worth a locale dependency.
+  const months = ['January', 'February', 'March', 'April', 'May', 'June',
+                  'July', 'August', 'September', 'October', 'November', 'December']
+
+  return `${months[gm - 1]} ${gd}, ${gy}`
 }
 
-function getJapaneseDate(date = new Date()) {
-  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`
+function getJapaneseDate([gy, gm, gd]) {
+  return `${gy}年${gm}月${gd}日`
 }
 
-function localizedDate(lang, date = new Date()) {
-  if (lang === 'en') return getEnglishDate(date)
-  if (lang === 'ja') return getJapaneseDate(date)
-  return getJalaliDate(date)
+function localizedDate(lang, ymd = LAST_UPDATED) {
+  if (lang === 'en') return getEnglishDate(ymd)
+  if (lang === 'ja') return getJapaneseDate(ymd)
+  return getJalaliDate(ymd)
+}
+
+// The machine-readable twin of the line above, for <time datetime>.
+// It is built from the same three numbers, so the words a reader
+// sees and the date a crawler parses can never drift apart.
+function isoDate([gy, gm, gd] = LAST_UPDATED) {
+  const pad = (n) => String(n).padStart(2, '0')
+
+  return `${gy}-${pad(gm)}-${pad(gd)}`
 }
 
 
@@ -905,7 +946,7 @@ function renderMeta(lang) {
   const p = pack(lang)
   return `
     <div class="meta">
-      <div class="m-row">${escapeHtml(p['footer.updated'])} <b>${escapeHtml(localizedDate(lang))}</b></div>
+      <div class="m-row">${escapeHtml(p['footer.updated'])} <b><time datetime="${isoDate()}">${escapeHtml(localizedDate(lang))}</time></b></div>
       <span class="version-badge">${escapeHtml(p['footer.version'])} ${escapeHtml(CONFIG.VERSION)}</span>
       <div class="m-note">${escapeHtml(p['footer.validity'])}</div>
     </div>`
