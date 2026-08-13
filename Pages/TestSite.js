@@ -33,7 +33,7 @@ import { CONFIG } from '../Config.js'
 import { getPageHead } from '../Core/DesignSystem.js'
 import { createHtmlResponse, clientIp, timingSafeEqual } from '../Core/Http.js'
 import { logWarning } from '../Core/Logging.js'
-import { escapeHtml, hexToRgb } from '../Core/Html.js'
+import { escapeHtml, hexToRgb, accentInk } from '../Core/Html.js'
 import { themeBootScript } from '../Core/PageChrome.js'
 import { langCookieHeader, matchRequestLang, themeFromCookie } from '../Core/RequestContext.js'
 import {
@@ -945,6 +945,12 @@ function themeTokens(accent, accentRgb) {
   :root {
     --accent: ${accent};
     --accent-rgb: ${accentRgb};
+
+    /* The text colour that reads on an accent-filled control.
+       Measured, not assumed - accentInk() in Core/Html.js. This
+       page paints with the GAME's colour, so a bright one used to
+       print white on mint at about 1.3:1. */
+    --on-accent: ${accentInk(accent)};
     --bg: #f4f6fb;
     --bg-soft: #eef1f8;
     --surface: #ffffff;
@@ -1063,7 +1069,7 @@ function renderLogin(baseUrl, lang, theme, error) {
     font: inherit; font-size: .8rem; padding: 6px 11px; border-radius: 999px;
     transition: color .2s ease, background .2s ease; }
   .lg-lang-btn:hover { color: var(--text); }
-  .lg-lang-btn.is-active { color: #fff; background: var(--accent); }
+  .lg-lang-btn.is-active { color: var(--on-accent, #fff); background: var(--accent); }
   .lg-icon-btn { width: 38px; height: 38px; border-radius: 50%; cursor: pointer;
     background: var(--surface); border: 1px solid var(--border); color: var(--text);
     display: inline-flex; align-items: center; justify-content: center; box-shadow: var(--shadow);
@@ -1081,7 +1087,7 @@ function renderLogin(baseUrl, lang, theme, error) {
 
   .lg-head { text-align: center; margin-bottom: 26px; }
   .lg-icon { width: 56px; height: 56px; margin: 0 auto 16px; border-radius: 16px;
-    display: flex; align-items: center; justify-content: center; color: #fff;
+    display: flex; align-items: center; justify-content: center; color: var(--on-accent, #fff);
     background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #8a5bff));
     box-shadow: 0 10px 26px rgba(var(--accent-rgb), .4); }
   .lg-icon svg { width: 26px; height: 26px; }
@@ -1109,7 +1115,7 @@ function renderLogin(baseUrl, lang, theme, error) {
   .lg-eye-off { display: none; }
 
   .lg-btn { width: 100%; padding: 14px; border: 0; border-radius: 13px; cursor: pointer;
-    font: inherit; font-weight: 700; font-size: 1rem; color: #fff;
+    font: inherit; font-weight: 700; font-size: 1rem; color: var(--on-accent, #fff);
     background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 62%, #8a5bff));
     box-shadow: 0 8px 22px rgba(var(--accent-rgb), .38);
     transition: transform .2s ease, box-shadow .2s ease, opacity .2s ease; }
@@ -1522,7 +1528,7 @@ function dashStyles(accent, accentRgb) {
     font: inherit; font-size: .82rem; padding: 6px 12px; border-radius: 999px;
     transition: color .2s ease, background .2s ease; }
   .ts-lang-btn:hover { color: var(--text); }
-  .ts-lang-btn.is-active { color: #fff; background: var(--accent); }
+  .ts-lang-btn.is-active { color: var(--on-accent, #fff); background: var(--accent); }
   .ts-icon-btn { width: 40px; height: 40px; border-radius: 50%; cursor: pointer;
     background: var(--surface); border: 1px solid var(--border); color: var(--text);
     display: inline-flex; align-items: center; justify-content: center; box-shadow: var(--shadow);
@@ -1572,7 +1578,7 @@ function dashStyles(accent, accentRgb) {
   .ts-btn:disabled { opacity: .55; cursor: default; transform: none; }
   .ts-btn .ts-ic { color: currentColor; }
   .ts-btn .ts-ic svg { width: 16px; height: 16px; }
-  .ts-btn-run { background: var(--accent); color: #fff; border-color: transparent; }
+  .ts-btn-run { background: var(--accent); color: var(--on-accent, #fff); border-color: transparent; }
   .ts-btn-run:hover { box-shadow: 0 10px 26px rgba(var(--accent-rgb), .4); }
   .ts-btn-danger { color: var(--err); border-color: rgba(var(--err-rgb), .35); background: rgba(var(--err-rgb), .08); }
   .ts-btn-danger:hover { background: rgba(var(--err-rgb), .16); }

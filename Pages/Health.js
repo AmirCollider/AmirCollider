@@ -7,7 +7,7 @@
 import { CONFIG, validateGameId } from '../Config.js'
 import { getPageHead } from '../Core/DesignSystem.js'
 import { createJsonResponse, createHtmlResponse } from '../Core/Http.js'
-import { escapeHtml, hexToRgb } from '../Core/Html.js'
+import { escapeHtml, hexToRgb, accentInk } from '../Core/Html.js'
 import { seoHead } from '../Core/Seo.js'
 import { siteNavCss, siteFooter, siteBackToTop, siteChromeScript } from '../Core/SiteNav.js'
 import { matchRequestLang } from '../Core/RequestContext.js'
@@ -332,6 +332,12 @@ function healthStyles(accent, accentRgb) {
   :root {
     --accent: ${accent};
     --accent-rgb: ${accentRgb};
+
+    /* The text colour that reads on an accent-filled control.
+       Measured, not assumed - accentInk() in Core/Html.js. This
+       page paints with the GAME's colour, so a bright one used to
+       print white on mint at about 1.3:1. */
+    --on-accent: ${accentInk(accent)};
     --bg: #f4f6fb;
     --bg-soft: #eef1f8;
     --surface: #ffffff;
@@ -413,7 +419,7 @@ function healthStyles(accent, accentRgb) {
     transition: color .2s ease, background .2s ease;
   }
   .hc-lang-btn:hover { color: var(--text); }
-  .hc-lang-btn.is-active { color: #fff; background: var(--accent); }
+  .hc-lang-btn.is-active { color: var(--on-accent, #fff); background: var(--accent); }
 
   .hc-icon-btn {
     width: 40px; height: 40px; border-radius: 50%; cursor: pointer;
@@ -491,7 +497,7 @@ function healthStyles(accent, accentRgb) {
     font: inherit; font-size: .8rem; padding: 6px 14px; border-radius: 999px; cursor: pointer;
     transition: background .2s ease, color .2s ease;
   }
-  .hc-copy:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .hc-copy:hover { background: var(--accent); color: var(--on-accent, #fff); border-color: var(--accent); }
   .hc-json pre {
     background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px;
     padding: 16px; overflow-x: auto; direction: ltr; text-align: start;
@@ -508,8 +514,8 @@ function healthStyles(accent, accentRgb) {
   }
   .hc-btn:hover { transform: translateY(-2px); }
   .hc-btn .hc-ic svg { width: 16px; height: 16px; }
-  .hc-btn-primary { background: var(--accent); color: #fff; border-color: transparent; }
-  .hc-btn-primary .hc-ic { color: #fff; }
+  .hc-btn-primary { background: var(--accent); color: var(--on-accent, #fff); border-color: transparent; }
+  .hc-btn-primary .hc-ic { color: var(--on-accent, #fff); }
 
   @media (max-width: 600px) {
     .hc-topbar { justify-content: center; }

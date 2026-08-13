@@ -863,8 +863,9 @@ function renderAccount(game, lang, theme, player, owned, record, flash = {}) {
     const src = String((product && product.image) || '').trim()
     if (!/^(https?:\/\/|\/)/i.test(src)) return emoji
 
-    return '<span class="acc-own-art">' + emoji
+    return '<span class="acc-own-art"><span class="acc-own-emoji">' + emoji + '</span>'
       + '<img src="' + escapeHtml(src) + '" alt="" loading="lazy" decoding="async"'
+      + ' onload="this.previousElementSibling.hidden=true"'
       + ' onerror="this.remove()"></span>'
   }
 
@@ -1108,8 +1109,12 @@ function renderAccount(game, lang, theme, player, owned, record, flash = {}) {
          line so nothing below shifts. */
       .acc-own-art{position:relative;display:inline-grid;place-items:center;width:1.6em;height:1.6em;
         vertical-align:middle}
-      .acc-own-art img{position:absolute;inset:0;margin:auto;max-width:100%;max-height:100%;
-        width:auto;height:auto;object-fit:contain}
+      .acc-own-art > *{grid-area:1/1}
+      .acc-own-art img{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain}
+      /* The emoji is the fallback and shows only when there is no
+         image beside it - never both at once, stacked. */
+      .acc-own-art .acc-own-emoji[hidden]{display:none}
+      .acc-own-art:has(img) .acc-own-emoji{display:none}
 
       .acc-stat--item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
       .acc-stat--item img{width:auto;height:34px;max-width:100%;object-fit:contain;display:block;

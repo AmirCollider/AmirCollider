@@ -251,11 +251,21 @@ function productArt(product) {
   const src = String((product && product.image) || '').trim()
   if (!/^(https?:\/\/|\/)/i.test(src)) return emoji
 
-  // The emoji sits behind the image rather than being replaced by
-  // it, so a slow or broken URL degrades to what the card showed
-  // before instead of to an empty box.
-  return '<span class="pic-art">' + emoji
+  // The emoji is the FALLBACK, so it has to disappear the moment
+  // there is a picture. Stacking the two and leaving both visible
+  // is what the first version did, and it drew a knife on top of
+  // a knife emoji.
+  //
+  // Two mechanisms, because they cover different failures:
+  //   :has(img) hides it with no script and no flash, and stops
+  //             hiding it the instant onerror removes the image
+  //   onload    the same for a browser without :has()
+  //
+  // Both agree on the rule: the emoji is visible exactly when
+  // there is no <img> beside it.
+  return '<span class="pic-art"><span class="pic-emoji">' + emoji + '</span>'
     + '<img src="' + escapeHtml(src) + '" alt="" loading="lazy" decoding="async"'
+    + ' onload="this.previousElementSibling.hidden=true"'
     + ' onerror="this.remove()"></span>'
 }
 
@@ -650,9 +660,13 @@ function renderStore(game, lang, theme, { products, player, owned, ready }) {
          like it did before there was art rather than leaving a
          hole where the product used to be. */
       .pic-art{position:relative;display:inline-grid;place-items:center;min-width:64px;min-height:64px}
-      .pic-art img{position:absolute;inset:0;margin:auto;max-width:100%;max-height:64px;
-        width:auto;height:auto;object-fit:contain;
+      .pic-art img{max-width:100%;max-height:64px;width:auto;height:auto;object-fit:contain;
         filter:drop-shadow(0 6px 14px color-mix(in srgb,var(--accent) 38%,transparent))}
+      /* Same cell, so the box does not resize when one replaces
+         the other - but only ever one of them is showing. */
+      .pic-art > *{grid-area:1/1}
+      .pic-art .pic-emoji[hidden]{display:none}
+      .pic-art:has(img) .pic-emoji{display:none}
       .pname{font-size:1.02em;font-weight:800;margin-block-end:6px}
       .pdesc{font-size:.85em;line-height:1.6;color:var(--dim);flex:1}
       .pmeta{display:flex;gap:6px;flex-wrap:wrap;margin-block:12px 14px}

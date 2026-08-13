@@ -7,7 +7,7 @@
 import { CONFIG, validateGameId } from '../Config.js'
 import { getPageHead } from '../Core/DesignSystem.js'
 import { createJsonResponse, createHtmlResponse } from '../Core/Http.js'
-import { escapeHtml, hexToRgb } from '../Core/Html.js'
+import { escapeHtml, hexToRgb, accentInk } from '../Core/Html.js'
 import { seoHead } from '../Core/Seo.js'
 import { siteNavCss, siteFooter, siteBackToTop, siteChromeScript } from '../Core/SiteNav.js'
 import { matchRequestLang } from '../Core/RequestContext.js'
@@ -388,6 +388,12 @@ function pingStyles(accent, accentRgb) {
   :root {
     --accent: ${accent};
     --accent-rgb: ${accentRgb};
+
+    /* The text colour that reads on an accent-filled control.
+       Measured, not assumed - accentInk() in Core/Html.js. This
+       page paints with the GAME's colour, so a bright one used to
+       print white on mint at about 1.3:1. */
+    --on-accent: ${accentInk(accent)};
     --bg: #f4f6fb;
     --surface: #ffffff;
     --surface-2: #f7f9fd;
@@ -471,7 +477,7 @@ function pingStyles(accent, accentRgb) {
     transition: color .2s ease, background .2s ease;
   }
   .pg-lang-btn:hover { color: var(--text); }
-  .pg-lang-btn.is-active { color: #fff; background: var(--accent); }
+  .pg-lang-btn.is-active { color: var(--on-accent, #fff); background: var(--accent); }
 
   .pg-icon-btn {
     width: 40px; height: 40px; border-radius: 50%; cursor: pointer;
@@ -594,7 +600,7 @@ function pingStyles(accent, accentRgb) {
     font: inherit; font-size: .8rem; padding: 6px 14px; border-radius: 999px; cursor: pointer;
     transition: background .2s ease, color .2s ease;
   }
-  .pg-copy:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .pg-copy:hover { background: var(--accent); color: var(--on-accent, #fff); border-color: var(--accent); }
   .pg-json pre {
     background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px;
     padding: 16px; overflow-x: auto; direction: ltr; text-align: start;
@@ -612,8 +618,8 @@ function pingStyles(accent, accentRgb) {
   }
   .pg-btn:hover { transform: translateY(-2px); }
   .pg-btn .pg-ic svg { width: 16px; height: 16px; }
-  .pg-btn-primary { background: var(--accent); color: #fff; border-color: transparent; }
-  .pg-btn-primary .pg-ic { color: #fff; }
+  .pg-btn-primary { background: var(--accent); color: var(--on-accent, #fff); border-color: transparent; }
+  .pg-btn-primary .pg-ic { color: var(--on-accent, #fff); }
 
   @media (max-width: 600px) {
     .pg-topbar { justify-content: center; }

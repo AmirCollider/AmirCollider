@@ -28,7 +28,7 @@
 import { CONFIG } from '../Config.js'
 import { getPageHead } from '../Core/DesignSystem.js'
 import { createJsonResponse, createHtmlResponse } from '../Core/Http.js'
-import { escapeHtml, hexToRgb } from '../Core/Html.js'
+import { escapeHtml, hexToRgb, accentInk } from '../Core/Html.js'
 import { themeBootScript } from '../Core/PageChrome.js'
 import { seoHead } from '../Core/Seo.js'
 import { siteNavCss, siteFooter, siteBackToTop, siteChromeScript } from '../Core/SiteNav.js'
@@ -369,6 +369,12 @@ function metricsStyles(accent, accentRgb) {
   :root {
     --accent: ${accent};
     --accent-rgb: ${accentRgb};
+
+    /* The text colour that reads on an accent-filled control.
+       Measured, not assumed - accentInk() in Core/Html.js. This
+       page paints with the GAME's colour, so a bright one used to
+       print white on mint at about 1.3:1. */
+    --on-accent: ${accentInk(accent)};
     --bg: #f4f6fb;
     --bg-soft: #eef1f8;
     --surface: #ffffff;
@@ -458,7 +464,7 @@ function metricsStyles(accent, accentRgb) {
     padding: 6px 11px; border-radius: 9px; transition: background .2s ease, color .2s ease;
   }
   .mc-lang-btn:hover { color: var(--text); }
-  .mc-lang-btn.is-active { background: var(--accent); color: #fff; }
+  .mc-lang-btn.is-active { background: var(--accent); color: var(--on-accent, #fff); }
 
   .mc-icon-btn {
     width: 40px; height: 40px; border-radius: 12px; cursor: pointer;
@@ -545,7 +551,7 @@ function metricsStyles(accent, accentRgb) {
     padding: 7px 14px; border-radius: 10px;
     transition: background .2s ease, color .2s ease, border-color .2s ease;
   }
-  .mc-copy:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .mc-copy:hover { background: var(--accent); color: var(--on-accent, #fff); border-color: var(--accent); }
   .mc-hint { color: var(--muted); font-size: .86rem; margin-top: 12px; }
   .mc-code {
     font-family: ui-monospace, 'SF Mono', Consolas, monospace; direction: ltr;
@@ -575,7 +581,7 @@ function metricsStyles(accent, accentRgb) {
   }
   .mc-btn:hover { transform: translateY(-2px); }
   .mc-btn .mc-ic svg { width: 16px; height: 16px; }
-  .mc-btn-primary { background: var(--accent); color: #fff; border-color: transparent; }
+  .mc-btn-primary { background: var(--accent); color: var(--on-accent, #fff); border-color: transparent; }
 
   .mc-footer { text-align: center; color: var(--muted); padding-top: 6px; }
   .mc-f-name { font-weight: 700; color: var(--text); }

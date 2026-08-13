@@ -36,7 +36,7 @@
 // ==========================================
 
 import { CONFIG, LANGUAGES } from '../Config.js'
-import { escapeHtml } from './Html.js'
+import { escapeHtml, accentInk } from './Html.js'
 import { resolveLang } from './RequestContext.js'
 import { localizedPath } from './Locale.js'
 
@@ -281,6 +281,12 @@ export function siteNavCss() {
       --acn-surface-2: var(--surface-2, rgba(255,255,255,0.09));
       --acn-border: var(--border, rgba(255,255,255,0.12));
       --acn-accent: var(--accent, var(--brand, #6c63ff));
+
+      /* The ink that reads on the accent-filled language button.
+         Overridden per page by siteHeader() when it is handed a
+         game accent; this default matches the default accent
+         above, so a page that passes none is unchanged. */
+      --acn-on-accent: var(--on-accent, #fff);
       --acn-bg: var(--bg-1, #0b0e16);
       --acn-radius: 13px;
       --acn-maxw: var(--maxw, 1280px);
@@ -379,7 +385,7 @@ export function siteNavCss() {
     }
     .ac-seg button:hover { color: var(--acn-fg); }
     .ac-seg button[aria-pressed="true"] {
-      color: #fff;
+      color: var(--acn-on-accent, #fff);
       background: linear-gradient(135deg, var(--acn-accent), color-mix(in srgb, var(--acn-accent) 55%, #fff));
     }
     .ac-theme-btn {
@@ -589,7 +595,13 @@ export function siteHeader({ lang, active = '', extra = [], accent = '' } = {}) 
     + entry.toUpperCase() + '</button>'
   ).join('')
 
-  const accentStyle = accent ? ' style="--acn-accent: ' + escapeHtml(accent) + '"' : ''
+  // Both or neither. The accent alone would leave the pressed
+  // language button printing white on whatever colour arrived -
+  // which on a bright one is the same 1.3:1 the game buttons had.
+  const accentStyle = accent
+    ? ' style="--acn-accent: ' + escapeHtml(accent)
+      + '; --acn-on-accent: ' + escapeHtml(accentInk(accent)) + '"'
+    : ''
 
   return `
     <a class="ac-skip" href="#main">${escapeHtml(p.skip)}</a>

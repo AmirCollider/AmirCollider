@@ -26,7 +26,7 @@
 //   - Bespoke card:      register a renderer in CUSTOM_CARD_RENDERERS.
 // ==========================================
 
-import { escapeHtml, safeColor } from '../Core/Html.js'
+import { escapeHtml, accentInk, safeColor } from '../Core/Html.js'
 import { dirFor, resolveLang } from '../Core/RequestContext.js'
 import { localizedPath } from '../Core/Locale.js'
 
@@ -598,16 +598,23 @@ function getGamesCardsCSS() {
   .gc-act-text b { font-size: 0.88em; font-weight: 700; }
   .gc-act-text small { font-size: 0.74em; opacity: 0.62; }
 
+  /* The ink is measured from this card's own accent rather than
+     assumed to be white - see accentInk() in Core/Html.js. A card
+     for a game with a bright accent used to print its primary
+     action, the one naming in-app purchases, at about 1.3:1. */
   .gc-act--primary {
-    color: #fff;
+    color: var(--on-accent, #fff);
     background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 48%, #fff));
     border-color: transparent;
     box-shadow: 0 6px 20px color-mix(in srgb, var(--accent) 32%, transparent);
   }
+  /* The icon chip washes toward the ink, not toward white: a
+     white scrim under dark type is the one combination that
+     makes the glyph vanish instead of the label. */
   .gc-act--primary .gc-act-ic {
-    color: #fff;
-    background: rgba(255,255,255,0.18);
-    border-color: rgba(255,255,255,0.24);
+    color: var(--on-accent, #fff);
+    background: color-mix(in srgb, var(--on-accent, #fff) 18%, transparent);
+    border-color: color-mix(in srgb, var(--on-accent, #fff) 26%, transparent);
   }
   .gc-act--primary .gc-act-text small { opacity: 0.8; }
 
@@ -1098,7 +1105,7 @@ function createDefaultGameCard(id, game, baseUrl, lang, index, player) {
     : ''
 
   return `
-    <article class="gc-card" dir="${dirFor(lang)}" lang="${escapeHtml(resolveLang(lang))}" style="--accent: ${accent}; --i: ${Number(index) || 0};">
+    <article class="gc-card" dir="${dirFor(lang)}" lang="${escapeHtml(resolveLang(lang))}" style="--accent: ${accent}; --on-accent: ${accentInk(accent)}; --i: ${Number(index) || 0};">
       <div class="gc-bar"></div>
       <div class="gc-glow"></div>
       ${createMotifs(game)}

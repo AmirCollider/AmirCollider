@@ -233,7 +233,15 @@ function authPageCSS() {
       border: none; background: transparent; color: var(--text-dim); font: inherit; font-weight: 600;
       padding: 7px 12px; cursor: pointer; transition: color 0.2s ease, background 0.2s ease;
     }
-    .ac-seg button[aria-pressed="true"] { color: #fff; background: var(--accent); }
+    /* This duplicates the same selector in Core/SiteNav.js, so it
+       reads the same two variables that file publishes - otherwise
+       the language strip on this page and the one in the header
+       would disagree about their own ink the moment a game accent
+       is anything but dark. */
+    .ac-seg button[aria-pressed="true"] {
+      color: var(--acn-on-accent, var(--on-accent, #fff));
+      background: var(--acn-accent, var(--accent));
+    }
     .ac-icon-btn {
       width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center;
       border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text);
