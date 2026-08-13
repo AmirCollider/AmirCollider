@@ -22,8 +22,11 @@ import {
   readPlayerData,
   buildProfileUpdate,
   validateProfileFields,
-  boardFilter,
-  hasLeaderboardOptOut,
+  readBoard,
+  hasPlayerColumn,
+  LEADERBOARD_OPT_OUT_COLUMN,
+  LEVEL_COLUMN,
+  SELECTED_ITEM_COLUMN,
   refuseIfBanned,
   ensurePlayerRow
 } from '../Games/PlayerRecord.js'
@@ -285,27 +288,15 @@ export async function handleDatabaseGet(url, request, gameId, requestId, GAMES, 
       // everybody with a score and shown as "Unknown User" because a
       // username is null until somebody sets one on the site.
       //
-      // One board, one rule — and now literally one expression, in
-      // boardFilter(). A player who has opted out is absent from
-      // both copies, so a game cannot show somebody the site hides.
+      // One board, one rule — and now literally one function,
+      // readBoard(), which the page calls too. That covers the
+      // rows as well as the membership: a game whose board carries
+      // a stage and an equipped item gets them here in the same
+      // shape the site renders, so an in-game board and the web
+      // one cannot show different things about the same player.
       // ==========================================
-      const filter = await boardFilter(db)
-
-      const { results } = await db.prepare(`
-        SELECT username, username AS displayName, high_score AS highScore,
-               profile_pic_url AS photoURL, selected_color AS selectedColor
-        FROM players WHERE ${filter.where}
-        ORDER BY high_score DESC LIMIT 100
-      `).all()
-
-      return createJsonResponse((results || []).map((row, index) => ({
-        rank: index + 1,
-        username: row.username || 'Unknown User',
-        displayName: row.displayName || 'Unknown User',
-        highScore: row.highScore || 0,
-        photoURL: row.photoURL || '',
-        selectedColor: row.selectedColor || 'FFFFFF'
-      })), 200)
+      const { rows } = await readBoard(db, { board: game.leaderboard, limit: 100 })
+      return createJsonResponse(rows, 200)
     }
 
     return unknownPath(requestId)
@@ -447,6 +438,29 @@ async function writeHighScore(db, uid, body, gameId, requestId) {
 }
 
 
+// ==========================================
+// The profile fields that live in an OPTIONAL column
+//
+// Each pair is "what a client sends" and "the column it lands
+// in". Every one of them arrived with a migration that a given
+// game's database may or may not have run, and the list is here
+// rather than as three if-statements so that adding a fourth is
+// one line in one place.
+// ==========================================
+const OPTIONAL_PROFILE_FIELDS = [
+  ['leaderboardOptOut', LEADERBOARD_OPT_OUT_COLUMN],
+  ['highLevel', LEVEL_COLUMN],
+  ['selectedItem', SELECTED_ITEM_COLUMN]
+]
+
+async function dropUnsupportedFields(db, data) {
+  for (const [field, column] of OPTIONAL_PROFILE_FIELDS) {
+    if (data[field] === undefined) continue
+    if (!(await hasPlayerColumn(db, column))) delete data[field]
+  }
+}
+
+
 async function writeProfile(db, uid, body, gameId, requestId, isPatch) {
   const parsed = parseJsonBody(body, requestId)
   if (parsed.refusal) return parsed.refusal
@@ -456,17 +470,19 @@ async function writeProfile(db, uid, body, gameId, requestId, isPatch) {
     return createJsonResponse({ ...fieldError, requestId }, 400)
   }
 
-  // The leaderboard opt-out is the one field a game database may
-  // not have a column for, and naming a missing column fails the
-  // WHOLE update - so a client that sends it against a database
-  // that has not run 0010 would lose the username and the play
-  // time in the same statement. Dropped rather than refused: the
-  // rest of the save is still what the player asked for, and a
-  // database with no such column has no player who can be hidden
-  // anyway.
-  if (parsed.data.leaderboardOptOut !== undefined && !(await hasLeaderboardOptOut(db))) {
-    delete parsed.data.leaderboardOptOut
-  }
+  // Fields whose column a game database may not have, dropped
+  // before they can take the rest of the save down with them.
+  //
+  // Naming a missing column fails the WHOLE update, so a client
+  // that sends one of these against an un-migrated database
+  // would lose the username and the play time in the same
+  // statement. Dropped rather than refused: the rest of the save
+  // is still what the player asked for, and a database with no
+  // such column has nothing that field could have meant anyway.
+  //
+  // The probe only runs for a field that was actually sent, so
+  // the ordinary save costs no extra queries.
+  await dropUnsupportedFields(db, parsed.data)
 
   const currentData = parsed.data.dataPatch !== undefined ? await readPlayerData(db, uid) : null
   const { updates, values } = buildProfileUpdate(parsed.data, isPatch, currentData)

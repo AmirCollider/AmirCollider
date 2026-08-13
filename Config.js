@@ -563,6 +563,263 @@ const GAME_REGISTRY = {
       // with no error anywhere.
       deepLinkScheme: 'com.amircollider.neonkatana'
     }
+  },
+
+  'chronoblades': {
+    name: 'Chrono Blades',
+    icon: '🗡️',
+    color: '#20fea9',
+    logo: 'https://dl.amircollider.com/ChronoBladesLogo.png',
+    description: 'Knife throwing at the target',
+    i18n: {
+      description: {
+        fa: 'پرتاب چاقو به هدف',
+        en: 'Knife throwing at the target',
+        ja: '標的へのナイフ投げ'
+      }
+    },
+    tags: [
+      { fa: 'بازی', en: 'Game', ja: 'ゲーム' },
+      { fa: 'اندروید', en: 'Android', ja: 'Android' }
+    ],
+
+    // The things this game throws, drifting behind its card on
+    // the dashboard. Same rule as Neon Katana's: the game's own
+    // objects, four of them, decorative and aria-hidden.
+    card: {
+      motifs: ['🎯', '🔪', '🗡️', '🍎']
+    },
+
+    // ==========================================
+    // What its leaderboard is made of.
+    //
+    // Most games' boards are a name and a number, and this one is
+    // not: Chrono Blades generates its stages one after another
+    // with no end, so how far somebody got is a second record
+    // that a score alone does not imply - two players tied on
+    // points can be a hundred stages apart. And the knife in
+    // their hand is the thing they actually bought, so a board
+    // that leaves it out is a board that never shows anybody what
+    // the store is for.
+    //
+    // Declared HERE rather than in Pages/Leaderboard.js for the
+    // reason `icon` and `card.motifs` are: it is a fact about the
+    // game. The page renders what a game declares and nothing
+    // else, so Neon Katana's board is untouched by every line
+    // below.
+    //
+    // Both halves are independent and both degrade. `level` needs
+    // a high_level column in this game's own D1 and `item` needs
+    // selected_item; a database missing either simply drops that
+    // half of the row, exactly as a database missing
+    // leaderboard_opt_out drops the opt-out.
+    // ==========================================
+    leaderboard: {
+      // The second number, beside the score.
+      level: {
+        icon: '🎯',
+        i18n: { fa: 'مرحله', en: 'Level', ja: 'ステージ' }
+      },
+
+      // The knife the player currently has equipped, drawn from
+      // the `selected_item` column. The keys ARE the product ids
+      // in store.products below - plus the free one, which is not
+      // a product because nobody buys it - so what somebody paid
+      // for and what the board draws can never be two different
+      // strings.
+      //
+      // `default` is what a player who has never chosen holds:
+      // the free knife. Stored as NULL rather than backfilled, so
+      // renaming the free knife is one line here and no migration.
+      item: {
+        default: 'RegularKnife',
+        // Turned off wholesale by a reader who asked not to be
+        // animated - Pages/Leaderboard.js wraps the spin in
+        // prefers-reduced-motion either way. This switch is for
+        // the game to say "my item art does not read well
+        // rotating", which is a different decision.
+        spin: true,
+        options: {
+          RegularKnife: {
+            image: 'https://dl.amircollider.com/ChronoBlades/RegularKnife.png',
+            i18n: { fa: 'چاقوی معمولی', en: 'Regular Knife', ja: 'ノーマルナイフ' }
+          },
+          SilverKnife: {
+            image: 'https://dl.amircollider.com/ChronoBlades/SilverKnife.png',
+            i18n: { fa: 'چاقوی نقره‌ای', en: 'Silver Knife', ja: 'シルバーナイフ' }
+          },
+          GoldenKnife: {
+            image: 'https://dl.amircollider.com/ChronoBlades/GoldenKnife.png',
+            i18n: { fa: 'چاقوی طلایی', en: 'Golden Knife', ja: 'ゴールデンナイフ' }
+          }
+        }
+      }
+    },
+
+    // ==========================================
+    // A landing page that says something on day one.
+    //
+    // Neon Katana deliberately has no baseline here - its copy is
+    // all in the panel - and this is the other case CLAUDE.md
+    // describes: a brand new game whose page would otherwise be a
+    // logo, one line and a download button until somebody opens
+    // /thegod. Every field below is overridden per field by the
+    // panel the moment anything is typed there, so this is a
+    // starting point and not a second place to maintain the copy.
+    // ==========================================
+    landing: {
+      tagline: {
+        fa: 'یک چاقو، یک هدف در حال چرخش، و مرحله‌ای که هیچ‌وقت تمام نمی‌شود.',
+        en: 'One knife, one spinning target, and a stage that never ends.',
+        ja: '一本のナイフ、回る標的、そして終わらないステージ。'
+      },
+      about: {
+        fa: 'چاقو را پرتاب کن، به هدفِ در حال چرخش بزن، و برو مرحله‌ی بعد. '
+          + 'مرحله‌ها از پیش ساخته نشده‌اند — یکی پس از دیگری تولید می‌شوند، '
+          + 'پس پایانی وجود ندارد و تنها چیزی که می‌ماند این است که تا کجا رفته‌ای. '
+          + 'امتیاز و مرحله هر دو روی جدول امتیازات ثبت می‌شوند، همراه با چاقویی که در دست داری.',
+        en: 'Throw the knife, hit the spinning target, move to the next stage. '
+          + 'The stages are not authored — they are generated one after another, '
+          + 'so there is no ending and the only thing left is how far you got. '
+          + 'Both your score and your stage are recorded on the leaderboard, '
+          + 'along with the knife you are holding.',
+        ja: 'ナイフを投げ、回転する標的に当て、次のステージへ。'
+          + 'ステージは作り置きではなく次々と生成されるため終わりはなく、'
+          + '残るのはどこまで進んだかだけです。'
+          + 'スコアとステージは、手にしているナイフとともにリーダーボードに記録されます。'
+      },
+      features: [
+        { icon: '♾️', fa: 'مرحله‌های بی‌پایان و تولیدشده', en: 'Endless, generated stages', ja: '終わりのない生成ステージ' },
+        { icon: '🏆', fa: 'جدول امتیازات با امتیاز و مرحله', en: 'A board that ranks score and stage', ja: 'スコアとステージのランキング' },
+        { icon: '🗡️', fa: 'سه چاقو — یکی رایگان، دوتا خریدنی', en: 'Three knives — one free, two for sale', ja: '3本のナイフ — 1本は無料、2本は有料' },
+        { icon: '☁️', fa: 'ذخیره‌ی ابری با ورود گوگل', en: 'Cloud save with Google sign-in', ja: 'Google サインインでクラウドセーブ' }
+      ],
+      devices: [
+        { kind: 'android', label: 'Android 8+' }
+      ],
+      faq: [
+        {
+          q: {
+            fa: 'مرحله‌ها تمام می‌شوند؟',
+            en: 'Do the stages ever end?',
+            ja: 'ステージに終わりはありますか？'
+          },
+          a: {
+            fa: 'نه. مرحله‌ها یکی پس از دیگری ساخته می‌شوند، پس بالاترین مرحله‌ی تو همان‌قدر رکورد است که بالاترین امتیازت.',
+            en: 'No. They are generated one after another, so your highest stage is as much a record as your highest score.',
+            ja: 'いいえ。次々と生成されるため、最高ステージは最高スコアと同じく記録です。'
+          }
+        },
+        {
+          q: {
+            fa: 'چاقوهایی که می‌خرم چه فرقی دارند؟',
+            en: 'What do the knives I buy change?',
+            ja: '購入したナイフは何が変わりますか？'
+          },
+          a: {
+            fa: 'ظاهر. چاقوی نقره‌ای و طلایی یک‌بار خریده می‌شوند و برای همیشه می‌مانند، و همانی هستند که کنار نام تو روی جدول امتیازات دیده می‌شود.',
+            en: 'How it looks. The silver and golden knives are bought once and kept forever, and they are what appears beside your name on the leaderboard.',
+            ja: '見た目です。シルバーとゴールドのナイフは一度の購入で永久に残り、リーダーボードで名前の横に表示されます。'
+          }
+        },
+        {
+          q: {
+            fa: 'اگر بازی را پاک کنم امتیازم می‌رود؟',
+            en: 'Do I lose my score if I uninstall?',
+            ja: 'アンインストールするとスコアは消えますか？'
+          },
+          a: {
+            fa: 'نه، اگر با گوگل وارد شده باشی. امتیاز، مرحله و چاقوهایت روی حساب تو ذخیره می‌شوند و با نصب دوباره برمی‌گردند.',
+            en: 'Not if you signed in with Google. Your score, your stage and your knives are stored against your account and come back on reinstall.',
+            ja: 'Google でサインインしていれば消えません。スコア・ステージ・ナイフはアカウントに保存され、再インストールで戻ります。'
+          }
+        }
+      ]
+    },
+
+    package: 'com.amircollider.chronoblades',
+    d1Binding: 'CHRONOBLADES_DB',
+    deepLink: { host: 'oauth' },
+
+    capabilities: {
+      onlinePlay: false,
+      login: true,
+      cloudSave: true,
+      leaderboard: true,
+      store: true
+    },
+
+    download: {
+      primary: 'apk',
+      links: {
+        apk: 'https://dl.amircollider.com/APK/ChronoBlades.apk'
+      }
+    },
+
+    status: GAME_STATUS.LIVE,
+
+    // Two knives, and the third is not here on purpose:
+    // RegularKnife is free, everybody starts with it, and a
+    // product nobody can buy has no business in a catalogue that
+    // exists to be priced, ribboned and ordered. It is named in
+    // `leaderboard.item.options` above, which is the only place
+    // that has to know it exists.
+    //
+    // The ids ARE the strings the shipped build sends and the
+    // entitlements API grants, so they are chosen once and never
+    // renamed.
+    store: {
+      products: [
+        {
+          id: 'SilverKnife',
+          sku: 'chronoblades_silver_knife',
+          kind: PRODUCT_KIND.NONCONSUMABLE,
+          priceUsd: '4.99',
+          icon: '🔪',
+          grant: { type: 'cosmetic', code: 'SilverKnife' },
+          i18n: {
+            name: { fa: 'چاقوی نقره‌ای', en: 'Silver Knife', ja: 'シルバーナイフ' },
+            description: {
+              fa: 'تیغه‌ی نقره‌ای. یک‌بار خرید، برای همیشه — و کنار نام تو روی جدول امتیازات.',
+              en: 'The silver blade. Bought once, kept forever — and shown beside your name on the board.',
+              ja: 'シルバーの刃。一度購入すれば永久に — リーダーボードの名前の横にも表示されます。'
+            }
+          }
+        },
+        {
+          id: 'GoldenKnife',
+          sku: 'chronoblades_golden_knife',
+          kind: PRODUCT_KIND.NONCONSUMABLE,
+          priceUsd: '9.99',
+          icon: '🗡️',
+          badge: 'best',
+          grant: { type: 'cosmetic', code: 'GoldenKnife' },
+          i18n: {
+            name: { fa: 'چاقوی طلایی', en: 'Golden Knife', ja: 'ゴールデンナイフ' },
+            description: {
+              fa: 'گران‌ترین چیزی که می‌شود پرتاب کرد. یک‌بار خرید، برای همیشه — و کنار نام تو روی جدول امتیازات.',
+              en: 'The most expensive thing you can throw. Bought once, kept forever — and shown beside your name on the board.',
+              ja: '投げられる中で最も高価な一本。一度購入すれば永久に — リーダーボードの名前の横にも表示されます。'
+            }
+          }
+        }
+      ]
+    },
+
+    env: {
+      android: 'CHRONOBLADES_GOOGLE_CLIENT_ID_ANDROID',
+      web: 'CHRONOBLADES_GOOGLE_CLIENT_ID_WEB',
+      secret: 'CHRONOBLADES_GOOGLE_CLIENT_SECRET',
+      deepLinkScheme: 'CHRONOBLADES_DEEPLINK_SCHEME'
+    },
+    fallback: {
+      // Must match the intent-filter in the shipped APK's
+      // AndroidManifest.xml exactly. Note that it is NOT the
+      // Android package (which is the same string here only by
+      // coincidence of naming) - the two are separate facts and
+      // are allowed to diverge.
+      deepLinkScheme: 'com.amircollider.chronoblades'
+    }
   }
 }
 
@@ -577,6 +834,75 @@ const CAPABILITY_DEFAULTS = deepFreeze({
   leaderboard: false,
   store: false
 })
+
+
+// ==========================================
+// buildBoard
+// What a game's leaderboard shows besides a name and a score.
+//
+// Normalised here rather than trusted as written, for the same
+// reason `card.motifs` is: Pages/Leaderboard.js and
+// Api/PlayerDataApi.js both read this on every board view, and a
+// view that has to check whether a field is a string, an object
+// or undefined is a view that eventually renders "[object
+// Object]" on a public page.
+//
+// The result is always the same shape:
+//
+//   { level: { icon, i18n } | null,
+//     item:  { default, spin, options: { key: { image, i18n } } } | null }
+//
+// null means "this game does not have one", and every reader
+// treats that as the board it drew before any of this existed.
+// An `item` whose options all lack an image is null too: an
+// emblem column with nothing to draw is worse than no column,
+// because it reserves the space.
+// ==========================================
+function trio(source, fallback = '') {
+  const read = key => String((source && source[key]) || '').trim()
+  const fa = read('fa') || fallback
+  const en = read('en') || fallback
+  return { fa, en: en, ja: read('ja') || en || fa }
+}
+
+function buildBoard(def) {
+  const board = (def && def.leaderboard) || {}
+
+  const level = board.level
+    ? {
+        icon: String(board.level.icon || '').trim(),
+        i18n: trio(board.level.i18n, 'Level')
+      }
+    : null
+
+  const rawItem = board.item || null
+  const options = {}
+
+  for (const [key, value] of Object.entries((rawItem && rawItem.options) || {})) {
+    // Only https and site-local images. The registry is code
+    // rather than operator input, so this is not a trust
+    // boundary - it is the same check every other image URL on
+    // this site passes, kept here so that a typo is a missing
+    // picture instead of a javascript: URL in an <img src>.
+    const image = String((value && value.image) || '').trim()
+    if (!/^(https?:\/\/|\/)/i.test(image)) continue
+
+    options[key] = { image, i18n: trio(value && value.i18n, key) }
+  }
+
+  const item = rawItem && Object.keys(options).length
+    ? {
+        // Only a default that is actually one of the options. A
+        // default naming a key that was renamed is an empty slot
+        // on every row belonging to a player who never chose.
+        default: options[rawItem.default] ? String(rawItem.default) : '',
+        spin: rawItem.spin !== false,
+        options
+      }
+    : null
+
+  return { level, item }
+}
 
 
 /**
@@ -626,6 +952,10 @@ function buildGame(id, def, env) {
 
     status: GAME_STATUS.ALL.includes(def.status) ? def.status : GAME_STATUS.LIVE,
     capabilities: { ...CAPABILITY_DEFAULTS, ...(def.capabilities || {}) },
+
+    // What this game's board shows beyond a name and a score.
+    // Always present and always the same shape - see buildBoard.
+    leaderboard: buildBoard(def),
 
     // The baseline the landing page falls back to, field by field,
     // when the panel has not overridden it. Games/Registry.js does

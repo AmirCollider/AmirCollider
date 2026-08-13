@@ -391,6 +391,8 @@ const I18N = {
     plBanned: 'مسدود',
     plPlayer: 'بازیکن',
     plScore: 'بالاترین امتیاز',
+    plLevel: 'بالاترین مرحله',
+    plItem: 'آیتم انتخاب‌شده',
     plRuns: 'تعداد بازی',
     plPlayTime: 'مدت بازی',
     plHours: 'س',
@@ -864,6 +866,8 @@ const I18N = {
     plBanned: 'Banned',
     plPlayer: 'Player',
     plScore: 'High score',
+    plLevel: 'Highest level',
+    plItem: 'Equipped item',
     plRuns: 'Runs',
     plPlayTime: 'Play time',
     plHours: 'h',
@@ -1327,6 +1331,8 @@ const I18N = {
     plBanned: 'BAN',
     plPlayer: 'プレイヤー',
     plScore: 'ハイスコア',
+    plLevel: '最高ステージ',
+    plItem: '装備アイテム',
     plRuns: 'プレイ回数',
     plPlayTime: 'プレイ時間',
     plHours: '時間',
@@ -4180,6 +4186,14 @@ function tgOpenPlayer(playerId) {
 
     +   '<div class="plstats">'
     +     tgStat(TG.t.plScore, Number(p.highScore).toLocaleString(TG.locale))
+    // Only for a database that has the column. A confident 0 on a
+    // table with no high_level reads as "this player has never
+    // finished a stage", which is a different statement from
+    // "nothing here records stages" - and only one of the two is
+    // fixed by running a migration.
+    +     (p.progressSupported
+        ? tgStat(TG.t.plLevel, Number(p.highLevel).toLocaleString(TG.locale))
+        : '')
     +     tgStat(TG.t.plRuns, Number(p.gamesPlayed).toLocaleString(TG.locale))
     +     tgStat(TG.t.plPlayTime, tgPlayTime(p.playTime))
     +     tgStat(TG.t.plJoined, tgDate(p.createdAt))
@@ -4189,6 +4203,15 @@ function tgOpenPlayer(playerId) {
     +   '<div class="scroll"><table class="tbl"><tbody>'
     +     '<tr><td>' + tgEsc(TG.t.plEmail) + '</td><td dir="ltr"><code>' + tgEsc(p.email) + '</code></td></tr>'
     +     '<tr><td>' + tgEsc(TG.t.plId) + '</td><td dir="ltr"><code>' + tgEsc(p.playerId) + '</code></td></tr>'
+
+    // What they are holding, as the raw product id rather than a
+    // translated name: this row exists to answer "why is that
+    // picture on the board?", and the id is the string that
+    // question is really about.
+    +     (p.progressSupported && p.selectedItem
+        ? '<tr><td>' + tgEsc(TG.t.plItem) + '</td><td dir="ltr"><code>'
+          + tgEsc(p.selectedItem) + '</code></td></tr>'
+        : '')
 
     // The player's own leaderboard decision. Here so that "why is
     // this player not on the board?" has an answer, and read-only
@@ -4485,7 +4508,9 @@ function tgSchemaCard(data) {
     var features = [
       ['banned_at', TG.t.plModeration, player.moderation],
       ['data_json', TG.t.pgAbout, player.document],
-      ['leaderboard_opt_out', TG.t.plBoard, player.leaderboardOptOut]
+      ['leaderboard_opt_out', TG.t.plBoard, player.leaderboardOptOut],
+      ['high_level', TG.t.plLevel, player.level],
+      ['selected_item', TG.t.plItem, player.selectedItem]
     ];
 
     playerCard = '<div class="card">'

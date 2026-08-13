@@ -21,7 +21,7 @@
 // money from there.
 // ==========================================
 
-import { LEADERBOARD_OPT_OUT_COLUMN } from './PlayerRecord.js'
+import { LEADERBOARD_OPT_OUT_COLUMN, LEVEL_COLUMN, SELECTED_ITEM_COLUMN } from './PlayerRecord.js'
 
 
 // ==========================================
@@ -98,6 +98,10 @@ const BASE_COLUMNS =
 // database, which succeeds on the first attempt and costs
 // nothing.
 const OPTIONAL_GROUPS = [
+  // 0012. Both are "what this player has done and what they are
+  // holding", which is one migration and therefore one group: a
+  // database has both or neither.
+  { key: 'progress', columns: `${LEVEL_COLUMN}, ${SELECTED_ITEM_COLUMN}` },
   { key: 'optOut', columns: LEADERBOARD_OPT_OUT_COLUMN },
   { key: 'moderation', columns: MODERATION_COLUMNS }
 ]
@@ -116,7 +120,8 @@ async function selectPlayers(database, clause, binds) {
       return {
         rows: results || [],
         moderation: present.has('moderation'),
-        optOut: present.has('optOut')
+        optOut: present.has('optOut'),
+        progress: present.has('progress')
       }
     } catch (error) {
       if (!/no such column/i.test(String(error && error.message))) throw error
@@ -128,7 +133,7 @@ async function selectPlayers(database, clause, binds) {
   // and selects only columns that have existed since 0001. If
   // THAT fails the error is not about a missing column and was
   // rethrown above.
-  return { rows: [], moderation: false, optOut: false }
+  return { rows: [], moderation: false, optOut: false, progress: false }
 }
 
 
@@ -140,7 +145,7 @@ async function selectPlayers(database, clause, binds) {
 // entire point of this function existing.
 // ==========================================
 export async function listGamePlayers(database, { q = '', limit = 40, offset = 0, status = '' } = {}) {
-  if (!database) return { rows: [], total: 0, moderation: false, optOut: false }
+  if (!database) return { rows: [], total: 0, moderation: false, optOut: false, progress: false }
 
   const where = []
   const binds = []
@@ -170,7 +175,7 @@ export async function listGamePlayers(database, { q = '', limit = 40, offset = 0
   try {
     out = await selectPlayers(database, clause, binds)
   } catch {
-    return { rows: [], total: 0, moderation: false, optOut: false }
+    return { rows: [], total: 0, moderation: false, optOut: false, progress: false }
   }
 
   // Status is filtered here rather than in SQL because
@@ -185,7 +190,7 @@ export async function listGamePlayers(database, { q = '', limit = 40, offset = 0
   // than showing one that will refuse - which is the difference
   // between "this game's database has not run that migration" and
   // "the button is broken".
-  return { rows, total, moderation: out.moderation, optOut: out.optOut }
+  return { rows, total, moderation: out.moderation, optOut: out.optOut, progress: out.progress }
 }
 
 

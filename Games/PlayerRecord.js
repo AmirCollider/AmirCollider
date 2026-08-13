@@ -113,6 +113,177 @@ export async function boardFilter(db) {
 
 
 // ==========================================
+// The two columns a board may carry BESIDES the score
+//
+// Both belong to a game rather than to this file: whether they
+// mean anything is declared in GAME_REGISTRY (see buildBoard in
+// Config.js), and whether they exist is a property of that
+// game's own D1. Neither is assumed anywhere.
+//
+//   high_level     the furthest stage reached. Monotonic, like
+//                  high_score, for the same reason: the client
+//                  sends its own running record read out of a
+//                  save file, so a plain assignment lets a fresh
+//                  install erase what the server already knew.
+//
+//   selected_item  which single thing the player has equipped.
+//                  A product id from the game's catalogue, so
+//                  the thing somebody paid for and the thing the
+//                  board draws are one string.
+//
+// A game that declares neither is unaffected by every line
+// below, and a game that declares one against a database that
+// has not been migrated for it loses that half of the row rather
+// than the whole board.
+// ==========================================
+export const LEVEL_COLUMN = 'high_level'
+export const SELECTED_ITEM_COLUMN = 'selected_item'
+
+/**
+ * Whether this players table has a given column.
+ *
+ * The same probe hasLeaderboardOptOut() makes, parameterised.
+ * SELECT ... LIMIT 1 rather than PRAGMA table_info because it
+ * answers the question a query is actually about - "will naming
+ * this column fail?" - on an empty table as well as a full one.
+ *
+ * The name is interpolated, so it must never come from a
+ * request. Every caller passes one of the constants above.
+ */
+export async function hasPlayerColumn(db, column) {
+  if (!db) return false
+  try {
+    await db.prepare(`SELECT ${column} FROM players LIMIT 1`).first()
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Which of the optional board columns this game WANTS and this
+ * database HAS, plus the SQL fragments that follow from it.
+ *
+ * Wanting without having is the interesting case and it is
+ * deliberately silent: the column is dropped from the SELECT and
+ * from the ORDER BY, the page renders the half it can, and
+ * /thegod's health check is where somebody is told to run the
+ * migration. A board that 500s because a game was configured
+ * before its database was migrated is the wrong trade - the
+ * scores are still correct and still worth showing.
+ */
+export async function boardExtras(db, board) {
+  const wantsLevel = Boolean(board && board.level)
+  const wantsItem = Boolean(board && board.item)
+
+  const [level, item] = await Promise.all([
+    wantsLevel ? hasPlayerColumn(db, LEVEL_COLUMN) : Promise.resolve(false),
+    wantsItem ? hasPlayerColumn(db, SELECTED_ITEM_COLUMN) : Promise.resolve(false)
+  ])
+
+  const select = [
+    level ? `, ${LEVEL_COLUMN} AS highLevel` : '',
+    item ? `, ${SELECTED_ITEM_COLUMN} AS selectedItem` : ''
+  ].join('')
+
+  return {
+    // What the game asked for.
+    wantsLevel,
+    wantsItem,
+    // What it actually got.
+    level,
+    item,
+    select,
+    // The stage is the tie-break the score leaves open: two
+    // players on the same points are not equal, one of them got
+    // further. Only added when the column is there, so the
+    // ordering of a board without it is exactly what it was.
+    order: level ? `high_score DESC, ${LEVEL_COLUMN} DESC` : 'high_score DESC'
+  }
+}
+
+
+/**
+ * Which item key to draw for one row.
+ *
+ * A stored value that is not in the game's option list - a
+ * renamed knife, an old build, a client sending whatever it
+ * likes - falls back to the declared default rather than to
+ * nothing. An empty slot on a board row reads as a missing
+ * image; the free item reads as a player who has not bought one,
+ * which is the true statement in every case that gets here.
+ */
+function itemKey(item, stored) {
+  const key = String(stored || '').trim()
+  if (key && item.options[key]) return key
+  return item.default || ''
+}
+
+
+// ==========================================
+// readBoard
+// THE board query. One copy, two callers.
+//
+// Pages/Leaderboard.js renders it and Api/PlayerDataApi.js hands
+// it to the game client, and CLAUDE.md's rule is that those two
+// can never disagree about who is on the list or what a row
+// says. They each used to build their own SELECT, which is how
+// they disagreed the first time; the WHERE clause was pulled out
+// into boardFilter() then, and the rest of the query follows it
+// here now that a row is more than a name and a number.
+//
+// `board` is the normalised block from GAME_REGISTRY. A game
+// without one gets exactly the four columns every board has
+// always returned, in exactly the same order.
+// ==========================================
+export async function readBoard(db, { board = null, limit = 100, withTotal = false } = {}) {
+  const filter = await boardFilter(db)
+  const extras = await boardExtras(db, board)
+
+  const { results } = await db.prepare(`
+    SELECT username AS displayName, high_score AS highScore,
+           profile_pic_url AS photoURL, selected_color AS selectedColor${extras.select}
+    FROM players
+    WHERE ${filter.where}
+    ORDER BY ${extras.order}
+    LIMIT ?
+  `).bind(limit).all()
+
+  const rows = (results || []).map((row, index) => {
+    const out = {
+      rank: index + 1,
+      username: row.displayName || 'Unknown User',
+      displayName: row.displayName || 'Unknown User',
+      highScore: row.highScore || 0,
+      photoURL: row.photoURL || '',
+      selectedColor: row.selectedColor || 'FFFFFF'
+    }
+
+    // Present when the GAME declares the field, not when the
+    // database happens to have the column. A client reading this
+    // should see a stable shape per game: 0 for a level nobody
+    // has recorded and the default item for a player who has
+    // never chosen are both true answers, and an absent key is
+    // not.
+    if (board && board.level) out.highLevel = Number(row.highLevel) || 0
+    if (board && board.item) out.selectedItem = itemKey(board.item, row.selectedItem)
+
+    return out
+  })
+
+  let total = rows.length
+  if (withTotal) {
+    total = await db.prepare(`SELECT COUNT(*) AS total FROM players WHERE ${filter.where}`)
+      .first()
+      .then(row => Number(row && row.total) || 0)
+      .catch(() => rows.length)
+  }
+
+  return { rows, total, filter, extras }
+}
+
+
+// ==========================================
 // Username policy
 // Length and character rules plus a blocklist. Messages come back
 // in all three UI languages so a client can show one without a
@@ -219,9 +390,23 @@ export function mapPlayer(player) {
     displayName: player.username,
     photoURL: player.profile_pic_url,
     highScore: player.high_score,
+
+    // The furthest stage reached, for a game that has stages.
+    // Reads as 0 on a database with no such column, which is the
+    // same answer a player who has never finished one gives - so
+    // a client never has to know which of the two it is looking
+    // at.
+    highLevel: Number(player[LEVEL_COLUMN]) || 0,
+
     gamesPlayed: player.games_played,
     totalPlayTime: player.total_play_time,
     selectedColor: player.selected_color,
+
+    // Which single item is equipped, as a catalogue product id.
+    // Empty means "the game's default" - the registry names it,
+    // not this column, so nothing has to be backfilled when a
+    // free item is renamed.
+    selectedItem: player[SELECTED_ITEM_COLUMN] || '',
     purchasedColors: JSON.parse(player.purchased_colors || '["FFFFFF"]'),
     purchasedItems: JSON.parse(player.purchased_items || '{}'),
     createdAt: player.created_at,
@@ -290,6 +475,40 @@ export function buildProfileUpdate(data, includeGamesPlayed = false, currentData
   if (data.username !== undefined) push('username', data.username)
   if (data.selectedColor !== undefined) push('selected_color', data.selectedColor)
 
+  // ==========================================
+  // Which item the player is holding.
+  //
+  // A plain assignment, unlike the counters below, because
+  // equipping is a choice and a choice goes both ways: somebody
+  // who buys the golden knife and then puts the free one back is
+  // not regressing, they changed their mind.
+  //
+  // AN EMPTY STRING IS IGNORED, and that is not tidiness - it is
+  // the one thing standing between this column and Unity's
+  // JsonUtility. JsonUtility.ToJson serialises every field of a
+  // class, including the ones the caller never set, so a patch
+  // built to change only the username arrives here carrying
+  // "selectedItem":"". Written literally, that unequips the
+  // player every time they rename themselves.
+  //
+  // Nothing is lost by refusing it: empty already means "the
+  // game's default" on read, the column starts NULL, and a
+  // player who wants the free item back sends its id like any
+  // other. There is deliberately no way for a client to blank
+  // this column.
+  //
+  // Not validated against the catalogue on purpose. The board
+  // resolves an unknown key to the game's default when it draws
+  // (itemKey above), so a build shipping an id nobody here has
+  // heard of costs that player their picture and nothing else -
+  // a better failure than a save that refuses because the client
+  // is one version ahead of the registry.
+  // ==========================================
+  if (data.selectedItem !== undefined) {
+    const chosen = String(data.selectedItem || '').trim().slice(0, 60)
+    if (chosen) push(SELECTED_ITEM_COLUMN, chosen)
+  }
+
   // The board opt-out, writable by the game as well as by the
   // site. A player who turns it off inside the game should not
   // have to open a browser to have it take effect, and the site's
@@ -335,6 +554,26 @@ export function buildProfileUpdate(data, includeGamesPlayed = false, currentData
   if (data.totalPlayTime !== undefined) {
     updates.push('total_play_time = MAX(COALESCE(total_play_time, 0), ?)')
     values.push(data.totalPlayTime)
+  }
+
+  // The furthest stage reached, written the same way and for the
+  // same reason.
+  //
+  // This is a RECORD, not a position: a player currently on
+  // stage 3 of a fresh run has still reached stage 90, and a
+  // client that sends "where I am now" instead of "the best I
+  // have done" must not be able to take the record down with it.
+  // high_score is protected by its own write path refusing a
+  // lower number; this column has no separate endpoint, so the
+  // MAX is what protects it.
+  //
+  // An operator lowering somebody's record is not something any
+  // client can ask for, and there is no path here that offers
+  // it - by design, exactly as with high_score.
+  if (data.highLevel !== undefined) {
+    const level = Math.max(0, Math.floor(Number(data.highLevel) || 0))
+    updates.push(`${LEVEL_COLUMN} = MAX(COALESCE(${LEVEL_COLUMN}, 0), ?)`)
+    values.push(level)
   }
 
   if (includeGamesPlayed && data.gamesPlayed !== undefined) {

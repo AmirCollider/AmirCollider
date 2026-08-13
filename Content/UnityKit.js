@@ -95,6 +95,15 @@ function readGame(game, origin) {
     base: base(origin),
     capabilities,
     products,
+
+    // What this game's leaderboard carries beyond a name and a
+    // score, normalised by buildBoard() in Config.js. Null for a
+    // game that declares nothing, and every generator below is
+    // written so that null produces exactly the C# it produced
+    // before this existed - a kit should not gain a field its
+    // own API never returns.
+    board: (game && game.leaderboard) || null,
+
     platforms: gamePlatforms(game || {})
   }
 }
@@ -135,6 +144,41 @@ export function constantsSource(spec) {
     ? products.map(product =>
         `            public const string ${csharpName(product.id)} = "${product.sku || String(product.id).replace(/-/g, '_')}";`).join('\n')
     : '            // No products in this game\'s catalogue yet.'
+
+  // ---- the equipped-item ids ----
+  //
+  // Not the same list as the catalogue, and that difference is
+  // the reason this class exists: an item a player can HOLD is
+  // not always an item they had to BUY. The free starter one has
+  // no price, no sku and no entitlement, so it is not a product -
+  // but it is the string this game writes to `selectedItem` for
+  // everybody who has never chosen, and a build with no constant
+  // for it ends up with that string typed by hand in two places.
+  //
+  // Generated from GAME_REGISTRY's leaderboard.item.options, which
+  // is the list the website draws from - so a knife the site can
+  // render and a knife this build can equip are the same set.
+  const boardItem = (spec.board && spec.board.item) || null
+  const boardItems = boardItem
+    ? `
+
+        // ---- equipped items ----
+        // What a player can be HOLDING, which is not the same list
+        // as the catalogue above: the free one is not a product.
+        // Assign one of these to selectedItem (AmirColliderPlayer
+        // .Equip) and the website draws it beside this player on
+        // the leaderboard and on their account page.
+        public static class Items
+        {
+${Object.keys(boardItem.options).map(key =>
+        `            public const string ${csharpName(key)} = "${key}";`).join('\n')}
+
+            // What the site shows for a player who has never
+            // chosen. Equipping this explicitly and never
+            // equipping anything look identical on the board.
+            public const string Default = "${boardItem.default || ''}";
+        }`
+    : ''
 
   const deepLink = spec.platforms.android
     ? `
@@ -237,7 +281,7 @@ ${productIds}
         public static class Skus
         {
 ${skus}
-        }
+        }${boardItems}
     }
 }
 `
@@ -807,6 +851,15 @@ ${platformField}
 // ==========================================
 function playerModule(spec) {
   const name = spec.pascal
+
+  // What this game's board records beyond a score. Both are
+  // false for a game that declares nothing, and every fragment
+  // below collapses to '' - so its kit is the kit it always was.
+  const board = spec.board || {}
+  const level = Boolean(board.level)
+  const item = Boolean(board.item)
+  const levelName = (board.level && board.level.i18n && board.level.i18n.en) || 'Level'
+
   const code = `// ==========================================
 // AmirColliderPlayer.cs
 // The player's own row: profile, high score, inventory.
@@ -851,7 +904,16 @@ namespace AmirCollider
         public string username;
         public string displayName;
         public string photoURL;
-        public int highScore;
+        public int highScore;${level ? `
+
+        // The furthest stage this player has reached.
+        //
+        // A record, not a position: somebody on stage 3 of a
+        // fresh run has still reached ${levelName.toLowerCase()} 90. The server
+        // keeps the HIGHER of what it holds and what you send,
+        // so sending "where I am now" can never take the record
+        // down - but it is still the wrong number to send.
+        public int highLevel;` : ''}
         public int gamesPlayed;
         public int totalPlayTime;
 
@@ -859,7 +921,13 @@ namespace AmirCollider
         // has not run 0007, which reads as a default GameData
         // rather than an error.
         public GameData data;
-        public string selectedColor;
+        public string selectedColor;${item ? `
+
+        // Which single item is equipped, as one of the ids in
+        // ${name}Constants.Items. Empty means the player has
+        // never chosen, and the site draws
+        // ${name}Constants.Items.Default for them.
+        public string selectedItem;` : ''}
         public long createdAt;
         public long lastLogin;
     }
@@ -880,7 +948,9 @@ namespace AmirCollider
     {
         public string username;
         public string selectedColor;
-        public int totalPlayTime;
+        public int totalPlayTime;${level ? `
+        public int highLevel;` : ''}${item ? `
+        public string selectedItem;` : ''}
 
         // Merged into the stored document key by key, so a build
         // that has never heard of a field somebody added last
@@ -967,7 +1037,72 @@ namespace AmirCollider
         public static IEnumerator SaveData(GameData data, Action<bool> done)
         {
             yield return Save(new ProfilePatch { dataPatch = data }, done);
-        }
+        }${level ? `
+
+        // ==========================================
+        // SubmitLevel
+        // Sends the furthest ${levelName.toLowerCase()} reached. The server keeps
+        // the higher of the two, exactly as it does for the score.
+        //
+        // Send your RECORD, not your current position. The MAX on
+        // the server means a smaller number cannot do damage, but
+        // it also means it does nothing - so a build that sends
+        // "I am on 3" after a record of 90 simply stops updating.
+        //
+        // Its own tiny patch class rather than a ProfilePatch,
+        // and that is not a style choice: JsonUtility.ToJson
+        // writes EVERY field of a class, including the ones you
+        // never touched, so a ProfilePatch sent to change one
+        // number also carries username:"" and selectedColor:"".
+        // ==========================================
+        [Serializable]
+        private class LevelPatch { public int highLevel; }
+
+        public static IEnumerator SubmitLevel(int reached, Action<bool> done)
+        {
+            string uid = AmirColliderAuth.Instance.PlayerId;
+            string token = AmirColliderAuth.Instance.IdToken;
+
+            yield return AmirColliderApi.Post(
+                ${name}Constants.PlayerPatch + uid,
+                JsonUtility.ToJson(new LevelPatch { highLevel = Mathf.Max(0, reached) }),
+                token,
+                result => { if (done != null) done(result.Ok); });
+        }` : ''}${item ? `
+
+        // ==========================================
+        // Equip
+        // Which item this player is holding, from
+        // ${name}Constants.Items.
+        //
+        // This is what the website draws beside their name on the
+        // leaderboard and on their account page, so it is worth
+        // sending the moment the player changes it rather than at
+        // the end of a run.
+        //
+        // Own patch class, for the JsonUtility reason above - and
+        // here it matters more than anywhere else: a ProfilePatch
+        // carrying selectedItem:"" would look exactly like a
+        // player unequipping. The server refuses an empty value
+        // for that reason, so a mistake costs nothing, but the
+        // right call is still this one.
+        // ==========================================
+        [Serializable]
+        private class EquipPatch { public string selectedItem; }
+
+        public static IEnumerator Equip(string itemId, Action<bool> done)
+        {
+            if (string.IsNullOrEmpty(itemId)) { if (done != null) done(false); yield break; }
+
+            string uid = AmirColliderAuth.Instance.PlayerId;
+            string token = AmirColliderAuth.Instance.IdToken;
+
+            yield return AmirColliderApi.Post(
+                ${name}Constants.PlayerPatch + uid,
+                JsonUtility.ToJson(new EquipPatch { selectedItem = itemId }),
+                token,
+                result => { if (done != null) done(result.Ok); });
+        }` : ''}
     }
 }
 `
@@ -990,18 +1125,30 @@ namespace AmirCollider
       fa: [
         'امتیاز کمتر از رکورد با ۲۰۰ و success:false برمی‌گردد، نه خطا — این را خطا حساب نکن وگرنه حلقه‌ی تلاش بی‌پایان می‌سازی.',
         'بدنه‌ی ارسال امتیاز فقط خود عدد است، نه JSON.',
-        'ردیف بازیکن را خودِ سرور موقع اولین خواندن می‌سازد، پس ۴۰۴ روی خواندن پروفایلِ خودت عملاً پیش نمی‌آید. اگر دیدی‌اش، یعنی توکن مال آن شناسه نیست.'
-      ],
+        'ردیف بازیکن را خودِ سرور موقع اولین خواندن می‌سازد، پس ۴۰۴ روی خواندن پروفایلِ خودت عملاً پیش نمی‌آید. اگر دیدی‌اش، یعنی توکن مال آن شناسه نیست.',
+        'JsonUtility.ToJson همه‌ی فیلدهای کلاس را می‌نویسد، حتی آن‌هایی که ست نکرده‌ای. برای همین برای نوشتن یک فیلد از کلاس کوچکِ مخصوص همان فیلد استفاده کن، نه ProfilePatch.'
+      ].concat(
+        level ? ['highLevel رکورد است نه موقعیت فعلی: سرور بزرگ‌ترِ دو مقدار را نگه می‌دارد، پس فرستادن «الآن مرحله‌ی ۳ هستم» فقط بی‌اثر است.'] : [],
+        item ? ['selectedItem خالی نادیده گرفته می‌شود؛ برای برگرداندن آیتم رایگان، شناسه‌ی خودش را بفرست.'] : []
+      ),
       en: [
         'A score below the record returns 200 with success:false — not an error. Treating it as one produces a retry loop that can never succeed.',
         'The score body is the bare number, not JSON.',
-        'The server creates the player row on the first read, so a 404 on your own profile is effectively unreachable. If you do see one, the token does not belong to that player id.'
-      ],
+        'The server creates the player row on the first read, so a 404 on your own profile is effectively unreachable. If you do see one, the token does not belong to that player id.',
+        'JsonUtility.ToJson writes every field of a class, including the ones you never set — so write one field with a class that has one field, not with a ProfilePatch.'
+      ].concat(
+        level ? ['highLevel is a record, not a position. The server keeps the larger of the two, so sending "I am on stage 3" is harmless and also does nothing.'] : [],
+        item ? ['An empty selectedItem is ignored on purpose. To go back to the free item, send its id like any other.'] : []
+      ),
       ja: [
         '記録未満のスコアは 200 と success:false を返します。エラー扱いすると無限リトライになります。',
         'スコア送信のボディは JSON ではなく数値そのものです。',
-        'プレイヤー行は初回読み取り時にサーバー側で作成されるため、自分のプロフィール取得で 404 になることは実質ありません。出た場合はトークンがその ID のものではありません。'
-      ]
+        'プレイヤー行は初回読み取り時にサーバー側で作成されるため、自分のプロフィール取得で 404 になることは実質ありません。出た場合はトークンがその ID のものではありません。',
+        'JsonUtility.ToJson は設定していないフィールドも含めてすべて書き出します。1 つのフィールドを書くときは ProfilePatch ではなく専用の小さなクラスを使ってください。'
+      ].concat(
+        level ? ['highLevel は現在位置ではなく記録です。サーバーは大きい方を保持するため、「今ステージ 3」を送っても何も起きません。'] : [],
+        item ? ['空の selectedItem は意図的に無視されます。無料アイテムに戻すときも、その ID を送ってください。'] : []
+      )
     },
     code
   }
@@ -1013,6 +1160,10 @@ namespace AmirCollider
 // ==========================================
 function leaderboardModule(spec) {
   const name = spec.pascal
+  const board = spec.board || {}
+  const level = Boolean(board.level)
+  const item = Boolean(board.item)
+
   const code = `// ==========================================
 // AmirColliderLeaderboard.cs
 // The public score table.
@@ -1034,9 +1185,23 @@ namespace AmirCollider
         public int rank;
         public string username;
         public string displayName;
-        public int highScore;
+        public int highScore;${level ? `
+
+        // The furthest stage this player reached. Sent for every
+        // row, and 0 for somebody who has never finished one -
+        // the field is always there, so there is nothing to
+        // check for.
+        public int highLevel;` : ''}
         public string photoURL;
-        public string selectedColor;
+        public string selectedColor;${item ? `
+
+        // What that player is holding, as one of the ids in
+        // ${name}Constants.Items. NEVER empty on a board row: the
+        // server resolves a player who has chosen nothing to
+        // ${name}Constants.Items.Default before sending it, so an
+        // in-game board can draw a sprite for every row without a
+        // fallback branch.
+        public string selectedItem;` : ''}
     }
 
     public static class AmirColliderLeaderboard
@@ -1547,6 +1712,16 @@ function bootstrapModule(spec) {
   const board = spec.capabilities.leaderboard
   const store = spec.capabilities.store
 
+  // The two optional halves of a board row. They change the
+  // SIGNATURE of EndRun below, which is the whole reason they are
+  // generated rather than left as a comment: a game that records
+  // a stage has to be handed one, and a game that does not should
+  // never see the parameter.
+  const hasLevel = Boolean(spec.board && spec.board.level)
+  const hasItem = Boolean(spec.board && spec.board.item)
+  const runArgs = hasLevel ? 'int score, int stageReached, int secondsPlayed' : 'int score, int secondsPlayed'
+  const runPass = hasLevel ? 'score, stageReached, secondsPlayed' : 'score, secondsPlayed'
+
   const afterSignIn = [
     cloud ? '            StartCoroutine(LoadProfile());' : '',
     store ? '            StartCoroutine(AmirColliderStore.Refresh(ok => Debug.Log("[AmirCollider] Entitlements: " + ok)));' : ''
@@ -1570,7 +1745,9 @@ function bootstrapModule(spec) {
                 }
 
                 Profile = profile;
-                Debug.Log("[AmirCollider] High score: " + profile.highScore);
+                Debug.Log("[AmirCollider] High score: " + profile.highScore);${hasLevel ? `
+                Debug.Log("[AmirCollider] Furthest reached: " + profile.highLevel);` : ''}${hasItem ? `
+                Debug.Log("[AmirCollider] Equipped: " + profile.selectedItem);` : ''}
             });
         }
 
@@ -1581,14 +1758,19 @@ function bootstrapModule(spec) {
         // The score goes up on its own endpoint and the rest of
         // the profile is a separate merge, because the server
         // keeps the HIGHER of two scores and would have to guess
-        // at everything else.
+        // at everything else.${hasLevel ? `
+        //
+        // stageReached is the furthest point THIS RUN got to. The
+        // server keeps the larger of that and the stored record,
+        // so passing the run's own figure is right and passing
+        // the stored record is merely pointless.` : ''}
         // ==========================================
-        public void EndRun(int score, int secondsPlayed)
+        public void EndRun(${runArgs})
         {
-            StartCoroutine(SubmitRun(score, secondsPlayed));
+            StartCoroutine(SubmitRun(${runPass}));
         }
 
-        private IEnumerator SubmitRun(int score, int secondsPlayed)
+        private IEnumerator SubmitRun(${runArgs})
         {
             if (!AmirColliderAuth.Instance.IsSignedIn) yield break;
 
@@ -1602,10 +1784,31 @@ function bootstrapModule(spec) {
                     Debug.Log("[AmirCollider] New record: " + result.newHighScore);
                 }
             });
-
+${hasLevel ? `
+            // Its own call rather than a field on the patch
+            // below, because JsonUtility writes every field of a
+            // class and a ProfilePatch built for one number
+            // carries four empty ones with it.
+            yield return AmirColliderPlayer.SubmitLevel(stageReached, null);
+` : ''}
             ProfilePatch patch = new ProfilePatch { totalPlayTime = secondsPlayed };
             yield return AmirColliderPlayer.Save(patch, null);
-        }
+        }${hasItem ? `
+
+        // ==========================================
+        // EquipItem
+        // Call this the moment the player picks a different one -
+        // not at the end of a run. It is what the website draws
+        // beside them on the leaderboard, so a player who changes
+        // it and then checks the board should see the change.
+        //
+        //   EquipItem(${name}Constants.Items.Default);
+        // ==========================================
+        public void EquipItem(string itemId)
+        {
+            StartCoroutine(AmirColliderPlayer.Equip(itemId,
+                ok => Debug.Log("[AmirCollider] Equipped " + itemId + ": " + ok)));
+        }` : ''}
 `
     : ''
 
@@ -1621,7 +1824,9 @@ function bootstrapModule(spec) {
             {
                 foreach (LeaderboardRow row in rows)
                 {
-                    Debug.Log(row.rank + ". " + row.username + " - " + row.highScore);
+                    Debug.Log(row.rank + ". " + row.username + " - " + row.highScore${hasLevel ? `
+                        + " (" + row.highLevel + ")"` : ''}${hasItem ? `
+                        + " [" + row.selectedItem + "]"` : ''});
                 }
             }));
         }
@@ -2505,16 +2710,20 @@ export const UNITY_KIT_INDEX = [
   },
   {
     id: 'player', file: 'AmirColliderPlayer.cs', kind: 'code',
-    covers: 'The player row: profile, high score, play time and the free-form save document. '
-          + 'Knows that the score body is a bare integer and that a score below the record is a '
-          + '200 with success:false rather than an error.',
+    covers: 'The player row: profile, high score, play time and the free-form save document, plus '
+          + 'the stage record (highLevel) and the equipped item (selectedItem) when the game '
+          + 'declares them. Knows that the score body is a bare integer, that a score below the '
+          + 'record is a 200 with success:false rather than an error, and that JsonUtility writes '
+          + 'every field of a class - so a single-field write uses a single-field class.',
     endpoints: ['/database/get/games/:id/users/:uid', '/database/set/…', '/database/patch/…'],
     requires: ['constants', 'api', 'auth'], gatedBy: 'capabilities.cloudSave'
   },
   {
     id: 'leaderboard', file: 'AmirColliderLeaderboard.cs', kind: 'code',
     covers: 'The public board. Handles the top-level array and the fact that opted-out and '
-          + 'banned players are simply absent rather than ranked and hidden.',
+          + 'banned players are simply absent rather than ranked and hidden. Rows carry highLevel '
+          + 'and selectedItem for a game whose registry entry declares them, and selectedItem is '
+          + 'never empty - the server resolves it to Items.Default first.',
     endpoints: ['/:gameId/leaderboard'], requires: ['constants', 'api'],
     gatedBy: 'capabilities.leaderboard'
   },

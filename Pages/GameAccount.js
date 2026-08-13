@@ -57,6 +57,8 @@ const I18N = {
 
     statsTitle: 'آمار تو',
     statScore: 'بالاترین امتیاز',
+    statLevel: 'بالاترین مرحله',
+    statItem: 'در دست تو',
     statRuns: 'تعداد بازی',
     statPlayTime: 'مدت بازی',
     statJoined: 'تاریخ عضویت',
@@ -154,6 +156,8 @@ const I18N = {
 
     statsTitle: 'Your stats',
     statScore: 'High score',
+    statLevel: 'Highest level',
+    statItem: 'In your hand',
     statRuns: 'Runs',
     statPlayTime: 'Play time',
     statJoined: 'Joined',
@@ -251,6 +255,8 @@ const I18N = {
 
     statsTitle: 'あなたの記録',
     statScore: 'ハイスコア',
+    statLevel: '最高ステージ',
+    statItem: '手にしているもの',
     statRuns: 'プレイ回数',
     statPlayTime: 'プレイ時間',
     statJoined: '登録日',
@@ -888,11 +894,54 @@ function renderAccount(game, lang, theme, player, owned, record, flash = {}) {
 
   const asDate = ms => (Number(ms) ? new Date(Number(ms)).toLocaleDateString(locale) : '—')
 
+  // ==========================================
+  // The two figures that only some games have.
+  //
+  // Both are gated on the COLUMN being present rather than on
+  // the game declaring them, because this page reads the row it
+  // was handed: a game whose registry entry has just started
+  // asking for a stage, against a database that has not run
+  // 0012, would otherwise print a confident 0 next to a real
+  // score. hasOwnProperty rather than a truthiness test - 0 is a
+  // legitimate value here and "never finished a stage" is a
+  // different statement from "this table does not record them".
+  // ==========================================
+  const board = game.leaderboard || {}
+  const has = column => record && Object.prototype.hasOwnProperty.call(record, column)
+
+  const levelStat = board.level && has('high_level')
+    ? stat(Number(record.high_level || 0).toLocaleString(locale), t.statLevel)
+    : ''
+
+  // The item is a picture rather than a number, so it does not
+  // go through stat() - it borrows the tile's shape and puts the
+  // artwork where the figure would be. Same fallback the board
+  // uses: an unknown key is the game's default, because a player
+  // who never chose is holding the free one.
+  const itemOption = (() => {
+    if (!board.item || !has('selected_item')) return null
+    const options = board.item.options || {}
+    const stored = String(record.selected_item || '').trim()
+    return options[stored] || options[board.item.default] || null
+  })()
+
+  const itemStat = itemOption
+    ? `<div class="acc-stat acc-stat--item">
+         <img src="${escapeHtml(itemOption.image)}"
+              alt="${escapeHtml(itemOption.i18n[lang] || itemOption.i18n.en)}"
+              loading="lazy" decoding="async"
+              onerror="this.closest('.acc-stat').style.display='none'">
+         <span>${escapeHtml(t.statItem)}</span>
+       </div>`
+    : ''
+
   const statsBlock = record ? `
     <div class="ghead" style="margin-block-start:26px">${escapeHtml(t.statsTitle)}</div>
     <div class="gcard">
       <div class="acc-stats">
         ${stat(Number(record.high_score || 0).toLocaleString(locale), t.statScore)}
+        ${levelStat}
+        ${itemStat}
         ${stat(Number(record.games_played || 0).toLocaleString(locale), t.statRuns)}
         ${stat(playTime(record.total_play_time), t.statPlayTime)}
         ${stat(asDate(record.created_at), t.statJoined)}
@@ -1039,6 +1088,19 @@ function renderAccount(game, lang, theme, player, owned, record, flash = {}) {
       .acc-stat{padding:14px 16px;border-radius:14px;background:var(--surface-2);border:1px solid var(--border)}
       .acc-stat b{display:block;font-size:1.25em;font-weight:800;margin-block-end:3px}
       .acc-stat span{font-size:.76em;color:var(--dim)}
+
+      /* The equipped item borrows the tile's shape and puts its
+         artwork where the figure would be, so the row still
+         reads as one grid of facts rather than a picture bolted
+         onto the end of it. The height matches a tile's number
+         line so nothing below shifts. */
+      .acc-stat--item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
+      .acc-stat--item img{width:auto;height:34px;max-width:100%;object-fit:contain;display:block;
+        filter:drop-shadow(0 5px 12px color-mix(in srgb,var(--accent) 40%,transparent))}
+      @media (prefers-reduced-motion:no-preference){
+        .acc-stat--item img{animation:accSpin 7s linear infinite}
+      }
+      @keyframes accSpin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
       .acc-form{display:grid;gap:16px}
       .acc-field{display:block}
       .acc-field>span{display:block;font-size:.8em;font-weight:700;color:var(--dim);margin-block-end:6px}

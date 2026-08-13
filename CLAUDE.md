@@ -61,6 +61,7 @@ allows `'unsafe-inline'`.
 |---|---|---|---|
 | `LICENSE_DB` | `amircollider-licenses` | `7ddcf78a-8de1-47d4-899d-9ca72b903b68` | game settings, product overrides, versions, orders, entitlements, licences, mail outbox, panel rate limits |
 | `NEON_KATANA_DB` | `neon-katana-db` | `790fc372-1b4d-4e5a-996f-bf92cde2d19c` | Neon Katana's `players` table |
+| `CHRONOBLADES_DB` | `chronoblades-db` | `90733250-c9e3-4430-8d56-46d74773750e` | Chrono Blades' `players` table (created 2026-08-13, schema applied) |
 
 Other D1 databases exist on the account (`amircodecolliderdb`,
 `mcjn-jazzy-commissions-db`, `unit-v-synth-voices-db`) and other R2 buckets —
@@ -68,7 +69,8 @@ Other D1 databases exist on the account (`amircodecolliderdb`,
 
 ### Worker secrets (names only; values are not in the repo)
 
-Per game, derived from the id (`NEON_KATANA_*` for `neon-katana`):
+Per game, derived from the id (`NEON_KATANA_*` for `neon-katana`,
+`CHRONOBLADES_*` for `chronoblades`):
 `{UPPER}_GOOGLE_CLIENT_ID_WEB`, `{UPPER}_GOOGLE_CLIENT_SECRET`,
 `{UPPER}_GOOGLE_CLIENT_ID_ANDROID`, `{UPPER}_DEEPLINK_SCHEME` (optional).
 
@@ -159,6 +161,8 @@ Content/               Large static content
                        Pages/GameLanding.js AND Api/TheGodApi.js — one copy.
   ToolsCatalog.js, AboutMe.js, DocSnapVideos.js, SupportTemplates.js
 migrations/            SQL. NOT authoritative — see §12.
+                       0012 + <game>.sql belong to a GAME's own D1; the
+                       numbered rest belong to LICENSE_DB.
 Docs/                  Checkout.md, Games.md, Licensing.md, Seo.md
 ```
 
@@ -214,7 +218,7 @@ NULL means "no override, use `Config.js`". Full expected column set is
 | landing B | `tagline_fa, tagline_en, tagline_ja, features_json, screenshots_json, faq_json` | 0008 |
 | landing C | `screenshots_{fa,en,ja}_json, videos_{fa,en,ja}_json, google_enabled, google_head_{fa,en,ja}, google_body_{fa,en,ja}` | 0011 |
 
-### A game's own D1 (`neon-katana-db`)
+### A game's own D1 (`neon-katana-db`, `chronoblades-db`)
 
 One table matters: `players`.
 
@@ -224,16 +228,23 @@ profile_pic_url (NOT NULL), high_score, games_played, total_play_time,
 purchased_colors, selected_color, purchased_items, created_at, last_login,
 banned_at, ban_reason, restricted_until, restrict_reason, admin_note,   -- 0006
 data_json,                                                              -- 0007
-leaderboard_opt_out                                                     -- 0010
+leaderboard_opt_out,                                                    -- 0010
+high_level, selected_item                                               -- 0012
 ```
 
-`username` and `profile_pic_url` are `NOT NULL` on the **live** table while
-`migrations/neon-katana.sql` declares them nullable. `ensurePlayerRow()` in
-`Games/PlayerRecord.js` always supplies both — do not remove that.
+`username` and `profile_pic_url` are `NOT NULL` on the **live** neon-katana
+table while `migrations/neon-katana.sql` declares them nullable.
+`ensurePlayerRow()` in `Games/PlayerRecord.js` always supplies both — do not
+remove that.
+
+`chronoblades-db` was created from `migrations/chronoblades.sql` and has every
+column above, 0012 included. `neon-katana-db` has **not** run 0012 — see
+[Known drift](#12-known-drift-verify-before-trusting).
 
 Optional columns are **probed, never assumed**: `hasModerationColumns()`,
-`hasLeaderboardOptOut()`, `boardFilter()`. A database missing a column keeps
-working with that feature switched off.
+`hasLeaderboardOptOut()`, `hasPlayerColumn()`, `boardFilter()`,
+`boardExtras()`. A database missing a column keeps working with that feature
+switched off.
 
 ---
 
@@ -268,7 +279,42 @@ anybody opens the panel.
 `invalidateSettingsCache()` after any write; the panel always reads
 `{ fresh: true }`.
 
-Current registry: **one game, `neon-katana`.**
+Current registry: **two games, `neon-katana` and `chronoblades`.**
+
+`chronoblades` ships a `landing` baseline, which `neon-katana` deliberately
+does not: it is brand new, and a page that says nothing until somebody opens
+the panel is the case the baseline exists for. The panel still wins per field.
+
+### What a board row carries — `leaderboard` in `GAME_REGISTRY`
+
+A leaderboard is a name and a score for most games and not for all. A registry
+entry may declare either or both of:
+
+```
+leaderboard.level   a second number beside the score  -> players.high_level
+leaderboard.item    the thing the player is holding   -> players.selected_item
+```
+
+`buildBoard()` in `Config.js` normalises it to
+`{ level: {icon,i18n}|null, item: {default,spin,options}|null }`, always that
+shape. `chronoblades` declares both (stage + three knives, the free one of
+which is **not** a product); `neon-katana` declares neither and every code path
+below renders exactly what it rendered before this existed.
+
+**`readBoard()` in `Games/PlayerRecord.js` is the one board query.** The page
+(`Pages/Leaderboard.js`), its count and the game client's copy
+(`Api/PlayerDataApi.js`) all call it, so membership *and* row contents cannot
+drift apart. It reports `highLevel`/`selectedItem` when the GAME declares them
+— not when the database happens to have the column — and resolves an unknown
+or absent `selected_item` to the game's declared default, so a board row's
+item is never empty.
+
+`high_level` is **monotonic**: `buildProfileUpdate()` writes
+`MAX(existing, incoming)`, same as `total_play_time`, because clients send a
+record read out of a save file. An **empty** `selectedItem` is ignored on
+write — Unity's `JsonUtility.ToJson` serialises every field of a class, so a
+patch meant to change a username arrives carrying `selectedItem:""`, and
+writing that literally would unequip the player.
 
 ### The landing page's section order (`Pages/GameLanding.js`)
 
@@ -474,6 +520,9 @@ nothing else breaks — a confusing hour.
 | Change the merge of code ↔ database | `Games/Registry.js` `mergeGame()` |
 | Add a `game_settings` column | `SETTINGS_SCHEMA` in `Games/Store.js` + a migration file. Nothing else — the writer, the repair, the SQL generator and the panel all read that array. |
 | Change leaderboard membership | `boardFilter()` in `Games/PlayerRecord.js` — **one place**, read by the page, its count, and the game's JSON copy |
+| Change what a board ROW says | `readBoard()` in `Games/PlayerRecord.js` — the single query all three boards run |
+| Give a game a stage/level or an equipped item on its board | `leaderboard` in that game's `GAME_REGISTRY` entry + `migrations/0012_player_progress.sql` against its own D1 |
+| Add a knife / skin / emblem to that strip | `leaderboard.item.options` in `Config.js`. A key that is also for sale needs a matching `store.products` id — a free one does not |
 | Change what account deletion removes | `handleGameAccountDelete` in `Pages/GameAccount.js` + `deletePlayerByEmail` / `releasePlayerIdentity`. Orders and entitlements are kept on purpose — say so on the page if that changes |
 | Reorder the landing page | the `body` template in `handleGameLanding` — one list, in render order |
 | Add a panel action | `Api/TheGodApi.js` switch + the `bad_action` list + UI in `Pages/TheGod.js` |
@@ -512,7 +561,15 @@ nothing else breaks — a confusing hour.
    own database. Until it is, the opt-out checkbox does not render and
    `game.verify` reports the column as missing. Nothing breaks without it.
 
-5. **`0011_landing_languages.sql` is new** and belongs to `LICENSE_DB`, not to a
+5. **`0012_player_progress.sql` has NOT been run against `neon-katana-db`.**
+   It adds `high_level` and `selected_item` to a game's OWN database.
+   `chronoblades-db` was created with both. Neon Katana declares no
+   `leaderboard` block, so it needs neither and nothing warns about it — run
+   the file only if that game ever starts recording a stage. Running it
+   against `LICENSE_DB` is the classic wrong-database mistake and does nothing
+   useful.
+
+6. **`0011_landing_languages.sql` is new** and belongs to `LICENSE_DB`, not to a
    game's database. Thirteen columns: the six per-language screenshot/video
    lists and the seven the Google disclosure needs. Until it is run, the Game
    page tab greys out the language strip and the disclosure card, names the
@@ -520,6 +577,9 @@ nothing else breaks — a confusing hour.
    showing the shared galleries and the standard disclosure, because both
    degrade to exactly what they did before. `/thegod` → SQL →
    **Repair the schema** adds all thirteen, same as the file.
+   **Verified applied on 2026-08-13:** `game_settings` in `LICENSE_DB` now has
+   all forty columns, 0008 and 0011 included, so items 2 and this one are
+   history rather than open faults.
 
 ---
 
@@ -531,8 +591,12 @@ nothing else breaks — a confusing hour.
   checks the row's `email` (`emailMatchesRow`) or the `player_identity` claim.
 - A caller may only read or write **their own** player row. Ownership comes from
   the verified `id_token`, never from the path.
-- `high_score` only moves up. `total_play_time` and `games_played` are written
-  with `MAX(existing, incoming)` — clients send running totals, not deltas.
+- `high_score` only moves up. `total_play_time`, `games_played` and
+  `high_level` are written with `MAX(existing, incoming)` — clients send
+  running totals and records, not deltas.
+- `selected_item` is a plain assignment (equipping goes both ways) **except**
+  that an empty value is ignored. There is deliberately no way for a client to
+  blank it; empty already means "the game's default" on read.
 - Product ids are hard-coded in shipped builds. The database may re-price,
   re-order, re-ribbon or disable a product; it may **not** create one.
 - `badge` has three states: `NULL` = no override, `''` = operator chose no

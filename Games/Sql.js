@@ -138,6 +138,22 @@ CREATE TABLE IF NOT EXISTS players (
   -- lower somebody's record.
   high_score      INTEGER NOT NULL DEFAULT 0,
 
+  -- The furthest stage, level or wave this player reached.
+  --
+  -- A second record rather than a second score: a game whose
+  -- stages are generated has no end to reach, so how far
+  -- somebody got is not implied by how many points they scored.
+  -- Written through the ordinary profile PATCH as \`highLevel\`
+  -- and MONOTONIC like the counters below - buildProfileUpdate()
+  -- writes MAX(existing, incoming), because the client sends its
+  -- own running record out of a save file and a fresh install
+  -- must not be able to erase what the server already knew.
+  --
+  -- A game that has no stages simply never writes it, and its
+  -- board never shows it: whether this column MEANS anything is
+  -- declared in GAME_REGISTRY, not here.
+  high_level      INTEGER NOT NULL DEFAULT 0,
+
   games_played    INTEGER NOT NULL DEFAULT 0,
   total_play_time INTEGER NOT NULL DEFAULT 0,
 
@@ -148,6 +164,22 @@ CREATE TABLE IF NOT EXISTS players (
   selected_color  TEXT NOT NULL DEFAULT 'FFFFFF',
   purchased_colors TEXT NOT NULL DEFAULT '["FFFFFF"]',
   purchased_items  TEXT NOT NULL DEFAULT '{}',
+
+  -- Which single item the player currently has equipped.
+  --
+  -- A product id from GAME_REGISTRY['${names.id}'].store, so the
+  -- thing somebody paid for and the thing the leaderboard draws
+  -- beside their name are one string and cannot disagree.
+  --
+  -- NULL means "the game's default", which the registry names
+  -- rather than this column - so renaming a free starter item is
+  -- one line of config instead of a backfill across every row
+  -- belonging to a player who never chose anything.
+  --
+  -- Deliberately NOT part of purchased_items: that is an
+  -- inventory and this is a selection, and a player owns several
+  -- things while holding one.
+  selected_item   TEXT,
 
   -- Anything else THIS game wants to save.
   --
@@ -218,8 +250,14 @@ CREATE INDEX IF NOT EXISTS idx_players_email ON players (email);
 -- The board query is "highest scores, excluding banned and
 -- excluding anybody who opted out", so the index carries all
 -- three columns in the order the WHERE clause narrows them.
+--
+-- high_level is the tie-break that follows high_score for a game
+-- that records one, so it sits on the end of the same index
+-- rather than in one of its own: two players on identical points
+-- are separated by how far they got, and without it the order
+-- between them is whatever SQLite happened to return.
 CREATE INDEX IF NOT EXISTS idx_players_board
-  ON players (banned_at, leaderboard_opt_out, high_score DESC);`
+  ON players (banned_at, leaderboard_opt_out, high_score DESC, high_level DESC);`
 
   const purchases = `
 

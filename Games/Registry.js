@@ -504,6 +504,26 @@ export function isPlayable(game) {
 
 
 // ==========================================
+// absoluteAsset
+// A site-local path made absolute, and an absolute URL left
+// exactly as it is.
+//
+// Every caller here is building JSON for something with no page
+// of its own to resolve a relative path against - a Unity build,
+// a bot, a share card - so "/assets/x.png" has to become
+// "https://…/assets/x.png". What it must NOT do is treat a URL
+// that already names a host as a path, which is how a logo
+// served from a CDN became "https://amircollider.comhttps://…".
+// ==========================================
+function absoluteAsset(value, base) {
+  const asset = String(value || '').trim()
+  if (!asset) return ''
+  if (/^https?:\/\//i.test(asset)) return asset
+  return base + (asset.startsWith('/') ? asset : '/' + asset)
+}
+
+
+// ==========================================
 // gameManifest
 // The JSON a client reads before it does anything else.
 //
@@ -520,7 +540,15 @@ export function gameManifest(game, origin) {
     status: game.status,
     icon: game.icon || '',
     color: game.color,
-    logo: game.logo ? base + game.logo : '',
+    // Absolute, because a Unity build has no page to resolve a
+    // relative path against - but only when it is not absolute
+    // already. A logo hosted somewhere other than this Worker is
+    // a perfectly ordinary thing for a registry entry to name
+    // (an R2 custom domain, a CDN), and prepending the origin to
+    // one produced "https://amircollider.comhttps://…" - a URL
+    // that fails silently in a client, because a logo that will
+    // not load is a blank square and not an error.
+    logo: absoluteAsset(game.logo, base),
     package: game.package || '',
     minVersion: game.minVersion || '',
 

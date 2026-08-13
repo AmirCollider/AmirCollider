@@ -45,7 +45,11 @@ import {
   playerDb, listGamePlayers, getGamePlayer, setModeration,
   setUsername, deleteGamePlayer, moderationOf
 } from '../Games/Players.js'
-import { LEADERBOARD_OPT_OUT_COLUMN } from '../Games/PlayerRecord.js'
+import {
+  LEADERBOARD_OPT_OUT_COLUMN,
+  LEVEL_COLUMN,
+  SELECTED_ITEM_COLUMN
+} from '../Games/PlayerRecord.js'
 import {
   gameSchemaSql, settingsSeedSql, productSeedSql, purgeSeedSql,
   schemaRepairSql, setupCommands, slug, namesFor
@@ -143,6 +147,16 @@ function presentPlayer(row) {
     highScore: Number(row.high_score) || 0,
     gamesPlayed: Number(row.games_played) || 0,
     playTime: Number(row.total_play_time) || 0,
+
+    // The furthest stage reached and the item being held, for a
+    // game that records either. Both read as "nothing" on a
+    // database that has not run 0012 - and `progressSupported`
+    // is what lets the panel say WHY the figure is missing
+    // rather than printing a confident 0.
+    highLevel: Number(row[LEVEL_COLUMN]) || 0,
+    selectedItem: row[SELECTED_ITEM_COLUMN] || '',
+    progressSupported: Object.prototype.hasOwnProperty.call(row, LEVEL_COLUMN),
+
     createdAt: Number(row.created_at) || 0,
     lastLogin: Number(row.last_login) || 0,
     state: moderationOf(row),
@@ -1449,7 +1463,14 @@ export async function handleTheGodApi(url, request, gameId, requestId, GAMES, en
               present: [...players],
               moderation: players.has('banned_at'),
               document: players.has('data_json'),
-              leaderboardOptOut: players.has(LEADERBOARD_OPT_OUT_COLUMN)
+              leaderboardOptOut: players.has(LEADERBOARD_OPT_OUT_COLUMN),
+
+              // 0012. Reported for every game, not only the ones
+              // that declare a board level, because this card
+              // answers "what is in this table?" and the answer
+              // does not depend on what Config.js asks for.
+              level: players.has(LEVEL_COLUMN),
+              selectedItem: players.has(SELECTED_ITEM_COLUMN)
             }
           : null,
         repair: schemaRepairSql(schema)
@@ -1547,6 +1568,34 @@ export async function handleTheGodApi(url, request, gameId, requestId, GAMES, en
             ? 'Players can hide themselves from the public board.'
             : `No ${LEADERBOARD_OPT_OUT_COLUMN} column. The checkbox on the account page will not appear. `
               + 'Run migrations/0010_leaderboard_optout.sql against this game\'s database.', 'warn')
+
+        // Only asked of a game that says its board carries these.
+        // A game whose board is a name and a score is not missing
+        // anything by not having them, and reporting it as a
+        // warning would be a checklist item nobody can ever clear.
+        const board = game.leaderboard || {}
+
+        if (board.level) {
+          add('playersLevel', playersTable.has(LEVEL_COLUMN), 'Stage / level record',
+            playersTable.has(LEVEL_COLUMN)
+              ? 'highLevel is recorded and shown on the board beside the score.'
+              : `This game's registry entry declares a level on its board, but there is no `
+                + `${LEVEL_COLUMN} column here — so the board shows scores only and a client `
+                + 'sending highLevel has it dropped. Run migrations/0012_player_progress.sql '
+                + 'against this game\'s database.', 'warn')
+        }
+
+        if (board.item) {
+          const keys = Object.keys(board.item.options || {})
+          add('playersItem', playersTable.has(SELECTED_ITEM_COLUMN), 'Equipped item',
+            playersTable.has(SELECTED_ITEM_COLUMN)
+              ? `Players show one of ${keys.length} item${keys.length === 1 ? '' : 's'} `
+                + `beside their name (${keys.join(', ')}).`
+              : `This game's registry entry declares an item on its board, but there is no `
+                + `${SELECTED_ITEM_COLUMN} column here — so nothing is drawn and a client `
+                + 'sending selectedItem has it dropped. Run '
+                + 'migrations/0012_player_progress.sql against this game\'s database.', 'warn')
+        }
       }
 
       if (spec.capabilities && spec.capabilities.login) {

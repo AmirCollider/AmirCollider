@@ -15,6 +15,11 @@
       "database_id": "790fc372-1b4d-4e5a-996f-bf92cde2d19c"
     },
     {
+      "binding": "CHRONOBLADES_DB",
+      "database_name": "chronoblades-db",
+      "database_id": "90733250-c9e3-4430-8d56-46d74773750e"
+    },
+    {
       "binding": "LICENSE_DB",
       "database_name": "amircollider-licenses",
       "database_id": "7ddcf78a-8de1-47d4-899d-9ca72b903b68"

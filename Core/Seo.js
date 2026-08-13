@@ -59,6 +59,18 @@ export function siteOrigin() {
 /** An absolute URL on the canonical origin. */
 export function absoluteUrl(path = '/') {
   const suffix = String(path || '/')
+
+  // Already absolute, so leave it alone. Almost every caller
+  // passes a site-local path, but `image` on videoGameLd() is
+  // whatever a game's registry entry names for its logo - and a
+  // logo served from a CDN or an R2 custom domain is an ordinary
+  // thing for that to be. Prepending the origin to one produced
+  // "https://amircollider.comhttps://…" inside the structured
+  // data on the dashboard, which is the worst place for it: no
+  // page looks broken, and the search engine reading it simply
+  // gets an image that does not exist.
+  if (/^https?:\/\//i.test(suffix)) return suffix
+
   return siteOrigin() + (suffix.startsWith('/') ? suffix : '/' + suffix)
 }
 
