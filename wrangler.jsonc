@@ -8,6 +8,29 @@
   "name": "amircollider",
   "main": "Worker.js",
   "compatibility_date": "2025-08-03",
+
+  // ==========================================
+  // Do not wipe what this file does not know about.
+  //
+  // Wrangler's default is keep_vars: false, and "false" means
+  // the deploy REPLACES the Worker's variables with the set
+  // declared here. Nothing is declared here - every secret on
+  // this Worker was added out of band - so a deploy from this
+  // config removes any variable that was added through the
+  // Cloudflare dashboard.
+  //
+  // That is what happened on 2026-08-13: CHRONOBLADES_GOOGLE_
+  // CLIENT_ID_WEB and _SECRET were set in the dashboard, the
+  // next deploy took them away, and because validateEnvironment()
+  // in Config.js treats those two as required for a game that
+  // signs players in, the whole Worker would have started
+  // answering 500 - not just Chrono Blades.
+  //
+  // Secrets put with `npx wrangler secret put` were never at
+  // risk. This line protects the dashboard-set ones, which is
+  // the case that actually bit.
+  // ==========================================
+  "keep_vars": true,
   "d1_databases": [
     {
       "binding": "NEON_KATANA_DB",

@@ -68,6 +68,79 @@ export function gameAccent(value) {
 
 
 // ==========================================
+// The ink that reads on an accent-coloured field
+//
+// Every filled control on these pages - the download button, the
+// current nav tab, the pressed segment - is painted with a
+// gradient from the accent to a 50/50 mix of the accent and
+// white, and the text on top of it used to be a hard-coded
+// `#fff`. That is a bet that every accent anybody ever picks is
+// dark, and it loses the first time somebody picks a bright one.
+//
+// Chrono Blades is #20fea9, a bright mint. White on the middle
+// of that gradient measures 1.28:1. The floor for readable text
+// is 4.5:1, so the label was not "hard to read" - it was very
+// nearly invisible, and no amount of squinting was going to fix
+// it.
+//
+// So the ink is measured rather than assumed. Both candidates
+// are scored against the MIDDLE of the gradient (the honest
+// worst case for the whole button, since white text fails
+// hardest at the light end) and the better one wins. A dark
+// accent still gets white, exactly as before; a light one gets a
+// near-black tinted with its own hue, which reads as deliberate
+// rather than as a black rectangle dropped on the colour.
+//
+// The result is one CSS variable, --on-accent, so a rule can
+// stop caring which case it is in.
+// ==========================================
+
+/** A #rrggbb string as [r, g, b], or null if it is not one. */
+function channels(hex) {
+  const match = /^#([0-9a-f]{6})$/i.exec(String(hex || '').trim())
+  if (!match) return null
+  const value = match[1]
+  return [0, 2, 4].map(at => parseInt(value.slice(at, at + 2), 16))
+}
+
+/** WCAG relative luminance. */
+function luminance(rgb) {
+  const linear = rgb.map(channel => {
+    const scaled = channel / 255
+    return scaled <= 0.04045 ? scaled / 12.92 : Math.pow((scaled + 0.055) / 1.055, 2.4)
+  })
+  return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+}
+
+/** WCAG contrast ratio between two colours, 1 to 21. */
+function contrast(a, b) {
+  const first = luminance(a)
+  const second = luminance(b)
+  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05)
+}
+
+export function accentInk(value) {
+  const accent = channels(gameAccent(value))
+  if (!accent) return '#fff'
+
+  // The middle of the button's gradient: the accent already a
+  // quarter of the way to white. Scoring against the base alone
+  // would pass a colour whose right-hand half is unreadable.
+  const middle = accent.map(channel => Math.round(channel + (255 - channel) * 0.25))
+
+  // A near-black that keeps the accent's hue. Pure black works
+  // too, but on a coloured field it reads as a hole rather than
+  // as type.
+  const dark = accent.map(channel => Math.round(channel * 0.16))
+  const white = [255, 255, 255]
+
+  return contrast(middle, white) >= contrast(middle, dark)
+    ? '#fff'
+    : '#' + dark.map(channel => channel.toString(16).padStart(2, '0')).join('')
+}
+
+
+// ==========================================
 // chromeCss
 // One stylesheet for all three pages.
 // ==========================================
@@ -89,6 +162,11 @@ export function chromeCss(accent) {
 
     :root{
       --accent:${gameAccent(accent)};
+
+      /* The text colour that reads on an accent-filled control.
+         Measured from the accent rather than assumed - see
+         accentInk() above, and the 1.28:1 that motivated it. */
+      --on-accent:${accentInk(accent)};
       --brand:#6c63ff;--ok:#4caf50;--warn:#ff9800;--err:#f44336;
       --radius:18px;--maxw:1060px;
       --bg-1:#0b0e16;--bg-2:#141a2e;
@@ -176,14 +254,14 @@ export function chromeCss(accent) {
       background:var(--surface);border:1px solid var(--border);
       transition:color .18s ease,border-color .18s ease,transform .18s ease}
     .gnav a:hover{color:var(--text);transform:translateY(-2px)}
-    .gnav a[aria-current="page"]{color:#fff;border-color:transparent;
+    .gnav a[aria-current="page"]{color:var(--on-accent);border-color:transparent;
       background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 50%,#fff))}
     .gnav a.is-off{opacity:.45;pointer-events:none}
 
     .gseg{display:inline-flex;padding:3px;gap:2px;border-radius:12px;background:var(--surface);border:1px solid var(--border)}
     .gseg button{border:0;cursor:pointer;padding:7px 11px;border-radius:9px;font:inherit;font-size:.8em;
       font-weight:700;color:var(--dim);background:transparent}
-    .gseg button[aria-pressed="true"]{color:#fff;background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 50%,#fff))}
+    .gseg button[aria-pressed="true"]{color:var(--on-accent);background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 50%,#fff))}
     .gicon-btn{width:38px;height:38px;border-radius:11px;cursor:pointer;display:inline-flex;align-items:center;
       justify-content:center;color:var(--text);background:var(--surface);border:1px solid var(--border)}
 
@@ -195,7 +273,7 @@ export function chromeCss(accent) {
 
     .gbtn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 20px;
       border:1px solid transparent;border-radius:13px;font:inherit;font-weight:700;font-size:.9em;
-      cursor:pointer;text-decoration:none;color:#fff;
+      cursor:pointer;text-decoration:none;color:var(--on-accent);
       background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 50%,#fff));
       transition:transform .16s ease,filter .16s ease}
     .gbtn:hover{transform:translateY(-2px);filter:brightness(1.08)}

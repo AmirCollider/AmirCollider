@@ -851,9 +851,21 @@ function renderAccount(game, lang, theme, player, owned, record, flash = {}) {
     const names = product && product.i18n && product.i18n.name
     return (names && (names[lang] || names.en)) || productId
   }
+  // The owned-item glyph, preferring the product's artwork.
+  //
+  // Same rule as the store card: a shelf of three knives is told
+  // apart by the pictures, not by the emoji. The emoji stays
+  // underneath as the fallback, so a product with no art - or one
+  // whose art fails to load - looks exactly as it did before.
   const iconOf = productId => {
     const product = catalogue.find(item => item.id === productId)
-    return (product && product.icon) || '📦'
+    const emoji = escapeHtml((product && product.icon) || '📦')
+    const src = String((product && product.image) || '').trim()
+    if (!/^(https?:\/\/|\/)/i.test(src)) return emoji
+
+    return '<span class="acc-own-art">' + emoji
+      + '<img src="' + escapeHtml(src) + '" alt="" loading="lazy" decoding="async"'
+      + ' onerror="this.remove()"></span>'
   }
 
   const rows = owned.map(row => {
@@ -868,7 +880,7 @@ function renderAccount(game, lang, theme, player, owned, record, flash = {}) {
 
     return `
       <div style="display:flex;align-items:center;gap:14px;padding:15px 0;border-block-end:1px solid var(--border)">
-        <span style="font-size:1.7em;line-height:1">${escapeHtml(iconOf(row.product_id))}</span>
+        <span style="font-size:1.7em;line-height:1">${iconOf(row.product_id)}</span>
         <span style="flex:1;min-width:0">
           <b style="display:block">${escapeHtml(nameOf(row.product_id))}</b>
           <span style="color:var(--dim);font-size:.8em">
@@ -1094,6 +1106,11 @@ function renderAccount(game, lang, theme, player, owned, record, flash = {}) {
          reads as one grid of facts rather than a picture bolted
          onto the end of it. The height matches a tile's number
          line so nothing below shifts. */
+      .acc-own-art{position:relative;display:inline-grid;place-items:center;width:1.6em;height:1.6em;
+        vertical-align:middle}
+      .acc-own-art img{position:absolute;inset:0;margin:auto;max-width:100%;max-height:100%;
+        width:auto;height:auto;object-fit:contain}
+
       .acc-stat--item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
       .acc-stat--item img{width:auto;height:34px;max-width:100%;object-fit:contain;display:block;
         filter:drop-shadow(0 5px 12px color-mix(in srgb,var(--accent) 40%,transparent))}

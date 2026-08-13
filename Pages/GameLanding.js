@@ -48,7 +48,7 @@ import { chromeTheme, langHeader, page, localeFor } from './GameChrome.js'
 import { escapeHtml } from '../Core/Html.js'
 import { matchRequestLang } from '../Core/RequestContext.js'
 import { localizedPath } from '../Core/Locale.js'
-import { CONFIG } from '../Config.js'
+import { CONFIG, LANGUAGES } from '../Config.js'
 
 
 // ==========================================
@@ -250,8 +250,48 @@ function notesList(raw) {
 
 
 function pickLang(map, lang) {
-  if (!map) return ''
-  return map[lang] || map.en || map.fa || map.ja || ''
+  return pickLangCoded(map, lang).text
+}
+
+
+// ==========================================
+// Which language a string actually came from, and which way it
+// runs.
+//
+// pickLang() falls back - the Persian page shows the English
+// tagline when nobody wrote a Persian one - so "the page is in
+// Persian" is not the same statement as "this paragraph is". The
+// coded version answers the second one, which is the only one a
+// dir attribute can be built from.
+//
+// This exists because `dir="auto"` was wrong here, and wrong in
+// a way that looks like a rendering bug rather than a
+// specification working as designed. `auto` reads the FIRST
+// STRONG character and lets it decide the whole block. An
+// operator's Persian description that opens with an emoji and a
+// Latin brand name -
+//
+//   ⚔️ **Chrono Blades – یک پرتاب، یک فرصت…
+//
+// - has no strong character until the "C", so the browser
+// concluded the paragraph was English and laid the Persian out
+// left to right. Which is the ordinary way to write a game
+// description, so this was going to happen to every game.
+//
+// The language of the FIELD is the fact we actually have, and it
+// cannot be fooled by what the operator typed into it.
+// ==========================================
+function pickLangCoded(map, lang) {
+  if (!map) return { text: '', code: lang }
+  for (const code of [lang, 'en', 'fa', 'ja']) {
+    if (map[code]) return { text: map[code], code }
+  }
+  return { text: '', code: lang }
+}
+
+function dirOf(code) {
+  const meta = LANGUAGES.meta[code]
+  return (meta && meta.dir) || 'ltr'
 }
 
 
@@ -458,8 +498,22 @@ function heroBlock(game, lang, currentVersion) {
   else badges.push(`<span class="gchip is-dim">${escapeHtml(d.offline)}</span>`)
   if (game.capabilities.cloudSave) badges.push(`<span class="gchip is-dim">${escapeHtml(d.cloud)}</span>`)
 
-  const tagline = pickLang(game.landing.tagline, lang)
-  const description = pickLang(game.i18n && game.i18n.description, lang) || game.description || ''
+  // Both carry the language they were actually written in, not
+  // the language of the page: pickLang falls back, so a Persian
+  // page can be showing an English tagline, and a paragraph laid
+  // out in the wrong direction is worse than one in the wrong
+  // language.
+  const tagline = pickLangCoded(game.landing.tagline, lang)
+  const description = pickLangCoded(game.i18n && game.i18n.description, lang)
+  if (!description.text && game.description) {
+    // The bare `description` on a registry entry is the English
+    // one-liner, so it is labelled as such rather than as the
+    // page's language.
+    description.text = game.description
+    description.code = 'en'
+  }
+
+  const lede = tagline.text ? tagline : description
 
   return `
     <section class="ln-hero">
@@ -469,9 +523,9 @@ function heroBlock(game, lang, currentVersion) {
           ? `<img src="${escapeHtml(game.logo)}" alt="" onerror="this.style.display='none'">` : ''}</span>
         <div class="ln-head">
           <h1 class="ln-title">${escapeHtml(game.name)}</h1>
-          <p class="ln-tag" dir="auto">${escapeHtml(tagline || description)}</p>
-          ${tagline && description && tagline !== description
-            ? `<p class="ln-sub" dir="auto">${escapeHtml(description)}</p>` : ''}
+          <p class="ln-tag" dir="${dirOf(lede.code)}">${escapeHtml(lede.text)}</p>
+          ${tagline.text && description.text && tagline.text !== description.text
+            ? `<p class="ln-sub" dir="${dirOf(description.code)}">${escapeHtml(description.text)}</p>` : ''}
           ${badges.length ? `<div class="ln-badges">${badges.join('')}</div>` : ''}
         </div>
       </div>
@@ -562,19 +616,19 @@ function getBlock(game, lang) {
 // escapeHtml() before it reaches the document, because this is
 // operator input on a public page.
 // ==========================================
-function disclosureHtml(text) {
+function disclosureHtml(text, dir = 'auto') {
   const out = []
   let paragraph = []
   let bullets = []
 
   const flushParagraph = () => {
     if (!paragraph.length) return
-    out.push(`<p dir="auto">${escapeHtml(paragraph.join('\n'))}</p>`)
+    out.push(`<p dir="${dir}">${escapeHtml(paragraph.join('\n'))}</p>`)
     paragraph = []
   }
   const flushBullets = () => {
     if (!bullets.length) return
-    out.push(`<ul dir="auto">${bullets.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`)
+    out.push(`<ul dir="${dir}">${bullets.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`)
     bullets = []
   }
 
@@ -635,13 +689,19 @@ function googleBlock(game, lang) {
   const disclosure = googleDisclosureFor(game, lang)
   if (!disclosure.enabled) return ''
 
-  const body = disclosureHtml(disclosure.body)
+  // googleDisclosureFor() resolves this per language and falls
+  // back to that language's own default rather than to another
+  // language's stored text, so what comes back is always in
+  // `lang` - which makes the page's direction the right one, with
+  // no guessing from the first character.
+  const dir = dirOf(lang)
+  const body = disclosureHtml(disclosure.body, dir)
   if (!disclosure.head && !body) return ''
 
   const labels = POLICY_LABELS[lang] || POLICY_LABELS.fa
 
   return `<section class="gcard ln-sec">
-      ${disclosure.head ? `<h2 class="ghead" dir="auto">${escapeHtml(disclosure.head)}</h2>` : ''}
+      ${disclosure.head ? `<h2 class="ghead" dir="${dir}">${escapeHtml(disclosure.head)}</h2>` : ''}
       <div class="ln-google">
         ${body}
         <div class="ln-policy">
@@ -659,11 +719,11 @@ function featuresBlock(game, lang) {
   const d = dict(lang)
   const features = rows(game.landing.features, 8)
     .map(feature => {
-      const label = pickLang(feature, lang)
-      if (!label) return ''
+      const label = pickLangCoded(feature, lang)
+      if (!label.text) return ''
       return `<div class="ln-feat">
         <span class="ln-feat-icon" aria-hidden="true">${escapeHtml(feature.icon || '•')}</span>
-        <span dir="auto">${escapeHtml(label)}</span>
+        <span dir="${dirOf(label.code)}">${escapeHtml(label.text)}</span>
       </div>`
     }).filter(Boolean).join('')
 
@@ -752,12 +812,12 @@ function devicesBlock(game, lang) {
 
 function aboutBlock(game, lang) {
   const d = dict(lang)
-  const about = game.landing.about[lang] || game.landing.about.en || game.landing.about.fa
-  if (!about) return ''
+  const about = pickLangCoded(game.landing.about, lang)
+  if (!about.text) return ''
 
   return `<section class="gcard ln-sec">
       <h2 class="ghead">${escapeHtml(d.about)}</h2>
-      <div class="ln-about" dir="auto">${escapeHtml(about)}</div>
+      <div class="ln-about" dir="${dirOf(about.code)}">${escapeHtml(about.text)}</div>
     </section>`
 }
 
@@ -770,8 +830,8 @@ function productsBlock(game, lang) {
   if (!products.length) return ''
 
   const items = products.map(product => {
-    const name = pickLang(product.i18n && product.i18n.name, lang) || product.id
-    return `<span class="ln-prod">${escapeHtml(product.icon || '')}<b dir="auto">${escapeHtml(name)}</b>
+    const name = pickLangCoded(product.i18n && product.i18n.name, lang)
+    return `<span class="ln-prod">${escapeHtml(product.icon || '')}<b dir="${dirOf(name.code)}">${escapeHtml(name.text || product.id)}</b>
       <span>$${escapeHtml(product.priceUsd)}</span></span>`
   }).join('')
 
@@ -816,13 +876,13 @@ function faqLd(game, lang) {
 function faqBlock(game, lang) {
   const d = dict(lang)
   const items = rows(game.landing.faq, 12).map(entry => {
-    const question = pickLang(entry.q, lang)
-    const answer = pickLang(entry.a, lang)
-    if (!question || !answer) return ''
+    const question = pickLangCoded(entry.q, lang)
+    const answer = pickLangCoded(entry.a, lang)
+    if (!question.text || !answer.text) return ''
 
     return `<details>
-      <summary dir="auto">${escapeHtml(question)}</summary>
-      <p dir="auto">${escapeHtml(answer)}</p>
+      <summary dir="${dirOf(question.code)}">${escapeHtml(question.text)}</summary>
+      <p dir="${dirOf(answer.code)}">${escapeHtml(answer.text)}</p>
     </details>`
   }).filter(Boolean).join('')
 

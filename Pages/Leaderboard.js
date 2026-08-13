@@ -221,7 +221,7 @@ function leaderboardCss() {
   return `
     .lb-ic{width:18px;height:18px;flex:none}
     .lb-hero{text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;margin-block:6px 26px}
-    .lb-badge{width:58px;height:58px;border-radius:18px;display:grid;place-items:center;color:#fff;
+    .lb-badge{width:58px;height:58px;border-radius:18px;display:grid;place-items:center;color:var(--on-accent);
       background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 45%,#fff));
       box-shadow:0 12px 30px color-mix(in srgb,var(--accent) 40%,transparent)}
     .lb-badge svg{width:29px;height:29px}

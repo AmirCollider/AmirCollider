@@ -228,6 +228,38 @@ const I18N = {
   }
 }
 
+// ==========================================
+// productArt
+// The picture on a product card, or the emoji standing in for
+// one.
+//
+// A catalogue of three near-identical knives cannot be told
+// apart by 🔪 and 🗡️: the difference between them IS the
+// artwork, so a game that ships artwork gets the artwork. The
+// emoji is still there underneath - it is what renders while the
+// image loads, what renders if it 404s, and what a game with no
+// art gets - so nothing regresses for a catalogue of emoji.
+//
+// The URL is validated the same way every other operator-facing
+// image on this site is. A product's `image` comes from
+// Config.js today, which is code rather than input, but the
+// product row is overridable from the panel and the check costs
+// nothing.
+// ==========================================
+function productArt(product) {
+  const emoji = escapeHtml(product.icon || '📦')
+  const src = String((product && product.image) || '').trim()
+  if (!/^(https?:\/\/|\/)/i.test(src)) return emoji
+
+  // The emoji sits behind the image rather than being replaced by
+  // it, so a slow or broken URL degrades to what the card showed
+  // before instead of to an empty box.
+  return '<span class="pic-art">' + emoji
+    + '<img src="' + escapeHtml(src) + '" alt="" loading="lazy" decoding="async"'
+    + ' onerror="this.remove()"></span>'
+}
+
+
 function pack(lang) {
   return I18N[lang] || I18N.fa
 }
@@ -541,7 +573,7 @@ function renderStore(game, lang, theme, { products, player, owned, ready }) {
     return `
       <article class="pcard"${product.badge === 'best' ? ' data-featured="1"' : ''}>
         ${badge ? `<span class="pbadge">${escapeHtml(badge)}</span>` : ''}
-        <div class="pic">${escapeHtml(product.icon || '📦')}</div>
+        <div class="pic">${productArt(product)}</div>
         <h3 class="pname">${escapeHtml(localized(product.i18n && product.i18n.name, lang, product.id))}</h3>
         <p class="pdesc">${escapeHtml(localized(product.i18n && product.i18n.description, lang, ''))}</p>
 
@@ -609,9 +641,18 @@ function renderStore(game, lang, theme, { products, player, owned, ready }) {
       .pcard[data-featured="1"]{border-color:color-mix(in srgb,var(--accent) 55%,var(--border));
         box-shadow:0 12px 34px color-mix(in srgb,var(--accent) 16%,transparent)}
       .pbadge{position:absolute;inset-block-start:12px;inset-inline-end:12px;padding:3px 10px;border-radius:999px;
-        font-size:.68em;font-weight:800;color:#fff;
+        font-size:.68em;font-weight:800;color:var(--on-accent);
         background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 45%,#fff))}
       .pic{font-size:2.3em;line-height:1;margin-block-end:12px}
+
+      /* The emoji is the floor and the artwork is drawn over it,
+         so a 404 or a slow connection leaves the card looking
+         like it did before there was art rather than leaving a
+         hole where the product used to be. */
+      .pic-art{position:relative;display:inline-grid;place-items:center;min-width:64px;min-height:64px}
+      .pic-art img{position:absolute;inset:0;margin:auto;max-width:100%;max-height:64px;
+        width:auto;height:auto;object-fit:contain;
+        filter:drop-shadow(0 6px 14px color-mix(in srgb,var(--accent) 38%,transparent))}
       .pname{font-size:1.02em;font-weight:800;margin-block-end:6px}
       .pdesc{font-size:.85em;line-height:1.6;color:var(--dim);flex:1}
       .pmeta{display:flex;gap:6px;flex-wrap:wrap;margin-block:12px 14px}

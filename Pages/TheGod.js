@@ -2645,7 +2645,21 @@ function tgRenderEditor() {
 
   +   '<div class="grid two">'
   +     '<label class="f"><span>' + tgEsc(TG.t.fColor) + '</span>'
-  +       '<span class="row"><input type="color" id="f-color" value="' + tgEsc(game.color) + '">'
+  // ==========================================
+  // Two inputs, one value, BOTH directions.
+  //
+  // The swatch used to be write-only: typing a hex updated it,
+  // but picking a colour in it updated nothing - and the save
+  // below reads f-color-text. So the ordinary way of using this
+  // control (click the swatch, pick a colour, press save) sent
+  // the OLD hex, wrote the old hex, and redrew the page in the
+  // old colour. It looked exactly like a save that had been
+  // refused, which is the worst way for a working save to fail:
+  // the row really was written, with the value that was already
+  // in it.
+  // ==========================================
+  +       '<span class="row"><input type="color" id="f-color" value="' + tgEsc(game.color) + '"'
+  +       ' oninput="tgById(\'f-color-text\').value=this.value">'
   +       '<input type="text" id="f-color-text" dir="ltr" value="' + tgEsc(game.color) + '"'
   +       ' oninput="tgById(\'f-color\').value=this.value"></span></label>'
   +     '<label class="f"><span>' + tgEsc(TG.t.fStatus) + '</span>'

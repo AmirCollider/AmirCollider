@@ -775,7 +775,15 @@ const GAME_REGISTRY = {
           sku: 'chronoblades_silver_knife',
           kind: PRODUCT_KIND.NONCONSUMABLE,
           priceUsd: '4.99',
+
+          // The emoji is the fallback, not the picture. A store
+          // selling three near-identical knives cannot tell them
+          // apart with 🔪 and 🗡️ - the difference between them IS
+          // the artwork, so the artwork is what the card shows.
+          // The emoji stays for anywhere too small for an image
+          // and for the moment before one loads.
           icon: '🔪',
+          image: 'https://dl.amircollider.com/ChronoBlades/SilverKnife.png',
           grant: { type: 'cosmetic', code: 'SilverKnife' },
           i18n: {
             name: { fa: 'چاقوی نقره‌ای', en: 'Silver Knife', ja: 'シルバーナイフ' },
@@ -792,6 +800,7 @@ const GAME_REGISTRY = {
           kind: PRODUCT_KIND.NONCONSUMABLE,
           priceUsd: '9.99',
           icon: '🗡️',
+          image: 'https://dl.amircollider.com/ChronoBlades/GoldenKnife.png',
           badge: 'best',
           grant: { type: 'cosmetic', code: 'GoldenKnife' },
           i18n: {

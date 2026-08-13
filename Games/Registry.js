@@ -566,6 +566,13 @@ export function gameManifest(game, origin) {
       kind: product.kind,
       priceUsd: product.priceUsd,
       icon: product.icon || '',
+
+      // The artwork, absolute so a Unity build can fetch it with
+      // no page to resolve a relative path against - the same
+      // reason `logo` above is absolutised, and through the same
+      // helper so an off-domain URL is left alone.
+      image: absoluteAsset(product.image, base),
+
       badge: product.badge || '',
       durationDays: product.durationDays || 0,
       grant: product.grant || null,
