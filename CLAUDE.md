@@ -618,8 +618,15 @@ nothing else breaks — a confusing hour.
 There is no test suite in the repo. What works:
 
 ```bash
-# 1. Syntax — catches the most common break
-for f in $(find . -name '*.js' -not -path './node_modules/*'); do node --check "$f"; done
+# 1. Syntax — catches the most common break.
+#    Read from STDIN with --input-type=module. `node --check <file>` is NOT
+#    a check for this repository: on a file containing `import`/`export` it
+#    returns 0 whatever the file contains, so a broken module passes. That
+#    false pass is how a Pages/Leaderboard.js that could not be parsed at
+#    all reached the repository on 2026-08-14.
+for f in $(find . -name '*.js' -not -path './node_modules/*' -not -path './.git/*'); do
+  node --input-type=module --check < "$f" >/dev/null 2>&1 || echo "SYNTAX ERROR: $f"
+done
 
 # 2. The inline panel scripts are template literals inside those files.
 #    A stray backtick or ${ inside PANEL_JS / dashClientScript silently
@@ -658,6 +665,11 @@ node --check /tmp/p.js
   outside an `I18N` object.
 - HTML is built with template literals and **always** escaped with
   `escapeHtml()`. Operator input reaches public pages.
+- **Never write a backtick inside one of those template literals** — CSS and
+  comments included. A page's stylesheet is a backtick string, so a comment
+  that quotes a declaration as `` `width:100%` `` ends the string there and the
+  file stops parsing. Quote code in those comments with plain words. Same for
+  a literal `${`.
 - URLs from operator input are validated to `https?://` (or a leading `/` for
   site-local images) before they reach `src` / `href`.
 - Errors degrade: a missing column, an unmigrated database or an unbound

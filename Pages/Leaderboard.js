@@ -282,22 +282,46 @@ function leaderboardCss() {
        markup it always did and none of this matches. */
     .lb-meta{display:flex;align-items:center;gap:14px;flex:none}
 
-    /* The size lives on ONE custom property, and the picture is sized in
-       that property rather than in percentages of its wrapper.
+    /* ---------- how big the held thing is drawn ----------
 
-       Percentages were the bug. `width:100%` on the image resolves against
-       the wrapper's box, so the wrapper losing its own size for any reason
-       - a stylesheet that arrived out of order, a rule that did not match -
-       leaves the image sizing itself from its intrinsic dimensions instead.
-       The knife art is 73x376, so it did not render slightly too big: it
-       rendered at full height, out of the row and across the one below it.
-       An absolute length cannot fail that way, whatever happens to the
-       wrapper. */
+       The knife art is tall and narrow - 73 by 376 - so the size of
+       this box is not a detail. A picture that escapes it does not
+       come out a little too big, it comes out five times the height
+       of the row and draws across the rows above and below.
+
+       BOTH axes are absolute lengths, and that is the whole fix.
+       This rule used to size the picture in percentages of its
+       wrapper (width:100%;height:100% inside a 42px box), which
+       reads as equivalent and is not: the wrapper is a grid whose
+       item is centred rather than stretched, so the percentage
+       HEIGHT resolved to auto while the percentage width resolved to
+       42px - and an auto height on a replaced element comes from its
+       own aspect ratio. 42px wide, 216px tall, measured in Chromium,
+       not deduced. The width looked right the whole time, which is
+       why the rule read as correct.
+
+       max-width / max-height repeat the same length so no future
+       rule can grow one axis without the other, and overflow:clip
+       makes the wrapper the hard limit whatever any of them do: a
+       leaderboard row is a place where a picture may be missing or
+       ugly, and is not a place where a picture may be 216px tall.
+
+       The glow moved from the picture to the wrapper for that clip.
+       A filter is applied to what an element paints AFTER its own
+       overflow has clipped it, so a shadow declared out here still
+       spreads past the 42px edge while the picture inside cannot -
+       the containment costs nothing visible. It also means the light
+       stops turning with the blade: the offset is now the row's, not
+       the picture's, so a spinning knife is lit from above through
+       the whole turn instead of carrying its shadow around with it.
+
+       The size lives on one custom property so the mobile rule below
+       restates one number instead of six. */
     .lb-item{--lb-item:42px;width:var(--lb-item);height:var(--lb-item);flex:none;
-      display:grid;place-items:center}
-    .lb-item img{width:var(--lb-item);height:var(--lb-item);
-      max-width:var(--lb-item);max-height:var(--lb-item);object-fit:contain;display:block;
+      display:grid;place-items:center;overflow:clip;
       filter:drop-shadow(0 5px 12px color-mix(in srgb,var(--accent) 40%,transparent))}
+    .lb-item img{width:var(--lb-item);height:var(--lb-item);
+      max-width:var(--lb-item);max-height:var(--lb-item);object-fit:contain;display:block}
 
 
     .lb-level{flex:none;text-align:center;min-width:46px;line-height:1.15}
