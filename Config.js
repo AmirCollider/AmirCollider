@@ -127,7 +127,7 @@ export const CONFIG = deepFreeze({
   //   https://github.com/AmirCollider/UnityDocSnap/blob/main/package.json
   DOCSNAP: {
     REPO_URL: 'https://github.com/AmirCollider/UnityDocSnap',
-    VERSION: '1.0.2',
+    VERSION: '1.0.3',
     TIERS: {
       plus: { name: 'Plus', price: '19.99', buyUrl: '/checkout?tier=plus' },
       pro: { name: 'Pro', price: '49.99', buyUrl: '/checkout?tier=pro' }
@@ -140,7 +140,7 @@ export const CONFIG = deepFreeze({
   //   https://github.com/AmirCollider/UnityDirectTMP/blob/main/package.json
   DIRECTTMP: {
     REPO_URL: 'https://github.com/AmirCollider/UnityDirectTMP',
-    VERSION: '2.1.10',
+    VERSION: '2.1.13',
     GIT_URL: 'https://github.com/AmirCollider/UnityDirectTMP.git'
   },
 
