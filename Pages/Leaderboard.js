@@ -282,9 +282,23 @@ function leaderboardCss() {
        markup it always did and none of this matches. */
     .lb-meta{display:flex;align-items:center;gap:14px;flex:none}
 
-    .lb-item{width:42px;height:42px;flex:none;display:grid;place-items:center}
-    .lb-item img{width:100%;height:100%;object-fit:contain;display:block;
+    /* The size lives on ONE custom property, and the picture is sized in
+       that property rather than in percentages of its wrapper.
+
+       Percentages were the bug. `width:100%` on the image resolves against
+       the wrapper's box, so the wrapper losing its own size for any reason
+       - a stylesheet that arrived out of order, a rule that did not match -
+       leaves the image sizing itself from its intrinsic dimensions instead.
+       The knife art is 73x376, so it did not render slightly too big: it
+       rendered at full height, out of the row and across the one below it.
+       An absolute length cannot fail that way, whatever happens to the
+       wrapper. */
+    .lb-item{--lb-item:42px;width:var(--lb-item);height:var(--lb-item);flex:none;
+      display:grid;place-items:center}
+    .lb-item img{width:var(--lb-item);height:var(--lb-item);
+      max-width:var(--lb-item);max-height:var(--lb-item);object-fit:contain;display:block;
       filter:drop-shadow(0 5px 12px color-mix(in srgb,var(--accent) 40%,transparent))}
+
 
     .lb-level{flex:none;text-align:center;min-width:46px;line-height:1.15}
     .lb-level-num{display:block;font-weight:800;font-size:1.02em;direction:ltr;unicode-bidi:isolate;
@@ -303,7 +317,7 @@ function leaderboardCss() {
 
     @media (max-width:520px){
       .lb-meta{gap:9px}
-      .lb-item{width:32px;height:32px}
+      .lb-item{--lb-item:32px}
       .lb-level{min-width:34px}
       .lb-row.has-meta .lb-score{min-width:52px}
       .lb-level-tag,.lb-row.has-meta .lb-score span{font-size:.62em}
@@ -338,7 +352,18 @@ function leaderboardCss() {
          The wrapper rises and falls; the picture inside turns. */
       .lb-item.is-spin{animation:lbBob 3.4s ease-in-out infinite;
         animation-delay:calc(.18s * var(--i,0))}
-      .lb-item.is-spin img{animation:lbSpin 7s linear infinite}
+
+      /* A turning picture sweeps a circle as wide as its longest side, so a
+         blade that exactly fills the box spends most of the turn outside it,
+         over the score beside it and the row above. Scaled to fit that
+         circle inside the box instead: 1/root-2, rounded down.
+
+         Inside this media query rather than beside the size rules, because
+         it is the rotation that needs the room. A reader who asked not to be
+         animated gets a still knife at full size. */
+      .lb-item.is-spin img{animation:lbSpin 7s linear infinite;
+        width:calc(var(--lb-item) * .7);height:calc(var(--lb-item) * .7);
+        max-width:calc(var(--lb-item) * .7);max-height:calc(var(--lb-item) * .7)}
     }
     @keyframes lbRise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
     @keyframes lbBob{0%,100%{transform:translateY(-2px)}50%{transform:translateY(2px)}}
