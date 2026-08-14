@@ -52,7 +52,7 @@ import { otherTools } from '../Content/ToolsCatalog.js'
 
 import { escapeHtml } from '../Core/Html.js'
 import { chromeScript, themeBootScript } from '../Core/PageChrome.js'
-import { seoHead, breadcrumbLd, softwareApplicationLd } from '../Core/Seo.js'
+import { seoHead, breadcrumbLd, softwareApplicationLd, faqPageLd, howToLd } from '../Core/Seo.js'
 import { localizedPath } from '../Core/Locale.js'
 import { siteNavCss, siteBreadcrumb, siteFooter, NAV_I18N } from '../Core/SiteNav.js'
 import { langCookieHeader, parseCookies, resolveRequestLang, resolveRequestTheme } from '../Core/RequestContext.js'
@@ -60,7 +60,21 @@ import { langCookieHeader, parseCookies, resolveRequestLang, resolveRequestTheme
 const PLUS = CONFIG.DOCSNAP.TIERS.plus
 const PRO = CONFIG.DOCSNAP.TIERS.pro
 const REPO_URL = CONFIG.DOCSNAP.REPO_URL
+const GIT_URL = CONFIG.DOCSNAP.GIT_URL
 const VERSION = CONFIG.DOCSNAP.VERSION
+
+
+// A string that will sit inside a single-quoted JavaScript literal
+// in an inline handler. Escaping for HTML is not enough there - a
+// quote or a backslash breaks out of the literal rather than out of
+// the attribute.
+function escapeJs(value) {
+  return String(value == null ? '' : value)
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/\r?\n/g, '\\n')
+    .replace(/</g, '\\u003c')
+}
 
 
 // ==========================================
@@ -108,18 +122,50 @@ const I18N = {
     langName: 'فارسی',
 
     title: 'Unity DocSnap',
-    tagline: 'کل پروژه‌ی یونیتی‌ات را بکن یک وب‌سایت آفلاین — برای آدم‌ها و برای هوش مصنوعی.',
-    lede: 'هر سین را می‌گردد — هر گیم‌آبجکت، هر کامپوننت، هر فیلد، هر رفرنس — و هر پوشه‌ی اسست را با تنظیمات ایمپورتش، و همه را می‌پزد توی یک سایت HTML تمیز که با دابل‌کلیک باز می‌شود. بدون سرور، بدون بیلد.',
+    tagline: 'مستندسازی خودکار پروژه‌ی یونیتی — کل پروژه، توی یک وب‌سایت آفلاین.',
+    lede: 'یک ابزار مستندسازی برای یونیتی. هر سین را می‌گردد — هر گیم‌آبجکت، هر کامپوننت، هر فیلد سریالایزشده، هر رفرنس — و هر پوشه‌ی اسست را با تنظیمات ایمپورتش، و همه را می‌پزد توی یک وب‌سایت HTML آفلاین که با دابل‌کلیک باز می‌شود. بدون سرور، بدون بیلد، بدون اینترنت. هم برای اینکه خودت یادت بماند چه ساخته‌ای، هم به‌عنوان یک بک‌آپ خوانا از ساختار پروژه، هم برای اینکه کل پروژه را یک‌جا بدهی دست یک دستیار هوش مصنوعی.',
+
+    // The one-line answer to "what IS this". Deliberately uses the
+    // category noun rather than the product name.
+    whatis: 'یک افزونه‌ی یونیتی (نصب از Package Manager) که از پروژه‌ات مستندات HTML آفلاین می‌سازد.',
+
     ctaFree: 'رایگان شروع کن',
     ctaPrices: 'قیمت‌ها را ببین',
     priceNote: 'خرید یک‌باره · یک سیستم · بدون اشتراک ماهانه',
 
     sectionWhat: 'چه‌کار می‌کند',
+    sectionIs: 'دقیقاً چه هست و چه نیست',
     sectionVideos: 'ببین چطور کار می‌کند',
     sectionCompare: 'مقایسه‌ی نسخه‌ها',
     sectionSpotlight: 'چیزی که بیشترین آدم برایش پول می‌دهد',
+    sectionInstall: 'نصب و دانلود',
     sectionPricing: 'قیمت',
     sectionFaq: 'سؤال‌های پرتکرار',
+
+    isLede: 'اسم ابزار باعث سوءتفاهم می‌شود، پس صریح می‌نویسیم:',
+    isTitle: 'چه هست',
+    isList: [
+      'یک مستندساز: داده‌های واقعی پروژه را می‌خواند — سین‌ها، کامپوننت‌ها، فیلدهای سریالایزشده، رفرنس‌ها، تنظیمات ایمپورت — و از روی آن‌ها یک سایت می‌سازد.',
+      'یک عکس لحظه‌ای از ساختار پروژه، که نگهش می‌داری و بعداً با خروجی جدیدتر مقایسه‌اش می‌کنی.',
+      'یک راه برای دادن کل پروژه به یک دستیار هوش مصنوعی، در یک فایل.',
+      'کاملاً Editor-only و آفلاین: نه چیزی به بیلدت اضافه می‌کند، نه نسخه‌ی رایگانش اصلاً به شبکه وصل می‌شود.'
+    ],
+    isNotTitle: 'چه نیست',
+    isNotList: [
+      'ابزار اسکرین‌شات نیست. هیچ‌وقت از پنجره‌های یونیتی عکس نمی‌گیرد. (می‌تواند از تصاویر پروژه‌ات پیش‌نمایش PNG کوچک بسازد — گزینه‌ای که می‌شود خاموشش کرد.)',
+      'ضبط‌کننده‌ی ویدیو یا گیم‌پلی نیست.',
+      'سیستم کنترل نسخه نیست و جای Git را نمی‌گیرد.',
+      'مستندساز API مثل Doxygen نیست؛ چیزی که مستند می‌کند محتوای سین‌ها و اسست‌هاست، نه سطح API کد سی‌شارپت.'
+    ],
+
+    installLede: 'نسخه‌ی رایگان هیچ کدی نمی‌خواهد. همین آدرس را توی Package Manager بچسبان و تمام.',
+    installStep1: 'برو به Window ← Package Manager',
+    installStep2: 'کلیک کن روی + ← Add package from git URL…',
+    installStep3: 'این آدرس را بچسبان و Add را بزن:',
+    installStep4: 'تمام — منوی Unity DocSnap بالای یونیتی اضافه می‌شود.',
+    installAlt: 'یا ریپازیتوری را دانلود کن و پوشه‌ی Editor/UnityDocSnap را (همراه زیرپوشه‌ی ~Site) داخل Assets پروژه‌ات کپی کن.',
+    copy: 'کپی',
+    copied: 'کپی شد',
 
     videoLede: (count, total) =>
       `${count} کلیپ کوتاه، در مجموع ${total} — هر کدام یک کار را نشان می‌دهد، بدون مقدمه.`,
@@ -194,18 +240,50 @@ const I18N = {
     langName: 'English',
 
     title: 'Unity DocSnap',
-    tagline: 'Snap your whole Unity project into an offline website — for humans and AI alike.',
-    lede: 'It walks every Scene — every GameObject, every Component, every field, every reference — and every Asset folder with its import settings, then bakes all of it into a clean HTML site you open by double-clicking. No server, no build step.',
+    tagline: 'Automatic Unity project documentation — your whole project as an offline website.',
+    lede: 'A documentation generator for Unity. It walks every Scene — every GameObject, every Component, every serialized field, every reference — and every Asset folder with its import settings, then bakes all of it into an offline HTML website you open by double-clicking. No server, no build step, no internet. Read it to remember what you built, keep it as a legible backup of how the project is put together, or hand the whole thing to an AI assistant at once.',
+
+    // The one-line answer to "what IS this". Deliberately uses the
+    // category noun rather than the product name.
+    whatis: 'A Unity Editor extension (installed from the Package Manager) that generates offline HTML documentation of your project.',
+
     ctaFree: 'Start free',
     ctaPrices: 'See pricing',
     priceNote: 'One-off purchase · one machine · no subscription',
 
     sectionWhat: 'What it does',
+    sectionIs: 'What it is, and what it is not',
     sectionVideos: 'See it work',
     sectionCompare: 'Compare the editions',
     sectionSpotlight: 'What most people pay for',
+    sectionInstall: 'Install and download',
     sectionPricing: 'Pricing',
     sectionFaq: 'Common questions',
+
+    isLede: 'The name invites one particular misunderstanding, so plainly:',
+    isTitle: 'What it is',
+    isList: [
+      'A documentation generator: it reads your project’s real data — Scenes, Components, serialized fields, references, import settings — and builds a website out of it.',
+      'A snapshot of how the project is structured, which you keep and later diff against a newer export.',
+      'A way to hand an AI assistant your whole project in a single file.',
+      'Entirely Editor-only and offline: nothing is added to your build, and the free edition never touches the network at all.'
+    ],
+    isNotTitle: 'What it is not',
+    isNotList: [
+      'It is not a screenshot tool. It never photographs your Editor windows. (It can write small PNG previews of your image assets — an option you can switch off.)',
+      'It is not a video or gameplay recorder.',
+      'It is not version control, and it does not replace Git.',
+      'It is not an API documentation generator like Doxygen — it documents what is inside your Scenes and Assets, not your C# API surface.'
+    ],
+
+    installLede: 'The free edition needs no key at all. Paste this into the Package Manager and you are done.',
+    installStep1: 'Open Window → Package Manager',
+    installStep2: 'Click + → Add package from git URL…',
+    installStep3: 'Paste this and press Add:',
+    installStep4: 'Done — a Unity DocSnap menu appears in Unity’s top menu bar.',
+    installAlt: 'Or download the repository and copy the Editor/UnityDocSnap folder — including its Site~ sub-folder — into your project’s Assets folder.',
+    copy: 'Copy',
+    copied: 'Copied',
 
     videoLede: (count, total) =>
       `${count} short clips, ${total} in total — each one shows a single thing, with no preamble.`,
@@ -280,18 +358,50 @@ const I18N = {
     langName: '日本語',
 
     title: 'Unity DocSnap',
-    tagline: 'Unity プロジェクト全体を、オフラインの Web サイトに。人にも AI にも読める形で。',
-    lede: 'すべてのシーン(GameObject、コンポーネント、フィールド、参照)と、すべてのアセットフォルダのインポート設定を走査し、ダブルクリックで開ける HTML サイトに焼き込みます。サーバーもビルド手順も不要です。',
+    tagline: 'Unity プロジェクトのドキュメントを自動生成 — まるごとオフライン Web サイトに。',
+    lede: 'Unity 用のドキュメント生成ツールです。すべてのシーン(GameObject、コンポーネント、シリアライズ済みフィールド、参照)と、すべてのアセットフォルダのインポート設定を走査し、ダブルクリックで開けるオフライン HTML サイトに書き出します。サーバーもビルド手順もインターネットも不要です。自分が何を作ったか思い出すためにも、プロジェクト構成の読めるバックアップとしても、AI アシスタントにまるごと渡すためにも使えます。',
+
+    // The one-line answer to "what IS this". Deliberately uses the
+    // category noun rather than the product name.
+    whatis: 'プロジェクトのオフライン HTML ドキュメントを生成する Unity エディタ拡張(Package Manager からインストール)。',
+
     ctaFree: '無料ではじめる',
     ctaPrices: '価格を見る',
     priceNote: '買い切り · 1 台まで · サブスクリプションなし',
 
     sectionWhat: 'できること',
+    sectionIs: '何であって、何ではないか',
     sectionVideos: '動作を見る',
     sectionCompare: 'エディション比較',
     sectionSpotlight: '最も選ばれている理由',
+    sectionInstall: '導入とダウンロード',
     sectionPricing: '価格',
     sectionFaq: 'よくある質問',
+
+    isLede: '名前から誤解されやすいので、はっきり書いておきます。',
+    isTitle: 'これは',
+    isList: [
+      'ドキュメント生成ツールです。シーン、コンポーネント、シリアライズ済みフィールド、参照、インポート設定といった実データを読み取り、Web サイトとして書き出します。',
+      'プロジェクト構成のスナップショットです。保存しておき、後日のエクスポートとの差分を取れます。',
+      'AI アシスタントにプロジェクト全体を 1 ファイルで渡す手段です。',
+      '完全にエディタ専用かつオフラインです。ビルドには何も追加されず、無料版はネットワークに一切接続しません。'
+    ],
+    isNotTitle: 'これではありません',
+    isNotList: [
+      'スクリーンショットツールではありません。エディタのウィンドウを撮影することは一切ありません(画像アセットの小さな PNG プレビューは生成できますが、オフにできます)。',
+      '動画やゲームプレイの録画ツールではありません。',
+      'バージョン管理システムではなく、Git の代わりにもなりません。',
+      'Doxygen のような API ドキュメント生成ツールではありません。文書化するのはシーンとアセットの中身であり、C# の API ではありません。'
+    ],
+
+    installLede: '無料版にキーは不要です。この URL を Package Manager に貼り付けるだけで使えます。',
+    installStep1: 'Window → Package Manager を開く',
+    installStep2: '+ → Add package from git URL… をクリック',
+    installStep3: 'これを貼り付けて Add:',
+    installStep4: '完了です。Unity のメニューバーに Unity DocSnap が追加されます。',
+    installAlt: 'または、リポジトリをダウンロードし、Editor/UnityDocSnap フォルダを(Site~ サブフォルダを含めて)プロジェクトの Assets フォルダにコピーしてください。',
+    copy: 'コピー',
+    copied: 'コピーしました',
 
     videoLede: (count, total) =>
       `短いクリップ ${count} 本、合計 ${total}。前置きなしで 1 本につき 1 つの機能を紹介します。`,
@@ -674,6 +784,99 @@ function renderWhat(p, lang) {
 
 
 // ==========================================
+// renderIsIsNot
+//
+// The section that exists because of a real, observed failure:
+// handed this page's URL, a search engine classified Unity
+// DocSnap as a tool for taking automatic screenshots of the
+// Unity Editor. That reading is not unreasonable from the
+// outside - the product is called DocSnap, the tagline said
+// "snap", and the version history calls its exports snapshots.
+// Three separate nudges toward a camera, and nothing anywhere
+// on the page saying the word "documentation" in a sentence a
+// machine could take as a definition.
+//
+// So the definition is now written out, and the wrong reading
+// is denied by name. A crawler that reads one block of this
+// page reads this one; a human who is not sure what they are
+// looking at gets the same answer in the same place.
+//
+// The parenthetical about PNG previews is deliberate. Thumbnails
+// ARE written by default, and a flat "it produces no images"
+// would be the kind of tidy claim somebody disproves ten minutes
+// after installing - which costs more trust than the ambiguity
+// it was meant to buy.
+// ==========================================
+function renderIsIsNot(p) {
+  const yes = p.isList
+    .map(item => '<li>' + escapeHtml(item) + '</li>').join('')
+  const no = p.isNotList
+    .map(item => '<li>' + escapeHtml(item) + '</li>').join('')
+
+  return `
+    <section class="sec reveal">
+      <h2 class="section">${escapeHtml(p.sectionIs)}</h2>
+      <p class="fine">${escapeHtml(p.isLede)}</p>
+      <div class="isgrid stagger">
+        <div class="card is-yes lift">
+          <h3><span aria-hidden="true">✓</span> ${escapeHtml(p.isTitle)}</h3>
+          <ul class="islist">${yes}</ul>
+        </div>
+        <div class="card is-no lift">
+          <h3><span aria-hidden="true">✕</span> ${escapeHtml(p.isNotTitle)}</h3>
+          <ul class="islist">${no}</ul>
+        </div>
+      </div>
+    </section>`
+}
+
+
+// ==========================================
+// renderInstall
+//
+// The download link this page did not have. It linked to the
+// repository three times and never once printed the string the
+// Package Manager actually wants - and pasting the browser URL
+// into that dialog fails with an unhelpful error, so "there is a
+// GitHub link, work it out" was not a route anybody completed.
+//
+// Placed before pricing on purpose: the free edition is the whole
+// exporter, so the first thing a reader should be able to do is
+// install it. A price above an unexplained download is a bounce,
+// and a price above an IMPOSSIBLE download is worse.
+// ==========================================
+function renderInstall(p) {
+  return `
+    <section class="sec reveal">
+      <h2 class="section" id="install">${escapeHtml(p.sectionInstall)}</h2>
+      <p class="fine">${escapeHtml(p.installLede)}</p>
+      <div class="card install-card">
+        <ol class="steps">
+          <li><span>${escapeHtml(p.installStep1)}</span></li>
+          <li><span>${escapeHtml(p.installStep2)}</span></li>
+          <li>
+            <span>
+              ${escapeHtml(p.installStep3)}
+              <span class="copy-row">
+                <code class="copy-url" id="gitUrl">${escapeHtml(GIT_URL)}</code>
+                <button type="button" class="copy-btn" id="copyBtn"
+                        data-copied="${escapeHtml(p.copied)}"
+                        onclick="acCopy('${escapeJs(GIT_URL)}')">${escapeHtml(p.copy)}</button>
+              </span>
+            </span>
+          </li>
+          <li><span>${escapeHtml(p.installStep4)}</span></li>
+        </ol>
+        <p class="fine install-alt">${escapeHtml(p.installAlt)}</p>
+        <a class="btn ghost" href="${escapeHtml(REPO_URL)}" rel="noopener">
+          ${icon('download')}<span>${escapeHtml(p.tierFreeCta)}</span>
+        </a>
+      </div>
+    </section>`
+}
+
+
+// ==========================================
 // The poster frame
 //
 // A <video> with nothing loaded paints its background - which on
@@ -966,6 +1169,86 @@ function renderShelf(lang) {
 
 
 // ==========================================
+// Search metadata
+//
+// Every term below has a matching section of real content on the
+// page. That rule is what keeps this list honest, and it is also
+// what makes it work: a term with nothing behind it is a term the
+// page loses on anyway.
+//
+// The list leans hard on two words the page previously never said
+// in a form a machine could use - DOCUMENTATION and BACKUP. The
+// product is called DocSnap, its tagline said "snap", and its
+// version history calls exports snapshots; read cold, all three
+// point at a camera, and a search engine duly filed this as a tool
+// for taking screenshots of the Unity Editor. The fix is not a
+// cleverer sentence, it is naming the category outright, here and
+// in featureList and in the is/is-not section.
+// ==========================================
+const KEYWORDS = {
+  fa: [
+    'مستندسازی پروژه یونیتی', 'مستند سازی پروژه', 'بک آپ پروژه یونیتی',
+    'داکیومنت پروژه یونیتی', 'ابزار مستندسازی یونیتی', 'خروجی HTML پروژه یونیتی',
+    'لیست گیم آبجکت های سین', 'گزارش سلامت پروژه یونیتی', 'اسکریپت گم شده یونیتی',
+    'دادن پروژه یونیتی به هوش مصنوعی', 'افزونه ادیتور یونیتی', 'Unity DocSnap'
+  ],
+  en: [
+    'Unity project documentation', 'Unity documentation generator', 'Unity project backup',
+    'document Unity scenes', 'export Unity hierarchy', 'Unity scene documentation tool',
+    'Unity missing scripts report', 'Unity broken references', 'offline HTML project docs',
+    'give Unity project to AI', 'Unity editor extension', 'Unity DocSnap'
+  ],
+  ja: [
+    'Unity ドキュメント 自動生成', 'Unity プロジェクト ドキュメント', 'Unity プロジェクト バックアップ',
+    'Unity シーン 一覧 出力', 'Unity 階層 エクスポート', 'Unity 欠落スクリプト 検出',
+    'Unity 壊れた参照', 'オフライン HTML ドキュメント', 'Unity プロジェクトを AI に渡す',
+    'Unity エディタ拡張', 'Unity DocSnap'
+  ]
+}
+
+// What the tool does, in the vocabulary a machine indexes rather
+// than the vocabulary a headline is written in.
+const FEATURE_LIST = {
+  fa: [
+    'مستندسازی خودکار همه‌ی سین‌ها: سلسله‌مراتب کامل، هر کامپوننت و هر فیلد سریالایزشده',
+    'تبدیل رفرنس‌ها به لینک قابل کلیک بین آبجکت‌ها و اسست‌ها',
+    'خروجی وب‌سایت HTML آفلاین و خودکفا، بدون سرور و بدون بیلد',
+    'گزارش سلامت پروژه: اسکریپت‌های گم‌شده و رفرنس‌های شکسته با مسیر دقیق',
+    'مستندسازی تنظیمات ایمپورت پوشه‌های اسست',
+    'جست‌وجوی تمام‌متن و صفحه‌ی پکیج‌ها',
+    'خلاصه‌ی ساختارمند مارک‌داون و جیسون برای دستیارهای هوش مصنوعی',
+    'صفحه‌ی تغییرات بین دو خروجی',
+    'بک‌آپ ‎.unitypackage از کل پروژه',
+    'اتوماسیون CI از طریق DocSnapAPI و ‎-executeMethod'
+  ],
+  en: [
+    'Automatic documentation of every Scene: full hierarchy, every Component, every serialized field',
+    'References turned into clickable links between objects and assets',
+    'Self-contained offline HTML website output, with no server and no build step',
+    'Project health report: missing scripts and broken references with their exact paths',
+    'Documents the import settings of every Asset folder',
+    'Full-text search and a packages page',
+    'Structured Markdown and JSON summaries for AI assistants',
+    'A Changes page diffing two exports',
+    'Whole-project .unitypackage backup',
+    'CI automation through DocSnapAPI and -executeMethod'
+  ],
+  ja: [
+    'すべてのシーンを自動文書化:完全な階層、全コンポーネント、全シリアライズ済みフィールド',
+    'オブジェクトとアセットの間の参照をクリック可能なリンクに変換',
+    'サーバーもビルド手順も不要な自己完結型オフライン HTML サイトを出力',
+    'プロジェクトのヘルスレポート:欠落スクリプトと壊れた参照を正確なパス付きで表示',
+    'アセットフォルダのインポート設定を文書化',
+    '全文検索とパッケージページ',
+    'AI アシスタント向けの構造化された Markdown / JSON 要約',
+    '2 つのエクスポートを比較する変更ページ',
+    'プロジェクト全体の .unitypackage バックアップ',
+    'DocSnapAPI と -executeMethod による CI 自動化'
+  ]
+}
+
+
+// ==========================================
 // Page
 // ==========================================
 function renderPage(lang, theme) {
@@ -993,16 +1276,48 @@ function renderPage(lang, theme) {
     description: p.lede,
     lang,
     type: 'product',
+    keywords: KEYWORDS[lang] || KEYWORDS.en,
     graph: [
       breadcrumbLd(trail, lang),
       softwareApplicationLd({
         name: 'Unity DocSnap',
+        alternateName: ['DocSnap', 'Unity Doc Snap'],
         description: p.lede,
         path: '/unity-docsnap',
         version: VERSION,
-        price: CONFIG.DOCSNAP.TIERS.plus.price,
-        repo: REPO_URL
-      })
+
+        // All three editions, cheapest first. Quoting only the Plus
+        // price - which is what this node used to do - hid the fact
+        // that the whole exporter is free, on the one surface where
+        // a reader cannot see the pricing table.
+        offers: [
+          { name: p.tierFreeName, price: '0', url: '/unity-docsnap' },
+          { name: p.tierPlusName, price: PLUS.price, url: PLUS.buyUrl },
+          { name: p.tierProName, price: PRO.price, url: PRO.buyUrl }
+        ],
+
+        repo: REPO_URL,
+        downloadUrl: REPO_URL,
+        installUrl: GIT_URL,
+        softwareHelp: REPO_URL + '#readme',
+        featureList: FEATURE_LIST[lang] || FEATURE_LIST.en,
+        keywords: KEYWORDS[lang] || KEYWORDS.en,
+        requirements: 'Unity 2021.3 LTS or newer',
+        inLanguage: ['fa', 'en', 'ja'],
+
+        // The category noun, said to the crawler in its own field
+        // rather than hoped for out of the prose.
+        subCategory: 'Unity Editor Extension, Documentation Generator'
+      }),
+      howToLd({
+        name: p.sectionInstall,
+        description: p.installLede,
+        path: '/unity-docsnap',
+        lang,
+        tool: 'Unity Package Manager',
+        steps: [p.installStep1, p.installStep2, p.installStep3 + ' ' + GIT_URL, p.installStep4]
+      }),
+      faqPageLd(p.faq, lang)
     ]
   })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1028,9 +1343,11 @@ function renderPage(lang, theme) {
     <main id="main">
       ${renderHero(p)}
       ${renderWhat(p, lang)}
+      ${renderIsIsNot(p)}
       ${renderVideos(p, lang)}
       ${renderSpotlight(p)}
       ${renderCompare(p, lang)}
+      ${renderInstall(p)}
       ${renderPricing(p, lang)}
       ${renderFaq(p)}
       ${renderShelf(lang)}
@@ -1515,6 +1832,63 @@ function css() {
     .quiet { color: var(--text-dim); font-size: 0.9em; text-decoration: none; }
     .quiet:hover { color: var(--text); }
 
+    /* ---------- what it is / is not ----------
+       Two columns of the same weight. The denial is not a footnote
+       in small grey text: it is half the block, because the wrong
+       reading of this product is the one a stranger arrives with. */
+    .isgrid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+      margin-block-start: 16px;
+    }
+    @media (max-width: 760px) { .isgrid { grid-template-columns: 1fr; } }
+    .isgrid .card h3 {
+      display: flex; align-items: center; gap: 9px;
+      font-family: var(--font-display); font-size: 1.05em; font-weight: 800;
+      margin-block-end: 10px;
+    }
+    .card.is-yes { border-color: color-mix(in srgb, var(--ok) 42%, var(--border)); }
+    .card.is-yes h3 { color: color-mix(in srgb, var(--ok) 72%, var(--text)); }
+    .card.is-no { border-color: color-mix(in srgb, var(--coral) 40%, var(--border)); }
+    .card.is-no h3 { color: color-mix(in srgb, var(--coral) 74%, var(--text)); }
+    .islist { list-style: none; display: grid; gap: 9px; }
+    .islist li {
+      position: relative; padding-inline-start: 16px;
+      font-size: 0.9em; color: var(--text-dim); line-height: 1.7;
+    }
+    .islist li::before {
+      content: ''; position: absolute; inset-inline-start: 0; inset-block-start: 11px;
+      width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.4;
+    }
+
+    /* ---------- install ---------- */
+    .install-card { margin-block-start: 16px; }
+    .steps { list-style: none; counter-reset: step; display: grid; gap: 13px; }
+    .steps li { display: flex; align-items: flex-start; gap: 12px; }
+    .steps li::before {
+      counter-increment: step; content: counter(step);
+      flex: none; width: 26px; height: 26px; border-radius: 50%;
+      display: grid; place-items: center; font-size: 0.8em; font-weight: 800;
+      color: #fff; margin-block-start: 3px;
+      background: linear-gradient(135deg, ${LAV}, ${LAV_SOFT});
+    }
+    .copy-row { display: flex; align-items: stretch; gap: 8px; margin-block-start: 10px; flex-wrap: wrap; }
+    .copy-url {
+      flex: 1 1 300px; min-width: 0; font-family: var(--font-mono);
+      font-size: 0.84em; padding: 11px 14px; border-radius: var(--radius-sm);
+      direction: ltr; text-align: start;
+      background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+      overflow-x: auto; white-space: nowrap;
+    }
+    .copy-btn {
+      appearance: none; cursor: pointer; font: inherit; font-weight: 700; font-size: 0.85em;
+      padding: 11px 19px; border-radius: var(--radius-sm); border: 1px solid transparent;
+      color: #fff; flex: none;
+      background: linear-gradient(135deg, ${LAV}, ${LAV_SOFT});
+      transition: filter .18s ease;
+    }
+    .copy-btn:hover { filter: brightness(1.08); }
+    .install-alt { margin-block: 16px 14px; }
+
     /* ---------- faq ---------- */
     .faq {
       background: var(--surface); border: 1px solid var(--border);
@@ -1694,6 +2068,42 @@ function script(lang, p) {
   const data = videoData(lang)
 
   return `
+    // ==========================================
+    // Copy the package URL
+    //
+    // The clipboard API needs a secure context and a user gesture,
+    // and refuses in a few embedded browsers even with both. The
+    // fallback selects the URL so a person can copy it themselves,
+    // rather than pressing a button that silently does nothing.
+    // ==========================================
+    (function () {
+      function acSelectUrl() {
+        var el = document.getElementById('gitUrl');
+        if (!el || !window.getSelection || !document.createRange) return;
+        var range = document.createRange();
+        range.selectNodeContents(el);
+        var selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+
+      window.acCopy = function (text) {
+        var btn = document.getElementById('copyBtn');
+        var done = function () {
+          if (!btn) return;
+          var original = btn.textContent;
+          btn.textContent = btn.getAttribute('data-copied') || 'Copied';
+          setTimeout(function () { btn.textContent = original; }, 1600);
+        };
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(done, acSelectUrl);
+        } else {
+          acSelectUrl();
+        }
+      };
+    })();
+
     // ==========================================
     // Reveal on scroll
     //

@@ -1,32 +1,44 @@
 // ==========================================
 // Pages/UnityDirectTmp.js
-// The Unity DirectTMP product page: what the tool does,
-// what it costs (nothing), and how to install it.
+// The Unity DirectTMP product page: what the tool fixes,
+// what it costs (nothing), how to install it, and what it
+// deliberately does not do.
 //
 // Public entry:
 //   handleUnityDirectTmp(url, request, gameId, requestId, GAMES, env)
 //
-//   • The problem comes before the product. Somebody arriving
-//     cold does not know what tofu is, and "hand TextMeshPro
-//     the font file itself" means nothing until you have seen
-//     the row of empty boxes it prevents. So the page opens
-//     with □□□□□ rendered as literal boxes, next to the same
-//     text set properly.
+// ---------------------------------------------------------------
+// Why this page was rewritten, 2026-08-14
 //
-//   • The Editor-font feature gets its own section rather than
-//     a bullet. It is the thing 1.0 added, it is the thing no
-//     other TextMeshPro package does, and it is the thing
-//     somebody with a Persian or Japanese project searches for
-//     without knowing it exists.
+// It described a product that no longer exists. The page led on
+// "Editor Font — New in 1.0" and gave a whole section to the Font
+// Catalog and its coverage badges. Version 2.0.0 removed both, along
+// with nine other windows and about 18,000 lines: read the Removed
+// block of that release. The page was selling eleven things the
+// package had deliberately stopped doing.
 //
-//   • "Free" is stated where a price would be, not buried in a
-//     licence line. A developer looking at a Unity tool page
-//     assumes a price until told otherwise, and the assumption
-//     costs the click.
+// Worse, its FAQ answered "Does Persian text join up properly?" with
+// "contextual shaping is still on the roadmap". That has been the
+// package's headline feature since 2.0.0 - joined shapes read out of
+// the font's own GSUB table and diffed glyph-for-glyph against
+// HarfBuzz across five faces. The one page on the internet whose job
+// is to say the tool fixes Persian was telling every reader, and
+// every crawler, that it does not.
 //
-//   • The install snippet is one copyable line. The Package
-//     Manager git-URL flow is four clicks and one paste, and
-//     the paste is the part a page can actually help with.
+// That is also the whole SEO story here. Somebody with this problem
+// searches for the SYMPTOM - "unity persian text not joining",
+// "مشکل فارسی در یونیتی", "Unity 日本語 豆腐" - never for a package
+// name they have never heard. So the symptoms are on the page, in
+// the words people actually type, in all three languages, as real
+// content rather than as a keyword list. The specimen block renders
+// the three broken states from actual text so the page proves the
+// claim instead of asserting it.
+//
+// Every factual claim below is traceable to the shipping package:
+// README.md, package.json and CHANGELOG.md of UnityDirectTMP 2.1.13.
+// The honest-limits section exists because a tool page that only
+// lists wins is a tool page nobody believes twice.
+// ---------------------------------------------------------------
 //
 // Trilingual and theme-aware like every other page here.
 // ==========================================
@@ -38,7 +50,7 @@ import { otherTools } from '../Content/ToolsCatalog.js'
 
 import { escapeHtml } from '../Core/Html.js'
 import { chromeScript, themeBootScript } from '../Core/PageChrome.js'
-import { seoHead, breadcrumbLd, softwareApplicationLd } from '../Core/Seo.js'
+import { seoHead, breadcrumbLd, softwareApplicationLd, faqPageLd, howToLd } from '../Core/Seo.js'
 import { localizedPath } from '../Core/Locale.js'
 import { siteNavCss, siteBreadcrumb, siteFooter, NAV_I18N } from '../Core/SiteNav.js'
 import { langCookieHeader, parseCookies, resolveLang, resolveRequestLang, resolveRequestTheme } from '../Core/RequestContext.js'
@@ -50,6 +62,9 @@ const VERSION = CONFIG.DIRECTTMP.VERSION
 
 // ==========================================
 // The Inkwell palette.
+// The same six values as DirectTMPConstants.cs and the README
+// badges, so the package and the page that sells it are
+// recognisably one product.
 // ==========================================
 const INK = '#14808C'
 const INK_DEEP = '#0B5A63'
@@ -57,6 +72,45 @@ const BRASS = '#F0A73E'
 const PAPER = '#FBF6EC'
 const BLUSH = '#E8927C'
 const NIGHT = '#1B1725'
+
+
+// ==========================================
+// The specimen
+//
+// One Persian sentence, rendered four ways, is the entire
+// argument of this page. It is a specimen rather than UI text,
+// so it is NOT translated - the Japanese reader is being shown
+// what Persian does, and translating the sample would destroy
+// the thing being demonstrated. The labels around it are
+// translated; the sample is not.
+//
+// The three broken states are produced from the same string
+// rather than screenshotted, which means they cannot go stale
+// and they survive at any zoom level in any theme:
+//
+//   tofu      every character replaced with U+25A1, which is
+//             literally what a font with no glyph for it draws
+//   unjoined  a zero-width non-joiner between every character,
+//             which stops the browser's own shaper from joining
+//             exactly the way a missing GSUB lookup does
+//   reversed  unjoined, plus CSS bidi-override, which forces
+//             memory order onto the screen left-to-right - the
+//             precise failure somebody means by "my Persian
+//             comes out backwards"
+// ==========================================
+const SPECIMEN_FA = 'سلام، دنیا'
+const SPECIMEN_MIX = '日本語 · 中文 · 한국어 · Кириллица · ไทย · 😀'
+const ZWNJ = '‌'
+
+function tofu(text) {
+  return Array.from(String(text))
+    .map(character => (/\s/.test(character) ? ' ' : '□'))
+    .join('')
+}
+
+function unjoined(text) {
+  return Array.from(String(text)).join(ZWNJ)
+}
 
 
 // ==========================================
@@ -71,65 +125,131 @@ const I18N = {
     langName: 'فارسی',
 
     title: 'Unity DirectTMP',
-    tagline: 'فایل فونت رو مستقیم بده به TextMeshPro — هر زبونی، همون‌جوری که هست.',
-    lede: 'به‌جای فونت‌اسِت SDF از پیش پخته‌شده، خودِ فایل .ttf یا .otf رو به TextMeshPro می‌ده. گلیف‌ها همون لحظه‌ای که قراره کشیده بشن از فایل ساخته می‌شن، پس فارسی، عربی، ژاپنی، چینی و کره‌ای بدون هیچ تنظیمی رندر می‌شن.',
-    priceBadge: 'رایگان · MIT · بدون کد لایسنس',
+    tagline: 'حل مشکل متن فارسی و عربی در یونیتی — حروف چسبیده، ترتیب راست‌به‌چپ.',
+    lede: 'یک افزونه‌ی رایگان و متن‌باز برای یونیتی که مشکل نمایش متن راست‌به‌چپ را در TextMeshPro حل می‌کند: فارسی، عربی و اردو با حروف چسبیده و به ترتیب درست خوانده می‌شوند. فقط کافی است فایل .ttf یا .otf را روی لیبل بگذاری — نه Font Asset Creator، نه انتخاب رِنج کاراکتر. ژاپنی، چینی، کره‌ای، سیریلیک، تایلندی و ایموجی هم بدون هیچ تنظیمی کار می‌کنند.',
+
+    // The one-line answer to "what IS this", for the machine
+    // summary and for the reader who scanned nothing else.
+    whatis: 'یک پکیج یونیتی (نصب از Package Manager) برای درست‌کردن متن چندزبانه در TextMeshPro.',
+
+    priceBadge: 'رایگان · متن‌باز · لایسنس MIT · بدون کد لایسنس',
+    badgeUnity: 'یونیتی ۲۰۲۱.۳ به بالا',
+    badgeVersion: 'نسخه‌ی ' + VERSION,
     ctaInstall: 'نصبش کن',
-    ctaRepo: 'گیت‌هاب',
+    ctaRepo: 'سورس روی گیت‌هاب',
 
-    problemTitle: 'مشکل، در یک تصویر',
-    problemBody: 'یه فونت پیدا می‌کنی، می‌ندازیش توی یونیتی، یه ساعت توی Font Asset Creator رِنج کاراکترها رو انتخاب می‌کنی — و همین که یه بازیکن اسم خودش رو فارسی تایپ می‌کنه، این رو می‌بینی:',
-    problemBad: 'سلام دنیا',
-    problemGood: 'سلام دنیا',
-    problemBadLabel: 'با فونت‌اسِت پخته‌شده',
-    problemGoodLabel: 'با DirectTMP',
-    problemAfter: 'فایل فونت از قبل دقیقاً می‌دونه چه گلیف‌هایی داره. DirectTMP فقط دست از این برداشته که وانمود کنه نمی‌دونه.',
+    // ---- symptoms ----
+    symptomsEyebrow: 'اگر این‌ها برایت آشناست',
+    symptomsTitle: 'مشکلی که این افزونه حل می‌کند',
+    symptomsLede: 'اگر توی یونیتی دنبال حل یکی از این‌ها بوده‌ای، همین صفحه جواب است:',
+    symptoms: [
+      'متن فارسی در یونیتی به‌صورت مربع خالی (□□□) نشان داده می‌شود',
+      'حروف فارسی به هم نمی‌چسبند و جدا جدا در می‌آیند: س ل ا م',
+      'جمله‌ی فارسی برعکس و از چپ به راست خوانده می‌شود',
+      'توی Font Asset Creator رِنج کاراکتر انتخاب می‌کنی و باز هم یک حرف کم می‌آید',
+      'اسم بازیکن وقتی فارسی تایپ می‌شود خراب در می‌آید',
+      'متن ژاپنی، چینی یا کره‌ای اصلاً نمایش داده نمی‌شود',
+      'OutLine را روی یک لیبل تنظیم می‌کنی و روی همه‌ی لیبل‌های آن فونت می‌افتد'
+    ],
 
-    editorTitle: 'و روی خودِ یونیتی هم اثر می‌ذاره',
-    editorBadge: 'تازه در ۱.۰',
-    editorBody: 'یه GameObject رو «敵スポーナー» اسم بذار یا یه پوشه رو «فونت‌ها» — یونیتی درست ذخیره‌ش می‌کنه و بعد تا ابد بهت مربع خالی نشون می‌ده. اسست سالمه؛ رابط خودِ یونیتی با فونت خودِ یونیتی کشیده می‌شه و هیچ پکیج TextMeshPro ای تا حالا بهش دست نزده بود.',
-    editorBody2: 'از مسیر Unity DirectTMP ▸ Editor Font می‌تونی نوار منو، Hierarchy، Inspector، پنجره‌ی Project و Console رو با فونتی که خودت انتخاب می‌کنی بکشی.',
-    editorSafety: 'هیچ‌چیزی روی نصب یونیتی نوشته نمی‌شه. تغییر فقط توی حافظه‌ی همون سشن زندگی می‌کنه، پس بستن یونیتی همیشه همه‌چیز رو برمی‌گردونه — و فونتی که نتونه حروف لاتین و عدد رو بکشه اصلاً اعمال نمی‌شه، چون اون‌وقت خودِ گزینه‌ی «برگردون» هم مربع خالی می‌شد.',
+    // ---- specimen ----
+    specEyebrow: 'قبل و بعد',
+    specTitle: 'همین یک جمله، چهار جور',
+    specLede: 'این‌ها اسکرین‌شات نیستند؛ همین الان توی مرورگرت از روی یک رشته‌ی متن ساخته شده‌اند. سه حالت اول دقیقاً همان چیزی است که یونیتی بدون این افزونه نشان می‌دهد.',
+    specTofuLabel: 'فونت گلیف را ندارد',
+    specTofuNote: 'همان مربع‌های خالی. برای ژاپنی و چینی هم دقیقاً همین اتفاق می‌افتد.',
+    specUnjoinedLabel: 'گلیف هست، ولی حروف نمی‌چسبند',
+    specUnjoinedNote: 'فونت‌های مدرن فارسی فرم‌های نمایشی قدیمی را ندارند، پس کلمه بدون جوین می‌ماند.',
+    specReversedLabel: 'و ترتیب هم برعکس است',
+    specReversedNote: 'ترتیب حافظه به‌جای ترتیب خواندن — همان «فارسیم برعکس شده».',
+    specGoodLabel: 'با Unity DirectTMP',
+    specGoodNote: 'شکل‌های چسبیده از جدول GSUB خودِ فونت خوانده می‌شوند و ترتیب راست‌به‌چپ اعمال می‌شود.',
+    specMixLabel: 'و بقیه‌ی خط‌ها، بدون هیچ تنظیمی',
 
-    featuresTitle: 'چه‌کار می‌کند',
-    catalogTitle: 'کاتالوگ فونت',
-    catalogBody: 'همه‌ی فونت‌های پروژه و همه‌ی فونت‌های نصب‌شده روی سیستم توی یه لیست، و هر فایل مستقیم خونده می‌شه تا حقیقتش رو بگه: اسم خانواده‌ای که سازنده‌ی فونت نوشته، تعداد واقعی گلیف‌ها، و اینکه دقیقاً چه خط‌هایی رو می‌تونه بنویسه.',
-    catalogAmber: 'سبز یعنی پوشش کامل، کهربایی یعنی ناقص. همون کهربایی نکته‌ی اصلیه: فونتی که عربی داره ولی پ گ چ ژ نداره نمی‌تونه فارسی بنویسه، و یه فلگ ساده‌ی «از عربی پشتیبانی می‌کند» با خیال راحت بهت می‌گه می‌تونه.',
+    // ---- features ----
+    featuresEyebrow: 'چه‌کار می‌کند',
+    featuresTitle: 'شش کاری که واقعاً انجام می‌دهد',
 
-    installTitle: 'نصب',
+    // ---- usage ----
+    usageEyebrow: 'استفاده',
+    usageTitle: 'سه قدم، بعدش تمام',
+    usageStep1: 'لیبل TextMeshPro خودت را انتخاب کن.',
+    usageStep2: 'Add Component ▸ Unity DirectTMP ▸ Direct Font',
+    usageStep3: 'یک فایل .ttf یا .otf داخل فیلد Font بینداز.',
+    usageAfter: 'تمام. یک کامپوننت، یک لیبل، یک فونت — هیچ‌چیزی روی کل پروژه اعمال نمی‌شود و دو لیبل با دو فونت مختلف هیچ کاری به هم ندارند.',
+    usageBulk: 'یک UI کامل داری؟ Canvas را انتخاب کن و Unity DirectTMP ▸ Add Direct Font to Selection را بزن — همه‌ی لیبل‌های زیرش را انجام می‌دهد.',
+    usageCodeTitle: 'یا از داخل کد',
+
+    fieldsTitle: 'فیلدهای کامپوننت',
+    fieldsColName: 'فیلد',
+    fieldsColWhat: 'کارش چیست',
+
+    // ---- install ----
+    installEyebrow: 'نصب',
+    installTitle: 'از Package Manager، در چهار کلیک',
     installStep1: 'برو به Window ← Package Manager',
     installStep2: 'کلیک کن روی + ← Add package from git URL…',
-    installStep3: 'این آدرس رو بچسبون و Add رو بزن:',
+    installStep3: 'این آدرس را بچسبان و Add را بزن:',
+    installStep4: 'تمام — یونیتی خودش کامپایل می‌کند و منوی Unity DirectTMP اضافه می‌شود.',
     copy: 'کپی',
     copied: 'کپی شد',
 
-    requirementsTitle: 'پیش‌نیازها',
-    reqUnity: 'یونیتی 2021.3 LTS به بعد (یونیتی ۶ هم پشتیبانی می‌شه)',
-    reqTmp: 'TextMeshPro 3.0 به بعد — همراه خودِ یونیتی میاد',
-    reqNone: 'بدون هیچ وابستگی دیگه‌ای به کتابخونه‌ی شخص‌ثالث',
+    // ---- limits ----
+    limitsEyebrow: 'صادقانه',
+    limitsTitle: 'کارهایی که انجام نمی‌دهد',
+    limitsLede: 'اینها را این‌جا می‌نویسیم چون بهتر است قبل از نصب بدانی تا بعدش:',
+    limits: [
+      'حروف‌چینی نستعلیق ندارد — شکل چسبیده‌ی استاندارد را می‌گیری، نه جایگزین‌های زمینه‌ای.',
+      'جای‌گذاری علامت‌ها (GPOS) ندارد — حرکات سر جای پیش‌فرض فونت می‌نشینند.',
+      'یک تگ Rich Text در وسط یک جمله‌ی راست‌به‌چپ آن را به دو بخش تقسیم می‌کند که هرکدام ترتیب درستی دارند ولی نسبت به هم چپ‌به‌راست چیده می‌شوند. تگ دور کل عبارت هیچ مشکلی ندارد.',
+      'فونت را برایت لایسنس نمی‌کند: اگر فونت را داخل بیلد می‌فرستی، بررسی لایسنسش با خودت است.'
+    ],
+
+    // ---- requirements ----
+    reqEyebrow: 'پیش‌نیازها',
+    reqTitle: 'چه چیزی لازم دارد',
+    reqUnity: 'یونیتی ۲۰۲۱.۳ LTS به بعد — یونیتی ۶ هم پشتیبانی می‌شود',
+    reqTmp: 'TextMeshPro — همراه خودِ یونیتی می‌آید',
+    reqNone: 'هیچ وابستگی دیگری به کتابخانه‌ی شخص‌ثالث ندارد',
     reqCost: 'بدون هزینه، بدون کد لایسنس، بدون حساب کاربری، بدون درخواست شبکه',
 
+    troubleTitle: 'اگر فونتی چیزی نشان نداد',
+    troubleBody: 'خودِ Inspector کامپوننت دلیلش را می‌گوید. تقریباً همیشه یکی از این چهارتاست: وارد نشدن TMP Essential Resources، خاموش بودن Include Font Data در ایمپورتر فونت، Dynamic نبودن حالت Character آن، یا نبودن شیدر distance-field.',
+
+    // ---- faq ----
     faqTitle: 'سؤال‌های پرتکرار',
     faq: [
       {
-        q: 'واقعاً رایگانه؟ گیرش کجاست؟',
-        a: 'گیری نداره. لایسنس MIT، کل سورس روی گیت‌هاب، بدون تله‌ی نسخه‌ی پولی و بدون تلمتری. اگه به کارت اومد، یه ستاره روی ریپازیتوری تنها هزینه‌شه.'
+        q: 'واقعاً حروف فارسی را به هم می‌چسباند؟',
+        a: 'بله. شکل‌های چسبیده از جدول GSUB خودِ فونت خوانده می‌شود و خروجی گلیف‌به‌گلیف با HarfBuzz — موتور پشت کروم، فایرفاکس، اندروید و مک‌اواس — روی پنج فونت و یک مجموعه‌ی متن فارسی، عربی و اردو مقایسه شده است. ترتیب راست‌به‌چپ هم اعمال می‌شود، شامل خط‌های شکسته‌شده.'
       },
       {
-        q: 'عوض کردن فونت ادیتور خطرناک نیست؟',
-        a: 'برای همینه که فونتی که نتونه رابط خود ادیتور رو بکشه اصلاً اعمال نمی‌شه، نه اینکه فقط هشدار بگیره. تغییر هم فقط توی حافظه‌ی همون سشنه: چیزی روی نصب یونیتی نوشته نمی‌شه و بستن برنامه همیشه همه‌چیز رو برمی‌گردونه.'
+        q: 'پس دیگر به پلاگین RTL جداگانه نیاز ندارم؟',
+        a: 'نه. کارِ شکل‌دهی و ترتیب همین‌جا انجام می‌شود، آن هم داخل ITextPreprocessor خودِ TextMeshPro — یعنی چیزی در label.text نوشته نمی‌شود و مقداری که ست کرده‌ای دقیقاً همان برمی‌گردد.'
       },
       {
-        q: 'روی پرفورمنس بازی اثر می‌ذاره؟',
-        a: 'هر گلیف فقط یه بار ساخته می‌شه و بعدش کَش می‌مونه؛ هزینه‌ش بار اوله، نه هر فریم. فونت‌ها هم بر اساس (فایل + سایز + حالت رندر) کش می‌شن، پس صفحه‌ای با ۲۰۰ لیبل که همه یه فونت دارن فقط یه اطلس می‌سازه. برای متن‌های سنگین CJK هم Preload هست.'
+        q: 'با چه فونت‌هایی کار می‌کند؟',
+        a: 'با فونت‌های مدرن OpenType: وزیرمتن، ساحل، شبنم، ایران‌سنس و نوتو سنس عربی همگی تست شده‌اند. نسخه‌های قدیمی‌تر که فرم‌های نمایشی یونیکد را دارند هم کار می‌کنند — چون کلاسِ اتصال هر حرف از یونیکد گرفته می‌شود نه از فونت، یک گلیف غایب دیگر نمی‌تواند شکل حرف کنارش را خراب کند.'
       },
       {
-        q: 'حروف فارسی به هم می‌چسبن؟',
-        a: 'گلیف‌ها رندر می‌شن، ولی شکل‌دهی و اتصال حروف (Shaping) هنوز توی نقشه‌ی راهه. فعلاً برای متن‌های آماده‌ی از قبل شکل‌داده‌شده یا همراه یه کتابخونه‌ی RTL کار می‌کنه.'
+        q: 'واقعاً رایگان است؟ گیرش کجاست؟',
+        a: 'گیری ندارد. لایسنس MIT، کل سورس روی گیت‌هاب، بدون نسخه‌ی پولی در راه، بدون تلمتری و بدون هیچ درخواست شبکه‌ای. اگر به کارت آمد، یک ستاره روی ریپازیتوری تنها هزینه‌اش است.'
       },
       {
-        q: 'باید فونت رو توی بیلد بذارم؟',
-        a: 'اگه فونت همراه بازی ارسال می‌شه، بله — و بررسی لایسنس فونت با خودته، چون قرار دادن یه .ttf داخل بیلد یعنی بازنشر. ویژگی فونتِ ادیتور اما چیزی رو بازنشر نمی‌کنه؛ فقط ادیتور رو به فونتی که از قبل روی سیستمته وصل می‌کنه.'
+        q: 'روی پرفورمنس بازی اثر می‌گذارد؟',
+        a: 'هر گلیف فقط یک بار رَستر می‌شود و بعد کَش می‌ماند؛ هزینه‌اش بار اول است، نه هر فریم. برای متنی که اصلاً خط عربی ندارد، مرحله‌ی جوین و ترتیب هیچ هزینه‌ای ندارد چون اجرا نمی‌شود. برای حجم زیاد متن CJK هم Preload هست.'
+      },
+      {
+        q: 'چرا OutLine روی یک لیبل، روی همه می‌افتد؟',
+        a: 'چون در TextMeshPro همه‌ی لیبل‌هایی که یک فونت‌اَسِت دارند یک متریال مشترک دارند — این ایراد چیزی نیست، تعریف متریال مشترک است. فیلد Own material به این لیبل متریال خودش را می‌دهد، و Outline ▸ Width روی خودِ کامپوننت ذخیره می‌شود، پس بعد از کامپایل دوباره و در بیلد هم سر جایش می‌ماند.'
+      },
+      {
+        q: 'باید فونت را داخل بیلد بگذارم؟',
+        a: 'اگر فونت همراه بازی ارسال می‌شود بله — و بررسی لایسنس فونت با خودت است، چون قرار دادن یک .ttf داخل بیلد یعنی بازنشر. منوی Unity DirectTMP ▸ Bake Fonts For Build برای همین کار است.'
+      },
+      {
+        q: 'چند تا زبان روی یک لیبل؟',
+        a: 'به هر تعداد. فیلدهای Persian / Arabic و 日本語 / 中文 / 한국어 و English / Latin را پر کن؛ هر بار متن عوض شود تشخیص داده می‌شود متن واقعاً در چه خطی است — با شمردن کاراکترها، پس «Unity ۱۲۳ سلام دنیا» فارسی حساب می‌شود، نه انگلیسی — و فونت مربوطه استفاده می‌شود. هرکدام خالی بماند از فیلد Font استفاده می‌کند.'
       }
     ],
 
@@ -137,8 +257,7 @@ const I18N = {
     back: 'همه‌ی ابزارها',
     themeToLight: 'حالت روشن',
     themeToDark: 'حالت تاریک',
-    footerTagline: 'ابزارهای یونیتی و سامانه‌ی پروکسی AmirCollider.',
-    footerPowered: 'اجرا شده روی Cloudflare Workers'
+    langGroup: 'زبان صفحه'
   },
 
   en: {
@@ -147,65 +266,121 @@ const I18N = {
     langName: 'English',
 
     title: 'Unity DirectTMP',
-    tagline: 'Hand TextMeshPro the font file itself — and every language just works.',
-    lede: 'It gives TextMeshPro the .ttf or .otf itself instead of a pre-baked SDF font asset. Glyphs are rasterized from the file the moment they are first drawn, so Persian, Arabic, Japanese, Chinese and Korean render with nothing to configure.',
-    priceBadge: 'Free · MIT · no licence key',
+    tagline: 'Fix Persian and Arabic text in Unity — letters joined, right-to-left, correct.',
+    lede: 'A free, open-source Unity package that fixes right-to-left text in TextMeshPro: Persian, Arabic and Urdu come out with their letters joined and in reading order. Drop a .ttf or .otf on a label — no Font Asset Creator, no character ranges to pick. Japanese, Chinese, Korean, Cyrillic, Thai and emoji work with nothing to configure.',
+
+    whatis: 'A Unity package (installed from the Package Manager) that fixes multilingual text in TextMeshPro.',
+
+    priceBadge: 'Free · Open source · MIT licence · no licence key',
+    badgeUnity: 'Unity 2021.3+',
+    badgeVersion: 'Version ' + VERSION,
     ctaInstall: 'Install it',
-    ctaRepo: 'GitHub',
+    ctaRepo: 'Source on GitHub',
 
-    problemTitle: 'The problem, in one picture',
-    problemBody: 'You find a font, drop it into Unity, spend an hour in the Font Asset Creator picking character ranges — and the moment a player types their own name in Persian, you get this:',
-    problemBad: 'سلام دنیا',
-    problemGood: 'سلام دنیا',
-    problemBadLabel: 'with a baked font asset',
-    problemGoodLabel: 'with DirectTMP',
-    problemAfter: 'The font file already knows exactly which glyphs it has. DirectTMP just stops pretending it does not.',
+    symptomsEyebrow: 'If any of this sounds familiar',
+    symptomsTitle: 'The problem this package solves',
+    symptomsLede: 'If you have searched Unity for a fix to any of these, this page is the answer:',
+    symptoms: [
+      'Your Persian or Arabic text renders as empty boxes (□□□) in Unity',
+      'The letters do not join — you get s a l a m instead of a word',
+      'The Persian sentence reads backwards, left to right',
+      'You picked character ranges in the Font Asset Creator and a glyph is still missing',
+      'A player types their own name and TextMeshPro breaks',
+      'Japanese, Chinese or Korean text does not show up at all',
+      'You set an outline on one label and it appeared on every label using that font'
+    ],
 
-    editorTitle: 'And it works on Unity itself',
-    editorBadge: 'New in 1.0',
-    editorBody: 'Name a GameObject 敵スポーナー or a folder فونت‌ها, and Unity will store it correctly and then show you empty boxes forever. The asset is fine; Unity’s own interface is drawn with Unity’s own font, and nothing in a TextMeshPro package has ever touched it.',
-    editorBody2: 'Unity DirectTMP ▸ Editor Font points the menu bar, the Hierarchy, the Inspector, the Project window and the Console at a font of your choosing.',
-    editorSafety: 'Nothing is written to your Unity installation. The change lives in memory for the session, so quitting Unity always restores the default — and a font that cannot draw Latin letters and digits is refused rather than applied, because otherwise the Revert command itself would be a row of empty boxes.',
+    specEyebrow: 'Before and after',
+    specTitle: 'One sentence, four ways',
+    specLede: 'These are not screenshots. Your browser is drawing them right now from one string. The first three are exactly what Unity gives you without this package.',
+    specTofuLabel: 'The font has no glyph',
+    specTofuNote: 'The empty boxes. Japanese and Chinese fail in precisely the same way.',
+    specUnjoinedLabel: 'Glyphs, but the letters do not join',
+    specUnjoinedNote: 'Modern Persian faces carry no legacy presentation forms, so the word is left unshaped.',
+    specReversedLabel: 'And the order is backwards too',
+    specReversedNote: 'Memory order put on screen instead of reading order — the "my Persian came out reversed" bug.',
+    specGoodLabel: 'With Unity DirectTMP',
+    specGoodNote: 'Joined shapes read from the font’s own GSUB table, with right-to-left order applied.',
+    specMixLabel: 'And every other script, with nothing to configure',
 
-    featuresTitle: 'What it does',
-    catalogTitle: 'The Font Catalog',
-    catalogBody: 'Every font in the project and every font installed on the machine in one list, each file read directly to tell you the truth about it: the family name the foundry wrote, the real glyph count, and exactly which writing systems it can set.',
-    catalogAmber: 'Green is full coverage, amber is partial. The amber is the point: a font with Arabic but without پ گ چ ژ cannot set Persian, and a plain "supports Arabic" flag will happily tell you it can.',
+    featuresEyebrow: 'What it does',
+    featuresTitle: 'Six things it actually does',
 
-    installTitle: 'Install',
+    usageEyebrow: 'Using it',
+    usageTitle: 'Three steps, then you are done',
+    usageStep1: 'Select your TextMeshPro label.',
+    usageStep2: 'Add Component ▸ Unity DirectTMP ▸ Direct Font',
+    usageStep3: 'Drop a .ttf or .otf into the Font field.',
+    usageAfter: 'That is it. One component, one label, one font — nothing is applied project-wide, and two labels with two different fonts never interfere.',
+    usageBulk: 'Have a whole UI to convert? Select the Canvas and use Unity DirectTMP ▸ Add Direct Font to Selection — it does every label underneath it.',
+    usageCodeTitle: 'Or from code',
+
+    fieldsTitle: 'The component’s fields',
+    fieldsColName: 'Field',
+    fieldsColWhat: 'What it does',
+
+    installEyebrow: 'Install',
+    installTitle: 'From the Package Manager, in four clicks',
     installStep1: 'Open Window → Package Manager',
     installStep2: 'Click + → Add package from git URL…',
     installStep3: 'Paste this and press Add:',
+    installStep4: 'Done — Unity compiles it and a Unity DirectTMP menu appears.',
     copy: 'Copy',
     copied: 'Copied',
 
-    requirementsTitle: 'Requirements',
-    reqUnity: 'Unity 2021.3 LTS or newer (Unity 6 supported)',
-    reqTmp: 'TextMeshPro 3.0+ — bundled with Unity itself',
+    limitsEyebrow: 'Honestly',
+    limitsTitle: 'What it does not do',
+    limitsLede: 'Written down here because it is better to know before you install than after:',
+    limits: [
+      'No Nastaliq typesetting — you get the standard joined shape, not contextual alternates.',
+      'No mark positioning (GPOS) — harakat sit at the font’s default advance.',
+      'A rich-text tag placed mid-sentence inside a right-to-left line splits it into two correctly-ordered runs laid out left-to-right relative to each other. A tag around a whole phrase is fine.',
+      'It does not licence the font for you: if the font ships inside your build, checking its licence is still yours to do.'
+    ],
+
+    reqEyebrow: 'Requirements',
+    reqTitle: 'What it needs',
+    reqUnity: 'Unity 2021.3 LTS or newer — Unity 6 supported',
+    reqTmp: 'TextMeshPro — bundled with Unity itself',
     reqNone: 'No other third-party dependencies',
     reqCost: 'No cost, no licence key, no account, no network requests',
+
+    troubleTitle: 'If a font produces nothing',
+    troubleBody: 'The component’s own Inspector names the reason. It is almost always one of four: TMP Essential Resources not imported, Include Font Data switched off on the font importer, its Character mode not set to Dynamic, or a missing distance-field shader.',
 
     faqTitle: 'Frequently asked',
     faq: [
       {
-        q: 'It is really free? What is the catch?',
-        a: 'There is no catch. MIT licensed, the whole source is on GitHub, there is no paid tier waiting to appear and no telemetry. If it saves you an afternoon, a star on the repo is the whole price.'
+        q: 'Does it really join Persian and Arabic letters?',
+        a: 'Yes. Joined shapes are read from the font’s own GSUB table, and the output is diffed glyph-for-glyph against HarfBuzz — the engine behind Chrome, Firefox, Android and macOS — across five fonts and a Persian, Arabic and Urdu corpus. Right-to-left order is applied too, including across wrapped lines.'
       },
       {
-        q: 'Is changing the Editor font risky?',
-        a: 'That is exactly why a font which cannot draw the Editor’s own interface is refused rather than warned about. And the change is memory-only: nothing is written to your Unity installation, so quitting Unity always restores everything.'
+        q: 'So I do not need a separate RTL plugin?',
+        a: 'No. Shaping and reordering happen here, inside TextMeshPro’s own ITextPreprocessor — which means nothing is ever written back into label.text, and reading it gives back exactly the string you set.'
+      },
+      {
+        q: 'Which fonts work?',
+        a: 'Modern OpenType faces: Vazirmatn, Sahel, Shabnam, IRANSans and Noto Sans Arabic are all tested. Older faces that do carry the Unicode presentation forms work too — and because a letter’s joining class comes from Unicode rather than from the font, one missing glyph can no longer change the shape of the letter beside it.'
+      },
+      {
+        q: 'It is really free? What is the catch?',
+        a: 'There is no catch. MIT licensed, the whole source is on GitHub, there is no paid tier waiting to appear, no telemetry and no network request of any kind. If it saves you an afternoon, a star on the repo is the whole price.'
       },
       {
         q: 'What does it cost at runtime?',
-        a: 'Each glyph is rasterized once and then cached — the cost lands on first use, never per frame. Fonts are cached per (file + sampling size + render mode), so a screen with 200 labels sharing one font builds exactly one atlas. For a wall of brand-new CJK text there is Preload.'
+        a: 'Each glyph is rasterized once and then cached — the cost lands on first use, never per frame. For text with no Arabic script in it the joining and reordering pass costs nothing, because it does not run. For a wall of brand-new CJK text there is Preload.'
       },
       {
-        q: 'Does Persian text join up properly?',
-        a: 'Glyphs render, but contextual shaping — the joining forms — is still on the roadmap. Today it works for text that is already shaped, or alongside an RTL shaping library.'
+        q: 'Why does an outline on one label appear on all of them?',
+        a: 'Because in TextMeshPro every label sharing a font asset shares one material — that is what a shared material is, not a bug in anything. The Own material field gives this label its own, and Outline ▸ Width is stored on the component itself, so it survives a recompile, play mode and the build.'
       },
       {
         q: 'Do I have to ship the font in my build?',
-        a: 'If the font ships with your game, yes — and checking its licence is still yours to do, because putting a .ttf inside a build is redistribution. The Editor-font feature redistributes nothing: it only points the Editor at a font already on your machine.'
+        a: 'If the font ships with your game, yes — and checking its licence is still yours to do, because putting a .ttf inside a build is redistribution. Unity DirectTMP ▸ Bake Fonts For Build is there for exactly that step.'
+      },
+      {
+        q: 'How many languages on one label?',
+        a: 'As many as you have fonts for. Fill in the Persian / Arabic, 日本語 / 中文 / 한국어 and English / Latin fields; each time the text changes, the script it is actually in is worked out by counting characters — so "Unity ۱۲۳ سلام دنیا" is Persian, not English — and the matching font is used. Any field left empty falls back to Font.'
       }
     ],
 
@@ -213,8 +388,7 @@ const I18N = {
     back: 'All tools',
     themeToLight: 'Light mode',
     themeToDark: 'Dark mode',
-    footerTagline: 'Unity tools and the AmirCollider proxy.',
-    footerPowered: 'Powered by Cloudflare Workers'
+    langGroup: 'Page language'
   },
 
   ja: {
@@ -223,65 +397,121 @@ const I18N = {
     langName: '日本語',
 
     title: 'Unity DirectTMP',
-    tagline: 'フォントファイルをそのまま TextMeshPro へ。どんな言語も、そのまま表示されます。',
-    lede: '焼き込み済みの SDF フォントアセットではなく、.ttf / .otf そのものを TextMeshPro に渡します。グリフは最初に描画された瞬間にファイルから生成されるため、日本語・中国語・韓国語・ペルシャ語・アラビア語が設定なしで表示されます。',
-    priceBadge: '無料 · MIT · ライセンスキー不要',
+    tagline: 'Unity の文字化け(豆腐)とアラビア語表示を直す、TextMeshPro 用パッケージ。',
+    lede: '無料・オープンソースの Unity パッケージです。ラベルに .ttf / .otf を渡すだけで、そのファイルから直接描画します。Font Asset Creator も文字範囲の指定も不要なので、日本語・中国語・韓国語の豆腐(□)が消えます。さらにペルシャ語・アラビア語・ウルドゥー語は、文字が正しく連結され、右から左の語順で表示されます。キリル文字・タイ文字・絵文字も設定なしで使えます。',
+
+    whatis: 'TextMeshPro の多言語表示を直す Unity パッケージ(Package Manager からインストール)。',
+
+    priceBadge: '無料 · オープンソース · MIT ライセンス · ライセンスキー不要',
+    badgeUnity: 'Unity 2021.3 以降',
+    badgeVersion: 'バージョン ' + VERSION,
     ctaInstall: '導入する',
-    ctaRepo: 'GitHub',
+    ctaRepo: 'GitHub のソース',
 
-    problemTitle: '問題を 1 枚の絵で',
-    problemBody: 'フォントを見つけて Unity に入れ、Font Asset Creator で 1 時間かけて文字範囲を選ぶ——それでもプレイヤーが自分の名前を日本語で入力した瞬間、こうなります:',
-    problemBad: 'こんにちは世界',
-    problemGood: 'こんにちは世界',
-    problemBadLabel: '焼き込み済みフォントアセット',
-    problemGoodLabel: 'DirectTMP',
-    problemAfter: 'どのグリフを持っているかは、フォントファイル自身がとっくに知っています。DirectTMP は、それを知らないふりをするのをやめただけです。',
+    symptomsEyebrow: '心当たりがあれば',
+    symptomsTitle: 'このパッケージが解決する問題',
+    symptomsLede: '次のどれかを Unity で検索したことがあるなら、このページが答えです。',
+    symptoms: [
+      '日本語・中国語・韓国語が □□□(豆腐)になって表示されない',
+      'Font Asset Creator で文字範囲を選んでも、まだ足りない文字が出てくる',
+      'プレイヤーが入力した名前が表示できない',
+      'アラビア語・ペルシャ語の文字がつながらず、1 文字ずつ離れて出る',
+      '右から左に読む文章が逆順になる',
+      '1 つのラベルに付けたアウトラインが、同じフォントの全ラベルに付いてしまう',
+      '絵文字や記号だけがフォントから抜け落ちる'
+    ],
 
-    editorTitle: 'Unity 自身にも効きます',
-    editorBadge: '1.0 の新機能',
-    editorBody: 'GameObject に「敵スポーナー」と名前を付けたり、フォルダーを「فونت‌ها」と名付けたりすると、Unity はそれを正しく保存したうえで豆腐を表示し続けます。アセットは正常で、Unity 自身の UI が Unity のフォントで描画されているだけです。',
-    editorBody2: 'Unity DirectTMP ▸ Editor Font から、メニューバー・Hierarchy・Inspector・Project ウィンドウ・Console を、選んだフォントで描画できます。',
-    editorSafety: 'Unity のインストール先には一切書き込みません。変更はセッション中のメモリ上だけに存在するため、Unity を終了すれば必ず既定に戻ります。ラテン文字や数字を描画できないフォントは、警告ではなく適用そのものを拒否します——そうでなければ「元に戻す」項目自体が豆腐になるからです。',
+    specEyebrow: 'ビフォー・アフター',
+    specTitle: '同じ一文を、4 通りで',
+    specLede: 'これはスクリーンショットではありません。1 つの文字列から、いまブラウザが描画しています。最初の 3 つが、このパッケージなしの Unity で起きることそのものです。',
+    specTofuLabel: 'フォントにグリフがない',
+    specTofuNote: 'いわゆる豆腐です。日本語や中国語もまったく同じ理由で同じ結果になります。',
+    specUnjoinedLabel: 'グリフはあるが、文字がつながらない',
+    specUnjoinedNote: '現代のペルシャ語書体は旧来の表示形を持たないため、単語が未整形のまま残ります。',
+    specReversedLabel: 'しかも語順が逆',
+    specReversedNote: '読み順ではなくメモリ上の順序がそのまま画面に出た状態です。',
+    specGoodLabel: 'Unity DirectTMP を使うと',
+    specGoodNote: 'フォント自身の GSUB テーブルから連結形を読み出し、右から左の語順を適用します。',
+    specMixLabel: 'その他の文字体系も、設定なしで',
 
-    featuresTitle: 'できること',
-    catalogTitle: 'フォントカタログ',
-    catalogBody: 'プロジェクト内と この PC のすべてのフォントを一覧し、各ファイルを直接読んで実態を表示します。フォント制作者が書き込んだファミリー名、実際のグリフ数、そして対応している文字体系。',
-    catalogAmber: '緑は完全収録、琥珀は一部収録です。この琥珀が肝心で、アラビア文字を持っていても پ گ چ ژ を持たないフォントはペルシャ語を組めませんが、「アラビア文字対応」という単純なフラグは平然と「対応」と答えます。',
+    featuresEyebrow: 'できること',
+    featuresTitle: '実際にできる 6 つのこと',
 
-    installTitle: '導入',
+    usageEyebrow: '使い方',
+    usageTitle: '3 ステップで完了',
+    usageStep1: 'TextMeshPro のラベルを選択します。',
+    usageStep2: 'Add Component ▸ Unity DirectTMP ▸ Direct Font',
+    usageStep3: 'Font フィールドに .ttf / .otf をドロップします。',
+    usageAfter: '以上です。1 コンポーネント・1 ラベル・1 フォント。プロジェクト全体には何も適用されず、別のフォントを使う 2 つのラベルが干渉することもありません。',
+    usageBulk: 'UI 全体をまとめて変換したい場合は、Canvas を選択して Unity DirectTMP ▸ Add Direct Font to Selection を実行すると、配下のすべてのラベルに適用されます。',
+    usageCodeTitle: 'コードから使う場合',
+
+    fieldsTitle: 'コンポーネントのフィールド',
+    fieldsColName: 'フィールド',
+    fieldsColWhat: '役割',
+
+    installEyebrow: '導入',
+    installTitle: 'Package Manager から 4 クリック',
     installStep1: 'Window → Package Manager を開く',
     installStep2: '+ → Add package from git URL… をクリック',
     installStep3: 'これを貼り付けて Add:',
+    installStep4: '完了です。Unity がコンパイルし、Unity DirectTMP メニューが追加されます。',
     copy: 'コピー',
     copied: 'コピーしました',
 
-    requirementsTitle: '必要環境',
-    reqUnity: 'Unity 2021.3 LTS 以降(Unity 6 対応)',
-    reqTmp: 'TextMeshPro 3.0 以降 — Unity に同梱',
-    reqNone: 'その他のサードパーティ依存なし',
+    limitsEyebrow: '正直なところ',
+    limitsTitle: 'できないこと',
+    limitsLede: 'インストールしたあとに気づくより先に知っていただきたいので、ここに書いておきます。',
+    limits: [
+      'ナスタアリーク体の組版には対応しません。標準の連結形は得られますが、文脈依存の異体字は適用されません。',
+      'マーク位置決め(GPOS)には対応しません。ハラカートはフォント既定の送り位置に置かれます。',
+      '右から左の行の途中にリッチテキストタグを置くと、それぞれ正しい語順の 2 つの連なりに分割され、両者は左から右に並びます。フレーズ全体を囲む場合は問題ありません。',
+      'フォントのライセンスは代行しません。ビルドにフォントを同梱する場合、ライセンスの確認はご自身でお願いします。'
+    ],
+
+    reqEyebrow: '必要環境',
+    reqTitle: '必要なもの',
+    reqUnity: 'Unity 2021.3 LTS 以降 — Unity 6 対応',
+    reqTmp: 'TextMeshPro — Unity に同梱',
+    reqNone: 'その他のサードパーティ依存はありません',
     reqCost: '無料・ライセンスキー不要・アカウント不要・通信なし',
+
+    troubleTitle: '何も表示されないときは',
+    troubleBody: 'コンポーネントの Inspector が理由を表示します。ほとんどの場合、次の 4 つのいずれかです。TMP Essential Resources が未インポート、フォントインポーターの Include Font Data が無効、Character モードが Dynamic になっていない、distance-field シェーダーが見つからない。',
 
     faqTitle: 'よくある質問',
     faq: [
       {
-        q: '本当に無料ですか?',
-        a: '無料です。MIT ライセンスで、ソースはすべて GitHub にあります。あとから有料版が出てくることも、テレメトリもありません。役に立ったら、リポジトリへの ⭐ が唯一の対価です。'
+        q: 'ペルシャ語・アラビア語の文字は本当につながりますか?',
+        a: 'はい。連結形はフォント自身の GSUB テーブルから読み出しており、その出力を HarfBuzz(Chrome・Firefox・Android・macOS のテキストエンジン)とグリフ単位で比較検証しています。5 種類のフォントと、ペルシャ語・アラビア語・ウルドゥー語のコーパスで一致を確認済みです。折り返し後の行も含めて右から左の語順が適用されます。'
       },
       {
-        q: 'エディタのフォントを変えるのは危険では?',
-        a: 'だからこそ、エディタの UI を描画できないフォントは警告ではなく適用を拒否します。変更はメモリ上だけで、Unity のインストール先には何も書き込まないため、終了すれば必ず元に戻ります。'
+        q: '別途 RTL プラグインは必要ですか?',
+        a: '不要です。整形と並べ替えは TextMeshPro 自身の ITextPreprocessor の中で行われるため、label.text に書き戻すことは一切なく、設定した文字列がそのまま読み出せます。'
+      },
+      {
+        q: 'どのフォントで動きますか?',
+        a: '現代的な OpenType 書体で動作します。Vazirmatn、Sahel、Shabnam、IRANSans、Noto Sans Arabic はいずれも検証済みです。Unicode の表示形を持つ古い書体でも動作します。文字の接続クラスはフォントではなく Unicode から判断するため、グリフが 1 つ欠けても隣の文字の形が崩れることはありません。'
+      },
+      {
+        q: '本当に無料ですか?',
+        a: '無料です。MIT ライセンスで、ソースはすべて GitHub にあります。あとから有料版が出ることも、テレメトリも、いかなる通信もありません。お役に立てたら、リポジトリへの ⭐ が唯一の対価です。'
       },
       {
         q: '実行時のコストは?',
-        a: '各グリフのラスタライズは 1 回きりで、その後はキャッシュされます。フォントは(ファイル + サイズ + レンダーモード)ごとにキャッシュされるため、同じフォントのラベルが 200 個ある画面でもアトラスは 1 枚です。大量の CJK テキストには Preload があります。'
+        a: '各グリフのラスタライズは 1 回きりで、その後はキャッシュされます。コストがかかるのは初回だけで、毎フレームではありません。アラビア文字を含まないテキストでは整形と並べ替えの処理は実行されないためコストはゼロです。大量の CJK テキストには Preload があります。'
       },
       {
-        q: 'アラビア文字の接続形は?',
-        a: 'グリフは表示されますが、接続形へのシェーピングはロードマップ上です。現状は整形済みのテキスト、または RTL シェーピングライブラリと併用してご利用ください。'
+        q: 'なぜ 1 つのラベルのアウトラインが全部に付くのですか?',
+        a: 'TextMeshPro では同じフォントアセットを使うラベルがマテリアルを共有するためです。これは共有マテリアルの仕様であり、不具合ではありません。Own material フィールドでそのラベル専用のマテリアルを持たせられます。Outline ▸ Width はコンポーネント自体に保存されるため、再コンパイル後も Play Mode でもビルドでも保持されます。'
       },
       {
-        q: 'フォントをビルドに同梱する必要は?',
-        a: 'ゲームと一緒に配布するなら必要です。ビルドに .ttf を含めることは再配布にあたるため、ライセンスの確認はご自身でお願いします。エディタのフォント機能は何も再配布せず、すでに PC にあるフォントを参照するだけです。'
+        q: 'フォントをビルドに同梱する必要はありますか?',
+        a: 'ゲームと一緒に配布するなら必要です。ビルドに .ttf を含めることは再配布にあたるため、ライセンスの確認はご自身でお願いします。Unity DirectTMP ▸ Bake Fonts For Build がその工程のために用意されています。'
+      },
+      {
+        q: '1 つのラベルで何言語まで使えますか?',
+        a: 'フォントがある分だけ使えます。Persian / Arabic、日本語 / 中文 / 한국어、English / Latin の各フィールドを埋めてください。テキストが変わるたびに、文字数を数えて実際の文字体系を判定し(そのため「Unity ۱۲۳ سلام دنیا」は英語ではなくペルシャ語と判定されます)、対応するフォントが使われます。空欄のフィールドは Font にフォールバックします。'
       }
     ],
 
@@ -289,53 +519,135 @@ const I18N = {
     back: 'すべてのツール',
     themeToLight: 'ライトモード',
     themeToDark: 'ダークモード',
-    footerTagline: 'AmirCollider の Unity ツールとプロキシ。',
-    footerPowered: 'Cloudflare Workers で稼働'
+    langGroup: 'ページの言語'
   }
 }
 
 
 // ==========================================
-// The feature grid.
+// The feature grid
+//
+// Rewritten against UnityDirectTMP 2.1.13. The previous six
+// described the 1.x package: a fallback-chain editor, a font
+// catalog and a health-check window, none of which survived
+// 2.0.0. These six are the ones in the shipping README under
+// "Why people keep it", plus the two the component adds.
 // ==========================================
 const FEATURES = [
   {
+    mark: '🩺',
+    fa: ['فارسیِ واقعاً خوانا', 'شکل‌های چسبیده از جدول GSUB خودِ فونت خوانده می‌شود و گلیف‌به‌گلیف با HarfBuzz تست شده — همان موتوری که کروم و اندروید استفاده می‌کنند.'],
+    en: ['Persian that actually reads', 'Joined shapes come from the font’s own GSUB table, verified glyph-for-glyph against HarfBuzz — the same engine Chrome and Android use.'],
+    ja: ['本当に読めるペルシャ語', '連結形はフォント自身の GSUB から読み出し、Chrome や Android と同じ HarfBuzz とグリフ単位で照合済みです。']
+  },
+  {
     mark: '🅰️',
-    fa: ['فایل فونت رو بده، نه فونت‌اسِت رو', 'یه .ttf یا .otf رو بکش روی کامپوننت، تموم. کارهای SDF بی‌سروصدا پشت صحنه انجام می‌شه.'],
-    en: ['Point at a font file, not a font asset', 'Drag a .ttf or .otf onto the component and you are done. The SDF side is handled quietly in the background.'],
-    ja: ['指定するのはフォントアセットではなくファイル', '.ttf / .otf をコンポーネントにドラッグするだけ。SDF まわりは裏側で処理されます。']
+    fa: ['فایل فونت را بده، نه فونت‌اَسِت را', 'یک .ttf یا .otf را روی کامپوننت بینداز، تمام. نه Font Asset Creator، نه انتخاب رِنج کاراکتر — کارهای SDF بی‌سروصدا پشت صحنه انجام می‌شود.'],
+    en: ['Point at a font file, not a font asset', 'Drag a .ttf or .otf onto the component and you are done. No Font Asset Creator, no character ranges — the SDF side is handled quietly in the background.'],
+    ja: ['指定するのはフォントアセットではなくファイル', '.ttf / .otf をコンポーネントにドラッグするだけ。Font Asset Creator も文字範囲指定も不要で、SDF まわりは裏側で処理されます。']
   },
   {
     mark: '🌏',
-    fa: ['هر خطی که فونت داره، همون لحظه', 'فونتی که ۲۰٬۰۰۰ کانجی داره، واقعاً ۲۰٬۰۰۰ کانجی داره. دیگه هیچ‌وقت لازم نیست لیست کاراکترها رو دستی بنویسی.'],
-    en: ['Every script the font supports, instantly', 'A font that covers 20,000 kanji covers 20,000 kanji. You never enumerate a character set again.'],
-    ja: ['フォントが持つ文字は、すべてそのまま', '2 万字の漢字を含むフォントなら 2 万字そのまま使えます。文字セットの列挙はもう不要です。']
+    fa: ['یک فونت برای هر زبان، روی یک لیبل', 'فیلدهای فارسی، CJK و لاتین را پر کن؛ هر بار متن عوض شود با شمردن کاراکترها تشخیص داده می‌شود متن واقعاً در چه خطی است و فونت مربوطه استفاده می‌شود.'],
+    en: ['A font per language, on one label', 'Fill in the Persian, CJK and Latin fields; each time the text changes, the script it is actually in is detected by counting characters and the matching font is used.'],
+    ja: ['1 つのラベルに、言語ごとのフォント', 'ペルシャ語・CJK・ラテン各フィールドを設定すれば、テキストが変わるたびに文字数から実際の文字体系を判定し、対応するフォントが使われます。']
   },
   {
-    mark: '🔗',
-    fa: ['زنجیره‌ی فال‌بک با ترتیب خودت', 'یه فونت لاتین، یه CJK و یه فونت نماد رو پشت سر هم بچین؛ برای هر کاراکتر اولین فونتی که اون رو داره انتخاب می‌شه.'],
-    en: ['Fallback chains, ordered by you', 'Line up a Latin UI font, a CJK font and a symbol font; the first one that actually has a given character supplies it.'],
-    ja: ['順序を自分で決めるフォールバック', '欧文 UI・CJK・記号フォントを並べれば、その文字を持つ最初のフォントが 1 文字ごとに選ばれます。']
+    mark: '🎨',
+    fa: ['OutLine ای که فقط مال یک لیبل است', 'در TextMeshPro لیبل‌های هم‌فونت یک متریال مشترک دارند. Own material به این لیبل متریال خودش را می‌دهد و مقدار OutLine روی خودِ کامپوننت می‌ماند — پس در بیلد هم سر جایش است.'],
+    en: ['An outline that belongs to one label', 'In TextMeshPro, labels sharing a font share one material. Own material gives this label its own, and the outline value is kept on the component — so it survives into the build.'],
+    ja: ['そのラベルだけのアウトライン', 'TextMeshPro では同じフォントのラベルがマテリアルを共有します。Own material で専用マテリアルを持たせ、アウトライン値はコンポーネントに保存されるためビルドでも保持されます。']
   },
   {
-    mark: '💾',
-    fa: ['لود فونت در زمان اجرا', 'از StreamingAssets، از persistentDataPath، از یه byte[] دانلودشده، یا از فونت‌های نصب‌شده‌ی خود کاربر.'],
-    en: ['Load fonts at runtime', 'From StreamingAssets, persistentDataPath, a downloaded byte[], or the player’s own installed fonts.'],
-    ja: ['実行時のフォント読み込み', 'StreamingAssets、persistentDataPath、ダウンロードした byte[]、OS のインストール済みフォントから。']
+    mark: '🧩',
+    fa: ['بقیه‌ی خط‌ها، مجانی', 'ژاپنی، چینی، کره‌ای، سیریلیک، یونانی، تایلندی، ایموجی و نمادها: هیچ تنظیمی ندارند. اگر فونت گلیف را داشته باشد، تو هم داری.'],
+    en: ['Every other script, free', 'Japanese, Chinese, Korean, Cyrillic, Greek, Thai, emoji and symbols: nothing to configure. If the font has the glyph, you get it.'],
+    ja: ['その他の文字体系も、そのまま', '日本語・中国語・韓国語・キリル文字・ギリシャ文字・タイ文字・絵文字・記号は設定不要です。フォントにグリフがあれば、そのまま使えます。']
   },
   {
-    mark: '♻️',
-    fa: ['کش می‌شه، دوباره ساخته نمی‌شه', 'یه صفحه با ۲۰۰ لیبل که همه یه فونت دارن، فقط و فقط یه اطلس می‌سازه.'],
-    en: ['Cached, not rebuilt', 'A screen with 200 labels sharing one font builds exactly one atlas.'],
-    ja: ['作り直さず、キャッシュする', '同じフォントのラベルが 200 個ある画面でも、アトラスは 1 枚だけです。']
-  },
-  {
-    mark: '🩺',
-    fa: ['بررسی سلامت که خودش رو توضیح می‌ده', 'می‌گه چی کار می‌کنه، چی کار نمی‌کنه و چرا؛ هرچی رو بشه با یه کلیک درست می‌کنه و کل گزارش رو برای ثبت باگ کپی می‌کنه.'],
-    en: ['A health check that explains itself', 'It says what works, what does not and why, fixes what it can in one click, and copies the whole report for a bug report.'],
-    ja: ['理由まで説明する動作チェック', '何が動き何が動かないかとその理由を示し、直せるものはワンクリックで直し、レポート全体をコピーします。']
+    mark: '🤝',
+    fa: ['مؤدب', 'تگ‌های Rich Text هرگز شکل‌دهی یا جابه‌جا نمی‌شوند و چیزی در label.text نوشته نمی‌شود — مقداری که ست کرده‌ای دقیقاً همان برمی‌گردد.'],
+    en: ['Polite', 'Rich-text tags are never shaped or reordered, and label.text is never written to — reading it gives back exactly the string you set.'],
+    ja: ['行儀がよい', 'リッチテキストタグが整形・並べ替えされることはなく、label.text に書き戻すこともありません。設定した文字列がそのまま読み出せます。']
   }
 ]
+
+
+// ==========================================
+// The component's fields
+//
+// The same table as the shipping README. It is on the page
+// because "what do these fields do" is the question somebody
+// asks with the Inspector already open, and sending them to
+// GitHub for it is a page that did not answer.
+// ==========================================
+const FIELDS = [
+  {
+    name: 'Font',
+    fa: 'فایل فونت. تنها فیلدی که واقعاً لازم داری.',
+    en: 'The font file. The only one you actually need.',
+    ja: 'フォントファイル。実際に必要なのはこれだけです。'
+  },
+  {
+    name: 'Persian / Arabic',
+    fa: 'وقتی متن بیشتر فارسی، عربی یا اردو باشد. خالی = همان Font.',
+    en: 'Used when the text is mostly Persian, Arabic or Urdu. Empty = use Font.',
+    ja: 'テキストが主にペルシャ語・アラビア語・ウルドゥー語のときに使用。空欄なら Font を使用。'
+  },
+  {
+    name: '日本語 / 中文 / 한국어',
+    fa: 'وقتی متن بیشتر ژاپنی، چینی یا کره‌ای باشد. خالی = همان Font.',
+    en: 'Used when the text is mostly Japanese, Chinese or Korean. Empty = use Font.',
+    ja: 'テキストが主に日本語・中国語・韓国語のときに使用。空欄なら Font を使用。'
+  },
+  {
+    name: 'English / Latin',
+    fa: 'وقتی متن بیشتر انگلیسی یا لاتین باشد. خالی = همان Font.',
+    en: 'Used when the text is mostly English or another Latin language. Empty = use Font.',
+    ja: 'テキストが主に英語などのラテン文字のときに使用。空欄なら Font を使用。'
+  },
+  {
+    name: 'Outline ▸ Width',
+    fa: 'ضخامت OutLine دور حروف همین لیبل. صفر یعنی بدون OutLine.',
+    en: 'How thick an outline is drawn around this label’s letters. 0 is no outline.',
+    ja: 'このラベルの文字に描くアウトラインの太さ。0 でアウトラインなし。'
+  },
+  {
+    name: 'Outline ▸ Colour',
+    fa: 'رنگ همان OutLine.',
+    en: 'The colour of that outline.',
+    ja: 'そのアウトラインの色。'
+  },
+  {
+    name: 'Own material',
+    fa: 'متریال مخصوص همین لیبل، تا هرچه رویش تنظیم شود مال خودش بماند.',
+    en: 'Gives this label its own material, so anything set on it stays its own.',
+    ja: 'このラベル専用のマテリアルを与え、設定した内容がそのラベルだけに留まるようにします。'
+  },
+  {
+    name: 'Join Persian / Arabic',
+    fa: 'چسبیدن حروف و ترتیب راست‌به‌چپ. برای متن بدون خط عربی هیچ هزینه‌ای ندارد.',
+    en: 'Letter joining and right-to-left reading order. Free for text with no Arabic script.',
+    ja: '文字の連結と右から左の語順。アラビア文字を含まないテキストではコストはかかりません。'
+  },
+  {
+    name: 'Fix wrapped lines',
+    fa: 'ترتیب درست خط‌های شکسته‌شده در متن راست‌به‌چپ.',
+    en: 'Keeps wrapped right-to-left lines in the correct order.',
+    ja: '折り返された右から左の行を正しい順序に保ちます。'
+  }
+]
+
+
+// The API snippet. Straight out of the shipping README, so a
+// reader who copies it gets the same four calls the package
+// documents rather than a paraphrase of them.
+const CODE_SAMPLE = [
+  'DirectTMP.Apply(label, myFont);              // same thing the component does',
+  'DirectTMP.Outline(label, 0.2f, Color.black); // an outline on this label only',
+  'label.font = DirectTMP.Load(myFont);         // just the font asset',
+  'label.font = DirectTMP.LoadFromFile(path);   // a .ttf on disk, at runtime'
+].join('\n')
 
 
 function pack(lang) {
@@ -366,9 +678,11 @@ function escapeJs(value) {
 // ==========================================
 const ICONS = {
   contrast: '<circle cx="12" cy="12" r="9"/><path d="M12 3v18a9 9 0 0 0 0-18z" fill="currentColor" stroke="none"/>',
-  grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
-  download: '<path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M4 20h16"/>'
+  download: '<path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M4 20h16"/>',
+  github: '<path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.9a3.4 3.4 0 0 0-.9-2.6c3-.3 6.2-1.5 6.2-6.7A5.2 5.2 0 0 0 20 5.8a4.9 4.9 0 0 0-.1-3.6s-1.1-.3-3.6 1.4a12.4 12.4 0 0 0-6.6 0C7.2 1.9 6.1 2.2 6.1 2.2A4.9 4.9 0 0 0 6 5.8a5.2 5.2 0 0 0-1.4 3.6c0 5.2 3.2 6.4 6.2 6.7a3.4 3.4 0 0 0-.9 2.6V22"/>',
+  alert: '<path d="M12 9v4"/><path d="M12 17h.01"/><circle cx="12" cy="12" r="9"/>',
+  arrow: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>'
 }
 
 function icon(name, cls) {
@@ -379,7 +693,8 @@ function icon(name, cls) {
 
 
 // ==========================================
-// Inky
+// Inky, the package's mascot.
+// Traced from Docs~/mascot.svg in the repository.
 // ==========================================
 function inky(size) {
   return `
@@ -415,9 +730,26 @@ function inky(size) {
 // ==========================================
 // Stylesheet
 //
-// The site's token layer, with the accent swapped for the
-// tool's own teal so the page reads as the product rather
+// The site's token layer with the accent swapped for the
+// package's own teal, so the page reads as the product rather
 // than as the site.
+//
+// Two rules here are load-bearing rather than decorative:
+//
+//   .spec-line is direction-neutral and each specimen row sets
+//   its own dir attribute. The previous version hard-coded
+//   direction:rtl on the sample, which quietly mangled the
+//   Japanese page - the sample there is not right-to-left text
+//   and was being laid out as though it were.
+//
+//   .spec-reversed uses unicode-bidi:bidi-override to force
+//   memory order onto the screen. That is not a styling choice;
+//   it is the only honest way to reproduce the reversed-text bug
+//   in a browser that would otherwise fix it for us.
+//
+// No backtick and no dollar-brace may appear anywhere in this
+// string, comments included - see CLAUDE.md. Declarations are
+// quoted in plain words below for exactly that reason.
 // ==========================================
 function getCSS() {
   return `
@@ -433,83 +765,120 @@ function getCSS() {
       --paper: ${PAPER};
       --blush: ${BLUSH};
 
-      --radius: 18px;
-      --maxw: 940px;
+      --radius: 20px;
+      --radius-sm: 13px;
+      --maxw: 1000px;
 
-      --bg-1: #0d1416;
-      --bg-2: #0f2226;
+      --bg-1: #0b1214;
+      --bg-2: #102428;
       --surface: rgba(255,255,255,0.045);
       --surface-2: rgba(255,255,255,0.085);
+      --surface-3: rgba(255,255,255,0.03);
       --border: rgba(255,255,255,0.11);
+      --border-soft: rgba(255,255,255,0.07);
       --text: rgba(255,255,255,0.92);
-      --text-dim: rgba(255,255,255,0.60);
-      --accent: #2aa7b4;
+      --text-dim: rgba(255,255,255,0.62);
+      --text-faint: rgba(255,255,255,0.42);
+      --accent: #2fb3c0;
+      --shadow: 0 18px 44px rgba(0,0,0,0.42);
       color-scheme: dark;
     }
 
     @media (prefers-color-scheme: light) {
       :root:not([data-theme]) {
         --bg-1: ${PAPER};
-        --bg-2: #f0e9dc;
-        --surface: rgba(255,255,255,0.78);
+        --bg-2: #eee6d6;
+        --surface: rgba(255,255,255,0.80);
         --surface-2: #ffffff;
+        --surface-3: rgba(27,23,37,0.03);
         --border: rgba(27,23,37,0.12);
-        --text: rgba(27,23,37,0.92);
-        --text-dim: rgba(27,23,37,0.60);
+        --border-soft: rgba(27,23,37,0.07);
+        --text: rgba(27,23,37,0.93);
+        --text-dim: rgba(27,23,37,0.62);
+        --text-faint: rgba(27,23,37,0.42);
         --accent: ${INK};
+        --shadow: 0 18px 40px rgba(27,23,37,0.10);
         color-scheme: light;
       }
     }
 
     :root[data-theme="light"] {
       --bg-1: ${PAPER};
-      --bg-2: #f0e9dc;
-      --surface: rgba(255,255,255,0.78);
+      --bg-2: #eee6d6;
+      --surface: rgba(255,255,255,0.80);
       --surface-2: #ffffff;
+      --surface-3: rgba(27,23,37,0.03);
       --border: rgba(27,23,37,0.12);
-      --text: rgba(27,23,37,0.92);
-      --text-dim: rgba(27,23,37,0.60);
+      --border-soft: rgba(27,23,37,0.07);
+      --text: rgba(27,23,37,0.93);
+      --text-dim: rgba(27,23,37,0.62);
+      --text-faint: rgba(27,23,37,0.42);
       --accent: ${INK};
+      --shadow: 0 18px 40px rgba(27,23,37,0.10);
       color-scheme: light;
     }
     :root[data-theme="dark"] {
-      --bg-1: #0d1416;
-      --bg-2: #0f2226;
+      --bg-1: #0b1214;
+      --bg-2: #102428;
       --surface: rgba(255,255,255,0.045);
       --surface-2: rgba(255,255,255,0.085);
+      --surface-3: rgba(255,255,255,0.03);
       --border: rgba(255,255,255,0.11);
+      --border-soft: rgba(255,255,255,0.07);
       --text: rgba(255,255,255,0.92);
-      --text-dim: rgba(255,255,255,0.60);
-      --accent: #2aa7b4;
+      --text-dim: rgba(255,255,255,0.62);
+      --text-faint: rgba(255,255,255,0.42);
+      --accent: #2fb3c0;
+      --shadow: 0 18px 44px rgba(0,0,0,0.42);
       color-scheme: dark;
     }
 
     body {
       font-family: 'Vazirmatn', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-      background: radial-gradient(1100px 620px at 50% -10%, var(--bg-2), var(--bg-1));
-      background-attachment: fixed;
+      background: var(--bg-1);
       color: var(--text);
       min-height: 100vh;
-      line-height: 1.75;
+      line-height: 1.8;
       -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
     }
 
-    .wrap { max-width: var(--maxw); margin-inline: auto; padding: 26px 20px 60px; }
+    /* The glow behind the hero. A fixed pseudo-element rather than a
+       body background so it does not travel with the scroll and does
+       not repaint the whole page on every frame. */
+    body::before {
+      content: '';
+      position: fixed;
+      inset-block-start: -30vh;
+      inset-inline-start: 50%;
+      transform: translateX(-50%);
+      width: min(1200px, 160vw);
+      height: 90vh;
+      background: radial-gradient(closest-side, var(--bg-2), transparent 72%);
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    .wrap { max-width: var(--maxw); margin-inline: auto; padding: 26px 20px 72px; }
 
     /* ---------- topbar ---------- */
     .topbar {
       display: flex; align-items: center; justify-content: space-between;
-      gap: 14px; flex-wrap: wrap; margin-block-end: 26px;
+      gap: 14px; flex-wrap: wrap; margin-block-end: 22px;
     }
-    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .brand {
+      display: flex; align-items: center; gap: 12px; min-width: 0;
+      text-decoration: none; color: inherit; transition: opacity 0.18s ease;
+    }
+    .brand:hover { opacity: 0.82; }
     .brand-logo {
       width: 42px; height: 42px; border-radius: 12px; overflow: hidden;
       display: grid; place-items: center;
       background: var(--surface); border: 1px solid var(--border); flex: none;
     }
     .brand-logo img { width: 100%; height: 100%; object-fit: cover; }
-    .brand-name { font-weight: 800; }
-    .brand-sub { font-size: 0.82em; color: var(--text-dim); }
+    .brand-name { font-weight: 800; line-height: 1.3; }
+    .brand-sub { font-size: 0.8em; color: var(--text-dim); line-height: 1.3; }
     .controls { display: flex; align-items: center; gap: 10px; }
     .seg {
       display: inline-flex; padding: 3px; gap: 2px; border-radius: 999px;
@@ -519,66 +888,99 @@ function getCSS() {
       appearance: none; border: 0; cursor: pointer; font: inherit;
       padding: 6px 12px; border-radius: 999px; font-size: 0.82em; font-weight: 600;
       background: transparent; color: var(--text-dim);
+      transition: background 0.18s ease, color 0.18s ease;
     }
+    .seg button:hover { color: var(--text); }
     .seg button[aria-pressed="true"] { background: var(--surface-2); color: var(--text); }
     .icon-btn {
       appearance: none; cursor: pointer; width: 38px; height: 38px;
       display: grid; place-items: center; border-radius: 12px;
       background: var(--surface); border: 1px solid var(--border); color: var(--text);
+      transition: border-color 0.18s ease;
     }
+    .icon-btn:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
     .icon-btn svg { width: 19px; height: 19px; }
 
     /* ---------- hero ---------- */
-    .hero { text-align: center; margin-block-end: 40px; }
-    .inky { display: block; margin-inline: auto; margin-block-end: 6px; }
-    .hero h1 { font-size: clamp(2em, 6vw, 3em); font-weight: 800; letter-spacing: -0.02em; }
+    .hero { text-align: center; padding-block: 6px 46px; }
+    .inky { display: block; margin-inline: auto; margin-block-end: 4px; }
+    .hero h1 {
+      font-size: clamp(2.1em, 6.4vw, 3.3em); font-weight: 800;
+      letter-spacing: -0.022em; line-height: 1.18;
+    }
     .hero .tagline {
-      font-size: 1.08em; font-weight: 600; margin-block-start: 6px;
+      font-size: clamp(1.02em, 2.5vw, 1.2em); font-weight: 700;
+      margin-block-start: 10px; max-width: 44ch; margin-inline: auto;
+      color: color-mix(in srgb, var(--accent) 66%, var(--text));
+      text-wrap: balance;
+    }
+    .hero .lede {
+      color: var(--text-dim); max-width: 64ch;
+      margin-inline: auto; margin-block-start: 14px; font-size: 0.99em;
+    }
+
+    .badge-row {
+      display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+      margin-block-start: 18px;
+    }
+    .pill {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 6px 14px; border-radius: 999px; font-weight: 700; font-size: 0.82em;
+      color: var(--text-dim); background: var(--surface); border: 1px solid var(--border);
+    }
+    .pill.is-key {
       color: color-mix(in srgb, var(--accent) 62%, var(--text));
-    }
-    .hero .lede { color: var(--text-dim); max-width: 62ch; margin-inline: auto; margin-block-start: 12px; }
-
-    .price-badge {
-      display: inline-flex; align-items: center; gap: 8px; margin-block-start: 16px;
-      padding: 7px 16px; border-radius: 999px; font-weight: 700; font-size: 0.88em;
-      color: color-mix(in srgb, var(--accent) 60%, var(--text));
       background: color-mix(in srgb, var(--accent) 13%, transparent);
-      border: 1px solid color-mix(in srgb, var(--accent) 36%, transparent);
+      border-color: color-mix(in srgb, var(--accent) 36%, transparent);
     }
 
-    .cta-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-block-start: 20px; }
+    .cta-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-block-start: 22px; }
     .btn {
       display: inline-flex; align-items: center; gap: 9px;
-      padding: 12px 22px; border-radius: 13px; text-decoration: none;
-      font-weight: 700; font-size: 0.94em; border: 1px solid var(--border);
+      padding: 13px 24px; border-radius: var(--radius-sm); text-decoration: none;
+      font-weight: 700; font-size: 0.95em; border: 1px solid var(--border);
       background: var(--surface); color: var(--text);
-      transition: transform 0.18s ease, border-color 0.18s ease;
+      transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
     }
-    .btn:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--accent) 46%, var(--border)); }
-    .btn svg { width: 18px; height: 18px; }
+    .btn:hover {
+      transform: translateY(-2px);
+      border-color: color-mix(in srgb, var(--accent) 46%, var(--border));
+    }
+    .btn svg { width: 18px; height: 18px; flex: none; }
     .btn-primary {
       background: linear-gradient(135deg, var(--ink), var(--ink-deep));
       border-color: transparent; color: #fff;
+      box-shadow: 0 10px 26px color-mix(in srgb, var(--ink) 34%, transparent);
+    }
+    .btn-primary:hover { box-shadow: 0 15px 34px color-mix(in srgb, var(--ink) 44%, transparent); }
+
+    /* The one-sentence machine-readable answer to "what is this".
+       Small, quiet, and directly under the buttons, because the
+       reader who needs it is the one who has not decided to read
+       anything longer. */
+    .whatis {
+      margin-block-start: 20px; font-size: 0.86em; color: var(--text-faint);
+      max-width: 56ch; margin-inline: auto;
     }
 
     /* ---------- sections ---------- */
-    section { margin-block-end: 46px; }
+    section { margin-block-end: 56px; scroll-margin-block-start: 20px; }
+    .eyebrow {
+      display: inline-block; font-size: 0.74em; font-weight: 800;
+      letter-spacing: 0.11em; text-transform: uppercase;
+      color: color-mix(in srgb, var(--accent) 74%, var(--text-dim));
+      margin-block-end: 7px;
+    }
     .section-title {
-      font-size: 1.35em; font-weight: 800; margin-block-end: 6px;
-      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      font-size: clamp(1.35em, 3.4vw, 1.7em); font-weight: 800;
+      letter-spacing: -0.014em; line-height: 1.3;
     }
-    .section-lede { color: var(--text-dim); margin-block-end: 18px; }
-    .badge-new {
-      font-size: 0.6em; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
-      padding: 3px 10px; border-radius: 999px; color: #24170a;
-      background: var(--brass);
-    }
+    .section-lede { color: var(--text-dim); margin-block-start: 9px; max-width: 68ch; }
 
     .panel {
       background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 22px;
+      border-radius: var(--radius); padding: 24px; margin-block-start: 18px;
     }
-    .panel + .panel { margin-block-start: 14px; }
     .panel p + p { margin-block-start: 12px; }
 
     .note {
@@ -586,141 +988,228 @@ function getCSS() {
       padding-inline-start: 14px; color: var(--text-dim); font-size: 0.93em;
     }
 
-    /* ---------- the tofu demo ----------
-       The point of the whole page, so it is a real
-       comparison rather than a screenshot: the same string
-       twice, once in a font stack that cannot draw it. */
-    .tofu-demo { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-block: 18px; }
-    .tofu-card {
+    /* ---------- symptoms ----------
+       The list is the SEO surface and the comprehension surface at
+       once: these are the sentences people type into a search box,
+       so they are real body text with a check beside each one. */
+    .symptoms { list-style: none; display: grid; gap: 10px; margin-block-start: 18px; }
+    .symptoms li {
+      display: flex; align-items: flex-start; gap: 12px;
+      background: var(--surface); border: 1px solid var(--border-soft);
+      border-radius: var(--radius-sm); padding: 13px 16px;
+      font-size: 0.94em;
+      transition: border-color 0.18s ease, transform 0.18s ease;
+    }
+    .symptoms li:hover {
+      border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+      transform: translateX(0);
+    }
+    .symptom-mark {
+      flex: none; width: 22px; height: 22px; border-radius: 7px;
+      display: grid; place-items: center; font-size: 0.78em; font-weight: 800;
+      margin-block-start: 4px;
+      color: color-mix(in srgb, var(--blush) 78%, var(--text));
+      background: color-mix(in srgb, var(--blush) 18%, transparent);
+      border: 1px solid color-mix(in srgb, var(--blush) 38%, transparent);
+    }
+
+    /* ---------- the specimen ---------- */
+    .spec { display: grid; gap: 12px; margin-block-start: 20px; }
+    .spec-row {
       background: var(--surface-2); border: 1px solid var(--border);
-      border-radius: 14px; padding: 18px; text-align: center;
+      border-radius: var(--radius); padding: 18px 20px;
+      display: grid; gap: 4px;
     }
-    .tofu-card.is-bad { border-color: color-mix(in srgb, var(--blush) 42%, var(--border)); }
-    .tofu-card.is-good { border-color: color-mix(in srgb, var(--accent) 48%, var(--border)); }
-    .tofu-sample { font-size: 1.7em; font-weight: 700; line-height: 1.5; direction: rtl; }
-    .tofu-card.is-bad .tofu-sample {
-      color: color-mix(in srgb, var(--blush) 70%, var(--text));
-      letter-spacing: 0.06em;
+    .spec-row.is-bad { border-color: color-mix(in srgb, var(--blush) 40%, var(--border)); }
+    .spec-row.is-good {
+      border-color: color-mix(in srgb, var(--accent) 52%, var(--border));
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
     }
-    .tofu-label { font-size: 0.8em; color: var(--text-dim); margin-block-start: 8px; }
+    .spec-head {
+      display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+      font-size: 0.78em; font-weight: 800; letter-spacing: 0.04em;
+      text-transform: uppercase; color: var(--text-faint);
+    }
+    .spec-row.is-good .spec-head { color: color-mix(in srgb, var(--accent) 70%, var(--text)); }
+    .spec-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }
+
+    /* Direction-neutral on purpose. Each row carries its own dir
+       attribute, because one of these rows must be laid out in
+       memory order to show the bug and the others must not.
+
+       Centred for one reason: the four rows are a comparison, and
+       with each row aligned to its own start edge the right-to-left
+       samples sat hard right while the reversed one sat hard left,
+       so the four lines a reader is meant to compare never shared
+       a starting point. Centring is what makes them one column. */
+    .spec-line {
+      font-size: clamp(1.5em, 4.6vw, 2.05em); font-weight: 700;
+      line-height: 1.65; margin-block: 6px 2px;
+      word-break: break-word; text-align: center;
+    }
+    .spec-row.is-bad .spec-line { color: color-mix(in srgb, var(--blush) 66%, var(--text)); }
+    .spec-tofu { letter-spacing: 0.08em; }
+    .spec-reversed { direction: ltr; unicode-bidi: bidi-override; }
+    .spec-note { font-size: 0.86em; color: var(--text-dim); }
+
+    .spec-mixed {
+      background: var(--surface); border: 1px dashed var(--border);
+      border-radius: var(--radius); padding: 16px 20px; text-align: center;
+    }
+    .spec-mixed .spec-line { font-size: clamp(1.05em, 3vw, 1.4em); }
 
     /* ---------- feature grid ---------- */
-    .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+    .features {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(272px, 1fr));
+      gap: 14px; margin-block-start: 20px;
+    }
     .feature {
       background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 20px;
-      transition: transform 0.18s ease, border-color 0.18s ease;
+      border-radius: var(--radius); padding: 22px;
+      transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
     }
-    .feature:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
-    .feature-mark { font-size: 1.6em; line-height: 1.2; }
-    .feature h3 { font-size: 1.02em; font-weight: 700; margin-block: 8px 5px; }
-    .feature p { font-size: 0.9em; color: var(--text-dim); }
+    .feature:hover {
+      transform: translateY(-3px);
+      border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+      box-shadow: var(--shadow);
+    }
+    .feature-mark { font-size: 1.7em; line-height: 1.2; }
+    .feature h3 { font-size: 1.04em; font-weight: 800; margin-block: 9px 6px; }
+    .feature p { font-size: 0.91em; color: var(--text-dim); }
 
-    /* ---------- coverage badges ---------- */
-    .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-block-start: 14px; }
-    .cov {
-      font-size: 0.8em; font-weight: 700; padding: 4px 12px; border-radius: 999px;
-      border: 1px solid transparent;
-    }
-    .cov.full {
-      color: color-mix(in srgb, var(--accent) 62%, var(--text));
-      background: color-mix(in srgb, var(--accent) 14%, transparent);
-      border-color: color-mix(in srgb, var(--accent) 38%, transparent);
-    }
-    .cov.part {
-      color: color-mix(in srgb, var(--brass) 70%, var(--text));
-      background: color-mix(in srgb, var(--brass) 16%, transparent);
-      border-color: color-mix(in srgb, var(--brass) 42%, transparent);
-    }
-    .cov.none { color: var(--text-dim); background: var(--surface-2); border-color: var(--border); }
-
-    /* ---------- install ---------- */
-    .steps { list-style: none; counter-reset: step; display: grid; gap: 12px; }
-    .steps li { display: flex; align-items: flex-start; gap: 12px; }
+    /* ---------- steps ---------- */
+    .steps { list-style: none; counter-reset: step; display: grid; gap: 14px; }
+    .steps li { display: flex; align-items: flex-start; gap: 13px; }
     .steps li::before {
       counter-increment: step; content: counter(step);
-      flex: none; width: 26px; height: 26px; border-radius: 50%;
+      flex: none; width: 27px; height: 27px; border-radius: 50%;
       display: grid; place-items: center; font-size: 0.8em; font-weight: 800;
-      color: #fff; background: var(--ink);
+      color: #fff; background: var(--ink); margin-block-start: 3px;
     }
-    .copy-row {
-      display: flex; align-items: stretch; gap: 8px; margin-block-start: 8px; flex-wrap: wrap;
-    }
+    .steps b { font-weight: 700; }
+
+    .copy-row { display: flex; align-items: stretch; gap: 8px; margin-block-start: 10px; flex-wrap: wrap; }
     .copy-url {
-      flex: 1 1 300px; min-width: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 0.86em; padding: 11px 14px; border-radius: 11px; direction: ltr; text-align: start;
-      background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+      flex: 1 1 320px; min-width: 0;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.86em; padding: 12px 15px; border-radius: var(--radius-sm);
+      direction: ltr; text-align: start;
+      background: var(--surface-3); border: 1px solid var(--border); color: var(--text);
       overflow-x: auto; white-space: nowrap;
     }
     .copy-btn {
       appearance: none; cursor: pointer; font: inherit; font-weight: 700; font-size: 0.86em;
-      padding: 11px 18px; border-radius: 11px; border: 1px solid transparent;
-      background: var(--ink); color: #fff;
+      padding: 12px 20px; border-radius: var(--radius-sm); border: 1px solid transparent;
+      background: var(--ink); color: #fff; flex: none;
+      transition: filter 0.18s ease;
+    }
+    .copy-btn:hover { filter: brightness(1.1); }
+
+    pre.code {
+      margin-block-start: 12px; padding: 16px 18px; border-radius: var(--radius-sm);
+      background: var(--surface-3); border: 1px solid var(--border);
+      overflow-x: auto; direction: ltr; text-align: start;
+    }
+    pre.code code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.83em; line-height: 1.85; color: var(--text-dim); white-space: pre;
+    }
+
+    /* ---------- fields table ---------- */
+    .table-scroll { overflow-x: auto; margin-block-start: 18px; border-radius: var(--radius); }
+    table.fields {
+      width: 100%; border-collapse: collapse; min-width: 460px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden;
+    }
+    table.fields th, table.fields td {
+      padding: 12px 16px; text-align: start; vertical-align: top;
+      border-block-end: 1px solid var(--border-soft); font-size: 0.9em;
+    }
+    table.fields thead th {
+      font-size: 0.74em; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--text-faint); background: var(--surface-3);
+    }
+    table.fields tbody tr:last-child th, table.fields tbody tr:last-child td { border-block-end: 0; }
+    table.fields tbody th {
+      font-weight: 700; white-space: nowrap; direction: ltr;
+      color: color-mix(in srgb, var(--accent) 58%, var(--text));
+    }
+    table.fields td { color: var(--text-dim); }
+
+    /* ---------- limits ---------- */
+    .limits { list-style: none; display: grid; gap: 11px; }
+    .limits li { display: flex; align-items: flex-start; gap: 11px; font-size: 0.93em; color: var(--text-dim); }
+    .limits svg {
+      width: 18px; height: 18px; flex: none; margin-block-start: 6px;
+      color: color-mix(in srgb, var(--brass) 76%, var(--text));
     }
 
     /* ---------- requirements ---------- */
-    .reqs { list-style: none; display: grid; gap: 9px; }
-    .reqs li { display: flex; align-items: flex-start; gap: 10px; font-size: 0.94em; }
+    .reqs { list-style: none; display: grid; gap: 10px; }
+    .reqs li { display: flex; align-items: flex-start; gap: 11px; font-size: 0.94em; }
     .reqs svg {
-      width: 18px; height: 18px; flex: none; margin-block-start: 5px;
-      color: color-mix(in srgb, var(--accent) 62%, var(--text));
+      width: 18px; height: 18px; flex: none; margin-block-start: 6px;
+      color: color-mix(in srgb, var(--accent) 64%, var(--text));
     }
 
     /* ---------- faq ---------- */
     details.faq {
       background: var(--surface); border: 1px solid var(--border);
-      border-radius: 14px; padding: 14px 18px;
+      border-radius: var(--radius-sm); padding: 15px 19px;
+      transition: border-color 0.18s ease;
     }
+    details.faq[open] { border-color: color-mix(in srgb, var(--accent) 34%, var(--border)); }
     details.faq + details.faq { margin-block-start: 10px; }
+    details.faq:first-of-type { margin-block-start: 18px; }
     details.faq summary {
       cursor: pointer; font-weight: 700; list-style: none;
       display: flex; align-items: center; justify-content: space-between; gap: 12px;
     }
     details.faq summary::-webkit-details-marker { display: none; }
-    details.faq summary::after { content: '+'; font-weight: 800; color: var(--text-dim); }
+    details.faq summary::after { content: '+'; font-weight: 800; color: var(--text-faint); flex: none; }
     details.faq[open] summary::after { content: '−'; }
-    details.faq p { color: var(--text-dim); font-size: 0.93em; margin-block-start: 10px; }
+    details.faq p { color: var(--text-dim); font-size: 0.93em; margin-block-start: 11px; }
 
     /* ---------- also on this shelf ---------- */
-    .shelf { display: grid; gap: 12px; }
+    .shelf { display: grid; gap: 12px; margin-block-start: 18px; }
     .shelf a {
-      display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-      padding: 18px; border-radius: var(--radius); text-decoration: none; color: var(--text);
+      display: flex; align-items: center; gap: 15px; flex-wrap: wrap;
+      padding: 19px; border-radius: var(--radius); text-decoration: none; color: var(--text);
       background: var(--surface); border: 1px solid var(--border);
       transition: transform 0.18s ease, border-color 0.18s ease;
     }
-    .shelf a:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
-    .shelf-mark { font-size: 1.8em; }
+    .shelf a:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--accent) 42%, var(--border)); }
+    .shelf-mark { font-size: 1.9em; flex: none; }
     .shelf-body { flex: 1 1 240px; min-width: 0; }
     .shelf-name { font-weight: 800; }
     .shelf-desc { font-size: 0.88em; color: var(--text-dim); }
-    .shelf-cta { font-weight: 700; font-size: 0.9em; color: color-mix(in srgb, var(--accent) 58%, var(--text)); }
+    .shelf-cta { font-weight: 700; font-size: 0.9em; color: color-mix(in srgb, var(--accent) 60%, var(--text)); }
 
-    /* ---------- nav & footer ---------- */
-    .nav { display: flex; justify-content: center; margin-block: 30px 24px; }
+    /* ---------- nav ---------- */
+    .nav { display: flex; justify-content: center; margin-block: 8px 26px; }
     .back-link {
       display: inline-flex; align-items: center; gap: 9px;
-      padding: 11px 18px; border-radius: 13px; text-decoration: none;
+      padding: 11px 19px; border-radius: var(--radius-sm); text-decoration: none;
       font-weight: 600; font-size: 0.9em; color: var(--text);
       background: var(--surface); border: 1px solid var(--border);
+      transition: border-color 0.18s ease;
     }
-    .back-link svg { width: 18px; height: 18px; }
+    .back-link:hover { border-color: color-mix(in srgb, var(--accent) 42%, var(--border)); }
+    .back-link svg { width: 17px; height: 17px; }
 
-    /* The brand mark in the corner is a link home now, so it needs
-       to stop looking like body text when it is hovered. */
-    .brand { text-decoration: none; color: inherit; transition: opacity 0.18s ease; }
-    .brand:hover { opacity: 0.82; }
-
-    @media (max-width: 620px) {
-      .tofu-demo { grid-template-columns: 1fr; }
+    @media (max-width: 560px) {
+      .wrap { padding-inline: 16px; }
+      .panel { padding: 18px; }
+      .spec-row { padding: 15px 16px; }
     }
 
     @media (prefers-reduced-motion: no-preference) {
-      .topbar, .hero, section { animation: uRise 0.5s cubic-bezier(0.16,1,0.3,1) both; }
-      .hero { animation-delay: 0.05s; }
+      .topbar, .hero, section { animation: uRise 0.55s cubic-bezier(0.16,1,0.3,1) both; }
+      .hero { animation-delay: 0.04s; }
       .inky { animation: uFloat 4.5s ease-in-out infinite; }
     }
-    @keyframes uRise  { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes uRise  { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes uFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
   `
 }
@@ -751,8 +1240,10 @@ function renderTopbar(lang, amirLogo) {
         </span>
       </a>
       <div class="controls">
-        <div class="seg" role="group" aria-label="${escapeHtml(p.langName)}">${segButtons}</div>
+        <div class="seg" role="group" aria-label="${escapeHtml(p.langGroup)}">${segButtons}</div>
         <button type="button" id="themeBtn" class="icon-btn" onclick="acToggleTheme()"
+                data-to-light="${escapeHtml(p.themeToLight)}"
+                data-to-dark="${escapeHtml(p.themeToDark)}"
                 aria-label="${escapeHtml(p.themeToDark)}">${icon('contrast')}</button>
       </div>
     </div>`
@@ -762,78 +1253,112 @@ function renderHero(lang) {
   const p = pack(lang)
   return `
     <div class="hero">
-      ${inky(120)}
+      ${inky(122)}
       <h1>${escapeHtml(p.title)}</h1>
-      <div class="tagline">${escapeHtml(p.tagline)}</div>
+      <p class="tagline">${escapeHtml(p.tagline)}</p>
       <p class="lede">${escapeHtml(p.lede)}</p>
-      <div class="price-badge">${escapeHtml(p.priceBadge)}</div>
+      <div class="badge-row">
+        <span class="pill is-key">${escapeHtml(p.priceBadge)}</span>
+        <span class="pill">${escapeHtml(p.badgeUnity)}</span>
+        <span class="pill">${escapeHtml(p.badgeVersion)}</span>
+      </div>
       <div class="cta-row">
         <a class="btn btn-primary" href="#install">${icon('download')}<span>${escapeHtml(p.ctaInstall)}</span></a>
-        <a class="btn" href="${escapeHtml(REPO_URL)}" rel="noopener">${escapeHtml(p.ctaRepo)}</a>
+        <a class="btn" href="${escapeHtml(REPO_URL)}" rel="noopener">${icon('github')}<span>${escapeHtml(p.ctaRepo)}</span></a>
       </div>
+      <p class="whatis">${escapeHtml(p.whatis)}</p>
     </div>`
 }
 
-// The tofu comparison.
-function renderProblem(lang) {
+
+// ==========================================
+// renderSymptoms
+//
+// The section that makes this page findable, and the one that
+// makes it understandable. Somebody with this bug does not know
+// the package exists and would never search its name; they
+// search the symptom. Every line here is a sentence somebody
+// actually types, written as content rather than as a keyword
+// list - which is also why it is the first thing under the hero.
+// ==========================================
+function renderSymptoms(lang) {
   const p = pack(lang)
-  const boxes = Array.from(p.problemBad.replace(/\s/g, '')).map(() => '□').join('')
+  const items = p.symptoms.map(text => `
+    <li>
+      <span class="symptom-mark" aria-hidden="true">□</span>
+      <span>${escapeHtml(text)}</span>
+    </li>`).join('')
 
   return `
     <section id="problem">
-      <h2 class="section-title">${escapeHtml(p.problemTitle)}</h2>
-      <p class="section-lede">${escapeHtml(p.problemBody)}</p>
-      <div class="tofu-demo">
-        <div class="tofu-card is-bad">
-          <div class="tofu-sample" aria-label="${escapeHtml(p.problemBadLabel)}">${escapeHtml(boxes)}</div>
-          <div class="tofu-label">${escapeHtml(p.problemBadLabel)}</div>
-        </div>
-        <div class="tofu-card is-good">
-          <div class="tofu-sample">${escapeHtml(p.problemGood)}</div>
-          <div class="tofu-label">${escapeHtml(p.problemGoodLabel)}</div>
-        </div>
-      </div>
-      <p class="note">${escapeHtml(p.problemAfter)}</p>
+      <span class="eyebrow">${escapeHtml(p.symptomsEyebrow)}</span>
+      <h2 class="section-title">${escapeHtml(p.symptomsTitle)}</h2>
+      <p class="section-lede">${escapeHtml(p.symptomsLede)}</p>
+      <ul class="symptoms">${items}</ul>
     </section>`
 }
 
-function renderEditorFont(lang) {
-  const p = pack(lang)
-  return `
-    <section id="editor-font">
-      <h2 class="section-title">
-        <span>${escapeHtml(p.editorTitle)}</span>
-        <span class="badge-new">${escapeHtml(p.editorBadge)}</span>
-      </h2>
-      <div class="panel">
-        <p>${escapeHtml(p.editorBody)}</p>
-        <p>${escapeHtml(p.editorBody2)}</p>
-        <p class="note">${escapeHtml(p.editorSafety)}</p>
-      </div>
-    </section>`
-}
 
-function renderCatalog(lang) {
+// ==========================================
+// renderSpecimen
+//
+// The proof. Four renderings of one Persian string, produced in
+// the browser from that string rather than photographed, so the
+// demonstration cannot go stale and reads correctly at any zoom
+// in either theme.
+//
+// Each row carries its OWN dir attribute. The good row and the
+// unjoined row are right-to-left text and are marked as such;
+// the reversed row is deliberately laid out in memory order by
+// CSS, which is the bug being shown; the tofu row is boxes and
+// has no direction worth arguing about.
+// ==========================================
+function renderSpecimen(lang) {
   const p = pack(lang)
 
-  // A miniature of the real badge row, using the same three
-  // states the tool uses. It is the fastest way to explain
-  // what "partial" means without a screenshot.
-  const badges = [
-    ['full', 'Latin'], ['full', 'Cyrillic'], ['full', 'Kana'], ['full', 'Han'],
-    ['part', 'Arabic script ~'], ['none', 'Hebrew'], ['none', 'Thai']
-  ].map(([kind, label]) => '<span class="cov ' + kind + '">' + escapeHtml(label) + '</span>').join('')
+  // `isPersian` tags the row's language for a screen reader and for
+  // font selection. It is set on the three rows that hold the Persian
+  // specimen and not on the tofu row, which is boxes rather than
+  // Persian and should not be announced as a Persian string.
+  const row = ({ kind, isPersian, label, note, text, dir, lineCls }) => `
+    <div class="spec-row ${kind}">
+      <div class="spec-head"><span class="spec-dot" aria-hidden="true"></span>${escapeHtml(label)}</div>
+      <div class="spec-line ${lineCls || ''}"${dir ? ' dir="' + dir + '"' : ''}${isPersian ? ' lang="fa"' : ''}>${escapeHtml(text)}</div>
+      <div class="spec-note">${escapeHtml(note)}</div>
+    </div>`
 
   return `
-    <section id="catalog">
-      <h2 class="section-title">${escapeHtml(p.catalogTitle)}</h2>
-      <div class="panel">
-        <p>${escapeHtml(p.catalogBody)}</p>
-        <div class="badges">${badges}</div>
-        <p class="note">${escapeHtml(p.catalogAmber)}</p>
+    <section id="specimen">
+      <span class="eyebrow">${escapeHtml(p.specEyebrow)}</span>
+      <h2 class="section-title">${escapeHtml(p.specTitle)}</h2>
+      <p class="section-lede">${escapeHtml(p.specLede)}</p>
+
+      <div class="spec">
+        ${row({
+          kind: 'is-bad', label: p.specTofuLabel, note: p.specTofuNote,
+          text: tofu(SPECIMEN_FA), lineCls: 'spec-tofu'
+        })}
+        ${row({
+          kind: 'is-bad', label: p.specUnjoinedLabel, note: p.specUnjoinedNote,
+          text: unjoined(SPECIMEN_FA), dir: 'rtl', isPersian: true
+        })}
+        ${row({
+          kind: 'is-bad', label: p.specReversedLabel, note: p.specReversedNote,
+          text: unjoined(SPECIMEN_FA), lineCls: 'spec-reversed', isPersian: true
+        })}
+        ${row({
+          kind: 'is-good', label: p.specGoodLabel, note: p.specGoodNote,
+          text: SPECIMEN_FA, dir: 'rtl', isPersian: true
+        })}
+      </div>
+
+      <div class="spec-mixed">
+        <div class="spec-line" dir="ltr">${escapeHtml(SPECIMEN_MIX)}</div>
+        <div class="spec-note">${escapeHtml(p.specMixLabel)}</div>
       </div>
     </section>`
 }
+
 
 function renderFeatures(lang) {
   const p = pack(lang)
@@ -849,15 +1374,69 @@ function renderFeatures(lang) {
 
   return `
     <section id="features">
+      <span class="eyebrow">${escapeHtml(p.featuresEyebrow)}</span>
       <h2 class="section-title">${escapeHtml(p.featuresTitle)}</h2>
       <div class="features">${cards}</div>
     </section>`
 }
 
+
+// ==========================================
+// renderUsage
+// Three steps, the bulk shortcut, the API, and the field table.
+// This is the section that answers "and then what", which the
+// previous page never did at all.
+// ==========================================
+function renderUsage(lang) {
+  const p = pack(lang)
+  const resolved = resolveLang(lang)
+
+  const rows = FIELDS.map(field => `
+    <tr>
+      <th scope="row">${escapeHtml(field.name)}</th>
+      <td>${escapeHtml(field[resolved] || field.en)}</td>
+    </tr>`).join('')
+
+  return `
+    <section id="usage">
+      <span class="eyebrow">${escapeHtml(p.usageEyebrow)}</span>
+      <h2 class="section-title">${escapeHtml(p.usageTitle)}</h2>
+      <div class="panel">
+        <ol class="steps">
+          <li><span>${escapeHtml(p.usageStep1)}</span></li>
+          <li><span><b>${escapeHtml(p.usageStep2)}</b></span></li>
+          <li><span>${escapeHtml(p.usageStep3)}</span></li>
+        </ol>
+        <p style="margin-block-start:16px">${escapeHtml(p.usageAfter)}</p>
+        <p class="note" style="margin-block-start:12px">${escapeHtml(p.usageBulk)}</p>
+      </div>
+
+      <div class="panel">
+        <h3 class="section-title" style="font-size:1.06em">${escapeHtml(p.usageCodeTitle)}</h3>
+        <pre class="code"><code>${escapeHtml(CODE_SAMPLE)}</code></pre>
+      </div>
+
+      <h3 class="section-title" style="font-size:1.1em; margin-block-start:26px">${escapeHtml(p.fieldsTitle)}</h3>
+      <div class="table-scroll">
+        <table class="fields">
+          <thead>
+            <tr>
+              <th scope="col">${escapeHtml(p.fieldsColName)}</th>
+              <th scope="col">${escapeHtml(p.fieldsColWhat)}</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </section>`
+}
+
+
 function renderInstall(lang) {
   const p = pack(lang)
   return `
     <section id="install">
+      <span class="eyebrow">${escapeHtml(p.installEyebrow)}</span>
       <h2 class="section-title">${escapeHtml(p.installTitle)}</h2>
       <div class="panel">
         <ol class="steps">
@@ -874,10 +1453,37 @@ function renderInstall(lang) {
               </span>
             </span>
           </li>
+          <li><span>${escapeHtml(p.installStep4)}</span></li>
         </ol>
       </div>
     </section>`
 }
+
+
+// ==========================================
+// renderLimits
+//
+// What it does not do, on the page rather than in a footnote.
+// A tool page that only lists wins is a tool page nobody
+// believes twice, and every line here is one the README already
+// states - so a reader who installs on the strength of this page
+// finds the same limits waiting, which is the whole point.
+// ==========================================
+function renderLimits(lang) {
+  const p = pack(lang)
+  const items = p.limits
+    .map(text => '<li>' + icon('alert') + '<span>' + escapeHtml(text) + '</span></li>')
+    .join('')
+
+  return `
+    <section id="limits">
+      <span class="eyebrow">${escapeHtml(p.limitsEyebrow)}</span>
+      <h2 class="section-title">${escapeHtml(p.limitsTitle)}</h2>
+      <p class="section-lede">${escapeHtml(p.limitsLede)}</p>
+      <div class="panel"><ul class="limits">${items}</ul></div>
+    </section>`
+}
+
 
 function renderRequirements(lang) {
   const p = pack(lang)
@@ -887,10 +1493,18 @@ function renderRequirements(lang) {
 
   return `
     <section id="requirements">
-      <h2 class="section-title">${escapeHtml(p.requirementsTitle)}</h2>
-      <div class="panel"><ul class="reqs">${items}</ul></div>
+      <span class="eyebrow">${escapeHtml(p.reqEyebrow)}</span>
+      <h2 class="section-title">${escapeHtml(p.reqTitle)}</h2>
+      <div class="panel">
+        <ul class="reqs">${items}</ul>
+      </div>
+      <div class="panel">
+        <h3 class="section-title" style="font-size:1.02em">${escapeHtml(p.troubleTitle)}</h3>
+        <p style="margin-block-start:10px; color:var(--text-dim); font-size:0.93em">${escapeHtml(p.troubleBody)}</p>
+      </div>
     </section>`
 }
+
 
 function renderFaq(lang) {
   const p = pack(lang)
@@ -902,10 +1516,12 @@ function renderFaq(lang) {
 
   return `
     <section id="faq">
+      <span class="eyebrow">FAQ</span>
       <h2 class="section-title">${escapeHtml(p.faqTitle)}</h2>
       ${items}
     </section>`
 }
+
 
 // The rest of the shelf, read from the catalogue rather than
 // hard-coded - so a third tool appears here the moment it is
@@ -934,7 +1550,79 @@ function renderShelf(lang) {
     <section id="shelf">
       <h2 class="section-title">${escapeHtml(p.alsoTitle)}</h2>
       <div class="shelf">${cards}</div>
+      <div class="nav">
+        <a class="back-link" href="${escapeHtml(localizedPath('/tools', lang))}">
+          ${icon('arrow')}<span>${escapeHtml(p.back)}</span>
+        </a>
+      </div>
     </section>`
+}
+
+
+// ==========================================
+// Search metadata
+//
+// The terms below are the ones this page genuinely answers, in
+// the language it renders in. They are NOT a wish list: every
+// one of them has a matching section of real content above, and
+// a term without one belongs in neither place.
+//
+// This is what was missing before. The page carried a canonical,
+// hreflang and a SoftwareApplication node with a one-line
+// description - and nothing that told a crawler the thing it was
+// looking at is the answer to "why is my Persian text broken in
+// Unity". A crawler cannot infer that from a product name.
+// ==========================================
+const KEYWORDS = {
+  fa: [
+    'مشکل فارسی در یونیتی', 'حل مشکل RTL یونیتی', 'فارسی نویسی در یونیتی',
+    'متن راست به چپ یونیتی', 'حروف فارسی به هم نمی‌چسبند', 'مربع خالی یونیتی',
+    'فونت فارسی یونیتی', 'TextMeshPro فارسی', 'یونیتی متن عربی',
+    'نمایش فارسی TextMeshPro', 'افزونه فارسی یونیتی', 'Unity DirectTMP'
+  ],
+  en: [
+    'Unity RTL fix', 'Unity Persian text', 'Unity Arabic text not joining',
+    'TextMeshPro Arabic', 'TextMeshPro Persian font', 'Unity right to left text',
+    'Unity tofu boxes', 'Unity missing glyphs', 'Unity dynamic font TTF',
+    'Unity Arabic shaping', 'Unity bidi', 'Unity DirectTMP'
+  ],
+  ja: [
+    'Unity 日本語 文字化け', 'Unity 豆腐 文字', 'TextMeshPro 日本語 フォント',
+    'Unity フォント 動的', 'Unity アラビア語 表示', 'Unity 右から左 テキスト',
+    'TextMeshPro 中国語', 'Unity 多言語 フォント', 'Unity DirectTMP'
+  ]
+}
+
+// What the tool does, in the vocabulary a machine indexes rather
+// than the vocabulary a headline is written in.
+const FEATURE_LIST = {
+  fa: [
+    'شکل‌دهی و اتصال حروف فارسی، عربی و اردو از روی جدول GSUB خودِ فونت',
+    'ترتیب راست‌به‌چپ (bidi)، شامل خط‌های شکسته‌شده',
+    'استفاده‌ی مستقیم از فایل .ttf و .otf بدون Font Asset Creator',
+    'یک فونت جدا برای هر زبان روی یک لیبل',
+    'OutLine مخصوص یک لیبل با متریال اختصاصی',
+    'پشتیبانی از ژاپنی، چینی، کره‌ای، سیریلیک، یونانی، تایلندی و ایموجی',
+    'بارگذاری فونت در زمان اجرا از فایل یا آرایه‌ی بایت'
+  ],
+  en: [
+    'Arabic, Persian and Urdu letter shaping read from the font’s own GSUB table',
+    'Right-to-left (bidi) reordering, including across wrapped lines',
+    'Use a .ttf or .otf directly, with no Font Asset Creator step',
+    'A different font per language on a single label',
+    'Per-label outline through an owned material',
+    'Japanese, Chinese, Korean, Cyrillic, Greek, Thai and emoji support',
+    'Runtime font loading from a file path or a byte array'
+  ],
+  ja: [
+    'フォント自身の GSUB テーブルから読み出すアラビア文字・ペルシャ語・ウルドゥー語の整形',
+    '折り返し行を含む右から左(bidi)の並べ替え',
+    'Font Asset Creator を使わず .ttf / .otf を直接利用',
+    '1 つのラベルで言語ごとに異なるフォント',
+    '専用マテリアルによるラベル単位のアウトライン',
+    '日本語・中国語・韓国語・キリル文字・ギリシャ文字・タイ文字・絵文字に対応',
+    'ファイルパスやバイト配列からの実行時フォント読み込み'
+  ]
 }
 
 
@@ -947,12 +1635,20 @@ function createPage(lang, theme) {
   const p = pack(resolved)
   const site = NAV_I18N[resolved]
   const themeAttr = theme === 'light' || theme === 'dark' ? ` data-theme="${theme}"` : ''
+
+  // The title carries the symptom, not just the product name. A
+  // result reading "Unity DirectTMP - Unity tools" tells somebody
+  // searching for broken Persian text nothing at all; this one is
+  // the answer to their query in the fifty characters they read.
   const title = `${p.title} — ${p.tagline}`
+
   const trail = [
     { href: '/', label: site.home },
     { href: '/tools', label: site.tools },
     { href: '/unity-directtmp', label: 'Unity DirectTMP' }
   ]
+
+  const installSteps = [p.installStep1, p.installStep2, p.installStep3 + ' ' + GIT_URL, p.installStep4]
 
   return `<!DOCTYPE html>
 <html dir="${p.dir}" lang="${resolved}"${themeAttr}>
@@ -964,16 +1660,35 @@ function createPage(lang, theme) {
     description: p.lede,
     lang: resolved,
     type: 'product',
+    keywords: KEYWORDS[resolved] || KEYWORDS.en,
     graph: [
       breadcrumbLd(trail, resolved),
       softwareApplicationLd({
         name: 'Unity DirectTMP',
+        alternateName: ['DirectTMP', 'Unity Direct TMP'],
         description: p.lede,
         path: '/unity-directtmp',
-        version: CONFIG.DIRECTTMP.VERSION,
+        version: VERSION,
         price: '0',
-        repo: CONFIG.DIRECTTMP.REPO_URL
-      })
+        repo: REPO_URL,
+        downloadUrl: REPO_URL,
+        installUrl: GIT_URL,
+        softwareHelp: REPO_URL + '#readme',
+        featureList: FEATURE_LIST[resolved] || FEATURE_LIST.en,
+        keywords: KEYWORDS[resolved] || KEYWORDS.en,
+        requirements: 'Unity 2021.3 LTS or newer, TextMeshPro',
+        inLanguage: ['fa', 'en', 'ja'],
+        license: 'https://opensource.org/licenses/MIT'
+      }),
+      howToLd({
+        name: p.installTitle,
+        description: p.installEyebrow,
+        path: '/unity-directtmp',
+        lang: resolved,
+        tool: 'Unity Package Manager',
+        steps: installSteps
+      }),
+      faqPageLd(p.faq, resolved)
     ]
   })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -988,11 +1703,12 @@ function createPage(lang, theme) {
     ${siteBreadcrumb({ lang: resolved, trail })}
     <main id="main">
       ${renderHero(resolved)}
-      ${renderProblem(resolved)}
-      ${renderEditorFont(resolved)}
-      ${renderCatalog(resolved)}
+      ${renderSymptoms(resolved)}
+      ${renderSpecimen(resolved)}
       ${renderFeatures(resolved)}
+      ${renderUsage(resolved)}
       ${renderInstall(resolved)}
+      ${renderLimits(resolved)}
       ${renderRequirements(resolved)}
       ${renderFaq(resolved)}
       ${renderShelf(resolved)}

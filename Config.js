@@ -127,6 +127,15 @@ export const CONFIG = deepFreeze({
   //   https://github.com/AmirCollider/UnityDocSnap/blob/main/package.json
   DOCSNAP: {
     REPO_URL: 'https://github.com/AmirCollider/UnityDocSnap',
+
+    // The address pasted into Package Manager ▸ Add package from git
+    // URL. It is the repository URL with `.git` on the end, and it
+    // is NOT interchangeable with REPO_URL: pasting the browser URL
+    // into that dialog fails with an unhelpful error, which is why
+    // the product page has to print this exact string rather than
+    // link to the repository and let somebody work it out.
+    GIT_URL: 'https://github.com/AmirCollider/UnityDocSnap.git',
+
     VERSION: '1.0.3',
     TIERS: {
       plus: { name: 'Plus', price: '19.99', buyUrl: '/checkout?tier=plus' },
