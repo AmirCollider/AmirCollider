@@ -28,6 +28,7 @@
 // ==========================================
 
 import { CONFIG, validateGameId } from '../Config.js'
+import { gameFacts } from '../Content/GameFacts.js'
 import { getPageHead } from '../Core/DesignSystem.js'
 import { createErrorPage } from '../Core/ErrorPage.js'
 import { createHtmlResponse } from '../Core/Http.js'
@@ -905,10 +906,45 @@ function renderHero(lang, game, amirLogo, gameLogo) {
 // authored for meaning, not for shape - do not spend time hand-
 // sorting them, and do not be surprised when the rendered order
 // differs from the source order.
+// ==========================================
+// renderGameFacts
+// The block that makes a per-game policy page a page.
+//
+// Twelve per-game policy URLs were serving a document identical to
+// the site-wide one apart from an emoji, which is why Google
+// discovered them and never crawled them. Everything here is read
+// from the game's registry entry - see Content/GameFacts.js for
+// what that guarantees and why the rows are derived rather than
+// written.
+//
+// Renders nothing at all on the site-wide page, which is not about
+// a game.
+// ==========================================
+function renderGameFacts(lang) {
+  const facts = gameFacts(CONTEXT.siteLevel ? null : CONTEXT.game, lang, 'terms')
+  if (!facts) return ''
+
+  return `
+      <section class="panel">
+        <h2><span class="sec-ic">${icon('gamepad', 'p-ic')}</span><span>${escapeHtml(facts.title)}</span></h2>
+        <p>${escapeHtml(facts.intro)}</p>
+        <ul class="contact-list">
+          ${facts.rows.map(row => `
+          <li>
+            <span class="c-ic">${icon('doc', 'p-ic')}</span>
+            <span class="c-key">${escapeHtml(row.label)}</span>
+            <span class="c-val" dir="auto">${escapeHtml(row.value)}</span>
+          </li>`).join('')}
+        </ul>
+      </section>`
+}
+
+
 function renderSections(lang) {
   const p = pack(lang)
   return `
     <div class="policy">
+      ${renderGameFacts(lang)}
       ${SECTION_ORDER.map(sec => `
       <section class="panel">
         <h2><span class="sec-ic">${icon(sec.ic, 'p-ic')}</span><span>${escapeHtml(p['sec.' + sec.key + '.title'])}</span></h2>

@@ -19,6 +19,7 @@
 import { CONFIG, LANGUAGES, GAME_STATUS } from '../Config.js'
 import { absoluteUrl, siteOrigin } from '../Core/Seo.js'
 import { localizedPath, isLangRoutable } from '../Core/Locale.js'
+import { db, listVersions } from '../Games/Store.js'
 
 
 // Paths a crawler must never index: operator panels, anything that
@@ -62,7 +63,13 @@ function xmlEscape(value) {
  * at a low priority: submitting a page that says "coming soon" is
  * asking to be indexed for a thing that does not exist yet.
  */
-export function indexablePaths(games = {}) {
+export function indexablePaths(games = {}, options = {}) {
+  // Which games have at least one recorded release. Passed in
+  // rather than queried here, because this function is also called
+  // by robots.txt and by tests that have no database. An empty set
+  // means "nothing known", and see the note at the versions entry
+  // below for which way that falls.
+  const released = options.released || null
   const paths = [
     { loc: '/', priority: '1.0', changefreq: 'weekly', image: CONFIG.AMIR_LOGO, title: 'AmirCollider' },
     { loc: '/about', priority: '0.9', changefreq: 'monthly', image: CONFIG.AMIR_LOGO, title: 'AmirCollider' },
@@ -95,7 +102,29 @@ export function indexablePaths(games = {}) {
       title: game.name
     })
 
-    paths.push({ loc: '/' + game.id + '/versions', priority: '0.5', changefreq: 'weekly' })
+    // ==========================================
+    // The changelog, only once there is one.
+    //
+    // Search Console listed twenty URLs as "Discovered - currently
+    // not indexed": found in this sitemap, never fetched. Six of
+    // them were these. An empty changelog is 158 words that say
+    // "no version has been published yet", repeated per game per
+    // language - and submitting a page like that spends crawl
+    // budget that the game's own page needed.
+    //
+    // It stays linked from every game page, so the day a release
+    // is recorded Google finds it the ordinary way, and the entry
+    // below starts appearing too.
+    //
+    // `released === null` means nobody asked the database - which
+    // is the case for robots.txt and for any caller without an
+    // env. That falls through to INCLUDING the page: submitting a
+    // thin page is a small waste, and dropping a page that has
+    // content because a query failed is a real loss.
+    // ==========================================
+    if (!released || released.has(game.id)) {
+      paths.push({ loc: '/' + game.id + '/versions', priority: '0.5', changefreq: 'weekly' })
+    }
     if (game.capabilities && game.capabilities.leaderboard) {
       paths.push({ loc: '/' + game.id + '/leaderboard', priority: '0.7', changefreq: 'daily' })
     }
@@ -107,6 +136,26 @@ export function indexablePaths(games = {}) {
   }
 
   return paths
+}
+
+
+/**
+ * The ids of games that have at least one recorded release.
+ *
+ * Returns null when there is no database to ask, which
+ * indexablePaths() reads as "include the changelog anyway".
+ */
+async function releasedGames(games, env) {
+  const database = db(env)
+  if (!database) return null
+
+  const released = new Set()
+  for (const game of Object.values(games || {})) {
+    if (!game || !game.id) continue
+    const rows = await listVersions(database, game.id, 1)
+    if (rows.length) released.add(game.id)
+  }
+  return released
 }
 
 
@@ -231,14 +280,21 @@ export function handleRobots(url, request, gameId, requestId, GAMES) {
 // themselves. Generating all of them from one loop is what makes
 // that true by construction rather than by proofreading.
 // ==========================================
-export function handleSitemap(url, request, gameId, requestId, GAMES) {
+export async function handleSitemap(url, request, gameId, requestId, GAMES, env) {
+  // One query per game, behind the same hour of caching the rest
+  // of this response gets. Failure is caught inside listVersions
+  // and comes back as an empty list, which this treats as "no
+  // releases" - so a database blip drops six low-value URLs from
+  // one fetch of the sitemap and nothing else.
+  const released = await releasedGames(GAMES, env)
+
   // A constant, not today. See the note on CONFIG.SITEMAP_LASTMOD:
   // a sitemap that reports every page as having changed today, and
   // again tomorrow, is a sitemap whose dates a crawler stops
   // reading - on the pages where the date was real as well.
   const lastmod = CONFIG.SITEMAP_LASTMOD
 
-  const entries = indexablePaths(GAMES).flatMap(entry => {
+  const entries = indexablePaths(GAMES, { released }).flatMap(entry => {
     const alternates = LANGUAGES.supported.map(code =>
       '    <xhtml:link rel="alternate" hreflang="' + code + '" href="'
       + xmlEscape(absoluteUrl(localizedPath(entry.loc, code))) + '"/>'

@@ -545,6 +545,92 @@ Testing the *request* as well was the first version of this rule
 and it was wrong twice: it broke `/en/games/` into a three-redirect
 chain, and it was not buying the protection it appeared to.
 
+### Reading the Search Console index report
+
+The first real report on this property, two weeks in: **46 indexed,
+27 not indexed, 5 reasons.** Three of those reasons are the site
+working correctly and two were real. Grey is not automatically bad,
+and knowing which is which is the whole skill.
+
+| Reason | Pages | Verdict |
+|---|---|---|
+| Blocked by robots.txt | 3 | **Correct.** The panels and the transactional pages are disallowed on purpose |
+| Alternative page with proper canonical tag | 2 | **Correct — and it is the count that proves it.** Exactly two: `/docsnap` and `/directtmp`, the short aliases that canonicalise to `/unity-docsnap` and `/unity-directtmp` |
+| Duplicate without user-selected canonical | 1 | **Real.** `/?lang=` — see below |
+| Discovered – currently not indexed | 20 | **Real.** See below |
+| Crawled – currently not indexed | 1 | Normal for a new site; one Japanese leaderboard page |
+
+**`/?lang=` — an empty parameter.** `languageRedirect()` tested the
+`lang` value for truthiness, so an empty string fell straight
+through and the front page answered `200` at a second address. So
+did `?lang` with no equals sign, `?lang=xx` naming a language the
+site does not speak, and `/en?lang=` where a path prefix had
+already decided. Four extra spellings of pages that have one. The
+canonical tag was correct on all of them, which is why this was
+cosmetic rather than serious — but a crawler has to *fetch* a page
+to read its canonical, and it had already spent the fetch. All four
+shapes `301` to the canonical address now.
+
+**"Discovered – currently not indexed" is the one that mattered.**
+Twenty URLs, every one with `N/A` for *last crawled*: Google found
+them in the sitemap and decided not to spend a fetch on any of
+them. The examples were all `/en/chronoblades/*` — privacy, store,
+terms, versions.
+
+Measuring them explained it in one number. **The Chrono Blades
+privacy policy differed from the site-wide privacy policy by three
+tokens** — the game's emoji and the words "Game" and "View" from a
+navigation link. The body was byte-identical. Twelve addresses (two
+games × two policies × three languages) were serving one document,
+and six more were empty changelogs. Google was right.
+
+Deleting them was never an option: each game's **OAuth consent
+screen points at `/{game}/privacy` and `/{game}/terms`**, so they
+have to load and have to be about that application. So they say
+something now — `Content/GameFacts.js` renders a block of facts
+read from the game's registry entry: its name, its Android package,
+where it is downloaded from, which Google scopes it reads, which
+progress fields it stores, and what can be bought in it.
+
+Every row is derived from `capabilities`, `package`,
+`download.links`, `leaderboard` and `store.products` — the same
+flags that decide whether those pages exist at all. **A game with no
+store cannot claim purchases here, and a game that never signs
+anyone in cannot claim to read a Google profile.** That is the same
+guarantee `Content/GoogleDisclosure.js` gives, and it is what makes
+this block safe to generate rather than write.
+
+Overlap with the site-wide policy, measured as shared unique words:
+
+| Page | Before | After |
+|---|---|---|
+| `/en/{game}/privacy` | 99% | 87–88% |
+| `/en/{game}/terms` | 99% | 92–93% |
+
+The two *games'* policies remain about 97% alike, and that is
+honest rather than unfixed: they have the same capabilities, so
+they have the same privacy posture, and the rows that genuinely
+differ — the stored progress fields, the products, the package, the
+store — are exactly the rows now on the page. Chrono Blades records
+a stage and an equipped knife because it declares a `leaderboard`
+block; Neon Katana records neither, and its policy no longer
+implies it does.
+
+**The empty changelogs are no longer submitted.** `indexablePaths()`
+takes the set of games that have at least one recorded release, and
+`/{game}/versions` enters the sitemap only for those. It stays
+linked from every game page, so the day a release is recorded
+Google finds it the ordinary way. With no database to ask — which
+is the case for `robots.txt` — the page is included, because
+submitting a thin page is a small waste and dropping a page that
+has content because a query failed is a real loss.
+
+> **What no code change can do.** A two-week-old domain with no
+> inbound links has very little crawl budget, and "Discovered –
+> currently not indexed" is what that looks like from the inside.
+> Fewer and better URLs is the half that is in the repository. The
+> other half is the off-site work in section 2 below, and time.
+
 ### Google's policies, and where this site stands against them
 
 Every choice below was checked against Google Search's own

@@ -161,6 +161,10 @@ Content/               Large static content
   GoogleDisclosure.js  the "what Google sign-in is for" text (fa/en/ja) and the
                        per-game default built from `capabilities`. Read by
                        Pages/GameLanding.js AND Api/TheGodApi.js — one copy.
+  GameFacts.js         the per-game block on /{game}/privacy and /{game}/terms:
+                       name, package, stores, scopes, stored progress fields,
+                       products. All derived from the registry entry — see
+                       Docs/Seo.md for the duplication this fixed.
   ToolsCatalog.js, AboutMe.js, DocSnapVideos.js, SupportTemplates.js
 Scripts/               Dev tools. Not deployed.
   CheckBrandCoverage.mjs  every spelling of every name -> does the
@@ -564,6 +568,7 @@ nothing else breaks — a confusing hour.
 | Make a Persian name findable however it is typed | nothing — `persianSpellingVariants()` in `Core/Seo.js` derives all six forms: Arabic-codepoint (ی→ي, ک→ك) × separator (space / ZWNJ / joined), for every Persian alias and game `altNames` entry |
 | Change which misspellings `/about` publishes | `CONFIG.BRAND.TYPOS_SHOWN` — three, named not indexed. `MISSPELLINGS` is the full reference list and appears nowhere on the site |
 | Test that every spelling still reaches a page | `node Scripts/CheckBrandCoverage.mjs` (add `--remote` for the live site) |
+| Change what a per-game policy page says about ITS game | `Content/GameFacts.js` — one file, read by `Pages/Privacy.js` and `Pages/Terms.js`. Every row is derived from the registry, so a game cannot claim a capability it lacks |
 | Change which URL shapes redirect to the canonical one | `normalizeRedirect()` in `Worker.js`. It tests the **destination** only — testing the request too breaks `/en/games/` and does not protect case-sensitive R2 keys |
 
 ---

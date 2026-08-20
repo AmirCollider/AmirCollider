@@ -579,12 +579,49 @@ function languageRedirect(url, request) {
     return redirectTo(path, params, 301)
   }
 
+  // A prefix AND a query parameter. The prefix has already decided
+  // the language, so the parameter is a second address for a page
+  // that has one - "/en?lang=" and "/en?lang=fa" both render
+  // exactly what "/en" renders. Same class of duplicate as the
+  // empty parameter below, reached from the other direction.
+  if (pathLang && params.has('lang') && isLangRoutable(path)) {
+    params.delete('lang')
+    return redirectTo(localizedPath(path, pathLang), params, 301)
+  }
+
   // The old query form. Only for paths that take a prefix - the
   // checkout keeps `?lang=` exactly as it is, because a payment
   // provider is holding a `success_url` that carries one.
   if (!pathLang && queryLang && LANGUAGES.supported.includes(queryLang) && isLangRoutable(path)) {
     params.delete('lang')
     return redirectTo(localizedPath(path, queryLang), params, 301)
+  }
+
+  // ==========================================
+  // A `lang` parameter that names no language.
+  //
+  // Search Console reported "https://amircollider.com/?lang=" as
+  // "Duplicate without user-selected canonical" - an EMPTY value.
+  // The rule above tests `queryLang` for truthiness, so an empty
+  // string fell straight through it and the page answered 200 at a
+  // second address. So did `?lang` with no equals sign, and
+  // `?lang=xx` naming a language this site does not speak: three
+  // more spellings of the front page, none of them intended.
+  //
+  // The canonical tag was correct on all of them, which is why
+  // this was a cosmetic problem rather than a serious one. It is
+  // still a URL that should not exist, and a crawler that has to
+  // fetch a page to discover it is a duplicate has already spent
+  // the fetch.
+  //
+  // Dropped rather than resolved: an unusable value carries no
+  // preference, so the reader wants the address they asked for
+  // without it. The path-prefix rules above have already run, so
+  // this cannot strip a `lang` that meant something.
+  // ==========================================
+  if (!pathLang && params.has('lang') && !LANGUAGES.supported.includes(queryLang) && isLangRoutable(path)) {
+    params.delete('lang')
+    return redirectTo(path, params, 301)
   }
 
   // A bare path, and a reader who would rather have another
