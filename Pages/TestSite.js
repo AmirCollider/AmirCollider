@@ -41,7 +41,7 @@ import {
   isRateLimited, recordAttempt, clearAttempts
 } from '../Core/PanelSession.js'
 import { db } from '../Games/Store.js'
-import { siteOrigin } from '../Core/Seo.js'
+import { siteOrigin, persianSpellingVariants } from '../Core/Seo.js'
 
 const AUTH_COOKIE = 'amir_testsite_auth'
 const COOKIE_PATH = '/testsite'
@@ -303,7 +303,8 @@ const TEST_GROUPS = [
     tests: [
       { kind: 'seoRobots' }, { kind: 'seoSitemap' }, { kind: 'seoCanonical' },
       { kind: 'seoHreflang' }, { kind: 'seoJsonLd' }, { kind: 'seoBrand' },
-      { kind: 'seoSnippet' }, { kind: 'seoGamePage' }
+      { kind: 'seoSnippet' }, { kind: 'seoGamePage' }, { kind: 'seoCanonicalForm' },
+      { kind: 'seoNames' }
     ]
   },
   {
@@ -503,6 +504,11 @@ const I18N = {
     t_seoBrand: 'نام برند', d_seoBrand: 'نوشتن نام به فارسی و ژاپنی در صفحه‌ی اصلی',
     t_seoSnippet: 'عنوان و توضیح', d_seoSnippet: 'طول عنوان و توضیح صفحه‌ی اصلی و وجود یک h1',
     t_seoGamePage: 'صفحه‌ی بازی', d_seoGamePage: 'همان بررسی روی صفحه‌ی لندینگ یک بازی',
+    t_seoCanonicalForm: 'یک آدرس برای هر صفحه', d_seoCanonicalForm: 'اسلش آخر و حروف بزرگ باید با یک ۳۰۱ درست شوند',
+    t_seoNames: 'همه‌ی املاهای نام بازی', d_seoNames: 'نام بازی به هر خط و هر کدگذاری در صفحه‌اش هست',
+    seoBadRedirect: 'ریدایرکت نادرست',
+    seoNoNames: 'این املاها در صفحه نیست',
+    seoNameCount: 'تعداد املا',
     seoSnippetBad: 'مشکل در',
     seoWidths: 'عرض عنوان/توضیح',
     seoMissing: 'موارد جاافتاده',
@@ -722,6 +728,11 @@ const I18N = {
     t_seoBrand: 'Brand name', d_seoBrand: 'The Persian and Japanese spellings on the front page',
     t_seoSnippet: 'Title & description', d_seoSnippet: 'Front page title and description width, and a single h1',
     t_seoGamePage: 'Game page', d_seoGamePage: 'The same three checks on a game landing page',
+    t_seoCanonicalForm: 'One address per page', d_seoCanonicalForm: 'Trailing slash and capitals must 301 in a single hop',
+    t_seoNames: 'Every spelling of the name', d_seoNames: 'The game name in every script and encoding, on its page',
+    seoBadRedirect: 'Wrong redirect',
+    seoNoNames: 'These spellings are absent from the page',
+    seoNameCount: 'spellings',
     seoSnippetBad: 'Problem with',
     seoWidths: 'title/description width',
     seoMissing: 'Missing',
@@ -941,6 +952,11 @@ const I18N = {
     t_seoBrand: 'ブランド名', d_seoBrand: 'トップページ内のペルシア語・日本語表記',
     t_seoSnippet: 'タイトルと説明', d_seoSnippet: 'トップページのタイトル・説明の表示幅と h1 が 1 つであること',
     t_seoGamePage: 'ゲームページ', d_seoGamePage: 'ゲームのランディングページで同じ 3 項目を確認',
+    t_seoCanonicalForm: '1 ページ 1 アドレス', d_seoCanonicalForm: '末尾スラッシュと大文字は 1 回の 301 で正規化されること',
+    t_seoNames: '名前の全表記', d_seoNames: 'ゲーム名が各文字体系・各エンコーディングでページ内にあること',
+    seoBadRedirect: 'リダイレクトが不正',
+    seoNoNames: 'これらの表記がページにありません',
+    seoNameCount: '表記数',
     seoSnippetBad: '問題箇所',
     seoWidths: 'タイトル/説明の幅',
     seoMissing: '不足',
@@ -1366,7 +1382,17 @@ function renderDashboard(GAMES, baseUrl, lang, theme) {
     // change there re-aims the test instead of breaking it.
     siteOrigin: siteOrigin(),
     langs: LANGS,
-    brandForms: Object.values((CONFIG.BRAND && CONFIG.BRAND.SCRIPTS) || {}).filter(Boolean)
+    brandForms: Object.values((CONFIG.BRAND && CONFIG.BRAND.SCRIPTS) || {}).filter(Boolean),
+
+    // Every spelling of the FIRST game's name, including the
+    // derived Persian encodings. seoNames asserts each one is in
+    // that game's page.
+    gameNames: (function () {
+      const first = Object.values(GAMES || {})[0]
+      if (!first) return []
+      const declared = [first.name, ...(first.altNames || [])]
+      return [...declared, ...persianSpellingVariants(declared)]
+    })()
   }).replace(/</g, '\\u003c')
 
   const sectionsHtml = plan.map(group => renderGroupSection(group, dict)).join('')
@@ -1838,6 +1864,7 @@ function dashClientScript() {
     var SITE_ORIGIN = data.siteOrigin || BASE;
     var LANGS = data.langs || ['fa', 'en', 'ja'];
     var BRAND_FORMS = data.brandForms || [];
+    var GAME_NAMES = data.gameNames || [];
     var RESULTS = {};
     var stats = { total: 0, pass: 0, fail: 0, warn: 0 };
     var startTime = null;
@@ -2288,6 +2315,65 @@ function dashClientScript() {
          different code path. */
       seoGamePage: function () {
         return snippetCheck('/' + tgGameId());
+      },
+
+      /* ==========================================
+         One address per page.
+
+         A trailing slash, a capital letter and a doubled slash all
+         used to answer 404 - which is a dead end for the reader
+         and a link whose authority reaches nothing. Each must now
+         be a single 301 to the canonical form. Asserting ONE hop
+         matters as much as asserting the redirect: the first
+         version of this rule sent /en/games/ through three.
+         ========================================== */
+      seoCanonicalForm: function () {
+        var cases = [
+          { from: '/about/', to: '/about' },
+          { from: '/About', to: '/about' },
+          { from: '/games/', to: '/games' }
+        ];
+        return Promise.all(cases.map(function (c) {
+          return fetchTest(c.from, {}).then(function (r) {
+            if (!r.ok) return { bad: c.from + ' net' };
+            if (r.status !== 301) return { bad: c.from + ' = ' + r.status };
+            var to = r.headers.get('location') || '';
+            return to === c.to ? null : { bad: c.from + ' -> ' + to };
+          });
+        })).then(function (out) {
+          var bad = out.filter(Boolean).map(function (x) { return x.bad; });
+          if (bad.length) {
+            return { status: 'fail', code: null, ping: null, noteKey: 'seoBadRedirect', noteVal: bad.join('; ') };
+          }
+          return { status: 'pass', code: 301, ping: null };
+        });
+      },
+
+      /* ==========================================
+         Every spelling of every name reaches a page.
+
+         The browser-side twin of Scripts/CheckBrandCoverage.mjs,
+         narrowed to what one page fetch can answer: the front page
+         must contain the brand in all three scripts, and a game
+         page must contain that game's name in the reader's script.
+
+         This is the check that would have caught the Persian
+         spelling being wrong - it was "کولایدر" for two passes of
+         this work, and the correct "کلایدر" was sitting in the
+         misspellings list.
+         ========================================== */
+      seoNames: function () {
+        return fetchTest('/' + tgGameId(), {}).then(function (r) {
+          if (!r.ok) return netFail();
+          if (r.status !== 200) return expectFail(r, '200');
+          return r.res.text().then(function (body) {
+            var missing = GAME_NAMES.filter(function (name) { return body.indexOf(name) === -1; });
+            if (missing.length) {
+              return { status: 'fail', code: 200, ping: r.ping, noteKey: 'seoNoNames', noteVal: missing.join(', ') };
+            }
+            return { status: 'pass', code: 200, ping: r.ping, noteKey: 'seoNameCount', noteVal: String(GAME_NAMES.length) };
+          });
+        });
       },
 
       /* The check with the shortest description and the longest

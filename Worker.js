@@ -476,6 +476,85 @@ function redirectTo(pathname, params, status, varies = false) {
   })
 }
 
+// ==========================================
+// normalizeRedirect
+// One shape per address, before language routing sees it.
+//
+// A crawl of the live routes found three ways to reach a 404 that
+// a person or an external link produces constantly:
+//
+//   /about/      a trailing slash. Half the links people paste
+//                carry one, and every one of them was landing on
+//                the 404 page - a dead end for the reader and a
+//                wasted crawl that passes no signal to /about.
+//   /About       a capital. URLs are case-sensitive by
+//                specification, which is a fact about servers and
+//                not about the people typing a brand name into a
+//                bar.
+//   //about      a doubled slash, which is what string
+//                concatenation produces when somebody builds a
+//                link with a base that already ends in one.
+//
+// A 301 to the one correct form fixes all three, and a 301 is
+// specifically what moves the authority an external link carries
+// onto the page it meant.
+//
+// WHAT IS DELIBERATELY EXCLUDED, and why it matters more than the
+// rule itself: only paths that take a language prefix are
+// normalised (isLangRoutable, Core/Locale.js). That leaves out
+// `/assets/` - and R2 object keys ARE case-sensitive, so
+// lower-casing /assets/NeonKatanaLogo.png would turn every image
+// on the site into a 404. The same exclusion covers the machine
+// surface that shipped Android builds call, which must not be
+// handed a redirect at all.
+//
+// Runs before languageRedirect so /EN/About/ resolves in one hop
+// rather than two.
+// ==========================================
+function normalizeRedirect(url, request) {
+  if (request.method !== 'GET' && request.method !== 'HEAD') return null
+
+  const original = url.pathname
+
+  const collapsed = original.replace(/\/{2,}/g, '/')
+  const trimmed = collapsed.length > 1 ? collapsed.replace(/\/+$/, '') : collapsed
+  const normalized = trimmed.toLowerCase() || '/'
+
+  if (normalized === original) return null
+
+  // ==========================================
+  // The DESTINATION has to be a page path. Only the destination.
+  //
+  // Testing the original as well was the obvious first guess and
+  // it was wrong twice over.
+  //
+  // It broke "/en/games/". That splits to a bare "/games/", which
+  // is in NO_LANG_ROUTING because "/games/{id}/manifest" is the
+  // machine surface - so normalisation refused it, language
+  // routing rewrote it to "/games/?lang=en", normalisation then
+  // took the slash off, and language routing put the prefix back:
+  // three redirects to reach "/en/games". A chain a crawler
+  // follows but spends its budget on.
+  //
+  // And it was not buying the protection it looked like it was.
+  // The thing that must never happen is an R2 key being
+  // lower-cased - "/assets/NeonKatanaLogo.png" turning into a 404 -
+  // and testing the destination catches that on its own: the
+  // normalised form still starts with "/assets/", which is not
+  // routable, so the redirect is refused. Same for the machine API
+  // and both panels.
+  //
+  // Testing only the destination also resolves "/games/" itself,
+  // with no special case: the trailing slash is what put it in the
+  // API's prefix, and once it is gone "/games" is the catalogue.
+  // ==========================================
+  const { path: bare } = splitLangPath(normalized)
+  if (!isLangRoutable(bare)) return null
+
+  return redirectTo(normalized, new URLSearchParams(url.search), 301)
+}
+
+
 function languageRedirect(url, request) {
   if (request.method !== 'GET' && request.method !== 'HEAD') return null
 
@@ -570,6 +649,9 @@ async function handleRequest(request, env) {
 
   const redirect = canonicalRedirect(url, request)
   if (redirect) return redirect
+
+  const normalized = normalizeRedirect(url, request)
+  if (normalized) return normalized
 
   const moved = languageRedirect(url, request)
   if (moved) return moved

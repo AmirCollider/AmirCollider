@@ -47,7 +47,7 @@ import { googleDisclosureFor, POLICY_LABELS } from '../Content/GoogleDisclosure.
 import { chromeTheme, langHeader, page, localeFor } from './GameChrome.js'
 import { escapeHtml } from '../Core/Html.js'
 import {
-  videoGameLd, videoObjectLd, faqPageLd, keywordList, arabicKeyboardVariants,
+  videoGameLd, videoObjectLd, faqPageLd, keywordList, persianSpellingVariants,
   textWidth, clampWidth
 } from '../Core/Seo.js'
 import { matchRequestLang } from '../Core/RequestContext.js'
@@ -1254,9 +1254,9 @@ export function gameKeywords(game, lang) {
     alt,
 
     // The same name typed on an Arabic keyboard layout. See
-    // arabicKeyboardVariants() - "نئون کاتانا" and "نئون كاتانا"
+    // persianSpellingVariants() - "نئون کاتانا" and "نئون كاتانا"
     // look identical and are different strings.
-    arabicKeyboardVariants(alt),
+    persianSpellingVariants(alt),
     tags,
     platforms.android ? ['Android'] : [],
     platforms.web ? ['browser game'] : [],

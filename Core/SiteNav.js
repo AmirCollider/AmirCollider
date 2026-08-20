@@ -694,7 +694,7 @@ function byLabelLength(links) {
 //
 // One line in the footer of every page, and it is here rather than
 // on /about because of what "every page" buys. The name is a Latin
-// compound word; a Persian reader searching "امیرکولایدر" and a
+// compound word; a Persian reader searching "امیر کلایدر" and a
 // Japanese reader searching "アミールコライダー" were looking for a
 // string that appeared in this site's bytes exactly nowhere, and a
 // search engine does not transliterate a brand on your behalf. The

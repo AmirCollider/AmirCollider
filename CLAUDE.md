@@ -162,6 +162,9 @@ Content/               Large static content
                        per-game default built from `capabilities`. Read by
                        Pages/GameLanding.js AND Api/TheGodApi.js — one copy.
   ToolsCatalog.js, AboutMe.js, DocSnapVideos.js, SupportTemplates.js
+Scripts/               Dev tools. Not deployed.
+  CheckBrandCoverage.mjs  every spelling of every name -> does the
+                       site match it? Three tiers; see Docs/Seo.md.
 migrations/            SQL. NOT authoritative — see §12.
                        0012 + <game>.sql belong to a GAME's own D1; the
                        numbered rest belong to LICENSE_DB.
@@ -418,7 +421,7 @@ per registered game) + a `RUNNERS` object keyed by `kind`.
 Groups: `system`, `game-<id>` (per game), `auth`, `oauth`, `db`, `d1`,
 `checkout`, `seo`, `video`, `thegod`.
 
-The `seo` group is six GETs of public pages and the only group that
+The `seo` group is ten GETs of public pages and the only group that
 reads response BODIES rather than status codes — every failure it is
 written for returns 200. It checks `robots.txt`, `sitemap.xml` (URL
 count, a complete hreflang set, images), the front page's canonical
@@ -426,7 +429,16 @@ host, its hreflang links, its JSON-LD (parsed, and asserting
 `Organization` + `WebSite` + `WebPage`), and that the brand's Persian
 and Japanese spellings are present in the page's bytes. That last one
 is the whole point of `CONFIG.BRAND` and the easiest thing to lose in
-a refactor of the footer.
+a refactor of the footer. It also checks that `/about/`, `/About`
+and `/games/` each 301 to the canonical form in **one** hop, and
+that a game's name appears on its page in every script and Unicode
+encoding — the check that would have caught the Persian spelling
+being wrong for two passes.
+
+`Scripts/CheckBrandCoverage.mjs` is the deeper version of that last
+one: it generates every written form of every name and asserts each
+reaches a page, while asserting the unpublished misspellings do
+**not**. Run it after touching `CONFIG.BRAND` or any `altNames`.
 
 The `thegod` group exercises the operator panel read-paths and its refusals.
 It authorises with the `/thegod` cookie the browser already holds (cookie paths
@@ -549,7 +561,10 @@ nothing else breaks — a confusing hour.
 | Change what a game's search result says | `landingDescription()` in `Pages/GameLanding.js` — composed from name, pitch, platforms and `capabilities`, never from a single field |
 | Change what a store page's result says | `storeDescription()` in `Pages/GameStore.js` — names that store's own products |
 | Measure how long a title or description LOOKS | `textWidth()` / `clampWidth()` in `Core/Seo.js`. **Never count characters** — a full-width kana is two Latin characters wide and Google truncates by pixels |
-| Make a Persian name findable on both keyboard layouts | nothing — `arabicKeyboardVariants()` in `Core/Seo.js` derives the Arabic-codepoint form (ی→ي, ک→ك) of every Persian alias and game `altNames` entry |
+| Make a Persian name findable however it is typed | nothing — `persianSpellingVariants()` in `Core/Seo.js` derives all six forms: Arabic-codepoint (ی→ي, ک→ك) × separator (space / ZWNJ / joined), for every Persian alias and game `altNames` entry |
+| Change which misspellings `/about` publishes | `CONFIG.BRAND.TYPOS_SHOWN` — three, named not indexed. `MISSPELLINGS` is the full reference list and appears nowhere on the site |
+| Test that every spelling still reaches a page | `node Scripts/CheckBrandCoverage.mjs` (add `--remote` for the live site) |
+| Change which URL shapes redirect to the canonical one | `normalizeRedirect()` in `Worker.js`. It tests the **destination** only — testing the request too breaks `/en/games/` and does not protect case-sensitive R2 keys |
 
 ---
 

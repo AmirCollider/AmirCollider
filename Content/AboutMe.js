@@ -52,7 +52,7 @@ export const ABOUT = {
     dir: 'rtl',
 
     metaTitle: 'درباره‌ی من — AmirCollider',
-    metaDesc: 'AmirCollider (امیرکولایدر) کیست: بازی‌ساز مستقل، سازنده‌ی ابزارهای یونیتی و سازنده‌ی همین سایت. از کجا شروع شد و چرا هنوز ادامه دارد.',
+    metaDesc: 'AmirCollider (امیر کلایدر) کیست: بازی‌ساز مستقل، سازنده‌ی ابزارهای یونیتی و سازنده‌ی همین سایت. از کجا شروع شد و چرا هنوز ادامه دارد.',
 
     // The page's own terms. The name's other spellings are added
     // from CONFIG.BRAND where the tag is built - see Pages/About.js.
@@ -148,11 +148,11 @@ export const ABOUT = {
       },
       {
         q: 'اسمت به فارسی و ژاپنی چطور نوشته می‌شه؟',
-        a: 'به فارسی می‌شه «امیرکولایدر» (و بعضی‌ها «امیر کولایدر» می‌نویسن)، و به ژاپنی می‌شه «アミールコライダー». همه‌ی این‌ها یک نفرن و یک سایت: {aliases}. اسم اصلی و رسمی همون AmirCollider لاتینه — بقیه فقط همون اسمن به خط‌های دیگه.'
+        a: 'به فارسی می‌شه «امیر کلایدر» — کِلایدر، نه کولایدر — و سرِ هم هم همون «امیرکلایدر» است. به ژاپنی می‌شه «アミールコライダー». همه‌ی این‌ها یک نفرن و یک سایت: {aliases}. اسم اصلی و رسمی همون AmirCollider لاتینه؛ بقیه همون اسمن به خط‌های دیگه.'
       },
       {
-        q: 'اگه اسمت رو اشتباه بنویسم چی؟ مثلاً Amir Colider یا امیر کولیدر',
-        a: 'پیدام می‌کنی، نگران نباش. بیشترین اشتباهی که می‌بینم یکی از دو تا l افتاده — {typo1} — یا حرف آخر عوض شده و {typo2} نوشته شده. بعضی‌ها هم به فارسی {typo3} می‌نویسن که «کولایدر» رو کوتاه می‌کنه. املای درستش AmirCollider است: یک کلمه، دو تا l، و «collider» دقیقاً همون اسم کامپوننته توی یونیتی — برای همین هم انتخابش کردم.'
+        q: 'اگه اسمت رو اشتباه بنویسم چی؟ مثلاً {typo1} یا {typo3}',
+        a: 'پیدام می‌کنی، نگران نباش. بیشترین اشتباهی که می‌بینم یکی از دو تا l افتاده — {typo1} — یا حرف آخر عوض شده و {typo2} نوشته شده. به فارسی هم خیلی‌ها {typo3} می‌نویسن، چون «collider» توی فیزیک کولایدر خونده می‌شه؛ ولی اسم من کِلایدره. املای درستش AmirCollider است: یک کلمه، دو تا l، و «collider» دقیقاً همون اسم کامپوننته توی یونیتی — برای همین هم انتخابش کردم.'
       }
     ],
 
@@ -276,11 +276,11 @@ export const ABOUT = {
       },
       {
         q: 'How is the name written in Persian and Japanese?',
-        a: 'In Persian it is «امیرکولایدر» (some people write «امیر کولایدر», with the space), and in Japanese it is «アミールコライダー». All of these are one person and one site: {aliases}. The official spelling is the Latin one, AmirCollider — the rest are the same name in another script.'
+        a: 'In Persian it is «امیر کلایدر» — kolayder, not koolayder — and «امیرکلایدر» joined up. In Japanese it is «アミールコライダー». All of these are one person and one site: {aliases}. The official spelling is the Latin one, AmirCollider; the rest are the same name in another script.'
       },
       {
-        q: 'What if I spell it wrong — Amir Colider, AmirCollidor?',
-        a: 'You will still find me. The mistake I see most is a dropped L — {typo1} — or the last vowel swapped, giving {typo2}. In Persian people sometimes write {typo3}, which shortens the second half of the word. The correct spelling is AmirCollider: one word, two Ls, and “collider” exactly as Unity spells its component — which is why I picked it.'
+        q: 'What if I spell it wrong — {typo1}, {typo3}?',
+        a: 'You will still find me. The mistake I see most is a dropped L — {typo1} — or the last vowel swapped, giving {typo2}. In Persian a lot of people write {typo3}, because “collider” as the physics term is read koolayder there; my name is kolayder. The correct spelling is AmirCollider: one word, two Ls, and “collider” exactly as Unity spells its component — which is why I picked it.'
       }
     ],
 
@@ -404,11 +404,11 @@ export const ABOUT = {
       },
       {
         q: '日本語やペルシア語ではどう書きますか?',
-        a: '日本語では「アミールコライダー」(「アミール・コライダー」と中黒を入れる書き方もあります)、ペルシア語では「امیرکولایدر」です。いずれも同じ一人、同じサイトを指します: {aliases}。正式な表記はラテン文字の AmirCollider で、ほかは同じ名前を別の文字で書いたものです。'
+        a: '日本語では「アミールコライダー」(「アミール・コライダー」と中黒を入れる書き方もあります)、ペルシア語では「امیر کلایدر」(コラユデルではなくクラユデル) です。いずれも同じ一人、同じサイトを指します: {aliases}。正式な表記はラテン文字の AmirCollider で、ほかは同じ名前を別の文字で書いたものです。'
       },
       {
-        q: 'つづりを間違えたら見つかりませんか? (Amir Colider など)',
-        a: '見つかります。いちばん多いのは L が一つ抜けた {typo1} と、最後の母音が変わった {typo2} です。ペルシア語では {typo3} と書かれることもあります。正しいつづりは AmirCollider — 一語、L は二つ、"collider" は Unity のコンポーネント名そのままです。'
+        q: 'つづりを間違えたら見つかりませんか? ({typo1} など)',
+        a: '見つかります。いちばん多いのは L が一つ抜けた {typo1} と、最後の母音が変わった {typo2} です。ペルシア語では {typo3} と書かれがちですが (物理用語の collider の読みに引かれるためです)、正しくは کلایدر です。正しいつづりは AmirCollider — 一語、L は二つ、"collider" は Unity のコンポーネント名そのままです。'
       }
     ],
 
@@ -453,7 +453,11 @@ export const ABOUT = {
 // ==========================================
 function fillBrand(text) {
   const brand = CONFIG.BRAND || {}
-  const typos = brand.MISSPELLINGS || []
+  // Named, not indexed. Taking these by position out of
+  // MISSPELLINGS is what the previous version did, and it broke
+  // silently when that list was reordered - the sentence saying
+  // "one L dropped" printed a Persian spelling.
+  const shown = brand.TYPOS_SHOWN || {}
 
   return String(text || '')
     // A middle dot rather than a comma: the alias list mixes Latin,
@@ -486,9 +490,9 @@ function fillBrand(text) {
     // reference list for whoever maintains this, and they are not
     // published anywhere.
     // ==========================================
-    .replace('{typo1}', typos[0] || '')
-    .replace('{typo2}', typos[2] || '')
-    .replace('{typo3}', typos[9] || '')
+    .replace('{typo1}', shown.droppedL || '')
+    .replace('{typo2}', shown.swappedVowel || '')
+    .replace('{typo3}', shown.persian || '')
 }
 
 
@@ -499,9 +503,14 @@ export function aboutFor(lang) {
   // Only `ask` carries a placeholder, so only `ask` is rebuilt.
   // Copying the whole pack every call would be a new object for
   // every render of a page whose content never changes.
+  // Both halves. The question used to be left alone, which is how
+  // the English one came to name "AmirCollidor" - a fourth
+  // misspelling, published, that TYPOS_SHOWN did not know about
+  // and the answer did not explain. Scripts/CheckBrandCoverage.mjs
+  // caught it as a leak.
   return {
     ...pack,
-    ask: (pack.ask || []).map(entry => ({ q: entry.q, a: fillBrand(entry.a) }))
+    ask: (pack.ask || []).map(entry => ({ q: fillBrand(entry.q), a: fillBrand(entry.a) }))
   }
 }
 

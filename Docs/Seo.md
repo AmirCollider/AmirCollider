@@ -175,7 +175,7 @@ own:
 - It will not split a compound word for you. *Amir Collider* and
   *AmirCollider* are two different queries.
 - **It will not transliterate for you.** A Persian reader types
-  *امیرکولایدر*; a Japanese reader types *アミールコライダー*. Before
+  *امیر کلایدر*; a Japanese reader types *アミールコライダー*. Before
   this, neither string appeared anywhere in this site's bytes — in
   any form, on any page, in any tag. A trilingual site was
   findable under one script.
@@ -183,15 +183,83 @@ own:
   Correction is learned from seeing the wrong form near the right
   one; on a young domain it has seen neither.
 
-`CONFIG.BRAND` holds three lists, deliberately kept apart because
+> **The Persian spelling is «امیر کلایدر» — kolayder, not
+> koolayder.** Two passes of this work had it wrong, with
+> `امیرکولایدر` published as the primary spelling and the *correct*
+> form sitting in the misspellings list. The reason the wrong guess
+> looked right: Persian transliterates the physics term *collider*
+> as کولایدر, so anyone reasoning from the word rather than from
+> the person lands there. It is a personal handle, not the physics
+> term. `Scripts/CheckBrandCoverage.mjs` exists partly so this
+> class of mistake cannot survive another pass.
+
+`CONFIG.BRAND` holds four lists, deliberately kept apart because
 confusing them is how a site gets classified as keyword-stuffing:
 
 | List | What it is | Where it is used |
 |---|---|---|
 | `SCRIPTS` | one form per script (`en` / `fa` / `ja`) | **printed** in the footer of every page, reader's own language first |
-| `ALIASES` | genuine alternate names — the scripts, the spaced form, the casings | `alternateName` on `Organization`, `WebSite` and `Person`; `/about`'s keywords |
-| `MISSPELLINGS` | what people get wrong | **prose only**, in one `/about` answer that names them and gives the correct spelling |
+| `ALIASES` | genuine alternate names — the spaced form, both Persian forms, both Japanese forms | `alternateName` on `Organization`, `WebSite` and `Person`; `/about`'s keywords |
+| `TYPOS_SHOWN` | the **three** misspellings actually published | filled into the `/about` question and answer |
+| `MISSPELLINGS` | the full reference list | nowhere on the site — see below |
 | `TOPICS` | what the name is *about*, per language | `knowsAbout`, and the keyword tag on every page |
+
+### Persian is written six ways, and none of them is a mistake
+
+`persianSpellingVariants()` in `Core/Seo.js` derives the rest from
+the two listed forms. Two transformations, and they compose:
+
+**The alphabet is shared; the character set is not.**
+
+| Persian | | Arabic |
+|---|---|---|
+| `ی` U+06CC Farsi yeh | ↔ | `ي` U+064A Arabic yeh |
+| `ک` U+06A9 Keheh | ↔ | `ك` U+0643 Arabic kaf |
+
+They are visually identical in almost every font and are different
+strings. A Persian speaker on the Windows Arabic layout, on many
+Android keyboards, or copying from older Persian web content types
+the Arabic codepoints.
+
+**The separator is invisible.** Persian joins compounds with U+200C
+ZERO WIDTH NON-JOINER, which renders as a hair of space and is a
+different string from both a space and nothing:
+
+```
+امیر کلایدر     space
+امیر‌کلایدر     ZWNJ
+امیرکلایدر     joined
+```
+
+Two listed forms × three separators × two character sets, deduped,
+gives the six the `alternateName` list carries. Game `altNames` go
+through the same function, so `نئون کاتانا` reaches the page under
+five spellings.
+
+### Testing it: `Scripts/CheckBrandCoverage.mjs`
+
+```
+node Scripts/CheckBrandCoverage.mjs            # against the code
+node Scripts/CheckBrandCoverage.mjs --remote   # against the live site
+```
+
+It generates every written form of the brand, both games and both
+tools, fetches all 66 indexable pages, and asks of each form
+whether anything on the site matches it. Three tiers, and the
+distinction between them is the whole point:
+
+| Tier | Expectation | Why |
+|---|---|---|
+| **MUST** | present | correct spellings, every encoding. A miss is a reader who typed the name properly and found nothing |
+| **SHOULD** | present | the three misspellings answered in prose on `/about` |
+| **LEARNED** | **absent** | every other misspelling. Publishing them would be keyword stuffing; a search engine generalises its spelling correction from the three in the SHOULD tier |
+
+Its first run found three things: a fourth misspelling that had
+leaked into the English `/about` question and was not in
+`TYPOS_SHOWN`, and two bugs in its own matcher — a plain substring
+test reports `Amir Collide` and `アミールコライダ` as "leaked" because
+each is a *prefix* of the correct name. It matches on a word
+boundary now.
 
 A misspelling is deliberately **not** an `alternateName`: that
 field means "this thing is also called this", and a typo is not
@@ -444,6 +512,39 @@ heading was a `div` wearing the heading class. A document with no
 `h1` has no stated subject, and a screen reader's heading list
 opened on the second section.
 
+### One address per page
+
+A probe of the live routes found three shapes that answered **404**
+and should not have:
+
+| Request | Was | Now |
+|---|---|---|
+| `/about/` | 404 | `301` → `/about` |
+| `/About` | 404 | `301` → `/about` |
+| `//about` | 404 | `301` → `/about` |
+| `/games/` | 404 | `301` → `/games` |
+| `/EN/About/` | 404 | `301` → `/en/about`, **one hop** |
+
+A trailing slash is on half the links people paste; a capital is
+what a person types when the name is a brand. Each was a dead end
+for the reader and a link whose authority reached nothing.
+`normalizeRedirect()` in `Worker.js` handles all of them, before
+language routing so `/EN/About/` resolves in a single redirect
+rather than three.
+
+**What it deliberately does not touch** matters more than the rule.
+Only paths that take a language prefix are normalised, and the test
+is on the **destination**, not the request. R2 object keys are
+case-sensitive, so lower-casing `/assets/NeonKatanaLogo.png` would
+turn every image on the site into a 404 — the normalised form still
+starts with `/assets/`, which is not a language-routable path, so
+the redirect is refused. The same exclusion covers the machine API
+that shipped Android builds call, and both operator panels.
+
+Testing the *request* as well was the first version of this rule
+and it was wrong twice: it broke `/en/games/` into a three-redirect
+chain, and it was not buying the protection it appeared to.
+
 ### Google's policies, and where this site stands against them
 
 Every choice below was checked against Google Search's own
@@ -588,7 +689,7 @@ deployment can do it:
 - Link it from the **Myket listing** for Neon Katana.
 - Keep the product names spelled exactly the same everywhere. "Unity
   DocSnap" and "UnityDocSnap" are two different queries.
-- *AmirCollider*, *Amir Collider*, *امیرکولایدر* and *アミールコライダー*
+- *AmirCollider*, *Amir Collider*, *امیر کلایدر* and *アミールコライダー*
   are four different queries and one name. Five things now say so: the
   `alternateName` entries on `Organization`, `WebSite` and `Person`; the
   footer line that prints the name in all three scripts on **every**

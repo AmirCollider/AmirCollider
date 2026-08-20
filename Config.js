@@ -124,7 +124,7 @@ export const CONFIG = deepFreeze({
   //     and "AmirCollider" are two different queries, and roughly
   //     half the people who type the name type the spaced form.
   //   • It will not transliterate for you. A Persian reader types
-  //     "امیرکولایدر" and a Japanese reader types "アミールコライダー",
+  //     "امیر کلایدر" and a Japanese reader types "アミールコライダー",
   //     and a site whose every byte is Latin script matches
   //     neither - which is exactly the shape of "the site is
   //     trilingual and only ever found in English".
@@ -174,7 +174,17 @@ export const CONFIG = deepFreeze({
     // which is the same signal pointed the wrong way.
     SCRIPTS: {
       en: 'Amir Collider',
-      fa: 'امیرکولایدر',
+
+      // "امیر کلایدر" - kolayder, not koolayder. The owner's own
+      // pronunciation, and the correction that reversed a whole
+      // block of this file: an earlier pass here had "امیرکولایدر"
+      // as the primary Persian spelling and the CORRECT form sitting
+      // in MISSPELLINGS below. Persian transliterates the physics
+      // term "collider" as کولایدر, which is what made the wrong
+      // guess look reasonable - but this is a personal handle, not
+      // the physics term, and the person it belongs to says it
+      // کلایدر.
+      fa: 'امیر کلایدر',
       ja: 'アミールコライダー'
     },
 
@@ -200,12 +210,17 @@ export const CONFIG = deepFreeze({
       'Amir Collider',
       'AmirCollider Games',
 
-      // Persian. The first is how it is written running-on, the
-      // way the compound Latin form reads; the second is the
-      // spaced form, which is what most Persian keyboards produce
-      // and what a reader who has only heard the name will type.
-      'امیرکولایدر',
-      'امیر کولایدر',
+      // Persian. The spaced form is how it is said and how the
+      // owner writes it; the running-on form mirrors the compound
+      // Latin spelling. Both are correct and people type both.
+      //
+      // The separator variants (ZWNJ) and the Arabic-codepoint
+      // variants of each are DERIVED, not listed - see
+      // persianSpellingVariants() in Core/Seo.js. Listing six
+      // near-identical Persian strings here would be unreadable
+      // and would go stale the first time one was edited.
+      'امیر کلایدر',
+      'امیرکلایدر',
 
       // Japanese katakana, both without and with the middle dot.
       // A Japanese reader writes a two-part foreign name either
@@ -214,26 +229,80 @@ export const CONFIG = deepFreeze({
       'アミール・コライダー'
     ],
 
-    // Ordered roughly by how often each one turns up. Every entry
-    // here is a spelling somebody has plausibly typed while
-    // looking for this site: a dropped letter, a swapped vowel, or
-    // a transliteration that follows the sound rather than the
-    // spelling.
+    // The three that are actually PUBLISHED, in the answer on
+    // /about. Named rather than taken by index out of the list
+    // below - which is how the previous version did it, and which
+    // broke silently the moment that list was reordered: the
+    // answer says "one L dropped" and then printed whatever
+    // happened to be at index 0, which after a reorder was a
+    // Persian spelling.
+    //
+    // One Latin mistake of each common kind, and the one Persian
+    // mistake that matters. Every entry here must also appear in
+    // MISSPELLINGS; Scripts/CheckBrandCoverage.mjs asserts that.
+    TYPOS_SHOWN: {
+      droppedL: 'Amir Colider',
+      swappedVowel: 'Amir Collidor',
+      persian: 'امیر کولایدر'
+    },
+
+    // ==========================================
+    // What people get wrong.
+    //
+    // Ordered by how often each plausibly turns up. Three of these
+    // are worth understanding rather than just reading:
+    //
+    //   کولایدر  The Persian transliteration of the PHYSICS term
+    //     "collider" - as in the Large Hadron Collider, which is
+    //     برخورد‌دهنده‌ی هادرونی بزرگ but is written کولایدر
+    //     everywhere informal. Anyone who knows the word and does
+    //     not know the person will reach for it. It is the single
+    //     most likely Persian mistake, and an earlier pass over
+    //     this file had it as the CORRECT spelling.
+    //
+    //   Kollider / Kolider  German and Scandinavian readers spell
+    //     the /k/ sound with a K, and so does anyone transcribing
+    //     the Persian back into Latin.
+    //
+    //   Colider / Collidor  One L dropped, or the unstressed final
+    //     vowel heard as an o. Between them these are most of the
+    //     Latin-script mistakes there are.
+    //
+    // Only three of these are ever PUBLISHED - see fillBrand() in
+    // Content/AboutMe.js. The rest are a reference list for
+    // whoever maintains this and for Scripts/CheckBrandCoverage.mjs,
+    // which tests that each one still reaches the site.
+    // ==========================================
     MISSPELLINGS: [
+      // Persian: the physics-term transliteration, and the
+      // dropped-diphthong forms.
+      'امیر کولایدر',
+      'امیرکولایدر',
+      'امیر کولیدر',
+      'امیرکولیدر',
+      'امیر کلیدر',
+      'امیرکلیدر',
+      'امیر کالایدر',
+
+      // Latin.
       'Amir Colider',
       'AmirColider',
       'Amir Collidor',
       'AmirCollidor',
+      'Amir Collader',
       'Amir Collyder',
       'AmirColliderr',
       'Amir Kollider',
       'AmirKollider',
       'Amir Kolider',
-      'امیر کولیدر',
-      'امیرکولیدر',
-      'امیر کلایدر',
-      'امیرکلایدر',
-      'アミルコライダー'
+      'Amir Collide',
+      'AmirCollier',
+
+      // Japanese: the short first vowel, and the dropped final
+      // long mark.
+      'アミルコライダー',
+      'アミールコライダ',
+      'アミールコリダー'
     ],
 
     TOPICS: {

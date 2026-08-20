@@ -33,7 +33,8 @@
 //
 // The brand's name in other scripts, and the terms it is searched
 // for, come from CONFIG.BRAND. Nothing here writes a second copy
-// of either - see the note above ALSO_KNOWN_AS.
+// of either - see the note above ALSO_KNOWN_AS. Persian encodings
+// are derived by persianSpellingVariants().
 //
 // Callers pass plain text; everything is escaped here.
 // ==========================================
@@ -71,7 +72,7 @@ const TWITTER_HANDLE = (() => {
 // CONFIG.BRAND.ALIASES now - the same list the footer prints, the
 // About page answers a question about, and every structured-data
 // node declares - because the site is trilingual and the three
-// strings were not: a Persian reader searching "امیرکولایدر" and a
+// strings were not: a Persian reader searching "امیر کلایدر" and a
 // Japanese reader searching "アミールコライダー" were both looking for
 // a name that appeared nowhere in this site's bytes, in any form a
 // machine could match.
@@ -83,56 +84,95 @@ const TWITTER_HANDLE = (() => {
 // is both honest and the form a search engine can actually learn a
 // spelling correction from.
 // ==========================================
-// arabicKeyboardVariants
-// The same Persian word, typed on the other keyboard.
+// persianSpellingVariants
+// The same Persian word, typed the other ways it gets typed.
 //
-// This is the gap that a first pass over "make the brand findable
-// in Persian" misses completely, and it is bigger than the
-// misspellings are.
+// This is the gap a first pass over "make the brand findable in
+// Persian" misses completely, and it is bigger than the
+// misspellings are - because none of it is a mistake. Every form
+// below is somebody spelling the name CORRECTLY, on a different
+// keyboard or with a different separator, and producing a
+// different byte sequence.
 //
-// Persian and Arabic share an alphabet but not a character set.
-// Two letters in "امیرکولایدر" exist twice in Unicode:
+// TWO transformations, and they compose.
 //
-//   ی  U+06CC  Farsi yeh        ي  U+064A  Arabic yeh
-//   ک  U+06A9  Keheh            ك  U+0643  Arabic kaf
+// 1. THE ALPHABET IS SHARED, THE CHARACTER SET IS NOT.
 //
-// They look identical in almost every font. They are different
-// strings. A Persian speaker on the Windows Arabic layout, on many
-// Android keyboards, or copying from older Persian web content
-// types the Arabic codepoints - so "امیرکولایدر" and "اميركولايدر"
-// are two different queries that a reader cannot tell apart on
-// screen, and a page containing only one of them matches only one
-// of them.
+//      ی  U+06CC  Farsi yeh      ي  U+064A  Arabic yeh
+//      ک  U+06A9  Keheh          ك  U+0643  Arabic kaf
 //
-// Derived rather than listed, because it is a mechanical
-// transformation and a hand-written second copy of every Persian
-// string is a second copy to keep in step. Nothing PRINTS these -
-// the footer and /about show the correct Persian spelling only.
-// They exist so `alternateName` covers both encodings, which is
-// the honest claim: it is one name, written twice by Unicode.
+//    They look identical in almost every font. A Persian speaker
+//    on the Windows Arabic layout, on many Android keyboards, or
+//    copying from older Persian web content types the Arabic
+//    codepoints - so "امیر کلایدر" and "امير كلايدر" are two
+//    queries a reader cannot tell apart on screen.
+//
+// 2. THE SEPARATOR IS INVISIBLE.
+//
+//    Persian joins compounds with U+200C ZERO WIDTH NON-JOINER,
+//    which renders as a hair of space and is a completely
+//    different string from a space or from nothing at all. All
+//    three forms of a two-part name are ordinary Persian:
+//
+//      "امیر کلایدر"   space
+//      "امیر‌کلایدر"   ZWNJ
+//      "امیرکلایدر"   joined
+//
+// Derived rather than listed, because both are mechanical and a
+// hand-written copy of six Persian strings is six strings to keep
+// in step. Nothing PRINTS any of these - the footer and /about
+// show the spelling the owner uses. They exist so alternateName
+// covers every encoding, which is the honest claim: it is one
+// name, and Unicode writes it six ways.
+//
+// Scripts/CheckBrandCoverage.mjs asserts that each derived form
+// actually reaches a page.
 // ==========================================
-const PERSIAN_TO_ARABIC = [[/\u06CC/g, '\u064A'], [/\u06A9/g, '\u0643']]
+const FARSI_YEH = /\u06CC/g
+const FARSI_KEHEH = /\u06A9/g
+const ZWNJ = '\u200C'
 
-export function arabicKeyboardVariants(names = []) {
+/** Whether a string contains any Perso-Arabic letter at all. */
+function isPersian(text) {
+  return /[\u0600-\u06FF]/.test(text)
+}
+
+export function persianSpellingVariants(names = []) {
   const out = []
+
+  const add = value => {
+    if (value && !out.includes(value)) out.push(value)
+  }
 
   for (const name of names) {
     const text = String(name || '')
-    if (!/[\u06CC\u06A9]/.test(text)) continue
+    if (!isPersian(text)) continue
 
-    const swapped = PERSIAN_TO_ARABIC.reduce(
-      (value, [pattern, replacement]) => value.replace(pattern, replacement),
-      text
-    )
-    if (swapped !== text) out.push(swapped)
+    // Every separator form of this spelling, then every character
+    // set of every separator form. Composing the two is the point:
+    // somebody on an Arabic keyboard writing the ZWNJ form is one
+    // person, not an edge case.
+    const separators = [text]
+    if (text.includes(' ')) {
+      separators.push(text.replace(/ /g, ZWNJ))
+      separators.push(text.replace(/ /g, ''))
+    }
+
+    for (const form of separators) {
+      add(form)
+      const arabic = form.replace(FARSI_YEH, '\u064A').replace(FARSI_KEHEH, '\u0643')
+      add(arabic)
+    }
   }
 
-  return out
+  // The inputs themselves are already declared by the caller, so
+  // only the forms it does not have are returned.
+  return out.filter(value => !names.includes(value))
 }
 
 
 const BRAND_ALIASES = (CONFIG.BRAND && CONFIG.BRAND.ALIASES) || []
-const ALSO_KNOWN_AS = [...BRAND_ALIASES, ...arabicKeyboardVariants(BRAND_ALIASES)]
+const ALSO_KNOWN_AS = [...BRAND_ALIASES, ...persianSpellingVariants(BRAND_ALIASES)]
 
 
 /**
@@ -736,12 +776,12 @@ export function videoGameLd({
 
   if (image) node.image = absoluteUrl(image)
 
-  // The other-script names, plus the Arabic-keyboard encoding of
-  // any Persian one. Done here rather than at the three call sites
-  // so a game declaring altNames in Config.js gets both encodings
-  // on the dashboard, on /games and on its own page without any of
-  // them knowing this exists.
-  const altAll = [...alternateName, ...arabicKeyboardVariants(alternateName)]
+  // The other-script names, plus every Persian encoding of any of
+  // them. Done here rather than at the three call sites so a game
+  // declaring altNames in Config.js gets all of them on the
+  // dashboard, on /games and on its own page without any of those
+  // knowing this exists.
+  const altAll = [...alternateName, ...persianSpellingVariants(alternateName)]
   if (altAll.length) node.alternateName = altAll
   if (genres.length) node.genre = genres
   if (featureList.length) node.featureList = featureList

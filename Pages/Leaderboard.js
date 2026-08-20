@@ -718,9 +718,16 @@ export async function handleLeaderboardUnified(url, request, gameId, requestId, 
   // is. Google documents 503 as the correct code for exactly this
   // and treats it as "keep the URL, try later".
   //
-  // Deliberately NOT noindex: a blip would otherwise remove a good
-  // page from the index permanently, and getting it back takes
-  // weeks.
+  // The page also carries noindex (see createUnavailablePage), and
+  // that is belt and braces rather than the main mechanism: a
+  // crawler does not index the body of a 5xx at all, and does not
+  // act on a noindex it finds in one. What the meta tag actually
+  // buys is the day this path regresses to answering 200 - on that
+  // day the fallback page still does not enter the index.
+  //
+  // The 503 is what protects the URL. A noindex served on a 200
+  // would remove a good page permanently, and getting it back
+  // takes weeks.
   // ==========================================
   const unavailable = (error, message, status) => {
     if (wantsJson) return createJsonResponse({ error, message, requestId }, status)
