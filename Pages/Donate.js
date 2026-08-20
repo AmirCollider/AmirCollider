@@ -63,6 +63,7 @@ const I18N = {
   fa: {
     metaTitle: 'حمایت مالی از AmirCollider — هر مبلغی که دوست داری',
     metaDesc: 'اگر بازی‌ها یا افزونه‌های یونیتی AmirCollider به کارت آمده‌اند، می‌توانی با هر مبلغی که دوست داری حمایت کنی. پرداخت با ارز دیجیتال، بدون ثبت‌نام و بدون اشتراک.',
+    keywords: ['حمایت از توسعه‌دهنده', 'دونیت ارز دیجیتال', 'حمایت مالی بازی‌ساز مستقل'],
     breadcrumb: 'حمایت مالی',
 
     hi: 'سلام! 👋',
@@ -137,7 +138,8 @@ const I18N = {
 
   en: {
     metaTitle: 'Support AmirCollider — donate any amount you like',
-    metaDesc: 'If a game or a Unity extension from AmirCollider has been useful to you, you can chip in whatever amount you like. Paid in cryptocurrency, no sign-up and no subscription.',
+    metaDesc: 'If a game or Unity extension from AmirCollider has been useful to you, chip in whatever you like. Paid in cryptocurrency, no sign-up and no subscription.',
+    keywords: ['support an indie developer', 'crypto donation', 'donate to a game developer'],
     breadcrumb: 'Donate',
 
     hi: 'Hi there! 👋',
@@ -213,6 +215,7 @@ const I18N = {
   ja: {
     metaTitle: 'AmirCollider を支援する — 金額はお好きなだけ',
     metaDesc: 'AmirCollider のゲームや Unity 拡張が役に立ったなら、好きな金額で支援できます。暗号資産で支払い、登録も定期購入も不要です。',
+    keywords: ['インディー開発者を支援', '暗号資産で寄付', 'ゲーム開発者に寄付'],
     breadcrumb: '支援する',
 
     hi: 'こんにちは! 👋',
@@ -717,11 +720,13 @@ function createDonatePage(lang, theme, { error = '', amount = '' } = {}) {
     title: p.metaTitle,
     description: p.metaDesc,
     lang: code,
+    keywords: p.keywords || [],
     graph
   })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap"></noscript>
   ${themeBootScript()}
   <style>${siteNavCss()}${donateCss()}</style>
 </head>
@@ -780,7 +785,8 @@ function createHandoffPage(lang, theme, payUrl) {
 <head>
   ${getPageHead({ title: p.handoffTitle + ' — AmirCollider', amirLogo: CONFIG.AMIR_LOGO })}
   <meta name="robots" content="noindex, nofollow">
-  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap"></noscript>
   ${themeBootScript()}
   <style>${siteNavCss()}${donateCss()}</style>
 </head>
@@ -826,7 +832,8 @@ function createThanksPage(lang, theme) {
   })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap"></noscript>
   ${themeBootScript()}
   <style>${siteNavCss()}${donateCss()}</style>
 </head>

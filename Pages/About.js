@@ -46,7 +46,7 @@ import { aboutFor, aboutFaq } from '../Content/AboutMe.js'
 
 import { escapeHtml } from '../Core/Html.js'
 import { themeBootScript } from '../Core/PageChrome.js'
-import { seoHead, breadcrumbLd, personLd, profilePageLd, faqPageLd } from '../Core/Seo.js'
+import { seoHead, breadcrumbLd, personLd, profilePageLd, faqPageLd, keywordList } from '../Core/Seo.js'
 import {
   siteNavCss, siteHeader, siteBreadcrumb, siteFooter, siteBackToTop, siteChromeScript,
   socialLinks, NAV_I18N
@@ -563,11 +563,28 @@ function createAboutPage(lang, theme) {
     description: p.metaDesc,
     lang: resolved,
     type: 'profile',
+
+    // This page emits its own page-level node - a ProfilePage,
+    // tied to the Person - so seoHead does not add a WebPage
+    // beside it. Two page-level nodes for one document is a
+    // crawler being asked which of them the page actually is.
+    webPage: false,
+
+    // The one page whose subject is the NAME. Every form of it -
+    // the spaced one, the Persian one, the Japanese one - is
+    // answered in prose in the questions below and declared in the
+    // Person and Organization nodes above, and this is the tag
+    // that says the page is about that in the first place.
+    keywords: keywordList(
+      (CONFIG.BRAND && CONFIG.BRAND.ALIASES) || [],
+      p.keywords || []
+    ),
     graph
   })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap"></noscript>
   ${themeBootScript()}
   <style>${siteNavCss()}${aboutCss()}</style>
 </head>

@@ -119,7 +119,9 @@ Core/                  Cross-cutting, no business logic
   PanelSession.js      signed panel cookies + login rate limiting (shared by both panels)
   DesignSystem.js      getPageHead, shared tokens
   SiteNav.js           site header/footer
-  Seo.js               canonical, hreflang, OpenGraph, JSON-LD
+  Seo.js               canonical, hreflang, keywords, OpenGraph, JSON-LD.
+                       The brand's other spellings come from CONFIG.BRAND;
+                       seoHead() adds a WebPage node to every page itself.
   PageChrome.js        page shell
   ErrorPage.js         friendly error documents
 
@@ -414,7 +416,17 @@ per registered game) + a `RUNNERS` object keyed by `kind`.
 4. any `noteKey` you emit, in all three languages
 
 Groups: `system`, `game-<id>` (per game), `auth`, `oauth`, `db`, `d1`,
-`checkout`, `video`, `thegod`.
+`checkout`, `seo`, `video`, `thegod`.
+
+The `seo` group is six GETs of public pages and the only group that
+reads response BODIES rather than status codes — every failure it is
+written for returns 200. It checks `robots.txt`, `sitemap.xml` (URL
+count, a complete hreflang set, images), the front page's canonical
+host, its hreflang links, its JSON-LD (parsed, and asserting
+`Organization` + `WebSite` + `WebPage`), and that the brand's Persian
+and Japanese spellings are present in the page's bytes. That last one
+is the whole point of `CONFIG.BRAND` and the easiest thing to lose in
+a refactor of the footer.
 
 The `thegod` group exercises the operator panel read-paths and its refusals.
 It authorises with the `/thegod` cookie the browser already holds (cookie paths
@@ -529,6 +541,15 @@ nothing else breaks — a confusing hour.
 | Add a panel test | `Pages/TestSite.js` — see §8 |
 | Change the Unity client | `Content/UnityKit.js` |
 | Add a UI string | the `I18N` object in that file — **all three languages** |
+| Change the brand's name in another script, or the misspellings `/about` answers | `CONFIG.BRAND` in `Config.js` — **one block**, read by `Core/Seo.js` (structured data), `Core/SiteNav.js` (the footer line) and `Content/AboutMe.js` (three answers, via `{aliases}` / `{typos}`) |
+| Make a game findable under its Persian or Japanese name | `altNames` in that game's `GAME_REGISTRY` entry. Reaches `alternateName` on the `VideoGame` node and the keyword tag on all three of its pages |
+| Change what a page tells a crawler it is about | the `keywords` it passes to `seoHead()`. Brand terms are prepended automatically — pass only what the page itself answers |
+| Add a structured-data node type | `Core/Seo.js`. A page-level node (`WebPage`) is added by `seoHead()` itself; a page emitting its own passes `webPage: false` |
+| Change the date the sitemap reports | `CONFIG.SITEMAP_LASTMOD` — a constant on purpose, see `Docs/Seo.md` |
+| Change what a game's search result says | `landingDescription()` in `Pages/GameLanding.js` — composed from name, pitch, platforms and `capabilities`, never from a single field |
+| Change what a store page's result says | `storeDescription()` in `Pages/GameStore.js` — names that store's own products |
+| Measure how long a title or description LOOKS | `textWidth()` / `clampWidth()` in `Core/Seo.js`. **Never count characters** — a full-width kana is two Latin characters wide and Google truncates by pixels |
+| Make a Persian name findable on both keyboard layouts | nothing — `arabicKeyboardVariants()` in `Core/Seo.js` derives the Arabic-codepoint form (ی→ي, ک→ك) of every Persian alias and game `altNames` entry |
 
 ---
 

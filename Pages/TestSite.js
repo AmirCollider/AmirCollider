@@ -41,6 +41,7 @@ import {
   isRateLimited, recordAttempt, clearAttempts
 } from '../Core/PanelSession.js'
 import { db } from '../Games/Store.js'
+import { siteOrigin } from '../Core/Seo.js'
 
 const AUTH_COOKIE = 'amir_testsite_auth'
 const COOKIE_PATH = '/testsite'
@@ -280,6 +281,32 @@ const TEST_GROUPS = [
     ]
   },
   {
+    // ==========================================
+    // What a crawler sees.
+    //
+    // Everything in this group is a GET of a public page, and it
+    // exists because the SEO surface is the one part of this site
+    // that nobody looks at: a canonical tag pointing at the wrong
+    // host, a robots.txt that stopped naming the sitemap, or a
+    // hreflang cluster that lost a language all render a perfectly
+    // normal-looking page and are invisible until three months of
+    // indexing have gone somewhere else.
+    //
+    // seoBrand is the odd one and the most useful. It asserts that
+    // the brand's Persian and Japanese spellings are actually
+    // present in the bytes of the front page - which is the whole
+    // point of CONFIG.BRAND, and exactly the thing that is easy to
+    // lose in a refactor of the footer without anybody noticing.
+    // ==========================================
+    key: 'seo',
+    titleKey: 'gSeo',
+    tests: [
+      { kind: 'seoRobots' }, { kind: 'seoSitemap' }, { kind: 'seoCanonical' },
+      { kind: 'seoHreflang' }, { kind: 'seoJsonLd' }, { kind: 'seoBrand' },
+      { kind: 'seoSnippet' }, { kind: 'seoGamePage' }
+    ]
+  },
+  {
     key: 'video',
     titleKey: 'gVideo',
     tests: [
@@ -382,6 +409,7 @@ const I18N = {
     gDb: 'پایگاه‌داده',
     gD1: 'پایگاه‌داده D1',
     gCheckout: 'خرید با ارز دیجیتال',
+    gSeo: 'دیده‌شدن در گوگل',
     gVideo: 'ویدیوهای معرفی',
     gTheGod: 'پنل TheGod',
     // detail fragments
@@ -467,6 +495,26 @@ const I18N = {
     mNeedEndpoint: 'ابتدا مسیر را وارد کنید',
     mBadHeaders: 'هدرهای JSON نامعتبر',
     // test labels + descriptions
+    t_seoRobots: 'robots.txt', d_seoRobots: 'وجود Sitemap و قواعد Disallow و Allow',
+    t_seoSitemap: 'sitemap.xml', d_seoSitemap: 'تعداد آدرس‌ها، hreflang کامل و تصاویر',
+    t_seoCanonical: 'آدرس کاننیکال', d_seoCanonical: 'کاننیکال صفحه‌ی اصلی باید دامنه‌ی رسمی باشد',
+    t_seoHreflang: 'hreflang', d_seoHreflang: 'سه زبان به‌علاوه‌ی x-default',
+    t_seoJsonLd: 'داده‌ی ساختاریافته', d_seoJsonLd: 'JSON-LD معتبر با Organization و WebSite و WebPage',
+    t_seoBrand: 'نام برند', d_seoBrand: 'نوشتن نام به فارسی و ژاپنی در صفحه‌ی اصلی',
+    t_seoSnippet: 'عنوان و توضیح', d_seoSnippet: 'طول عنوان و توضیح صفحه‌ی اصلی و وجود یک h1',
+    t_seoGamePage: 'صفحه‌ی بازی', d_seoGamePage: 'همان بررسی روی صفحه‌ی لندینگ یک بازی',
+    seoSnippetBad: 'مشکل در',
+    seoWidths: 'عرض عنوان/توضیح',
+    seoMissing: 'موارد جاافتاده',
+    seoUrls: 'تعداد آدرس',
+    seoNodes: 'تعداد گره',
+    seoNoImages: 'هیچ تصویری در سایت‌مپ نیست',
+    seoNoCanonical: 'تگ کاننیکال وجود ندارد',
+    seoWrongHost: 'کاننیکال به دامنه‌ی دیگری اشاره می‌کند',
+    seoHreflangShort: 'hreflang ناقص',
+    seoNoJsonLd: 'هیچ JSON-LD در صفحه نیست',
+    seoBadJsonLd: 'بلاک JSON-LD خراب',
+    seoNoBrand: 'این شکل‌های نام در صفحه نیست',
     t_sysMetrics: 'Metrics', d_sysMetrics: 'صحت /metrics و فیلدهای کلیدی',
     t_sys404: 'مدیریت 404', d_sys404: 'مسیر نامعتبر باید 404 بدهد',
     t_sys405: 'مدیریت 405', d_sys405: 'متد غیرمجاز روی /metrics باید 405 بدهد',
@@ -583,6 +631,7 @@ const I18N = {
     gDb: 'Database',
     gD1: 'D1 database',
     gCheckout: 'Crypto checkout',
+    gSeo: 'Search visibility',
     gVideo: 'Demo videos',
     gTheGod: 'TheGod panel',
     net: 'Network error',
@@ -665,6 +714,26 @@ const I18N = {
     mWaiting: 'Sending…',
     mNeedEndpoint: 'Enter an endpoint first',
     mBadHeaders: 'Invalid headers JSON',
+    t_seoRobots: 'robots.txt', d_seoRobots: 'Sitemap line, Disallow and Allow rules',
+    t_seoSitemap: 'sitemap.xml', d_seoSitemap: 'URL count, full hreflang set and images',
+    t_seoCanonical: 'Canonical URL', d_seoCanonical: 'The front page must name the canonical domain',
+    t_seoHreflang: 'hreflang', d_seoHreflang: 'Three languages plus x-default',
+    t_seoJsonLd: 'Structured data', d_seoJsonLd: 'Valid JSON-LD with Organization, WebSite and WebPage',
+    t_seoBrand: 'Brand name', d_seoBrand: 'The Persian and Japanese spellings on the front page',
+    t_seoSnippet: 'Title & description', d_seoSnippet: 'Front page title and description width, and a single h1',
+    t_seoGamePage: 'Game page', d_seoGamePage: 'The same three checks on a game landing page',
+    seoSnippetBad: 'Problem with',
+    seoWidths: 'title/description width',
+    seoMissing: 'Missing',
+    seoUrls: 'URLs',
+    seoNodes: 'Nodes',
+    seoNoImages: 'No images in the sitemap',
+    seoNoCanonical: 'No canonical tag',
+    seoWrongHost: 'Canonical points at another host',
+    seoHreflangShort: 'Incomplete hreflang set',
+    seoNoJsonLd: 'No JSON-LD on the page',
+    seoBadJsonLd: 'Unparsable JSON-LD blocks',
+    seoNoBrand: 'These name forms are absent from the page',
     t_sysMetrics: 'Metrics', d_sysMetrics: '/metrics payload & key fields',
     t_sys404: '404 handling', d_sys404: 'Unknown route should return 404',
     t_sys405: '405 handling', d_sys405: 'Bad method on /metrics should return 405',
@@ -781,6 +850,7 @@ const I18N = {
     gDb: 'データベース',
     gD1: 'D1 データベース',
     gCheckout: '暗号資産チェックアウト',
+    gSeo: '検索での見え方',
     gVideo: 'デモ動画',
     gTheGod: 'TheGod パネル',
     net: 'ネットワークエラー',
@@ -863,6 +933,26 @@ const I18N = {
     mWaiting: '送信中…',
     mNeedEndpoint: '先にエンドポイントを入力',
     mBadHeaders: 'ヘッダーJSONが不正',
+    t_seoRobots: 'robots.txt', d_seoRobots: 'Sitemap 行と Disallow・Allow の規則',
+    t_seoSitemap: 'sitemap.xml', d_seoSitemap: 'URL 数、hreflang の完全性、画像',
+    t_seoCanonical: 'canonical URL', d_seoCanonical: 'トップページの canonical は正規ドメインであること',
+    t_seoHreflang: 'hreflang', d_seoHreflang: '3 言語 + x-default',
+    t_seoJsonLd: '構造化データ', d_seoJsonLd: 'Organization・WebSite・WebPage を含む有効な JSON-LD',
+    t_seoBrand: 'ブランド名', d_seoBrand: 'トップページ内のペルシア語・日本語表記',
+    t_seoSnippet: 'タイトルと説明', d_seoSnippet: 'トップページのタイトル・説明の表示幅と h1 が 1 つであること',
+    t_seoGamePage: 'ゲームページ', d_seoGamePage: 'ゲームのランディングページで同じ 3 項目を確認',
+    seoSnippetBad: '問題箇所',
+    seoWidths: 'タイトル/説明の幅',
+    seoMissing: '不足',
+    seoUrls: 'URL 数',
+    seoNodes: 'ノード数',
+    seoNoImages: 'サイトマップに画像がありません',
+    seoNoCanonical: 'canonical タグがありません',
+    seoWrongHost: 'canonical が別のホストを指しています',
+    seoHreflangShort: 'hreflang が不完全です',
+    seoNoJsonLd: 'ページに JSON-LD がありません',
+    seoBadJsonLd: '解析できない JSON-LD ブロック',
+    seoNoBrand: 'これらの表記がページにありません',
     t_sysMetrics: 'Metrics', d_sysMetrics: '/metrics と主要フィールド',
     t_sys404: '404 処理', d_sys404: '不明なルートは 404 を返すべき',
     t_sys405: '405 処理', d_sys405: '/metrics への不正メソッドは 405 を返すべき',
@@ -1267,7 +1357,16 @@ function renderDashboard(GAMES, baseUrl, lang, theme) {
   }
 
   const payload = JSON.stringify({
-    lang, defaultLang: DEFAULT_LANG, baseUrl, gameIds, i18n: I18N, langMeta: LANG_META
+    lang, defaultLang: DEFAULT_LANG, baseUrl, gameIds, i18n: I18N, langMeta: LANG_META,
+
+    // What the SEO group checks against, sent rather than
+    // hard-coded in the client script. The origin is the one the
+    // canonical tag has to name; the brand forms are the spellings
+    // the front page has to contain. Both are CONFIG values, so a
+    // change there re-aims the test instead of breaking it.
+    siteOrigin: siteOrigin(),
+    langs: LANGS,
+    brandForms: Object.values((CONFIG.BRAND && CONFIG.BRAND.SCRIPTS) || {}).filter(Boolean)
   }).replace(/</g, '\\u003c')
 
   const sectionsHtml = plan.map(group => renderGroupSection(group, dict)).join('')
@@ -1736,6 +1835,9 @@ function dashClientScript() {
     var data = JSON.parse(document.getElementById('ts-data').textContent);
     var root = document.documentElement;
     var BASE = data.baseUrl;
+    var SITE_ORIGIN = data.siteOrigin || BASE;
+    var LANGS = data.langs || ['fa', 'en', 'ja'];
+    var BRAND_FORMS = data.brandForms || [];
     var RESULTS = {};
     var stats = { total: 0, pass: 0, fail: 0, warn: 0 };
     var startTime = null;
@@ -1899,6 +2001,41 @@ function dashClientScript() {
       return { status: 'fail', code: r.status, ping: r.ping, noteKey: 'expected', noteVal: want };
     }
 
+    /* Rendered width of a string: full-width CJK glyphs count two.
+       The client-side twin of textWidth() in Core/Seo.js. */
+    function seoWidth(text) {
+      var width = 0;
+      var full = /[\u3000-\u303F\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uFF00-\uFF60]/;
+      for (var i = 0; i < text.length; i++) width += full.test(text.charAt(i)) ? 2 : 1;
+      return width;
+    }
+
+    /* Title, description and heading on one page. */
+    function snippetCheck(path) {
+      return fetchTest(path, {}).then(function (r) {
+        if (!r.ok) return netFail();
+        if (r.status !== 200) return expectFail(r, '200');
+        return r.res.text().then(function (body) {
+          var title = (body.match(/<title>([^<]*)<\\/title>/) || [])[1] || '';
+          var desc = (body.match(/<meta name="description" content="([^"]*)"/) || [])[1] || '';
+          var h1s = (body.match(/<h1[\s>]/g) || []).length;
+
+          var problems = [];
+          if (!desc) problems.push('description');
+          else if (seoWidth(desc) < 70) problems.push('description ' + seoWidth(desc));
+          else if (seoWidth(desc) > 165) problems.push('description ' + seoWidth(desc));
+          if (!title) problems.push('title');
+          else if (seoWidth(title) > 65) problems.push('title ' + seoWidth(title));
+          if (h1s !== 1) problems.push('h1 x' + h1s);
+
+          if (problems.length) {
+            return { status: 'fail', code: 200, ping: r.ping, noteKey: 'seoSnippetBad', noteVal: problems.join(', ') };
+          }
+          return { status: 'pass', code: 200, ping: r.ping, noteKey: 'seoWidths', noteVal: seoWidth(title) + '/' + seoWidth(desc) };
+        });
+      });
+    }
+
     function postJson(path, payload) {
       return fetchTest(path, {
         method: 'POST',
@@ -1978,6 +2115,197 @@ function dashClientScript() {
     }
 
     var RUNNERS = {
+      /* ==========================================
+         What a crawler sees.
+
+         Six GETs of public pages. Each one reads the BYTES rather
+         than a status code, because every failure this group is
+         written for returns 200: a canonical naming the wrong
+         host, a robots.txt that stopped pointing at the sitemap, a
+         hreflang cluster missing a language, a page that lost its
+         structured data in a refactor.
+         ========================================== */
+
+      seoRobots: function () {
+        return fetchTest('/robots.txt', {}).then(function (r) {
+          if (!r.ok) return netFail();
+          if (r.status !== 200) return expectFail(r, '200');
+          return r.res.text().then(function (body) {
+            var missing = [];
+            if (body.indexOf('Sitemap:') === -1) missing.push('Sitemap');
+            if (body.indexOf('Disallow: /thegod') === -1) missing.push('Disallow /thegod');
+            if (body.indexOf('Allow: /assets/') === -1) missing.push('Allow /assets/');
+            if (missing.length) {
+              return { status: 'fail', code: 200, ping: r.ping, noteKey: 'seoMissing', noteVal: missing.join(', ') };
+            }
+            return { status: 'pass', code: 200, ping: r.ping };
+          });
+        });
+      },
+
+      seoSitemap: function () {
+        return fetchTest('/sitemap.xml', {}).then(function (r) {
+          if (!r.ok) return netFail();
+          if (r.status !== 200) return expectFail(r, '200');
+          return r.res.text().then(function (body) {
+            var locs = (body.match(/<loc>/g) || []).length;
+            var alts = (body.match(/hreflang=/g) || []).length;
+            var imgs = (body.match(/<image:loc>/g) || []).length;
+            if (!locs) return { status: 'fail', code: 200, ping: r.ping, noteKey: 'badStruct' };
+
+            /* Every entry carries the full reciprocal set plus
+               x-default, so four per URL is the floor. Fewer means
+               the cluster is incomplete, which is the failure that
+               kept two thirds of this site out of the index. */
+            if (alts < locs * 4) {
+              return { status: 'fail', code: 200, ping: r.ping, noteKey: 'seoHreflangShort', noteVal: alts + '/' + (locs * 4) };
+            }
+
+            /* No images is not broken - it is a site with no key
+               art in the registry - but it is worth saying out
+               loud, because the usual cause is a logo path that
+               stopped resolving. */
+            if (!imgs) return { status: 'warn', code: 200, ping: r.ping, noteKey: 'seoNoImages' };
+            return { status: 'pass', code: 200, ping: r.ping, noteKey: 'seoUrls', noteVal: String(locs) };
+          });
+        });
+      },
+
+      seoCanonical: function () {
+        return fetchTest('/', {}).then(function (r) {
+          if (!r.ok) return netFail();
+          if (r.status !== 200) return expectFail(r, '200');
+          return r.res.text().then(function (body) {
+            var m = body.match(/<link rel="canonical" href="([^"]+)"/);
+            if (!m) return { status: 'fail', code: 200, ping: r.ping, noteKey: 'seoNoCanonical' };
+
+            /* The whole reason this check exists: a canonical that
+               names workers.dev tells a search engine the real
+               domain is the duplicate. */
+            if (m[1].indexOf(SITE_ORIGIN) !== 0) {
+              return { status: 'fail', code: 200, ping: r.ping, noteKey: 'seoWrongHost', noteVal: m[1] };
+            }
+            return { status: 'pass', code: 200, ping: r.ping };
+          });
+        });
+      },
+
+      seoHreflang: function () {
+        return fetchTest('/', {}).then(function (r) {
+          if (!r.ok) return netFail();
+          if (r.status !== 200) return expectFail(r, '200');
+          return r.res.text().then(function (body) {
+            var found = (body.match(/rel="alternate" hreflang="/g) || []).length;
+            var want = LANGS.length + 1;
+            if (found < want) {
+              return { status: 'fail', code: 200, ping: r.ping, noteKey: 'seoHreflangShort', noteVal: found + '/' + want };
+            }
+            return { status: 'pass', code: 200, ping: r.ping };
+          });
+        });
+      },
+
+      /* ==========================================
+         Two things below are written the long way on purpose.
+
+         There is no regex here and no literal closing script tag,
+         because this function is itself rendered INSIDE a script
+         tag: the browser's HTML parser ends that tag at the first
+         closing script sequence it sees - in a comment, in a regex
+         or in a string alike - and the rest of the panel would
+         simply stop existing. (This comment cannot spell that
+         sequence out either, for the same reason.) The tag is
+         assembled from two halves below so it never appears
+         anywhere in the source.
+
+         And nothing un-escapes the JSON. jsonLd() writes "<" as a
+         \u003c escape, and JSON.parse resolves that itself - which
+         is the whole reason that escape is safe to use.
+         ========================================== */
+      seoJsonLd: function () {
+        return fetchTest('/', {}).then(function (r) {
+          if (!r.ok) return netFail();
+          if (r.status !== 200) return expectFail(r, '200');
+          return r.res.text().then(function (body) {
+            var OPEN = '<script type="application/ld+json">';
+            var CLOSE = '<' + '/script>';
+
+            var blocks = [];
+            var from = 0;
+            while (true) {
+              var start = body.indexOf(OPEN, from);
+              if (start === -1) break;
+              var end = body.indexOf(CLOSE, start + OPEN.length);
+              if (end === -1) break;
+              blocks.push(body.slice(start + OPEN.length, end));
+              from = end + CLOSE.length;
+            }
+            if (!blocks.length) return { status: 'fail', code: 200, ping: r.ping, noteKey: 'seoNoJsonLd' };
+
+            /* Parsed, not counted. A block that does not parse is
+               a block a search engine discards silently, and the
+               usual cause is an unescaped character in operator
+               text that reached a description field. */
+            var broken = 0;
+            var types = [];
+            for (var i = 0; i < blocks.length; i++) {
+              try {
+                types.push(JSON.parse(blocks[i])['@type']);
+              } catch (e) { broken++; }
+            }
+            if (broken) return { status: 'fail', code: 200, ping: r.ping, noteKey: 'seoBadJsonLd', noteVal: String(broken) };
+
+            var want = ['Organization', 'WebSite', 'WebPage'];
+            var missing = want.filter(function (t) { return types.indexOf(t) === -1; });
+            if (missing.length) {
+              return { status: 'fail', code: 200, ping: r.ping, noteKey: 'seoMissing', noteVal: missing.join(', ') };
+            }
+            return { status: 'pass', code: 200, ping: r.ping, noteKey: 'seoNodes', noteVal: String(blocks.length) };
+          });
+        });
+      },
+
+      /* ==========================================
+         What a result actually looks like.
+
+         Title and description are measured by RENDERED WIDTH, not
+         by character count, because Google truncates by pixels and
+         this site writes in three scripts. A full-width kana is
+         about two Latin characters, so a Japanese description of
+         100 characters renders past the cutoff that a 150-character
+         English one clears. Counting characters got Japanese wrong
+         in both directions at once - see textWidth() in
+         Core/Seo.js, which this mirrors.
+         ========================================== */
+      seoSnippet: function () {
+        return snippetCheck('/');
+      },
+
+      /* The same three checks on a game's landing page - the pages
+         whose descriptions were three words long, and the ones
+         that had no h1 on their store tab. Checked separately from
+         the front page because they are built by a completely
+         different code path. */
+      seoGamePage: function () {
+        return snippetCheck('/' + tgGameId());
+      },
+
+      /* The check with the shortest description and the longest
+         reason. See the note on this group. */
+      seoBrand: function () {
+        return fetchTest('/', {}).then(function (r) {
+          if (!r.ok) return netFail();
+          if (r.status !== 200) return expectFail(r, '200');
+          return r.res.text().then(function (body) {
+            var missing = BRAND_FORMS.filter(function (form) { return body.indexOf(form) === -1; });
+            if (missing.length) {
+              return { status: 'fail', code: 200, ping: r.ping, noteKey: 'seoNoBrand', noteVal: missing.join(', ') };
+            }
+            return { status: 'pass', code: 200, ping: r.ping };
+          });
+        });
+      },
+
       /* ---------- TheGod operator panel ---------- */
 
       /* Does the endpoint exist, route, and refuse an action it

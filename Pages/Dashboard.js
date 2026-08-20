@@ -46,7 +46,7 @@ import { resolveGames } from '../Games/Registry.js'
 
 import { escapeHtml, safeColor } from '../Core/Html.js'
 import { themeBootScript } from '../Core/PageChrome.js'
-import { seoHead, videoGameLd, softwareApplicationLd, personLd } from '../Core/Seo.js'
+import { seoHead, videoGameLd, softwareApplicationLd, personLd, itemListLd, keywordList } from '../Core/Seo.js'
 import { siteNavCss, siteHeader, siteFooter, siteBackToTop, siteChromeScript } from '../Core/SiteNav.js'
 import { dirFor, langCookieHeader, parseCookies, resolveLang, resolveRequestLang, resolveRequestTheme } from '../Core/RequestContext.js'
 
@@ -65,8 +65,13 @@ const DASH_I18N = {
     // the brand was spending it on an implementation detail.
     title: 'AmirCollider',
     tagline: 'بازی‌های اندروید، کامپیوتر و تحت‌وب — و افزونه‌های یونیتی',
-    metaTitle: 'AmirCollider — بازی‌های اندروید، کامپیوتر و وب، و ابزارهای یونیتی',
+    metaTitle: 'AmirCollider — بازی‌های اندروید و کامپیوتر، و ابزارهای یونیتی',
     metaDesc: 'AmirCollider سازنده‌ی بازی‌های اندروید، کامپیوتر و تحت‌وب مانند Neon Katana، و افزونه‌های ادیتور یونیتی مانند Unity DocSnap و Unity DirectTMP است.',
+
+    // The front page's own terms. Every game name and tool name is
+    // appended automatically where the graph is built, and the
+    // brand's names are prepended inside seoHead().
+    keywords: ['بازی‌ساز مستقل', 'ساخت بازی با یونیتی', 'بازی اندروید رایگان', 'افزونه یونیتی', 'استودیو بازی‌سازی'],
     // The one paragraph of prose above the fold. See renderHero().
     lede: 'من AmirCollider هستم؛ بازی می‌سازم و برای ساختنشان ابزار می‌نویسم. هرچه ساخته‌ام این‌جاست: بازی‌هایی مثل Neon Katana برای اندروید، و افزونه‌هایی برای ادیتور یونیتی مثل Unity DocSnap و Unity DirectTMP که کارهای تکراری ساخت بازی را کوتاه‌تر می‌کنند. همه‌چیز رایگان قابل امتحان است و کدهای بیشترشان باز است.',
     subtitle: 'سامانه مدیریت احراز هویت OAuth',
@@ -117,8 +122,9 @@ const DASH_I18N = {
     locale: 'en-US',
     title: 'AmirCollider',
     tagline: 'Games for Android, PC and the web — and Unity editor extensions',
-    metaTitle: 'AmirCollider — Games for Android, PC & Web, and Unity Editor Tools',
+    metaTitle: 'AmirCollider — Android and PC games, and Unity editor tools',
     metaDesc: 'AmirCollider builds games for Android, PC and the web such as Neon Katana, and Unity editor extensions such as Unity DocSnap and Unity DirectTMP.',
+    keywords: ['indie game developer', 'Unity game development', 'free Android games', 'Unity editor extension', 'game studio'],
     lede: 'I am AmirCollider — I make games, and I write the tools I need to make them. Everything I have built lives here: games such as Neon Katana for Android, and Unity editor extensions such as Unity DocSnap and Unity DirectTMP that take the repetition out of building them. All of it is free to try, and most of it is open source.',
     subtitle: 'OAuth authentication management',
     langName: 'English',
@@ -167,8 +173,9 @@ const DASH_I18N = {
     locale: 'ja-JP',
     title: 'AmirCollider',
     tagline: 'Android・PC・ウェブ向けゲームと Unity エディタ拡張',
-    metaTitle: 'AmirCollider — Android・PC・ウェブ向けゲームと Unity エディタツール',
+    metaTitle: 'AmirCollider — Android ゲームと Unity エディタ拡張',
     metaDesc: 'AmirCollider は Neon Katana などの Android・PC・ウェブ向けゲームと、Unity DocSnap・Unity DirectTMP などの Unity エディタ拡張を開発しています。',
+    keywords: ['インディーゲーム開発者', 'Unity ゲーム開発', '無料 Android ゲーム', 'Unity エディタ拡張', 'ゲームスタジオ'],
     lede: 'AmirCollider です。ゲームを作り、そのために必要なツールも自分で書いています。ここに置いてあるのは、Android 向けの Neon Katana のようなゲームと、制作の繰り返し作業を減らす Unity DocSnap・Unity DirectTMP のような Unity エディタ拡張です。どれも無料で試せて、ほとんどはソースを公開しています。',
     subtitle: 'OAuth 認証管理システム',
     langName: '日本語',
@@ -905,6 +912,7 @@ function createDashboardPage(GAMES, baseUrl, routesCount, lang, theme, player = 
   const p = pack(resolved)
   const themeAttr = theme === 'light' || theme === 'dark' ? ` data-theme="${theme}"` : ''
   const games = Object.values(GAMES)
+  const tools = toolsFor(resolved)
 
   // The landing page carries the structured data for everything it
   // links to. One page describing the whole catalogue is what lets
@@ -922,30 +930,89 @@ function createDashboardPage(GAMES, baseUrl, routesCount, lang, theme, player = 
     personLd(resolved),
 
     ...games.map(game => videoGameLd({
+      id: game.id,
       name: game.name,
+
+      // The game's name in the scripts it is searched in. The
+      // front page is the one page on this site a crawler is
+      // guaranteed to read, so it is the worst place for a game to
+      // be nameable in one script only.
+      alternateName: game.altNames || [],
       description: (game.i18n && game.i18n.description && game.i18n.description[resolved]) || game.description,
       path: '/' + game.id,
       image: game.logo,
       downloadUrl: game.myketUrl,
-      genres: (game.tags || []).map(tag => tag[resolved] || tag.en).filter(Boolean)
+      sameAs: game.myketUrl ? [game.myketUrl] : [],
+      identifier: game.package || '',
+      lang: resolved,
+      genres: (game.tags || []).map(tag => tag[resolved] || tag.en).filter(Boolean),
+      keywords: keywordList(game.name, game.altNames || [],
+        (game.tags || []).map(tag => tag[resolved] || tag.en))
     })),
-    softwareApplicationLd({
-      name: 'Unity DocSnap',
-      description: 'Unity editor extension that turns in-editor documentation into shareable snapshots.',
-      path: '/unity-docsnap',
-      version: CONFIG.DOCSNAP.VERSION,
-      price: CONFIG.DOCSNAP.TIERS.plus.price,
-      repo: CONFIG.DOCSNAP.REPO_URL
-    }),
-    softwareApplicationLd({
-      name: 'Unity DirectTMP',
-      description: 'Free MIT-licensed Unity editor extension for working with TextMeshPro directly.',
-      path: '/unity-directtmp',
-      version: CONFIG.DIRECTTMP.VERSION,
-      price: '0',
-      repo: CONFIG.DIRECTTMP.REPO_URL
+
+    // ==========================================
+    // The two Unity tools.
+    //
+    // These descriptions used to be one English sentence each,
+    // hard-coded here and nowhere else - which meant the front
+    // page told a crawler something about DocSnap that neither the
+    // catalogue nor the product page said, in a language two
+    // thirds of this site's readers do not read. Worse, the
+    // sentence was wrong in the specific way the product page
+    // exists to correct: "shareable snapshots" reads as a
+    // screenshot tool, and being classified as one is the exact
+    // problem the KEYWORDS block in Pages/UnityDocSnap.js was
+    // written for.
+    //
+    // Read from Content/ToolsCatalog.js now, in the page's own
+    // language, so all three surfaces say one thing.
+    // ==========================================
+    ...tools.map(tool => softwareApplicationLd({
+      name: tool.name,
+      description: tool.description,
+      path: tool.href,
+      version: tool.version,
+      price: tool.pricing === 'free' ? '0' : null,
+      repo: tool.repo,
+      featureList: (tool.highlights || []).filter(Boolean),
+      keywords: keywordList(tool.name, 'Unity', 'Unity editor extension')
+    })),
+
+    // The catalogue itself, as one list. The front page links to
+    // every product this site has; saying so as a list is what
+    // lets a crawler read it as a catalogue rather than as a page
+    // that happens to carry several links.
+    itemListLd({
+      name: p.metaTitle,
+      lang: resolved,
+      items: [
+        ...games.map(game => ({
+          name: game.name,
+          url: '/' + game.id,
+          description: (game.i18n && game.i18n.description && game.i18n.description[resolved]) || game.description,
+          image: game.logo
+        })),
+        ...tools.map(tool => ({ name: tool.name, url: tool.href, description: tool.description }))
+      ]
     })
   ]
+
+  // The front page answers the broadest query this site gets -
+  // the brand's own name - so what it adds here is everything the
+  // brand MAKES, by name, in every script those names are written
+  // in. seoHead() prepends the brand terms themselves.
+  // The brand leads on the front page and nowhere else. Every
+  // other page's own subject comes first (see KEYWORD_CAP in
+  // Core/Seo.js) - but this page's subject IS the brand, and with
+  // two games and two tools to name, the sixteen-term cap was
+  // reached before the brand's own terms were appended at all.
+  const keywords = keywordList(
+    'AmirCollider',
+    'Amir Collider',
+    p.keywords || [],
+    games.flatMap(game => [game.name, ...(game.altNames || [])]),
+    tools.map(tool => tool.name)
+  )
 
   return `<!DOCTYPE html>
 <html dir="${dir}" lang="${resolved}"${themeAttr}>
@@ -956,11 +1023,13 @@ function createDashboardPage(GAMES, baseUrl, routesCount, lang, theme, player = 
     title: p.metaTitle,
     description: p.metaDesc,
     lang: resolved,
+    keywords,
     graph
   })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap"></noscript>
   ${themeBootScript()}
   <style>${siteNavCss()}${getDashboardCSS()}</style>
 </head>

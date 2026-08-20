@@ -21,14 +21,14 @@
 //     on switch so RTL/LTR is always correct.
 // ==========================================
 
-import { CONFIG } from '../Config.js'
+import { CONFIG, LANGUAGES } from '../Config.js'
 import { getPageHead } from '../Core/DesignSystem.js'
 import { createHtmlResponse } from '../Core/Http.js'
 import { toolsFor } from '../Content/ToolsCatalog.js'
 
 import { escapeHtml, safeColor } from '../Core/Html.js'
 import { themeBootScript } from '../Core/PageChrome.js'
-import { seoHead, breadcrumbLd, softwareApplicationLd } from '../Core/Seo.js'
+import { seoHead, breadcrumbLd, softwareApplicationLd, itemListLd, keywordList } from '../Core/Seo.js'
 import { localizedPath } from '../Core/Locale.js'
 import {
   siteNavCss, siteHeader, siteBreadcrumb, siteFooter, siteBackToTop, siteChromeScript, NAV_I18N
@@ -48,6 +48,17 @@ const I18N = {
     title: 'ابزارها',
     subtitle: 'افزونه‌های یونیتی از AmirCollider',
     lede: 'ابزارهایی که برای پروژه‌های خودم ساختم و بعد دیدم به درد بقیه هم می‌خورن. هرکدوم مستقل نصب می‌شن و به هم کاری ندارن.',
+
+    // The words a person types when they want one of these, as
+    // opposed to the words this page uses to describe them.
+    keywords: ['افزونه یونیتی', 'ابزار یونیتی', 'Unity Editor', 'مستندسازی پروژه یونیتی', 'TextMeshPro', 'پکیج منیجر یونیتی'],
+
+    // Its own string rather than the lede. The lede is written to
+    // be read on the page and says nothing about WHAT the tools
+    // are - which on a search result is the only question. This
+    // names both of them, because two product names are the two
+    // queries this page can realistically win.
+    metaDesc: 'افزونه‌های ادیتور یونیتی از AmirCollider: Unity DocSnap برای مستندسازی خودکار پروژه، و Unity DirectTMP برای درست‌شدن متن فارسی و عربی در TextMeshPro.',
     themeToLight: 'حالت روشن',
     themeToDark: 'حالت تاریک',
     back: 'بازگشت به خانه',
@@ -66,6 +77,8 @@ const I18N = {
     title: 'Tools',
     subtitle: 'Unity extensions by AmirCollider',
     lede: 'Tools built for my own projects that turned out to be useful to other people too. Each installs on its own and none of them depend on the others.',
+    keywords: ['Unity editor extension', 'Unity tools', 'Unity documentation generator', 'TextMeshPro', 'Unity Package Manager', 'Unity asset'],
+    metaDesc: 'Unity editor extensions by AmirCollider: Unity DocSnap, which documents a whole project automatically, and Unity DirectTMP, which fixes right-to-left text.',
     themeToLight: 'Light mode',
     themeToDark: 'Dark mode',
     back: 'Back to home',
@@ -84,6 +97,8 @@ const I18N = {
     title: 'ツール',
     subtitle: 'AmirCollider の Unity 拡張',
     lede: '自分のプロジェクトのために作り、他の方にも役立つと分かったツールです。それぞれ独立して導入でき、相互の依存はありません。',
+    keywords: ['Unity エディタ拡張', 'Unity ツール', 'Unity ドキュメント生成', 'TextMeshPro', 'Unity Package Manager', 'Unity アセット'],
+    metaDesc: 'AmirCollider の Unity エディタ拡張。プロジェクトのドキュメントを自動生成する Unity DocSnap と、TextMeshPro の右から左の表示を直す Unity DirectTMP。',
     themeToLight: 'ライトモード',
     themeToDark: 'ダークモード',
     back: 'ホームに戻る',
@@ -117,6 +132,28 @@ function icon(name, cls) {
   return '<svg class="' + (cls || 'd-ic') + '" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
     + ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
     + (ICONS[name] || '') + '</svg>'
+}
+
+
+// ==========================================
+// toolAliases
+// The other way somebody writes a tool's name.
+//
+// "Unity DocSnap", "UnityDocSnap" and "Unity Doc Snap" are three
+// queries and one product. The two product pages already declare
+// their own aliases by hand; this derives the same two forms for
+// the catalogue, so a tool added to Content/ToolsCatalog.js is
+// findable under both spellings without anybody remembering to
+// write a list.
+// ==========================================
+function toolAliases(name) {
+  const text = String(name || '').trim()
+  if (!text) return []
+
+  const squashed = text.replace(/\s+/g, '')
+  const spaced = text.replace(/([a-z])([A-Z])/g, '$1 $2')
+
+  return [squashed, spaced].filter(entry => entry && entry !== text)
 }
 
 
@@ -391,27 +428,46 @@ function createToolsPage(lang, theme) {
   // what each entry costs, without inferring either from prose.
   const graph = [
     breadcrumbLd(trail, resolved),
-    {
-      '@context': 'https://schema.org',
-      '@type': 'ItemList',
+
+    // Entries with a sentence and a mark on them, not bare names.
+    // See the same change on /games: a list a crawler has to open
+    // every entry of to learn anything is a list it does not open.
+    itemListLd({
       name: `${p.title} — AmirCollider`,
-      numberOfItems: tools.length,
-      itemListElement: tools.map((tool, index) => ({
-        '@type': 'ListItem',
-        position: index + 1,
+      lang: resolved,
+      items: tools.map(tool => ({
         name: tool.name,
-        url: CONFIG.SITE_URL + tool.href
+        url: tool.href,
+        description: tool.description
       }))
-    },
+    }),
+
     ...tools.map(tool => softwareApplicationLd({
       name: tool.name,
+
+      // The compound name and the spaced one, for the same reason
+      // the brand carries both: "Unity DocSnap" and "UnityDocSnap"
+      // are two queries, and a product page that answers one of
+      // them answers half the people looking for it.
+      alternateName: toolAliases(tool.name),
       description: tool.description,
       path: tool.href,
       version: tool.version,
       price: tool.pricing === 'free' ? '0' : null,
-      repo: tool.repo
+      repo: tool.repo,
+
+      // What each tool DOES, in the crawler's own vocabulary. The
+      // catalogue already stores these as the highlights the card
+      // renders, so this is the page's own bullet list said twice
+      // rather than a second set of claims to keep in step.
+      featureList: (tool.highlights || []).filter(Boolean),
+      keywords: keywordList(tool.name, toolAliases(tool.name), 'Unity',
+        'Unity editor extension', p.keywords || []),
+      inLanguage: LANGUAGES.supported.slice()
     }))
   ]
+
+  const keywords = keywordList(p.keywords || [], tools.flatMap(tool => [tool.name, ...toolAliases(tool.name)]))
 
   return `<!DOCTYPE html>
 <html dir="${p.dir}" lang="${resolved}"${themeAttr}>
@@ -419,18 +475,21 @@ function createToolsPage(lang, theme) {
   ${getPageHead({
     title: `${p.title} — Unity Extensions by AmirCollider`,
     amirLogo,
-    description: p.lede
+    description: p.metaDesc
   })}
   ${seoHead({
     path: '/tools',
     title: `${p.title} — Unity Extensions by AmirCollider`,
-    description: p.lede,
+    description: p.metaDesc,
     lang: resolved,
+    pageType: 'CollectionPage',
+    keywords,
     graph
   })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap"></noscript>
   ${themeBootScript()}
   <style>${siteNavCss()}${getToolsCSS()}</style>
 </head>

@@ -33,7 +33,7 @@ import { createErrorPage } from '../Core/ErrorPage.js'
 import { createHtmlResponse } from '../Core/Http.js'
 import { escapeHtml, sortListItems } from '../Core/Html.js'
 import { themeBootScript } from '../Core/PageChrome.js'
-import { seoHead, breadcrumbLd } from '../Core/Seo.js'
+import { seoHead, breadcrumbLd, keywordList } from '../Core/Seo.js'
 import { localizedPath } from '../Core/Locale.js'
 import {
   siteNavCss, siteHeader, siteBreadcrumb, siteFooter, siteBackToTop, siteChromeScript, NAV_I18N
@@ -255,6 +255,15 @@ const I18N = {
     locale: 'fa-IR',
     langName: 'فارسی',
     meta: 'سیاست حفظ حریم خصوصی',
+
+    // The meta description, with {subject} standing in for either
+    // a game's name or the site's. It used to be the page's title
+    // said twice - "سیاست حفظ حریم خصوصی — Neon Katana" - which is
+    // a label, not a description, and left every policy page on
+    // this Worker looking like the same page to a search engine.
+    // This one says what the policy actually covers, which is also
+    // what a Google OAuth reviewer is looking for.
+    metaDesc: 'سیاست حریم خصوصی {subject}: چه داده‌هایی جمع می‌شود، ورود با گوگل و scopeهای openid و email و profile، ذخیره‌ی ابری، و راه حذف حساب.',
     title: 'سیاست حفظ حریم خصوصی',
     themeToDark: 'حالت تاریک',
     themeToLight: 'حالت روشن',
@@ -343,6 +352,7 @@ const I18N = {
     locale: 'en-US',
     langName: 'English',
     meta: 'Privacy Policy',
+    metaDesc: 'The privacy policy for {subject}: what data is collected, Google sign-in and the openid, email and profile scopes, and how to delete your account.',
     title: 'Privacy Policy',
     themeToDark: 'Dark mode',
     themeToLight: 'Light mode',
@@ -431,6 +441,7 @@ const I18N = {
     locale: 'ja-JP',
     langName: '日本語',
     meta: 'プライバシーポリシー',
+    metaDesc: '{subject} のプライバシーポリシー。収集するデータ、Google サインインの各スコープ、クラウドセーブ、アカウントとデータの削除方法について。',
     title: 'プライバシーポリシー',
     themeToDark: 'ダークモード',
     themeToLight: 'ライトモード',
@@ -944,9 +955,16 @@ function createPrivacyPage(game, gameId, baseUrl, lang, theme, { path = '/privac
 
   const perGame = !siteLevel
   const title = perGame ? `${p.meta} — ${game.name} | AmirCollider` : `${p.meta} — AmirCollider`
-  const description = perGame
-    ? `${p.meta} — ${game.name}. AmirCollider Games.`
-    : `${p.meta} — AmirCollider.`
+  const description = String(p.metaDesc || '')
+    .replace('{subject}', perGame ? game.name : 'AmirCollider')
+
+  const keywords = keywordList(
+    p.meta,
+    perGame ? [game.name, ...(game.altNames || [])] : [],
+    'privacy policy',
+    'Google sign-in',
+    'openid email profile'
+  )
 
   const trail = perGame
     ? [
@@ -968,11 +986,13 @@ function createPrivacyPage(game, gameId, baseUrl, lang, theme, { path = '/privac
     title,
     description,
     lang: resolved,
+    keywords,
     graph: [breadcrumbLd(trail, resolved)]
   })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap"></noscript>
   ${themeBootScript()}
   <style>${siteNavCss()}${getPrivacyCSS()}</style>
 </head>

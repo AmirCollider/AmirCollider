@@ -446,13 +446,32 @@ const CANONICAL_EXEMPT = [
 // Query strings other than `lang` are preserved throughout. The
 // checkout's signed order handle arrives as one.
 // ==========================================
-function redirectTo(pathname, params, status) {
+function redirectTo(pathname, params, status, varies = false) {
   const query = params && params.toString ? params.toString() : ''
   return new Response(null, {
     status,
     headers: {
       Location: pathname + (query ? '?' + query : ''),
-      'Cache-Control': status === 301 ? 'public, max-age=3600' : 'no-store'
+      'Cache-Control': status === 301 ? 'public, max-age=3600' : 'no-store',
+
+      // ==========================================
+      // Vary, on the one redirect that reads a request header.
+      //
+      // Only the preference-based 302 below depends on the
+      // visitor: it looks at a cookie and at Accept-Language and
+      // sends a reader who wants English to /en/. Every other
+      // redirect here is decided by the URL alone and would be
+      // wrong to mark as varying.
+      //
+      // `no-store` already stops a shared cache from keeping it,
+      // so nothing was actually broken. This is the correct
+      // statement of WHY it must not be shared, and it is what
+      // Google's own guidance on locale-adaptive pages asks for -
+      // a crawler seeing it knows the URL has header-dependent
+      // behaviour and that the bare path it was served is not the
+      // only answer.
+      // ==========================================
+      ...(varies ? { Vary: 'Accept-Language, Cookie' } : {})
     }
   })
 }
@@ -495,7 +514,7 @@ function languageRedirect(url, request) {
   if (!pathLang && !queryLang && isLangRoutable(path)) {
     const preferred = matchRequestLang(url, request)
     if (preferred !== LANGUAGES.default) {
-      return redirectTo(localizedPath(path, preferred), params, 302)
+      return redirectTo(localizedPath(path, preferred), params, 302, true)
     }
   }
 

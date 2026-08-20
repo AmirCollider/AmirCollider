@@ -33,7 +33,7 @@ import { createErrorPage } from '../Core/ErrorPage.js'
 import { createHtmlResponse } from '../Core/Http.js'
 import { escapeHtml, sortListItems } from '../Core/Html.js'
 import { themeBootScript } from '../Core/PageChrome.js'
-import { seoHead, breadcrumbLd } from '../Core/Seo.js'
+import { seoHead, breadcrumbLd, keywordList } from '../Core/Seo.js'
 import { localizedPath } from '../Core/Locale.js'
 import {
   siteNavCss, siteHeader, siteBreadcrumb, siteFooter, siteBackToTop, siteChromeScript, NAV_I18N
@@ -242,6 +242,11 @@ const I18N = {
     locale: 'fa-IR',
     langName: 'فارسی',
     meta: 'شرایط و قوانین استفاده',
+
+    // See the note on the same field in Pages/Privacy.js: the
+    // description used to be the title repeated, which made every
+    // policy page on this Worker look like the same page.
+    metaDesc: 'شرایط استفاده از {subject}: قوانین حساب کاربری، خریدهای درون‌برنامه‌ای و بازپرداخت، رفتار قابل قبول، مالکیت محتوا و شرایط تعلیق یا حذف حساب.',
     title: 'شرایط و قوانین استفاده',
     themeToDark: 'حالت تاریک',
     themeToLight: 'حالت روشن',
@@ -353,6 +358,7 @@ const I18N = {
     locale: 'en-US',
     langName: 'English',
     meta: 'Terms of Service',
+    metaDesc: 'The terms of service for {subject}: account rules, in-app purchases and refunds, acceptable use, and when an account can be suspended or removed.',
     title: 'Terms of Service',
     themeToDark: 'Dark mode',
     themeToLight: 'Light mode',
@@ -464,6 +470,7 @@ const I18N = {
     locale: 'ja-JP',
     langName: '日本語',
     meta: '利用規約',
+    metaDesc: '{subject} の利用規約。アカウントの規則、アプリ内購入と返金、禁止事項、アカウントの停止・削除の条件について。',
     title: '利用規約',
     themeToDark: 'ダークモード',
     themeToLight: 'ライトモード',
@@ -998,9 +1005,16 @@ function createTermsPage(game, gameId, baseUrl, lang, theme, { path = '/terms', 
 
   const perGame = !siteLevel
   const title = perGame ? `${p.meta} — ${game.name} | AmirCollider` : `${p.meta} — AmirCollider`
-  const description = perGame
-    ? `${p.meta} — ${game.name}. AmirCollider Games.`
-    : `${p.meta} — AmirCollider.`
+  const description = String(p.metaDesc || '')
+    .replace('{subject}', perGame ? game.name : 'AmirCollider')
+
+  const keywords = keywordList(
+    p.meta,
+    perGame ? [game.name, ...(game.altNames || [])] : [],
+    'terms of service',
+    'in-app purchases',
+    'refunds'
+  )
 
   const trail = perGame
     ? [
@@ -1022,11 +1036,13 @@ function createTermsPage(game, gameId, baseUrl, lang, theme, { path = '/terms', 
     title,
     description,
     lang: resolved,
+    keywords,
     graph: [breadcrumbLd(trail, resolved)]
   })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap"></noscript>
   ${themeBootScript()}
   <style>${siteNavCss()}${getTermsCSS()}</style>
 </head>

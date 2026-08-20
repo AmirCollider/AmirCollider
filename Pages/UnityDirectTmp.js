@@ -126,6 +126,10 @@ const I18N = {
 
     title: 'Unity DirectTMP',
     tagline: 'حل مشکل متن فارسی و عربی در یونیتی — حروف چسبیده، ترتیب راست‌به‌چپ.',
+
+    // See the note on the same two fields in Pages/UnityDocSnap.js.
+    metaTitle: 'Unity DirectTMP — حل مشکل متن فارسی و عربی در یونیتی',
+    metaDesc: 'Unity DirectTMP متن فارسی، عربی و اردو را در TextMeshPro با حروف چسبیده و ترتیب درست نشان می‌دهد. کافی است .ttf را روی لیبل بگذاری. رایگان و متن‌باز.',
     lede: 'یک افزونه‌ی رایگان و متن‌باز برای یونیتی که مشکل نمایش متن راست‌به‌چپ را در TextMeshPro حل می‌کند: فارسی، عربی و اردو با حروف چسبیده و به ترتیب درست خوانده می‌شوند. فقط کافی است فایل .ttf یا .otf را روی لیبل بگذاری — نه Font Asset Creator، نه انتخاب رِنج کاراکتر. ژاپنی، چینی، کره‌ای، سیریلیک، تایلندی و ایموجی هم بدون هیچ تنظیمی کار می‌کنند.',
 
     // The one-line answer to "what IS this", for the machine
@@ -267,6 +271,8 @@ const I18N = {
 
     title: 'Unity DirectTMP',
     tagline: 'Fix Persian and Arabic text in Unity — letters joined, right-to-left, correct.',
+    metaTitle: 'Unity DirectTMP — Fix Persian and Arabic text in Unity',
+    metaDesc: 'Unity DirectTMP fixes right-to-left text in TextMeshPro: Persian, Arabic and Urdu, letters joined and in reading order. Drop in a .ttf. Free, MIT, open source.',
     lede: 'A free, open-source Unity package that fixes right-to-left text in TextMeshPro: Persian, Arabic and Urdu come out with their letters joined and in reading order. Drop a .ttf or .otf on a label — no Font Asset Creator, no character ranges to pick. Japanese, Chinese, Korean, Cyrillic, Thai and emoji work with nothing to configure.',
 
     whatis: 'A Unity package (installed from the Package Manager) that fixes multilingual text in TextMeshPro.',
@@ -398,6 +404,8 @@ const I18N = {
 
     title: 'Unity DirectTMP',
     tagline: 'Unity の文字化け(豆腐)とアラビア語表示を直す、TextMeshPro 用パッケージ。',
+    metaTitle: 'Unity DirectTMP — Unity の文字化けと RTL 表示を直す',
+    metaDesc: 'Unity DirectTMP は TextMeshPro の豆腐(□)を解消し、ペルシャ語・アラビア語の文字連結と右から左の表示を修正します。.ttf を渡すだけ。無料・MIT・オープンソース。',
     lede: '無料・オープンソースの Unity パッケージです。ラベルに .ttf / .otf を渡すだけで、そのファイルから直接描画します。Font Asset Creator も文字範囲の指定も不要なので、日本語・中国語・韓国語の豆腐(□)が消えます。さらにペルシャ語・アラビア語・ウルドゥー語は、文字が正しく連結され、右から左の語順で表示されます。キリル文字・タイ文字・絵文字も設定なしで使えます。',
 
     whatis: 'TextMeshPro の多言語表示を直す Unity パッケージ(Package Manager からインストール)。',
@@ -1640,7 +1648,7 @@ function createPage(lang, theme) {
   // result reading "Unity DirectTMP - Unity tools" tells somebody
   // searching for broken Persian text nothing at all; this one is
   // the answer to their query in the fifty characters they read.
-  const title = `${p.title} — ${p.tagline}`
+  const title = p.metaTitle
 
   const trail = [
     { href: '/', label: site.home },
@@ -1653,11 +1661,11 @@ function createPage(lang, theme) {
   return `<!DOCTYPE html>
 <html dir="${p.dir}" lang="${resolved}"${themeAttr}>
 <head>
-  ${getPageHead({ title, amirLogo, description: p.lede })}
+  ${getPageHead({ title, amirLogo, description: p.metaDesc })}
   ${seoHead({
     path: '/unity-directtmp',
     title,
-    description: p.lede,
+    description: p.metaDesc,
     lang: resolved,
     type: 'product',
     keywords: KEYWORDS[resolved] || KEYWORDS.en,
@@ -1693,7 +1701,8 @@ function createPage(lang, theme) {
   })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap"></noscript>
   ${themeBootScript()}
   <style>${siteNavCss()}${getCSS()}</style>
 </head>

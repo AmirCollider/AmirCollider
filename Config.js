@@ -112,6 +112,158 @@ export const CONFIG = deepFreeze({
     ja: 'AmirCollider — Neon Katana などの Android・PC・ウェブ向けゲームと、Unity DocSnap・Unity DirectTMP などの Unity エディタ拡張。'
   },
 
+  // ==========================================
+  // The name, in every form somebody actually types it.
+  //
+  // "AmirCollider" is one word in Latin script and always has
+  // been. That is one of five or six strings a person looking for
+  // this site will put in a search box, and a search engine does
+  // NOT derive the others on its own:
+  //
+  //   • It will not split a compound word for you. "Amir Collider"
+  //     and "AmirCollider" are two different queries, and roughly
+  //     half the people who type the name type the spaced form.
+  //   • It will not transliterate for you. A Persian reader types
+  //     "امیرکولایدر" and a Japanese reader types "アミールコライダー",
+  //     and a site whose every byte is Latin script matches
+  //     neither - which is exactly the shape of "the site is
+  //     trilingual and only ever found in English".
+  //   • It will not spell-correct a brand it has not learned yet.
+  //     Correction comes from having seen the correct form near
+  //     the incorrect one enough times; on a brand-new domain it
+  //     has seen neither.
+  //
+  // So the three lists below are the three different claims, and
+  // they are deliberately kept apart because they are used in
+  // different places and confusing them is how a site gets marked
+  // as keyword-stuffing:
+  //
+  //   ALIASES        Genuine alternate names: the same name in
+  //                  another script, or with the space, or in the
+  //                  casing a URL bar produces. These are the ONLY
+  //                  ones that go in `alternateName` in structured
+  //                  data, because that field means "this thing is
+  //                  also called this" and a misspelling is not
+  //                  another name for something.
+  //   MISSPELLINGS   What people get wrong. These appear as PROSE
+  //                  on /about, in an answer that says out loud
+  //                  which spellings are wrong and what the right
+  //                  one is. That is a real answer to a real
+  //                  question, it is the form a search engine can
+  //                  learn a correction from, and it is honest -
+  //                  which the same list hidden in a meta tag or
+  //                  claimed as an `alternateName` would not be.
+  //   TOPICS         What this name is ABOUT, per language. Read
+  //                  into `keywords` on the site-wide nodes so the
+  //                  brand is attached to a subject rather than
+  //                  floating as a string.
+  //
+  // Everything that renders any of this reads it from here. There
+  // is no second list anywhere.
+  // ==========================================
+  BRAND: {
+    NAME: 'AmirCollider',
+
+    // The one form of the name per script, for the places that
+    // SHOW it rather than declare it. The footer prints these on
+    // every page, which is the whole point: a name that appears in
+    // three scripts on 60 pages is a name a crawler has three
+    // spellings for, and it is also the spelling a Persian or
+    // Japanese reader was looking for. Printing all of ALIASES
+    // there would be a footer that reads as keyword stuffing,
+    // which is the same signal pointed the wrong way.
+    SCRIPTS: {
+      en: 'Amir Collider',
+      fa: 'امیرکولایدر',
+      ja: 'アミールコライダー'
+    },
+
+    // Every entry here has to be a name somebody would genuinely
+    // call this, because these are what `alternateName` declares -
+    // and Google's structured-data policy is that markup must not
+    // be misleading. Three kinds of thing were removed after a
+    // second pass:
+    //
+    //   'amircollider' / 'AMIRCOLLIDER'  Casing. Search is
+    //     case-insensitive; declaring these adds nothing and pads
+    //     the list, which is the shape of a spam signal.
+    //   'Amir-Collider'  Nobody writes it hyphenated.
+    //   'AmirCollider Studio'  Invented. No listing, no profile and
+    //     no page anywhere uses it, so declaring it is a claim
+    //     about an entity that does not exist.
+    //
+    // What is left is the spaced form, the Persian spelling, the
+    // Japanese spelling, and the one name that IS used elsewhere.
+    // The Arabic-keyboard forms are derived, not listed - see
+    // arabicKeyboardVariants() in Core/Seo.js.
+    ALIASES: [
+      'Amir Collider',
+      'AmirCollider Games',
+
+      // Persian. The first is how it is written running-on, the
+      // way the compound Latin form reads; the second is the
+      // spaced form, which is what most Persian keyboards produce
+      // and what a reader who has only heard the name will type.
+      'امیرکولایدر',
+      'امیر کولایدر',
+
+      // Japanese katakana, both without and with the middle dot.
+      // A Japanese reader writes a two-part foreign name either
+      // way and searches for it either way.
+      'アミールコライダー',
+      'アミール・コライダー'
+    ],
+
+    // Ordered roughly by how often each one turns up. Every entry
+    // here is a spelling somebody has plausibly typed while
+    // looking for this site: a dropped letter, a swapped vowel, or
+    // a transliteration that follows the sound rather than the
+    // spelling.
+    MISSPELLINGS: [
+      'Amir Colider',
+      'AmirColider',
+      'Amir Collidor',
+      'AmirCollidor',
+      'Amir Collyder',
+      'AmirColliderr',
+      'Amir Kollider',
+      'AmirKollider',
+      'Amir Kolider',
+      'امیر کولیدر',
+      'امیرکولیدر',
+      'امیر کلایدر',
+      'امیرکلایدر',
+      'アミルコライダー'
+    ],
+
+    TOPICS: {
+      fa: [
+        'بازی‌سازی مستقل',
+        'بازی اندروید',
+        'یونیتی',
+        'افزونه یونیتی',
+        'بازی رایگان اندروید',
+        'ساخت بازی'
+      ],
+      en: [
+        'indie game developer',
+        'Android games',
+        'Unity',
+        'Unity editor extensions',
+        'free Android games',
+        'game development'
+      ],
+      ja: [
+        'インディーゲーム開発',
+        'Android ゲーム',
+        'Unity',
+        'Unity エディタ拡張',
+        '無料 Android ゲーム',
+        'ゲーム開発'
+      ]
+    }
+  },
+
   // Unity DocSnap - the paid Unity editor extension. Sold through
   // this Worker's own crypto checkout (see Docs/Checkout.md).
   // Tier names must match DocSnapEditionMatrix in the Unity package,
@@ -288,7 +440,27 @@ export const CONFIG = deepFreeze({
   // the PNG paints its corners is the value that makes the seam
   // between artwork and backdrop invisible; anything else leaves a
   // faint square edge visible inside the circle.
-  ICON_BG: '#f4c21e'
+  ICON_BG: '#f4c21e',
+
+  // ==========================================
+  // What the sitemap reports as each page's last change.
+  //
+  // It used to be `new Date()` - today, on every one of the 48
+  // URLs, every time the file was fetched. That is not a small
+  // inaccuracy: `lastmod` is a hint a crawler decides whether to
+  // TRUST, and a sitemap claiming the privacy policy changed
+  // today, and again tomorrow, and again the day after, is a
+  // sitemap whose dates get ignored - including on the pages where
+  // the date was real and would have earned a recrawl.
+  //
+  // A constant is honest by comparison: it says "this site last
+  // changed when it was last deployed", which is true of a Worker
+  // that renders every page from code. Update it in the commit
+  // that changes something a reader would notice. A date in the
+  // past is fine; a date in the future is not, and Google drops
+  // the whole tag when it sees one.
+  // ==========================================
+  SITEMAP_LASTMOD: '2026-08-20'
 })
 
 
@@ -357,6 +529,25 @@ const GAME_REGISTRY = {
     color: '#FF5722',
     logo: '/assets/NeonKatanaLogo.png',
     description: 'Neon action sword game',
+
+    // ==========================================
+    // The game's name in the scripts people search it in.
+    //
+    // Same problem as CONFIG.BRAND, one level down: a Persian
+    // player types "نئون کاتانا" and a Japanese one types
+    // "ネオンカタナ", and a page whose only spelling of the name is
+    // "Neon Katana" is a page neither query reaches. The Latin
+    // name is still THE name - it is what the store listing, the
+    // APK and the OAuth consent screen say, and none of those may
+    // drift - so these are alternates and never a replacement.
+    //
+    // Read into `alternateName` on the VideoGame node and into the
+    // page's keywords. Nothing renders them as a heading, because
+    // the name a page shows has to be the one the store shows.
+    // A game with no `altNames` behaves exactly as before.
+    // ==========================================
+    altNames: ['نئون کاتانا', 'ネオンカタナ', 'NeonKatana', 'Neon-Katana'],
+
     i18n: {
       // The one-line description on the dashboard card. The game's
       // OWN page no longer reads this: its tagline and its long
@@ -580,6 +771,10 @@ const GAME_REGISTRY = {
     color: '#20fea9',
     logo: 'https://dl.amircollider.com/ChronoBladesLogo.png',
     description: 'Knife throwing at the target',
+
+    // See the note on Neon Katana's altNames above.
+    altNames: ['کرونو بلیدز', 'クロノブレイズ', 'ChronoBlades', 'Chrono-Blades'],
+
     i18n: {
       description: {
         fa: 'پرتاب چاقو به هدف',
@@ -952,6 +1147,16 @@ function buildGame(id, def, env) {
     description: def.description,
     i18n: def.i18n,
     tags: def.tags,
+
+    // The same name in another script. Normalised to a list of
+    // trimmed, non-empty strings so the structured data and the
+    // keyword builder can both spread it without checking; a game
+    // that declares none gets an empty array rather than
+    // undefined, which is what lets `.length` be the only test
+    // anywhere downstream.
+    altNames: (def.altNames || [])
+      .map(entry => String(entry || '').trim())
+      .filter(Boolean),
 
     // The dashboard card's decorative motifs. Normalised to a
     // short array of single glyphs here rather than trusted as

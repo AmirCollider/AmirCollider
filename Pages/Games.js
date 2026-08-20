@@ -39,7 +39,7 @@ import { resolveGames, isDownloadable, gamePlatforms } from '../Games/Registry.j
 
 import { escapeHtml, safeColor } from '../Core/Html.js'
 import { themeBootScript } from '../Core/PageChrome.js'
-import { seoHead, breadcrumbLd, videoGameLd, absoluteUrl } from '../Core/Seo.js'
+import { seoHead, breadcrumbLd, videoGameLd, itemListLd, keywordList } from '../Core/Seo.js'
 import { localizedPath } from '../Core/Locale.js'
 import {
   siteNavCss, siteHeader, siteBreadcrumb, siteFooter, siteBackToTop, siteChromeScript, NAV_I18N
@@ -55,9 +55,14 @@ const I18N = {
   fa: {
     dir: 'rtl',
     title: 'بازی‌ها',
-    metaTitle: 'بازی‌های AmirCollider — بازی‌های اندروید ساخته‌ی یک توسعه‌دهنده‌ی مستقل',
+    metaTitle: 'بازی‌های AmirCollider — بازی‌های اندروید مستقل',
     lede: 'بازی‌هایی که AmirCollider می‌سازد و منتشر می‌کند. هرکدام صفحه‌ی خودش، فروشگاه خودش و جدول امتیازات خودش را دارد.',
     metaDesc: 'فهرست کامل بازی‌هایی که AmirCollider ساخته و منتشر کرده است — از جمله Neon Katana، بازی اکشن اندرویدی با کاتانا.',
+
+    // What this page answers, in the words a person types. Merged
+    // with the brand's own terms inside seoHead(), and with every
+    // game's name in every script it is written in.
+    keywords: ['بازی‌های AmirCollider', 'بازی اندروید رایگان', 'بازی اکشن اندروید', 'بازی ایرانی اندروید', 'دانلود بازی اندروید'],
     countLabel: 'بازی',
     open: 'صفحه‌ی بازی',
     statusLive: 'منتشر شده',
@@ -79,6 +84,7 @@ const I18N = {
     metaTitle: 'AmirCollider Games — Android games by an indie developer',
     lede: 'The games AmirCollider builds and publishes. Each one has its own page, its own storefront and its own leaderboard.',
     metaDesc: 'Every game AmirCollider has built and published — including Neon Katana, an Android action game fought with a katana.',
+    keywords: ['AmirCollider games', 'free Android games', 'indie Android action game', 'katana game', 'download Android game'],
     countLabel: 'games',
     open: 'Game page',
     statusLive: 'Released',
@@ -97,9 +103,10 @@ const I18N = {
   ja: {
     dir: 'ltr',
     title: 'ゲーム',
-    metaTitle: 'AmirCollider のゲーム — インディー開発者による Android ゲーム',
+    metaTitle: 'AmirCollider のゲーム — Android 向けインディーゲーム',
     lede: 'AmirCollider が開発・公開しているゲームです。それぞれに専用ページ、ストア、ランキングがあります。',
     metaDesc: 'AmirCollider が制作・公開したゲームの一覧。カタナで戦う Android アクションゲーム Neon Katana を含みます。',
+    keywords: ['AmirCollider ゲーム', '無料 Android ゲーム', 'インディー アクションゲーム', 'カタナ ゲーム', 'Android ゲーム ダウンロード'],
     countLabel: 'タイトル',
     open: 'ゲームページ',
     statusLive: '公開中',
@@ -351,31 +358,57 @@ function createGamesPage(games, lang, theme) {
   // same shape /tools emits for its tools. A crawler reading this
   // page knows it is a catalogue, how many entries it has, and
   // that every entry is a game.
+  const describe = game => pickLang(game.landing && game.landing.tagline, resolved)
+    || pickLang(game.i18n && game.i18n.description, resolved)
+    || game.description
+
   const graph = [
     breadcrumbLd(trail, resolved),
-    {
-      '@context': 'https://schema.org',
-      '@type': 'ItemList',
+
+    // The list entries carry a sentence and a picture now, not
+    // just a name and a URL. A catalogue whose ListItems are bare
+    // names is a catalogue a search engine has to open every entry
+    // of to learn anything, and it will not.
+    itemListLd({
       name: p.metaTitle,
-      numberOfItems: games.length,
-      itemListElement: games.map((game, index) => ({
-        '@type': 'ListItem',
-        position: index + 1,
+      lang: resolved,
+      items: games.map(game => ({
         name: game.name,
-        url: absoluteUrl('/' + game.id)
+        url: '/' + game.id,
+        description: describe(game),
+        image: game.logo
       }))
-    },
+    }),
+
     ...games.map(game => videoGameLd({
+      id: game.id,
       name: game.name,
-      description: pickLang(game.landing && game.landing.tagline, resolved)
-        || pickLang(game.i18n && game.i18n.description, resolved)
-        || game.description,
+
+      // The same alternate names the game's own page declares.
+      // Both pages describe one game, so both have to be
+      // findable by the name a Persian or Japanese reader types -
+      // and this is the page that lists ALL of them.
+      alternateName: game.altNames || [],
+      description: describe(game),
       path: '/' + game.id,
       image: game.logo,
       downloadUrl: game.myketUrl,
-      genres: (game.tags || []).map(tag => tag[resolved] || tag.en).filter(Boolean)
+      sameAs: game.myketUrl ? [game.myketUrl] : [],
+      identifier: game.package || '',
+      lang: resolved,
+      genres: (game.tags || []).map(tag => tag[resolved] || tag.en).filter(Boolean),
+      keywords: keywordList(game.name, game.altNames || [],
+        (game.tags || []).map(tag => tag[resolved] || tag.en))
     }))
   ]
+
+  // What this page answers: every game's name in every script it
+  // is written in, plus the words somebody uses when they are
+  // looking for a catalogue rather than a specific title.
+  const keywords = keywordList(
+    p.keywords || [],
+    games.flatMap(game => [game.name, ...(game.altNames || [])])
+  )
 
   const cards = games.length
     ? `<div class="games">${games.map(game => gameCard(game, resolved)).join('')}</div>`
@@ -385,10 +418,22 @@ function createGamesPage(games, lang, theme) {
 <html dir="${p.dir}" lang="${resolved}"${themeAttr}>
 <head>
   ${getPageHead({ title: p.metaTitle, amirLogo: CONFIG.AMIR_LOGO, description: p.metaDesc })}
-  ${seoHead({ path: '/games', title: p.metaTitle, description: p.metaDesc, lang: resolved, graph })}
+  ${seoHead({
+    path: '/games',
+    title: p.metaTitle,
+    description: p.metaDesc,
+    lang: resolved,
+    // A CollectionPage rather than a WebPage: this page's subject
+    // is the set, and saying so is what turns "a page that
+    // mentions two games" into "the list of this studio's games".
+    pageType: 'CollectionPage',
+    keywords,
+    graph
+  })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap"></noscript>
   ${themeBootScript()}
   <style>${siteNavCss()}${gamesCss()}</style>
 </head>

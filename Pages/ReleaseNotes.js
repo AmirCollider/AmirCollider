@@ -26,7 +26,7 @@ import { getPageHead } from '../Core/DesignSystem.js'
 import { createHtmlResponse } from '../Core/Http.js'
 import { escapeHtml } from '../Core/Html.js'
 import { themeBootScript } from '../Core/PageChrome.js'
-import { seoHead, breadcrumbLd } from '../Core/Seo.js'
+import { seoHead, breadcrumbLd, keywordList } from '../Core/Seo.js'
 import {
   siteNavCss, siteHeader, siteBreadcrumb, siteFooter, siteBackToTop, siteChromeScript, NAV_I18N
 } from '../Core/SiteNav.js'
@@ -51,6 +51,14 @@ const RN_I18N = {
     latest: 'جدیدترین',
     back: 'بازگشت به خانه',
     footerTagline: 'سامانه پروکسی OAuth برای بازی‌های AmirCollider.',
+
+    // The meta description, and NOT footerTagline - which is what
+    // it used to be. That line says the site is an OAuth proxy:
+    // true of one subsystem, years out of date as a summary, and
+    // on this page it described neither the site nor the page. A
+    // search result for "AmirCollider release notes" read "OAuth
+    // proxy for AmirCollider games", which answers nobody.
+    metaDesc: 'تاریخچه‌ی کامل تغییرات AmirCollider — هر نسخه‌ی سایت و سرویس‌هایش، با تاریخ و فهرست چیزهایی که اضافه، اصلاح یا حذف شده است.',
     footerPowered: 'اجرا شده روی Cloudflare Workers'
   },
   en: {
@@ -64,6 +72,7 @@ const RN_I18N = {
     latest: 'Latest',
     back: 'Back to home',
     footerTagline: 'OAuth proxy for AmirCollider games.',
+    metaDesc: 'The full changelog for AmirCollider — every release of the site and its services, dated, with what was added, fixed or removed in each one.',
     footerPowered: 'Powered by Cloudflare Workers'
   },
   ja: {
@@ -77,6 +86,7 @@ const RN_I18N = {
     latest: '最新',
     back: 'ホームに戻る',
     footerTagline: 'AmirCollider ゲーム向けの OAuth プロキシ。',
+    metaDesc: 'AmirCollider の変更履歴。サイトと各サービスのリリースごとに、日付と、追加・修正・削除された内容の一覧をまとめています。',
     footerPowered: 'Cloudflare Workers で稼働'
   }
 }
@@ -1230,7 +1240,7 @@ function createReleaseNotesPage(lang, theme) {
   const site = NAV_I18N[resolved]
   const themeAttr = theme === 'light' || theme === 'dark' ? ` data-theme="${theme}"` : ''
   const title = `${site.releaseNotes} — AmirCollider`
-  const description = p.footerTagline
+  const description = p.metaDesc
   const trail = [
     { href: '/', label: site.home },
     { href: '/release-notes', label: site.releaseNotes }
@@ -1245,11 +1255,13 @@ function createReleaseNotesPage(lang, theme) {
     title,
     description,
     lang: resolved,
+    keywords: keywordList('release notes', 'changelog', site.releaseNotes),
     graph: [breadcrumbLd(trail, resolved)]
   })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap"></noscript>
   ${themeBootScript()}
   <style>${siteNavCss()}${getReleaseNotesCSS()}</style>
 </head>

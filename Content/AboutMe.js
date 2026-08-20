@@ -40,6 +40,9 @@
 // ==========================================
 
 
+import { CONFIG } from '../Config.js'
+
+
 export const ABOUT = {
   // ==========================================
   // فارسی
@@ -49,7 +52,11 @@ export const ABOUT = {
     dir: 'rtl',
 
     metaTitle: 'درباره‌ی من — AmirCollider',
-    metaDesc: 'AmirCollider کیست: بازی‌ساز مستقل، سازنده‌ی ابزارهای یونیتی و سازنده‌ی همین سایت. داستان اینکه از کجا شروع شد، چه چیزهایی از دست رفت، و چرا هنوز ادامه دارد.',
+    metaDesc: 'AmirCollider (امیرکولایدر) کیست: بازی‌ساز مستقل، سازنده‌ی ابزارهای یونیتی و سازنده‌ی همین سایت. از کجا شروع شد و چرا هنوز ادامه دارد.',
+
+    // The page's own terms. The name's other spellings are added
+    // from CONFIG.BRAND where the tag is built - see Pages/About.js.
+    keywords: ['AmirCollider کیست', 'بازی‌ساز مستقل ایرانی', 'توسعه‌دهنده یونیتی', 'سازنده Neon Katana'],
 
     breadcrumb: 'درباره‌ی من',
     hello: 'سلام، من AmirCollider هستم!',
@@ -138,6 +145,14 @@ export const ABOUT = {
       {
         q: 'اسمت رو AmirCollider می‌نویسی یا Amir Collider؟',
         a: 'یک کلمه، بدون فاصله: AmirCollider. ولی خیلی‌ها جدا می‌نویسنش — Amir Collider — و هر دوش من هستم. اگه یه جایی دنبالم گشتی و پیدام نکردی، معمولاً همون یه فاصله دلیلشه.'
+      },
+      {
+        q: 'اسمت به فارسی و ژاپنی چطور نوشته می‌شه؟',
+        a: 'به فارسی می‌شه «امیرکولایدر» (و بعضی‌ها «امیر کولایدر» می‌نویسن)، و به ژاپنی می‌شه «アミールコライダー». همه‌ی این‌ها یک نفرن و یک سایت: {aliases}. اسم اصلی و رسمی همون AmirCollider لاتینه — بقیه فقط همون اسمن به خط‌های دیگه.'
+      },
+      {
+        q: 'اگه اسمت رو اشتباه بنویسم چی؟ مثلاً Amir Colider یا امیر کولیدر',
+        a: 'پیدام می‌کنی، نگران نباش. بیشترین اشتباهی که می‌بینم یکی از دو تا l افتاده — {typo1} — یا حرف آخر عوض شده و {typo2} نوشته شده. بعضی‌ها هم به فارسی {typo3} می‌نویسن که «کولایدر» رو کوتاه می‌کنه. املای درستش AmirCollider است: یک کلمه، دو تا l، و «collider» دقیقاً همون اسم کامپوننته توی یونیتی — برای همین هم انتخابش کردم.'
       }
     ],
 
@@ -168,7 +183,8 @@ export const ABOUT = {
     dir: 'ltr',
 
     metaTitle: 'About me — AmirCollider',
-    metaDesc: 'Who AmirCollider is: an indie game developer, the author of the Unity tools on this site, and the person who built the site itself. How it started, what got lost along the way, and why it is still going.',
+    metaDesc: 'Who AmirCollider (Amir Collider) is: an indie game developer, the author of the Unity tools on this site, and the person who built the site. How it started.',
+    keywords: ['who is AmirCollider', 'indie game developer', 'Unity developer', 'Neon Katana developer'],
 
     breadcrumb: 'About',
     hello: 'Hi, I’m AmirCollider!',
@@ -257,6 +273,14 @@ export const ABOUT = {
       {
         q: 'Is it AmirCollider or Amir Collider?',
         a: 'One word, no space: AmirCollider. But a lot of people write it as two — Amir Collider — and both of them are me. If you have looked for me somewhere and come up empty, that single space is usually the reason.'
+      },
+      {
+        q: 'How is the name written in Persian and Japanese?',
+        a: 'In Persian it is «امیرکولایدر» (some people write «امیر کولایدر», with the space), and in Japanese it is «アミールコライダー». All of these are one person and one site: {aliases}. The official spelling is the Latin one, AmirCollider — the rest are the same name in another script.'
+      },
+      {
+        q: 'What if I spell it wrong — Amir Colider, AmirCollidor?',
+        a: 'You will still find me. The mistake I see most is a dropped L — {typo1} — or the last vowel swapped, giving {typo2}. In Persian people sometimes write {typo3}, which shortens the second half of the word. The correct spelling is AmirCollider: one word, two Ls, and “collider” exactly as Unity spells its component — which is why I picked it.'
       }
     ],
 
@@ -287,7 +311,8 @@ export const ABOUT = {
     dir: 'ltr',
 
     metaTitle: '自己紹介 — AmirCollider',
-    metaDesc: 'AmirCollider について。インディーゲーム開発者であり、このサイトの Unity ツールの作者であり、このサイト自体を作った人間です。どう始まり、何を失い、なぜ今も続いているのか。',
+    metaDesc: 'AmirCollider (アミールコライダー) について。インディーゲーム開発者であり、このサイトの Unity ツールの作者であり、サイト自体も自作しています。',
+    keywords: ['AmirCollider とは', 'インディーゲーム開発者', 'Unity 開発者', 'Neon Katana 開発者'],
 
     breadcrumb: '自己紹介',
     hello: 'こんにちは、AmirCollider です!',
@@ -376,6 +401,14 @@ export const ABOUT = {
       {
         q: '表記は AmirCollider ですか、Amir Collider ですか?',
         a: 'スペースなしの一語で AmirCollider です。ただ、Amir Collider と二語で書く人も多く、どちらも私のことです。どこかで探して見つからなかったとしたら、たいていはその空白が原因です。'
+      },
+      {
+        q: '日本語やペルシア語ではどう書きますか?',
+        a: '日本語では「アミールコライダー」(「アミール・コライダー」と中黒を入れる書き方もあります)、ペルシア語では「امیرکولایدر」です。いずれも同じ一人、同じサイトを指します: {aliases}。正式な表記はラテン文字の AmirCollider で、ほかは同じ名前を別の文字で書いたものです。'
+      },
+      {
+        q: 'つづりを間違えたら見つかりませんか? (Amir Colider など)',
+        a: '見つかります。いちばん多いのは L が一つ抜けた {typo1} と、最後の母音が変わった {typo2} です。ペルシア語では {typo3} と書かれることもあります。正しいつづりは AmirCollider — 一語、L は二つ、"collider" は Unity のコンポーネント名そのままです。'
       }
     ],
 
@@ -399,9 +432,77 @@ export const ABOUT = {
 }
 
 
+// ==========================================
+// The name, filled in from CONFIG.BRAND.
+//
+// Three of the questions above answer "what is this name, and what
+// if I write it differently", and the answers name every form of
+// it: the Persian and Japanese spellings, and the spellings people
+// get wrong. Those two lists live in Config.js because the
+// structured data, the footer and this page all need them, and a
+// second copy typed out here is a second copy that goes stale the
+// first time one is edited.
+//
+// So the answers carry {aliases} and {typos} and this fills them
+// in. It is also the reason this is the ONLY place misspellings
+// appear on the site: written out as prose in an answer to the
+// question "what if I spell it wrong", they are a real answer a
+// search engine can learn a correction from. The same list in a
+// meta tag, or claimed as an alternateName, would be neither
+// honest nor useful.
+// ==========================================
+function fillBrand(text) {
+  const brand = CONFIG.BRAND || {}
+  const typos = brand.MISSPELLINGS || []
+
+  return String(text || '')
+    // A middle dot rather than a comma: the alias list mixes Latin,
+    // Persian and Japanese runs, and a comma is a different
+    // character in each of them. A dot with spaces around it
+    // separates them all without belonging to any.
+    //
+    // These ARE all genuine names for one thing, so listing them
+    // is a list of names. The misspellings below are not, and they
+    // are handled completely differently.
+    .replace('{aliases}', (brand.ALIASES || []).join(' · '))
+
+    // ==========================================
+    // Three slots, in sentences. Not a list.
+    //
+    // The first version of this answer dropped all fourteen
+    // misspellings into one line separated by middots, and that is
+    // a keyword-stuffed page by Google's own definition - their
+    // spam policy names "lists or groups of keywords, out of
+    // context" as the pattern, and a run of fourteen near-identical
+    // strings is precisely that shape whether or not the intent
+    // was innocent.
+    //
+    // Three, each in a sentence that says WHY it is a common
+    // mistake, is a real answer to a real question. It is also the
+    // better signal: what teaches a search engine a spelling
+    // correction is the wrong form appearing next to the right one
+    // in ordinary prose, which is what this now is. The other
+    // eleven stay in CONFIG.BRAND.MISSPELLINGS - they are the
+    // reference list for whoever maintains this, and they are not
+    // published anywhere.
+    // ==========================================
+    .replace('{typo1}', typos[0] || '')
+    .replace('{typo2}', typos[2] || '')
+    .replace('{typo3}', typos[9] || '')
+}
+
+
 /** One language's pack, falling back to the site default. */
 export function aboutFor(lang) {
-  return ABOUT[lang] || ABOUT.fa
+  const pack = ABOUT[lang] || ABOUT.fa
+
+  // Only `ask` carries a placeholder, so only `ask` is rebuilt.
+  // Copying the whole pack every call would be a new object for
+  // every render of a page whose content never changes.
+  return {
+    ...pack,
+    ask: (pack.ask || []).map(entry => ({ q: entry.q, a: fillBrand(entry.a) }))
+  }
 }
 
 

@@ -46,6 +46,10 @@ import { db, listVersions } from '../Games/Store.js'
 import { googleDisclosureFor, POLICY_LABELS } from '../Content/GoogleDisclosure.js'
 import { chromeTheme, langHeader, page, localeFor } from './GameChrome.js'
 import { escapeHtml } from '../Core/Html.js'
+import {
+  videoGameLd, videoObjectLd, faqPageLd, keywordList, arabicKeyboardVariants,
+  textWidth, clampWidth
+} from '../Core/Seo.js'
 import { matchRequestLang } from '../Core/RequestContext.js'
 import { localizedPath } from '../Core/Locale.js'
 import { CONFIG, LANGUAGES } from '../Config.js'
@@ -116,6 +120,22 @@ const I18N = {
     devices: 'روی چه دستگاه‌هایی اجرا می‌شود',
     faq: 'پرسش‌های پرتکرار',
     versions: 'نسخه‌ها',
+    versionsDesc: 'تاریخچه‌ی کامل نسخه‌های {game}: هر نسخه با تاریخ انتشار و فهرست تغییراتش. آخرین نسخه {version} است.',
+    versionsDescEmpty: 'تاریخچه‌ی نسخه‌های {game}. هنوز نسخه‌ای ثبت نشده؛ هر انتشار تازه با تاریخ و فهرست تغییراتش این‌جا می‌آید.',
+
+    // The pieces the meta description is built from. See
+    // landingDescription() - each is a clause, not a sentence, so
+    // a game that lacks a capability simply drops its clause.
+    descOn: 'برای {platforms}',
+    descBy: 'ساخته‌ی AmirCollider.',
+    descFree: 'رایگان',
+    platAndroid: 'اندروید',
+    platWeb: 'مرورگر',
+    capOffline: 'بدون نیاز به اینترنت',
+    capLogin: 'ورود با گوگل',
+    capCloud: 'ذخیره‌ی ابری',
+    capBoard: 'جدول امتیازات',
+    capStore: 'خرید درون‌برنامه‌ای',
     versionsLink: 'تاریخچه‌ی نسخه‌ها',
     current: 'نسخه‌ی فعلی',
     released: 'تاریخ انتشار',
@@ -151,6 +171,18 @@ const I18N = {
     devices: 'Runs on',
     faq: 'Frequently asked',
     versions: 'Versions',
+    versionsDesc: 'The full release history of {game}: every version with its release date and its list of changes. The latest version is {version}.',
+    versionsDescEmpty: 'The release history of {game}. No version has been recorded yet; each new release will appear here with its date and its list of changes.',
+    descOn: 'for {platforms}',
+    descBy: 'Made by AmirCollider.',
+    descFree: 'Free',
+    platAndroid: 'Android',
+    platWeb: 'the browser',
+    capOffline: 'plays offline',
+    capLogin: 'Google sign-in',
+    capCloud: 'cloud saves',
+    capBoard: 'leaderboard',
+    capStore: 'in-app purchases',
     versionsLink: 'Version history',
     current: 'Current version',
     released: 'Released',
@@ -186,6 +218,18 @@ const I18N = {
     devices: '対応デバイス',
     faq: 'よくある質問',
     versions: 'バージョン',
+    versionsDesc: '{game} のリリース履歴。各バージョンのリリース日と変更点の一覧です。最新バージョンは {version} です。',
+    versionsDescEmpty: '{game} のリリース履歴。まだバージョンが登録されていません。新しいリリースは日付と変更点とともにここに表示されます。',
+    descOn: '{platforms}向け',
+    descBy: '制作: AmirCollider。',
+    descFree: '無料',
+    platAndroid: 'Android',
+    platWeb: 'ブラウザ',
+    capOffline: 'オフライン対応',
+    capLogin: 'Google サインイン',
+    capCloud: 'クラウドセーブ',
+    capBoard: 'ランキング',
+    capStore: 'アプリ内購入',
     versionsLink: 'バージョン履歴',
     current: '現在のバージョン',
     released: 'リリース日',
@@ -306,6 +350,191 @@ function absolute(origin, path) {
 }
 
 
+// ==========================================
+// landingDescription
+// The sentence a search result shows for a game.
+//
+// This was the worst thing on the site and it took a crawl to see
+// it. The description resolved to the tagline, then to the card's
+// one-liner, and for a game whose panel row is empty that is what
+// a search engine got:
+//
+//   <meta name="description" content="Neon action sword game">
+//
+// Twenty-two characters, on the most important page this domain
+// has. Google's advice for a short description is not to lengthen
+// it - it is that a description has to say something the title has
+// not already said, and "Neon action sword game" on a page titled
+// "Neon Katana - Android game" says nothing at all. A snippet
+// generator handed that writes its own from the page, which is how
+// the front page ended up quoting its own capability chips.
+//
+// So this composes one, out of facts the page ALREADY RENDERS and
+// nothing else:
+//
+//   the name, and its other-script name if the registry has one
+//   the pitch - tagline, or the card's line, whichever exists
+//   which platforms, derived from the download links
+//   what the game does with a network, from `capabilities`
+//   who made it
+//
+// Every clause is dropped when its fact is absent, so a game with
+// no store never claims purchases and a browser-only game is never
+// called an Android game. That is the same guarantee the Google
+// disclosure block gives, for the same reason: a description that
+// promises a feature the game does not have is worse than a short
+// one.
+//
+// Capped at 158 characters on a word boundary. Google renders
+// roughly 155-160 before it truncates, and a description cut
+// mid-word by the search engine reads as a broken page.
+// ==========================================
+// Rendered width, not characters. See textWidth() in Core/Seo.js:
+// a Japanese description built to 158 CHARACTERS renders at about
+// 250 and is truncated mid-clause, because every kana counts twice.
+const DESC_LIMIT = 158
+
+function landingDescription(game, lang, pitch) {
+  const d = dict(lang)
+  const platforms = gamePlatforms(game)
+  const capability = game.capabilities || {}
+
+  const places = []
+  if (platforms.android) places.push(d.platAndroid)
+  if (platforms.web) places.push(d.platWeb)
+
+  const features = []
+  if (!capability.onlinePlay) features.push(d.capOffline)
+  if (capability.login) features.push(d.capLogin)
+  if (capability.cloudSave) features.push(d.capCloud)
+  if (capability.leaderboard) features.push(d.capBoard)
+  if (capability.store) features.push(d.capStore)
+
+  // The name, with the other-script name beside it - in THIS
+  // page's script, not whichever one the registry happens to list
+  // first. Handing a Japanese reader "(نئون کاتانا)" is worse than
+  // handing them nothing: it is the highest-value position in the
+  // whole string, and it went to a script they cannot read.
+  const alt = altNameFor(game, lang)
+  const head = alt ? game.name + ' (' + alt + ')' : game.name
+
+  const parts = [head]
+  if (pitch && pitch !== game.name) parts.push(pitch.replace(/[.。]\s*$/, ''))
+  if (places.length) parts.push(fillDesc(d.descOn, { platforms: joinList(places, lang) }))
+
+  // ==========================================
+  // Assembled longest-first, then dropped from the middle.
+  //
+  // The attribution is the clause a description cannot lose - it
+  // is the whole reason a page about one game helps the brand at
+  // all - and it was the clause a plain clamp() cut off every
+  // time, because it is last. So the feature list is tried, and if
+  // the result does not fit it is dropped and the attribution
+  // stays. The pitch and the name are never dropped; if a game's
+  // tagline alone runs past the limit, that is an operator writing
+  // a paragraph into a one-line field and clamp() says so by
+  // trimming it.
+  // ==========================================
+  const head2 = parts.join(' — ')
+  const tail = d.descBy
+  const gap = lang === 'ja' ? '' : ' '
+
+  const build = list => head2
+    + (list.length ? sentenceEnd(lang) + gap + capitalise(joinList(list, lang), lang) : '')
+    + sentenceEnd(lang) + gap + tail
+
+  // As many features as fit, dropped one at a time from the end.
+  // All-or-nothing was the first version of this and it left a
+  // Persian description at 87 characters with seventy going spare -
+  // which is a description that fits and still under-answers,
+  // because "بدون نیاز به اینترنت" is a reason somebody installs a
+  // game and there was room to say it. The order they are dropped
+  // in is the order they were added above: the least interesting
+  // claim goes first.
+  for (let count = features.length; count > 0; count--) {
+    const candidate = build(features.slice(0, count))
+    if (textWidth(candidate) <= DESC_LIMIT) return candidate
+  }
+
+  const bare = build([])
+  if (textWidth(bare) <= DESC_LIMIT) return bare
+
+  return clampWidth(head2, DESC_LIMIT - textWidth(tail) - 2) + sentenceEnd(lang) + gap + tail
+}
+
+
+// ==========================================
+// altNameFor
+// The game's name in the script the reader is reading in.
+//
+// `altNames` is an unordered list of spellings; which one belongs
+// on a Japanese page is decided by the characters in it, not by
+// its position. Detecting the script beats adding a keyed object
+// to the registry, because the answer is already in the string and
+// a key is one more thing to get wrong when a third spelling is
+// added.
+//
+// Returns nothing for a Latin-script page: the Latin name is
+// already the heading, and "Neon Katana (NeonKatana)" is a
+// description wasting its best characters on a space.
+// ==========================================
+const SCRIPT_TESTS = {
+  fa: /[\u0600-\u06FF]/,
+  ja: /[\u3040-\u30FF\u4E00-\u9FFF]/
+}
+
+function altNameFor(game, lang) {
+  const test = SCRIPT_TESTS[lang]
+  if (!test) return ''
+  return (game.altNames || []).find(name => test.test(name)) || ''
+}
+
+
+function fillDesc(template, values) {
+  return Object.entries(values).reduce(
+    (out, [key, value]) => out.replace('{' + key + '}', value),
+    String(template || '')
+  )
+}
+
+/** The list separator each language actually writes. */
+function joinList(items, lang) {
+  if (lang === 'ja') return items.join('・')
+  if (lang === 'fa') return items.join('، ')
+  return items.join(', ')
+}
+
+function sentenceEnd(lang) {
+  return lang === 'ja' ? '。' : '.'
+}
+
+/** Sentence case, for the one language that has it. */
+function capitalise(text, lang) {
+  if (lang !== 'en' || !text) return text
+  return text.charAt(0).toUpperCase() + text.slice(1)
+}
+
+
+
+// ==========================================
+// fillVersionsDesc
+// The changelog page's meta description.
+//
+// It used to be "<game> - Versions", which is a label rather than
+// a description: a search result carrying it told a reader nothing
+// they did not already know from the title, and a snippet
+// generator with nothing to work from writes its own. This one
+// names the game, says what the page holds, and quotes the newest
+// release - which is the fact somebody searching "what changed in
+// <game>" actually came for.
+// ==========================================
+function fillVersionsDesc(d, game, latest) {
+  return String(d.versionsDesc || '')
+    .replace('{game}', game.name)
+    .replace('{version}', 'v' + (latest && latest.version ? latest.version : ''))
+}
+
+
 // A list from the landing blob, defended against a row written
 // by something other than the panel. Every one of these arrays
 // is JSON in a text column, so "an array of the right shape" is
@@ -363,6 +592,24 @@ function landingCss() {
     .ln-logo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
     .ln-head{flex:1;min-width:240px}
     .ln-title{font-size:2.1em;font-weight:800;line-height:1.15;margin-block-end:10px}
+    /* ==========================================
+       The game's name in the reader's own script.
+
+       Inside the h1 rather than beside it, and that is the point:
+       it is the same name, so it belongs to the same heading. A
+       Persian reader searching "نئون کاتانا" now finds that string
+       rendered on the page rather than only asserted in JSON-LD -
+       which matters for two separate reasons. It is what a
+       Persian speaker was looking for, and Google's structured
+       data policy asks that markup describe content a user can
+       actually see: alternateName on the VideoGame node is now
+       backed by text on the page instead of being a claim only a
+       crawler can check.
+
+       Nothing renders on an English page - see altNameFor() - so
+       the Latin heading never repeats itself.
+       ========================================== */
+    .ln-alt { display:block; font-size:.5em; font-weight:600; opacity:.72; margin-block-start:4px; }
     .ln-tag{color:var(--text);font-size:1.08em;line-height:1.65;max-width:56ch;font-weight:600}
     .ln-sub{color:var(--dim);font-size:.96em;line-height:1.7;max-width:60ch;margin-block-start:8px}
     .ln-badges{display:flex;flex-wrap:wrap;gap:8px;margin-block-start:16px}
@@ -522,7 +769,8 @@ function heroBlock(game, lang, currentVersion) {
         <span class="ln-logo">${escapeHtml(game.icon || '🎮')}${game.logo
           ? `<img src="${escapeHtml(game.logo)}" alt="" onerror="this.style.display='none'">` : ''}</span>
         <div class="ln-head">
-          <h1 class="ln-title">${escapeHtml(game.name)}</h1>
+          <h1 class="ln-title">${escapeHtml(game.name)}${altNameFor(game, lang)
+            ? `<span class="ln-alt" lang="${escapeHtml(lang)}">${escapeHtml(altNameFor(game, lang))}</span>` : ''}</h1>
           <p class="ln-tag" dir="${dirOf(lede.code)}">${escapeHtml(lede.text)}</p>
           ${tagline.text && description.text && tagline.text !== description.text
             ? `<p class="ln-sub" dir="${dirOf(description.code)}">${escapeHtml(description.text)}</p>` : ''}
@@ -855,21 +1103,17 @@ function productsBlock(game, lang) {
 // noise.
 // ==========================================
 function faqLd(game, lang) {
-  const items = rows(game.landing.faq, 12)
-    .map(entry => ({ q: pickLang(entry.q, lang), a: pickLang(entry.a, lang) }))
-    .filter(entry => entry.q && entry.a)
-
-  if (!items.length) return null
-
-  return {
-    '@context': 'https://schema.org',
-    '@type': 'FAQPage',
-    mainEntity: items.map(entry => ({
-      '@type': 'Question',
-      name: entry.q,
-      acceptedAnswer: { '@type': 'Answer', text: entry.a }
-    }))
-  }
+  // Built through the shared helper rather than by hand, so this
+  // page's FAQ markup and the About page's are the same shape -
+  // and so `inLanguage` is set, which a hand-written copy here was
+  // missing. An FAQ block with no declared language on a page that
+  // exists in three is a set of answers a search engine cannot
+  // safely show to anybody.
+  return faqPageLd(
+    rows(game.landing.faq, 12)
+      .map(entry => ({ q: pickLang(entry.q, lang), a: pickLang(entry.a, lang) })),
+    lang
+  )
 }
 
 
@@ -911,39 +1155,113 @@ function faqBlock(game, lang) {
 // crawler that finds a second one is entitled to ignore both.
 // ==========================================
 function gameLd(game, lang, origin, description, currentVersion) {
-  const url = absolute(origin, '/' + game.id)
-  const image = absolute(origin, game.landing.hero || game.logo || CONFIG.DEFAULT_GAME_LOGO)
-
   const platforms = Object.keys((game.download && game.download.links) || {})
     .map(key => (key === 'web' ? 'Web browser' : key === 'apk' || key === 'myket' || key === 'googleplay' ? 'Android' : key))
   const unique = [...new Set(platforms)]
 
-  return {
-    '@context': 'https://schema.org',
-    '@type': 'VideoGame',
+  // Everything below is read from the SAME data the body renders
+  // a few lines further down, and that is the point of doing it
+  // here rather than writing a second description for machines: a
+  // page whose markup says one thing and whose prose says another
+  // is a page a search engine has a reason to distrust, and this
+  // page's prose is operator input that changes without a deploy.
+  const features = rows(game.landing.features, 8)
+    .map(feature => pickLang(feature, lang))
+    .filter(Boolean)
+
+  const screenshots = langRows(game.landing.screenshotsByLang, game.landing.screenshots, lang, 12)
+    .map(shot => String(shot.url || ''))
+    .filter(url => /^(https?:\/\/|\/)/i.test(url))
+    .map(url => absolute(origin, url))
+
+  // The first trailer only. A VideoObject list on a landing page
+  // is a list of videos a search engine may show INSTEAD of the
+  // page, and the second and third trailers are not what somebody
+  // searching the game's name wanted.
+  const firstVideo = langRows(game.landing.videosByLang, game.landing.videos, lang, 8)
+    .map(entry => (typeof entry === 'string' ? { url: entry } : entry || {}))
+    .find(entry => landingVideo(entry.url))
+
+  const video = firstVideo
+    ? videoObjectLd({
+        name: firstVideo.title || game.name,
+        description,
+        embedUrl: landingVideo(firstVideo.url).embed,
+        thumbnail: game.landing.hero || game.logo || CONFIG.DEFAULT_GAME_LOGO,
+        lang
+      })
+    : null
+
+  // Where else this exact game exists. A store listing and this
+  // page are two documents about one game, and `sameAs` is the
+  // only thing on either of them that says so - without it they
+  // are two similarly named products as far as a crawler is
+  // concerned, and the store listing is the one with the links.
+  const storeLinks = Object.values((game.download && game.download.links) || {})
+    .map(link => String(link || ''))
+    .filter(link => /^https?:\/\//i.test(link))
+
+  return videoGameLd({
+    id: game.id,
     name: game.name,
-    url,
+
+    // The name in the scripts this site's own readers use. See
+    // altNames in GAME_REGISTRY - this is the field that decides
+    // whether a Persian search for the game finds the game.
+    alternateName: game.altNames || [],
+
     description,
-    inLanguage: lang,
-    applicationCategory: 'GameApplication',
-    operatingSystem: unique.length ? unique.join(', ') : 'Android',
-    ...(image ? { image } : {}),
-    ...(game.package ? { identifier: game.package } : {}),
-    ...(currentVersion ? { softwareVersion: currentVersion.version } : {}),
-    ...(game.tags && game.tags.length
-      ? { genre: game.tags.map(tag => pickLang(tag, lang)).filter(Boolean) }
-      : {}),
-    author: { '@type': 'Organization', name: 'AmirCollider', url: absolute(origin, '/') },
-    publisher: { '@type': 'Organization', name: 'AmirCollider', url: absolute(origin, '/') },
-    offers: {
-      '@type': 'Offer',
-      price: '0',
-      priceCurrency: 'USD',
-      availability: isDownloadable(game)
-        ? 'https://schema.org/InStock'
-        : 'https://schema.org/PreOrder'
-    }
-  }
+    path: '/' + game.id,
+    image: game.landing.hero || game.logo || CONFIG.DEFAULT_GAME_LOGO,
+    platforms: unique.length ? unique : ['Android'],
+    genres: (game.tags || []).map(tag => pickLang(tag, lang)).filter(Boolean),
+    featureList: features,
+    screenshots,
+    video,
+    keywords: gameKeywords(game, lang),
+    sameAs: storeLinks,
+    identifier: game.package || '',
+    version: currentVersion ? currentVersion.version : '',
+    downloadUrl: isDownloadable(game) ? absolute(origin, '/' + game.id + '/download') : '',
+    lang,
+    available: isDownloadable(game)
+  })
+}
+
+
+// ==========================================
+// gameKeywords
+// What THIS game is searched for.
+//
+// The name in every script it is written in, its tags in the
+// page's language, its platforms, and the publisher - which is
+// the pairing that matters most here. Somebody who has heard of
+// the game and not the studio, and somebody who has heard of the
+// studio and not the game, are two different searches, and a page
+// that names both is the only place either of them can be joined
+// up.
+//
+// Read by the landing page, the store page and the leaderboard,
+// so all three of a game's public pages answer the same queries.
+// ==========================================
+export function gameKeywords(game, lang) {
+  const tags = (game.tags || []).map(tag => pickLang(tag, lang)).filter(Boolean)
+  const platforms = gamePlatforms(game)
+  const alt = game.altNames || []
+
+  return keywordList(
+    game.name,
+    alt,
+
+    // The same name typed on an Arabic keyboard layout. See
+    // arabicKeyboardVariants() - "نئون کاتانا" and "نئون كاتانا"
+    // look identical and are different strings.
+    arabicKeyboardVariants(alt),
+    tags,
+    platforms.android ? ['Android'] : [],
+    platforms.web ? ['browser game'] : [],
+    'AmirCollider'
+  )
 }
 
 
@@ -990,10 +1308,15 @@ export async function handleGameLanding(url, request, gameId, requestId, GAMES, 
   // this page, then the card's description. It is the page's
   // <meta description> and its link preview, so an empty one is
   // a grey rectangle in every chat app the link is shared in.
-  const description = pickLang(game.landing.tagline, lang)
+  const pitch = pickLang(game.landing.tagline, lang)
     || pickLang(game.i18n && game.i18n.description, lang)
     || game.description
-    || game.name
+    || ''
+
+  // The pitch alone used to BE the description. See
+  // landingDescription() for why twenty-two characters on this page
+  // was the most expensive thing on the site.
+  const description = landingDescription(game, lang, pitch)
 
   // ==========================================
   // The order of the page.
@@ -1042,6 +1365,7 @@ export async function handleGameLanding(url, request, gameId, requestId, GAMES, 
     description,
     head: gameHead(game),
     siteName: game.name,
+    keywords: gameKeywords(game, lang),
     seoGraph: [
       gameLd(game, lang, url.origin, description, current),
       faqLd(game, lang)
@@ -1118,7 +1442,16 @@ export async function handleGameVersions(url, request, gameId, requestId, GAMES,
   return createHtmlResponse(page({
     game, lang, theme,
     title: `${d.versions} — ${game.name}`,
-    description: `${game.name} — ${d.versions}`,
+
+    // "Neon Katana - versions" said nothing a person searching
+    // would recognise as an answer. This page IS the changelog, so
+    // its description says so and names the newest release, which
+    // is the fact somebody arriving from "what changed in <game>"
+    // came for.
+    description: versions.length
+      ? fillVersionsDesc(d, game, versions[0])
+      : fillDesc(d.versionsDescEmpty, { game: game.name }),
+    keywords: keywordList(gameKeywords(game, lang), d.versions),
     active: 'versions',
     downloadable: isDownloadable(game),
     skipLabel: d.skip,

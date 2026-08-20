@@ -23,6 +23,8 @@ import {
 import { startPurchase, applyGamePayment, storeReady, readGameToken } from '../Games/Purchase.js'
 import { readPlayerSession } from '../Games/Session.js'
 import { page, chromeTheme, langHeader, localeFor, gameAccent } from './GameChrome.js'
+import { keywordList, textWidth } from '../Core/Seo.js'
+import { gameKeywords } from './GameLanding.js'
 import { escapeHtml, jsString } from '../Core/Html.js'
 import { matchRequestLang } from '../Core/RequestContext.js'
 
@@ -40,6 +42,13 @@ const I18N = {
   fa: {
     title: 'فروشگاه',
     lede: 'با ارز دیجیتال پرداخت کن — بیت‌کوین، تتر، اتریوم، ترون و ده‌ها ارز دیگر. خرید بلافاصله به حساب بازی‌ات اضافه می‌شود.',
+
+    // The meta description. {game} and {items} are filled in by
+    // storeDescription(); the item list is the products this game
+    // actually sells, so no two store pages describe themselves
+    // the same way.
+    metaDesc: 'خرید درون‌برنامه‌ای {game}: {items}. پرداخت با ارز دیجیتال و تحویل آنی به حساب بازی.',
+    metaDescEmpty: 'فروشگاه {game}. پرداخت با ارز دیجیتال و تحویل آنی به حساب بازی. در حال حاضر محصولی برای فروش نیست.',
 
     needSignIn: 'برای خرید اول وارد شو',
     needSignInBody: 'خرید باید به همان حسابی برسد که داخل بازی وارد شده‌ای. با گوگل وارد شو تا مطمئن شویم به دست خودت می‌رسد.',
@@ -104,6 +113,8 @@ const I18N = {
   en: {
     title: 'Store',
     lede: 'Pay with whatever you hold — Bitcoin, USDT, Ethereum, Tron and dozens more. What you buy is on your game account the moment it confirms.',
+    metaDesc: 'In-app purchases for {game}: {items}. Paid in cryptocurrency, delivered to your game account the moment it confirms.',
+    metaDescEmpty: 'The {game} store. Paid in cryptocurrency and delivered to your game account the moment it confirms. Nothing is on sale right now.',
 
     needSignIn: 'Sign in before you buy',
     needSignInBody: 'A purchase has to reach the account you are signed into in the game. Signing in with Google is how we know it will.',
@@ -167,6 +178,8 @@ const I18N = {
   ja: {
     title: 'ストア',
     lede: 'お手持ちの暗号資産でお支払いいただけます（BTC・USDT・ETH・TRX ほか多数）。決済が確定した時点でゲームアカウントに反映されます。',
+    metaDesc: '{game} のアプリ内購入: {items}。暗号資産で支払い、決済確定と同時にゲームアカウントへ反映されます。',
+    metaDescEmpty: '{game} のストア。暗号資産で支払い、決済確定と同時にゲームアカウントへ反映されます。現在販売中の商品はありません。',
 
     needSignIn: '購入前にサインイン',
     needSignInBody: '購入はゲームでサインイン中のアカウントに届く必要があります。Google サインインでそれを確認します。',
@@ -289,6 +302,49 @@ function localized(map, lang, fallback = '') {
 // handleGameStore
 // GET /:gameId/store
 // ==========================================
+// ==========================================
+// storeDescription
+// What this particular store sells.
+//
+// Every store page on this Worker used to describe itself with the
+// same sentence about cryptocurrency, which made six pages one
+// result: a set of pages that differ only in their title is a set
+// where Google picks one and files the rest under "Duplicate,
+// Google chose a different canonical".
+//
+// Naming the products fixes that at the source, and it is honest -
+// they are the products the page renders directly below. Three of
+// them, because a description is not a catalogue and the fourth
+// would be truncated anyway.
+// ==========================================
+// Rendered width, not characters - see textWidth() in Core/Seo.js.
+const STORE_DESC_LIMIT = 158
+
+function storeDescription(game, lang, products) {
+  const t = pack(lang)
+  const names = (products || [])
+    .map(product => localized(product.i18n && product.i18n.name, lang, ''))
+    .filter(Boolean)
+
+  const separator = lang === 'ja' ? '・' : lang === 'fa' ? '، ' : ', '
+  const build = list => String(list.length ? t.metaDesc : t.metaDescEmpty)
+    .replace('{game}', game.name)
+    .replace('{items}', list.join(separator))
+
+  // As many product names as fit, longest list first - the same
+  // rule landingDescription() uses on its feature list, and for the
+  // same reason. A hard cut at 158 characters ends a description
+  // mid-word, and a search result that ends mid-word reads as a
+  // page that lost its own text.
+  for (let count = Math.min(names.length, 3); count > 0; count--) {
+    const candidate = build(names.slice(0, count))
+    if (textWidth(candidate) <= STORE_DESC_LIMIT) return candidate
+  }
+
+  return build([])
+}
+
+
 export async function handleGameStore(url, request, gameId, requestId, GAMES, env) {
   const game = await resolveGame(env, GAMES, gameIdFrom(url))
   if (!game) return createJsonResponse({ ok: false, error: 'unknown_game', requestId }, 404)
@@ -620,8 +676,24 @@ function renderStore(game, lang, theme, { products, player, owned, ready }) {
            </div>`
         : ''
 
+  // ==========================================
+  // An h1, not a styled div.
+  //
+  // This page had no h1 at all - the heading was a div wearing the
+  // heading class, on all six store pages. A document with no h1
+  // has no stated subject: a crawler falls back to the title tag
+  // and a screen reader's heading list opens on "How it works",
+  // which is the second section.
+  //
+  // The game's name is in it now as well, because "Store" is the
+  // heading of six different pages on this domain and the one word
+  // that tells them apart was only ever in the title tag.
+  //
+  // .ghead already styles h1, h2 and div identically, so nothing
+  // about the page moves.
+  // ==========================================
   const body = `
-    <div class="ghead">${escapeHtml(t.title)}</div>
+    <h1 class="ghead">${escapeHtml(game.name)} — ${escapeHtml(t.title)}</h1>
     <p class="glede">${escapeHtml(t.lede)}</p>
 
     ${gate}
@@ -720,7 +792,14 @@ function renderStore(game, lang, theme, { products, player, owned, ready }) {
   return page({
     game, lang, theme, active: 'store',
     title: `${game.name} — ${t.title}`,
-    description: t.lede,
+
+    // The game's name in the description as well as the title.
+    // "What you can buy in this game" was true of every store page
+    // this Worker serves, which made all of them the same result
+    // to a search engine - and a set of pages that differ only in
+    // their title is a set where one gets indexed.
+    description: storeDescription(game, lang, products),
+    keywords: keywordList(gameKeywords(game, lang), t.title),
     downloadable: isDownloadable(game),
     body, script
   })

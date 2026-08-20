@@ -162,18 +162,114 @@ own on top.
 > Replacing the logo is still one object in R2. Nothing else has to
 > change, in code or in the bucket.
 
+### The name, in every form somebody types it
+
+**This is the second thing that mattered most, and it is the whole
+reason `CONFIG.BRAND` exists.**
+
+"AmirCollider" is one Latin word. That is one of five or six
+strings a person looking for this site will actually put in a
+search box, and a search engine derives none of the others on its
+own:
+
+- It will not split a compound word for you. *Amir Collider* and
+  *AmirCollider* are two different queries.
+- **It will not transliterate for you.** A Persian reader types
+  *امیرکولایدر*; a Japanese reader types *アミールコライダー*. Before
+  this, neither string appeared anywhere in this site's bytes — in
+  any form, on any page, in any tag. A trilingual site was
+  findable under one script.
+- It will not spell-correct a brand it has not learned yet.
+  Correction is learned from seeing the wrong form near the right
+  one; on a young domain it has seen neither.
+
+`CONFIG.BRAND` holds three lists, deliberately kept apart because
+confusing them is how a site gets classified as keyword-stuffing:
+
+| List | What it is | Where it is used |
+|---|---|---|
+| `SCRIPTS` | one form per script (`en` / `fa` / `ja`) | **printed** in the footer of every page, reader's own language first |
+| `ALIASES` | genuine alternate names — the scripts, the spaced form, the casings | `alternateName` on `Organization`, `WebSite` and `Person`; `/about`'s keywords |
+| `MISSPELLINGS` | what people get wrong | **prose only**, in one `/about` answer that names them and gives the correct spelling |
+| `TOPICS` | what the name is *about*, per language | `knowsAbout`, and the keyword tag on every page |
+
+A misspelling is deliberately **not** an `alternateName`: that
+field means "this thing is also called this", and a typo is not
+another name for something. Written out as an answer to "what if I
+spell it wrong", the same list is honest, is a real answer, and is
+the form a search engine can learn a correction from.
+
+> Editing any of this is one edit, in `CONFIG.BRAND`. The footer,
+> the structured data, the keyword tags and the three `/about`
+> answers all read from it — the answers carry `{aliases}` and
+> `{typos}`, filled in by `aboutFor()` in `Content/AboutMe.js`.
+
+**Games have the same problem one level down.** `altNames` in a
+`GAME_REGISTRY` entry holds the game's name in the other scripts
+(`نئون کاتانا`, `ネオンカタナ`). It reaches `alternateName` on the
+`VideoGame` node and the keyword tag on all three of that game's
+pages. The Latin name stays *the* name everywhere it is rendered —
+it is what the store listing, the APK and the OAuth consent screen
+say, and none of those may drift.
+
+### Per-page keywords
+
+`seoHead()` prepends `brandKeywords(lang)` to whatever a page
+passes, always, and de-duplicates case-insensitively at a cap of
+24 terms (`keywordList()`). So every page says who it belongs to,
+and a page that passes its own subject says both — which is the
+pairing that matters: *AmirCollider* beside *Unity editor
+extension* is an association a search engine can learn; either one
+alone is a word it already knows.
+
+Google has ignored `<meta name="keywords">` since 2009 and says so
+out loud. Bing, Yandex and Naver do not, and Naver is not a
+rounding error for a page that wants to be found in Japanese. It
+costs one tag. **Only ever pass terms the page actually answers** —
+stuffing it is the one way this tag can still hurt.
+
 ### Structured data
 
 | Node | Where |
 |---|---|
 | `Organization`, `WebSite` | every indexable page |
+| `WebPage` | every indexable page — added by `seoHead()` itself |
+| `CollectionPage` | `/games`, `/tools` (instead of `WebPage`) |
 | `Person` | `/` and `/about`, under one shared `@id` |
 | `ProfilePage`, `FAQPage` | `/about` |
 | `BreadcrumbList` | every page with breadcrumbs |
-| `VideoGame` | landing page, `/games`, each game's pages |
-| `SoftwareApplication` | landing page, `/tools`, each tool's page |
-| `ItemList` | `/games`, `/tools`, each leaderboard |
+| `VideoGame` | landing page, `/games`, `/` |
+| `SoftwareApplication` | `/`, `/tools`, each tool's page |
+| `VideoObject` | a game landing page with a trailer |
+| `ItemList` | `/`, `/games`, `/tools`, each leaderboard |
 | `FAQPage` | `/about`, each game's landing page |
+
+**A page-level node is new and it is the one that was missing.**
+Every page emitted an `Organization` and a `WebSite` and then
+stopped — two nodes about the *publisher* and none at all about
+the document in front of the crawler. Nothing said what the page
+was about, which language its bytes were in, or that the
+breadcrumb trail rendered above belonged to this page rather than
+to the site in general. `seoHead()` now builds one from what it
+already knows, so no page has to remember. A page that emits its
+own (`/about`, a `ProfilePage`) opts out with `webPage: false`
+rather than shipping two.
+
+**The `VideoGame` node carries the page's own content.** It used
+to be a name, a sentence, a URL, a platform and a genre list —
+exactly enough for a crawler to know the domain mentioned
+something called Neon Katana and not what it was. It now reads
+`featureList`, `screenshot`, `video`, `keywords`, `alternateName`,
+`sameAs` (the store listings), `identifier`, `softwareVersion` and
+`offers` out of the same merged registry-and-database record the
+body renders from — so the markup cannot say something the page
+does not.
+
+**Publishers are referenced by `@id`, never spelled out.** The
+game nodes used to write an inline `{"@type": "Organization",
+"name": "AmirCollider"}`, which minted a *second* Organization
+beside the one `seoHead()` emits — two publishers with one name,
+as far as a crawler is concerned.
 
 `Organization.founder` points at the `Person` node by `@id`, and the
 `Person` node is emitted on the front page as well as on `/about` —
@@ -204,7 +300,35 @@ submitted anywhere.
 
 Disallowed for crawlers: `/thegod`, `/testsite`, `/checkout`, `/order`,
 `/license`, `/oauth/`, `/auth/`, `/database/`, `/profile/`, `/games/`,
-`/video/`.
+`/video/` — plus, generated per game from the registry,
+`/{game}/account`, `/{game}/health` and `/{game}/ping`. The download
+endpoint is deliberately **not** disallowed: a crawler that follows
+`/{game}/download` to the store listing is a crawler learning that
+this page and that listing are about one game, which is the same
+association `sameAs` is making in the structured data.
+
+`Allow:` names `/assets/`, `/icon.svg` and `/favicon.ico`
+explicitly. Nothing forbade them before, but Googlebot-Image reads
+this file looking for a rule about itself, and an explicit allow is
+the difference between *not forbidden* and *invited*.
+
+**`lastmod` is `CONFIG.SITEMAP_LASTMOD`, not today.** It used to be
+`new Date()` — today, on all 66 URLs, every time the file was
+fetched. That is not a small inaccuracy: `lastmod` is a hint a
+crawler decides whether to *trust*, and a sitemap claiming the
+privacy policy changed today, and again tomorrow, is a sitemap
+whose dates get ignored on the pages where the date was real.
+Update the constant in the commit that changes something a reader
+would notice. A date in the future makes Google drop the tag
+entirely.
+
+**Game logos ride along.** The front page, `/about` and every game
+landing page carry an `<image:image>` entry. An image found in a
+sitemap beside the page it belongs to is an image a crawler can
+attribute; the same file discovered by parsing an `<img>` tag is a
+file on a CDN — and for a game whose whole identity is one piece
+of key art, that is the difference between the art appearing beside
+the search result and not.
 
 ### Games have an address, not an anchor
 
@@ -271,6 +395,158 @@ Diagnostics and anything transactional: `/metrics`, `/:game/health`,
 are thin or duplicated across games, and indexing them spends the
 site's authority on pages nobody searches for.
 
+### What a result actually says
+
+A crawl of all 66 indexable URLs found that the pages this domain
+most wants to rank were the ones describing themselves worst:
+
+| Page | Description before |
+|---|---|
+| `/neon-katana` | `Neon action sword game` — 22 characters |
+| `/chronoblades` | `One knife, one spinning target…` — 60 |
+| `/{game}/versions` | `Neon Katana — Versions` — the title, again |
+| `/{game}/store` | one sentence about cryptocurrency, identical on all six |
+| `/release-notes` | `OAuth proxy for AmirCollider games.` — describes neither the page nor, any more, the site |
+| `/unity-docsnap` | the entire opening paragraph — **455 characters** |
+
+Two different failures with one cause: no page had a string written
+to be a *description*. Some reused the visible lede, some reused
+the title, and the game pages fell through to a card's one-liner.
+
+They are composed now, from facts the page already renders:
+
+- **`landingDescription()`** in `Pages/GameLanding.js` builds a
+  game's from its name (plus its other-script name), its pitch, the
+  platforms derived from its download links, and its `capabilities`
+  flags. Every clause is dropped when its fact is absent, so a game
+  with no store never claims purchases.
+- **`storeDescription()`** in `Pages/GameStore.js` names the
+  products that store actually sells, which is what stopped six
+  store pages being one result.
+- The tool pages and the policy pages have their own `metaTitle` /
+  `metaDesc` strings, separate from the prose they had been
+  borrowing.
+
+**Length is measured in rendered width, not characters**
+(`textWidth()` in `Core/Seo.js`). Google truncates by pixel width,
+and a full-width kana is about two Latin characters — so a budget
+counted in characters got Japanese wrong in *both* directions at
+once: the audit flagged a 66-character Japanese description as too
+short while it was in fact rendering wider than a 130-character
+English one, and a Japanese string built to a 158-character budget
+was being truncated mid-clause. Where a composed description runs
+long, clauses are dropped one at a time from the end so it always
+ends on a complete sentence — the attribution is never the clause
+that goes.
+
+**A missing `<h1>`** — the six game store pages had none at all; the
+heading was a `div` wearing the heading class. A document with no
+`h1` has no stated subject, and a screen reader's heading list
+opened on the second section.
+
+### Google's policies, and where this site stands against them
+
+Every choice below was checked against Google Search's own
+published guidance rather than against general SEO advice, because
+several of the obvious moves here are the ones the spam policies
+name. This section is the record of what was checked, including the
+two places where the first pass over this work got it wrong.
+
+**Keyword stuffing** — the spam policy names *"lists or groups of
+keywords, out of context"* as the pattern. The first version of the
+misspellings answer on `/about` dropped all fourteen entries of
+`CONFIG.BRAND.MISSPELLINGS` into one line separated by middots.
+That is exactly that shape, regardless of intent. It is three
+misspellings now, each inside a sentence explaining *why* it is a
+common mistake — which is a real answer, and is also the better
+signal: a search engine learns a spelling correction from the wrong
+form appearing beside the right one in ordinary prose. The other
+eleven stay in `Config.js` as a reference list and are published
+nowhere.
+
+**Hidden text** — the footer's three-script brand line was
+originally dimmed twice (a dim token *and* `opacity: 0.75`), which
+took it under readable contrast. Low-contrast text carrying brand
+keywords is the textbook hidden-text pattern and is also an
+accessibility failure. It is ordinary footer text now.
+
+**Misleading structured data** — `alternateName` means *"this thing
+is also called this."* Three kinds of entry were removed after a
+second pass: casing variants (`amircollider`, `AMIRCOLLIDER` —
+search is case-insensitive, so these only pad the list), a
+hyphenation nobody uses, and `AmirCollider Studio`, which was
+invented and appears on no listing or profile anywhere. Misspellings
+are deliberately **not** in this field either — a typo is not
+another name for something.
+
+**Structured data must describe visible content** — every field the
+`VideoGame` node carries is rendered on the page it is on:
+`featureList` is the feature strip, `screenshot` is the gallery,
+`video` is the embedded trailer. `alternateName` was the one
+exception, asserting a Persian and Japanese name that appeared
+nowhere a reader could see it. Those names are now rendered inside
+the game's `<h1>` in the reader's own script, so the markup is
+backed by text on the page.
+
+**`<meta name="keywords">`** — Google has ignored it since 2009 and
+says so publicly, so it cannot help there. Bing has said they look
+at it *as a spam signal*, which means a padded list is not a
+neutral cost — it is the one way this tag still changes anything,
+in the wrong direction. Yandex and Naver do read it. So it stays,
+capped at **16 terms**, with the page's own subject first. See
+`KEYWORD_CAP` in `Core/Seo.js`.
+
+**Locale-adaptive serving** — Google's guidance is that automatic
+language redirection is acceptable when every version has its own
+crawlable URL and the visitor can override it. Both hold here. The
+one thing that was missing is `Vary: Accept-Language`, now sent on
+the preference-based `302` — and only on that redirect, since it is
+the only response that reads a request header. Googlebot sends no
+`Accept-Language` and never sees it.
+
+**`503` rather than `500`** — Google documents `503` as the code for
+temporary unavailability and treats it as *keep this URL, come back
+later*; a `500` says the page is broken, and a page that is broken
+twice is dropped. The leaderboard is in `sitemap.xml` at
+`changefreq=daily`, so it is fetched often — it answers `503` with
+`Retry-After` to browsers and crawlers now. The **JSON** status is
+unchanged, because shipped Unity builds switch on it.
+
+**Rich results that no longer exist** — worth knowing before anyone
+expects them in the search result:
+
+| Markup | Status |
+|---|---|
+| `FAQPage` | Since **August 2023** Google shows FAQ rich results only for well-known authoritative government and health sites. This site will not get them. |
+| `HowTo` | The rich result was **removed from Search entirely**. `howToLd()` on `/unity-directtmp` produces no visual result at all. |
+
+Both are kept anyway, and neither is a policy problem: they are
+valid schema, they cost a few hundred bytes, and they still
+describe the page to anything that reads structured data for
+*understanding* rather than for drawing a box — which now includes
+the assistants that answer questions about this site. Just do not
+wait for a rich result that is not coming.
+
+**Not done, on purpose** — no `aggregateRating` or `review` markup
+anywhere. There are no ratings and no reviews; inventing them is a
+structured-data violation with a manual action attached, and it is
+the single most common way a small site gets penalised.
+
+### Checking all of it after a deploy
+
+`/testsite` → **Search visibility**. Six checks, all read-only GETs of
+public pages: `robots.txt`, `sitemap.xml`, the front page's canonical
+host, its hreflang links, its JSON-LD (parsed, not counted), and
+whether the brand's Persian and Japanese spellings are actually in the
+page's bytes.
+
+Everything in that group is written for a failure that returns **200**.
+A canonical naming the wrong host, a robots.txt that stopped pointing
+at the sitemap, a hreflang cluster that lost a language, a footer
+refactor that dropped the brand line — all of them render a perfectly
+normal page and are invisible until three months of indexing have gone
+somewhere else.
+
 ---
 
 ## 2. Google Search Console — first-time setup
@@ -312,14 +588,22 @@ deployment can do it:
 - Link it from the **Myket listing** for Neon Katana.
 - Keep the product names spelled exactly the same everywhere. "Unity
   DocSnap" and "UnityDocSnap" are two different queries.
-- *AmirCollider* and *Amir Collider* are also two different queries.
-  Three things now say they are one name: the `alternateName` entries in
-  the structured data, a question on `/about` that answers it in prose
-  ("Is it AmirCollider or Amir Collider?"), and that question's presence
-  in the page's `FAQPage` markup. The association is still something
-  Google decides over time, and the off-site links above are what make
-  it decide sooner. Spell it **AmirCollider** everywhere you write it
-  yourself; the spaced form is for the people typing it.
+- *AmirCollider*, *Amir Collider*, *امیرکولایدر* and *アミールコライダー*
+  are four different queries and one name. Five things now say so: the
+  `alternateName` entries on `Organization`, `WebSite` and `Person`; the
+  footer line that prints the name in all three scripts on **every**
+  page; three questions on `/about` that answer it in prose (the
+  spacing, the other scripts, and the misspellings) and their presence
+  in that page's `FAQPage` markup; the keyword tag; and `/about`'s meta
+  description, which now carries the Persian and Japanese forms beside
+  the Latin one. The association is still something Google decides over
+  time, and the off-site links above are what make it decide sooner.
+  Spell it **AmirCollider** everywhere you write it yourself; the other
+  forms are for the people typing them.
+- The same applies to a **game's** name. `altNames` in `GAME_REGISTRY`
+  is what makes *نئون کاتانا* and *ネオンカタナ* reach Neon Katana's page.
+  If a game is announced in Persian or Japanese anywhere off-site, spell
+  it there exactly as `altNames` spells it here.
 - Give it time. A new domain takes weeks to settle regardless of what
   the markup says.
 
@@ -424,6 +708,12 @@ choice for a client that is not about one particular game.
 | To change | Edit |
 |---|---|
 | The canonical domain | `CONFIG.SITE_URL` |
+| The brand's name in another script | `CONFIG.BRAND.SCRIPTS` (footer) and `CONFIG.BRAND.ALIASES` (markup) |
+| Which misspellings `/about` answers | `CONFIG.BRAND.MISSPELLINGS` |
+| What the brand is *about* | `CONFIG.BRAND.TOPICS` — per language |
+| A game's name in another script | `altNames` in its `GAME_REGISTRY` entry |
+| One page's keywords | the `keywords` it passes to `seoHead()` |
+| The date the sitemap reports | `CONFIG.SITEMAP_LASTMOD` |
 | Which languages exist | `LANGUAGES.supported` |
 | Which paths take no language prefix | `NO_LANG_ROUTING` in `Core/Locale.js` |
 | The icon's backdrop colour | `CONFIG.ICON_BG` |

@@ -24,6 +24,16 @@
 //   howToLd({...})                   an ordered set of install steps
 //   softwareApplicationLd({...})     a Unity tool
 //   videoGameLd({...})               a game
+//   videoObjectLd({...})             a trailer
+//   webPageLd({...})                 the document itself; seoHead
+//                                    adds one automatically
+//   itemListLd({...})                a catalogue, as a list
+//   brandKeywords(lang)              the brand's own search terms
+//   keywordList(...parts)            de-duplicated keyword merge
+//
+// The brand's name in other scripts, and the terms it is searched
+// for, come from CONFIG.BRAND. Nothing here writes a second copy
+// of either - see the note above ALSO_KNOWN_AS.
 //
 // Callers pass plain text; everything is escaped here.
 // ==========================================
@@ -44,12 +54,220 @@ const DEFAULT_OG_IMAGE = '/assets/AmirColliderLogo.png'
 // footer, the About page and the structured data cannot drift.
 const SAME_AS = Object.values(CONFIG.SOCIAL || {}).filter(Boolean)
 
+// The X handle, derived from the same URL the footer links to
+// rather than written out a second time. twitter:site wants the
+// @form, and a card that names an account nobody owns is worse
+// than a card that names none.
+const TWITTER_HANDLE = (() => {
+  const url = (CONFIG.SOCIAL && CONFIG.SOCIAL.x) || ''
+  const match = /(?:x|twitter)\.com\/([A-Za-z0-9_]{1,15})/.exec(url)
+  return match ? '@' + match[1] : ''
+})()
+
 // The name the site is searched for, in every spelling somebody
-// actually types it in. "AmirCollider" is one word and always has
-// been, but half the people looking for it type two - and a search
-// engine will not split a compound word on your behalf unless you
-// tell it the split form is the same name.
-const ALSO_KNOWN_AS = ['Amir Collider', 'AmirCollider Games', 'amircollider']
+// actually types it in.
+//
+// This used to be three hard-coded English strings here. It is
+// CONFIG.BRAND.ALIASES now - the same list the footer prints, the
+// About page answers a question about, and every structured-data
+// node declares - because the site is trilingual and the three
+// strings were not: a Persian reader searching "امیرکولایدر" and a
+// Japanese reader searching "アミールコライダー" were both looking for
+// a name that appeared nowhere in this site's bytes, in any form a
+// machine could match.
+//
+// Deliberately NOT including CONFIG.BRAND.MISSPELLINGS. That list
+// exists and it matters, but `alternateName` means "this thing is
+// also called this", and a typo is not another name for something.
+// The misspellings are answered in prose on /about instead, which
+// is both honest and the form a search engine can actually learn a
+// spelling correction from.
+// ==========================================
+// arabicKeyboardVariants
+// The same Persian word, typed on the other keyboard.
+//
+// This is the gap that a first pass over "make the brand findable
+// in Persian" misses completely, and it is bigger than the
+// misspellings are.
+//
+// Persian and Arabic share an alphabet but not a character set.
+// Two letters in "امیرکولایدر" exist twice in Unicode:
+//
+//   ی  U+06CC  Farsi yeh        ي  U+064A  Arabic yeh
+//   ک  U+06A9  Keheh            ك  U+0643  Arabic kaf
+//
+// They look identical in almost every font. They are different
+// strings. A Persian speaker on the Windows Arabic layout, on many
+// Android keyboards, or copying from older Persian web content
+// types the Arabic codepoints - so "امیرکولایدر" and "اميركولايدر"
+// are two different queries that a reader cannot tell apart on
+// screen, and a page containing only one of them matches only one
+// of them.
+//
+// Derived rather than listed, because it is a mechanical
+// transformation and a hand-written second copy of every Persian
+// string is a second copy to keep in step. Nothing PRINTS these -
+// the footer and /about show the correct Persian spelling only.
+// They exist so `alternateName` covers both encodings, which is
+// the honest claim: it is one name, written twice by Unicode.
+// ==========================================
+const PERSIAN_TO_ARABIC = [[/\u06CC/g, '\u064A'], [/\u06A9/g, '\u0643']]
+
+export function arabicKeyboardVariants(names = []) {
+  const out = []
+
+  for (const name of names) {
+    const text = String(name || '')
+    if (!/[\u06CC\u06A9]/.test(text)) continue
+
+    const swapped = PERSIAN_TO_ARABIC.reduce(
+      (value, [pattern, replacement]) => value.replace(pattern, replacement),
+      text
+    )
+    if (swapped !== text) out.push(swapped)
+  }
+
+  return out
+}
+
+
+const BRAND_ALIASES = (CONFIG.BRAND && CONFIG.BRAND.ALIASES) || []
+const ALSO_KNOWN_AS = [...BRAND_ALIASES, ...arabicKeyboardVariants(BRAND_ALIASES)]
+
+
+/**
+ * The brand's own search terms for one language.
+ *
+ * Every page's `keywords` starts from this and appends whatever
+ * that page is specifically about, so the brand and its subject
+ * travel together on every surface that reads the tag rather than
+ * only on the front page.
+ */
+export function brandKeywords(lang) {
+  const code = resolveLang(lang)
+  const topics = (CONFIG.BRAND && CONFIG.BRAND.TOPICS && CONFIG.BRAND.TOPICS[code]) || []
+  return ['AmirCollider', 'Amir Collider', ...topics]
+}
+
+
+/**
+ * De-duplicated, trimmed keyword list.
+ *
+ * Callers build these by concatenating a brand list, a page list
+ * and whatever a game's registry entry declares, so duplicates are
+ * the normal case rather than a mistake. Capped, because a long
+ * keyword list is the one way this tag can still hurt a page.
+ */
+export function keywordList(...parts) {
+  const seen = new Set()
+  const out = []
+
+  for (const value of parts.flat()) {
+    const text = String(value == null ? '' : value).trim()
+    if (!text) continue
+    const key = text.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(text)
+  }
+
+  return out.slice(0, KEYWORD_CAP)
+}
+
+
+// ==========================================
+// How many keywords, and in which order.
+//
+// Sixteen, and the page's own terms first. Both numbers are a
+// judgement about a tag that is worth very little and can cost
+// something, so they are written down rather than guessed at:
+//
+//   Google has ignored <meta name="keywords"> since 2009 and says
+//   so publicly. It cannot help there, at all.
+//
+//   Bing has said the opposite of helpful - that they look at the
+//   tag as a signal FOR SPAM. A long, padded list is therefore not
+//   a neutral cost; it is the one way this tag still changes
+//   anything, in the wrong direction.
+//
+//   Yandex and Naver do read it, and Naver is not a rounding error
+//   for a page that wants to be found in Japanese.
+//
+// So: keep it, keep it short, and keep it honest. Sixteen terms
+// that a page genuinely answers reads as a description of the
+// page. Twenty-four, most of them variations on one name, starts
+// to read as a list. The cap was 24 in the first pass over this
+// file and it was reached on three pages, which was the signal to
+// look at the number rather than at the pages.
+//
+// The ORDER changed with it. Brand terms used to be prepended,
+// which meant a page passing many of its own terms had them
+// truncated away by the brand's - and the brand is already in the
+// title, the description, and three JSON-LD nodes on every page.
+// The page's subject goes first now; the brand fills what is left.
+// ==========================================
+const KEYWORD_CAP = 16
+
+
+// ==========================================
+// textWidth / clampWidth
+// How long a description actually LOOKS.
+//
+// Google truncates a title and a snippet by PIXEL WIDTH, not by
+// character count, and this site writes in three scripts with
+// very different widths. Counting characters got Japanese wrong in
+// both directions at once: a 66-character Japanese description
+// looked "too short" against a Latin floor while actually being
+// wider than a 130-character English one, and a Japanese string
+// built to a 158-character budget rendered past the cutoff and was
+// truncated mid-clause.
+//
+// A CJK ideograph or kana is a full-width glyph - about twice a
+// Latin character - so it counts twice. Persian is written in
+// narrow, connected letters that run slightly under Latin width,
+// which is close enough to 1 that pretending otherwise would be
+// false precision.
+//
+// This is an approximation of a value only Google can compute
+// exactly. It is a much better one than counting characters, and
+// being roughly right in three scripts beats being exactly right
+// in one.
+// ==========================================
+const FULL_WIDTH = /[\u3000-\u303F\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uFF00-\uFF60\uFFE0-\uFFE6]/
+
+export function textWidth(text) {
+  let width = 0
+  for (const character of String(text || '')) width += FULL_WIDTH.test(character) ? 2 : 1
+  return width
+}
+
+/**
+ * Trim to a rendered width, on a word boundary where one exists.
+ *
+ * No ellipsis: the string is not visibly truncated anywhere, it is
+ * simply short. A trailing "..." in a result Google did NOT
+ * truncate reads as a page that lost its own text.
+ *
+ * Japanese has no spaces, so the word-boundary search finds
+ * nothing and the hard cut applies - which is correct for a script
+ * that breaks between any two characters.
+ */
+export function clampWidth(text, limit) {
+  const value = String(text || '').trim()
+  if (textWidth(value) <= limit) return value
+
+  let out = ''
+  let width = 0
+  for (const character of value) {
+    const next = width + (FULL_WIDTH.test(character) ? 2 : 1)
+    if (next > limit) break
+    out += character
+    width = next
+  }
+
+  const space = out.lastIndexOf(' ')
+  return (space > limit * 0.6 ? out.slice(0, space) : out).replace(/[\s،,—·・-]+$/, '')
+}
 
 
 /** The canonical origin, without a trailing slash. */
@@ -134,7 +352,30 @@ export function organizationLd(lang) {
 
     email: CONFIG.SUPPORT_EMAIL,
     founder: { '@id': absoluteUrl('/about#person') },
-    sameAs: SAME_AS
+    sameAs: SAME_AS,
+
+    // What this organisation makes, in the crawler's vocabulary
+    // rather than in a sentence it has to parse. An Organization
+    // node with a name, a logo and a URL is an entity a search
+    // engine can store and has no reason to show anybody; these
+    // three fields are the difference between "a string this
+    // domain uses" and "a game studio that also ships Unity
+    // tools", which is the actual question behind every complaint
+    // that the site is not understood.
+    knowsAbout: (CONFIG.BRAND && CONFIG.BRAND.TOPICS && CONFIG.BRAND.TOPICS[code]) || [],
+    knowsLanguage: LANGUAGES.supported.slice(),
+    slogan: CONFIG.SITE_TAGLINE[code] || CONFIG.SITE_TAGLINE.en,
+
+    // The one contact route this site actually has. A support
+    // email that appears in the footer, on the order-help page and
+    // here is one fact said three times; an organisation with no
+    // contact point at all reads as a brochure.
+    contactPoint: {
+      '@type': 'ContactPoint',
+      contactType: 'customer support',
+      email: CONFIG.SUPPORT_EMAIL,
+      availableLanguage: LANGUAGES.supported.slice()
+    }
   }
 }
 
@@ -149,8 +390,18 @@ export function websiteLd(lang) {
     alternateName: ALSO_KNOWN_AS,
     description: CONFIG.SITE_TAGLINE[code] || CONFIG.SITE_TAGLINE.en,
     url: absoluteUrl('/'),
+
+    // The language THESE bytes are in, plus the languages the site
+    // exists in at all. Both are true and they answer different
+    // questions: `inLanguage` is what this document is written in,
+    // and a crawler that only ever learns that has no reason to
+    // look for the other two.
     inLanguage: code,
-    publisher: { '@id': absoluteUrl('/#organization') }
+    availableLanguage: LANGUAGES.supported.slice(),
+
+    keywords: brandKeywords(code).join(', '),
+    publisher: { '@id': absoluteUrl('/#organization') },
+    copyrightHolder: { '@id': absoluteUrl('/#organization') }
   }
 }
 
@@ -177,7 +428,11 @@ export function personLd(lang, { description = '', path = '/about' } = {}) {
     '@type': 'Person',
     '@id': absoluteUrl('/about#person'),
     name: 'AmirCollider',
-    alternateName: ['Amir Collider', 'amircollider'],
+
+    // The same list the Organization carries. The person and the
+    // studio share one name here, so a reader searching the name
+    // in Persian should reach both nodes or neither.
+    alternateName: ALSO_KNOWN_AS,
     description: description || CONFIG.SITE_TAGLINE[code] || CONFIG.SITE_TAGLINE.en,
     url: absoluteUrl(path),
     image: { '@id': absoluteUrl('/#logo') },
@@ -401,23 +656,251 @@ export function softwareApplicationLd({
   return node
 }
 
-/** A game. `downloadUrl` is the store link players actually use. */
-export function videoGameLd({ name, description, path, image, platform = 'Android', downloadUrl, genres = [] }) {
+// ==========================================
+// videoGameLd
+// A game, described the way a machine reads one.
+//
+// This node used to carry a name, a sentence, a URL, a platform
+// and a genre list, and that is exactly the amount of information
+// that produced the complaint this file was reopened for: a
+// crawler could tell the domain mentioned something called Neon
+// Katana and could not tell what it was, what was in it, what it
+// costs, which languages it speaks, or where it is downloaded
+// from. Everything below is a fact the page already renders in
+// prose - this is the same fact in the vocabulary a search engine
+// indexes rather than the one a person reads.
+//
+//   alternateName  the game's name in other scripts, from
+//                  `altNames` in GAME_REGISTRY. A Persian player
+//                  searching "نئون کاتانا" matches nothing without
+//                  it, however good the rest of the node is.
+//   featureList    what is IN the game, as short phrases
+//   screenshot     the gallery, as absolute URLs
+//   video          the trailer, already a VideoObject
+//   sameAs         the store listings, which is what ties this
+//                  page and the Myket entry into one thing rather
+//                  than two pages about a similarly named game
+//   offers         free is a price and has to be said as one;
+//                  omitting it reads as "price unknown"
+//
+// Every one of them is omitted rather than emptied when the game
+// has nothing to put in it, because an empty array in structured
+// data is a claim that the game has no features.
+// ==========================================
+export function videoGameLd({
+  name,
+  alternateName = [],
+  description,
+  path,
+  image,
+  platform = 'Android',
+  platforms = [],
+  downloadUrl,
+  sameAs = [],
+  genres = [],
+  featureList = [],
+  screenshots = [],
+  video,
+  keywords = [],
+  identifier,
+  version,
+  lang,
+  free = true,
+  available = true,
+  id
+}) {
   const node = {
     '@context': 'https://schema.org',
     '@type': 'VideoGame',
     name,
     description,
     url: absoluteUrl(path),
-    gamePlatform: platform,
-    operatingSystem: platform,
+    gamePlatform: platforms.length ? platforms : platform,
+    operatingSystem: platforms.length ? platforms.join(', ') : platform,
     applicationCategory: 'GameApplication',
+
+    // By reference, not by value. Spelling the publisher out
+    // in-line - which both callers used to do - mints a SECOND
+    // Organization node on the page beside the one seoHead()
+    // already emits, and two Organization nodes with the same name
+    // and no shared id is the site telling a crawler there are two
+    // publishers with one name.
     author: { '@id': absoluteUrl('/#organization') },
     publisher: { '@id': absoluteUrl('/#organization') }
   }
+
+  // A stable id per game, so the node on the dashboard, the node
+  // on /games and the node on the game's own page are understood
+  // as three mentions of one game rather than three games.
+  if (id) node['@id'] = absoluteUrl('/' + id) + '#game'
+
   if (image) node.image = absoluteUrl(image)
+
+  // The other-script names, plus the Arabic-keyboard encoding of
+  // any Persian one. Done here rather than at the three call sites
+  // so a game declaring altNames in Config.js gets both encodings
+  // on the dashboard, on /games and on its own page without any of
+  // them knowing this exists.
+  const altAll = [...alternateName, ...arabicKeyboardVariants(alternateName)]
+  if (altAll.length) node.alternateName = altAll
   if (genres.length) node.genre = genres
-  if (downloadUrl) node.installUrl = downloadUrl
+  if (featureList.length) node.featureList = featureList
+  if (keywords.length) node.keywords = keywords.join(', ')
+  if (screenshots.length) node.screenshot = screenshots.map(shot => absoluteUrl(shot))
+  if (video) node.video = video
+  if (identifier) node.identifier = identifier
+  if (version) node.softwareVersion = version
+  if (lang) node.inLanguage = resolveLang(lang)
+  if (sameAs.length) node.sameAs = sameAs
+
+  if (downloadUrl) {
+    node.installUrl = downloadUrl
+    node.downloadUrl = downloadUrl
+  }
+
+  if (free) {
+    node.offers = {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'USD',
+      availability: available
+        ? 'https://schema.org/InStock'
+        : 'https://schema.org/PreOrder',
+      url: absoluteUrl(path)
+    }
+  }
+
+  return node
+}
+
+
+// ==========================================
+// videoObjectLd
+// A trailer.
+//
+// A game page that embeds a YouTube frame is, to a crawler, a page
+// with an iframe on it. This is the same video said as a fact:
+// what it shows, which game it belongs to, and where the thumbnail
+// is. YouTube already indexes the video on its own domain - what
+// this adds is that the video and this page are about the same
+// thing.
+//
+// `uploadDate` is omitted rather than guessed. Google warns about
+// its absence and ignores a wrong one, and inventing today's date
+// for a trailer published last year is the kind of fact that
+// outlives the page that carried it.
+// ==========================================
+export function videoObjectLd({ name, description, embedUrl, thumbnail, lang } = {}) {
+  if (!name || !embedUrl) return null
+
+  const node = {
+    '@type': 'VideoObject',
+    name,
+    embedUrl,
+    publisher: { '@id': absoluteUrl('/#organization') }
+  }
+
+  if (description) node.description = description
+  if (thumbnail) node.thumbnailUrl = absoluteUrl(thumbnail)
+  if (lang) node.inLanguage = resolveLang(lang)
+  return node
+}
+
+
+// ==========================================
+// webPageLd
+// The page itself.
+//
+// Every page here emitted an Organization and a WebSite and then
+// stopped, which left a crawler holding two nodes about the
+// PUBLISHER and none at all about the document in front of it. The
+// consequence is not subtle: nothing said what the page was about,
+// which language these particular bytes were in, or that the
+// breadcrumb trail rendered above belonged to this page rather
+// than to the site in general.
+//
+// seoHead() builds this automatically from what it already knows,
+// so no page has to remember to pass one. A caller that emits its
+// own page-level node - /about has a ProfilePage - opts out with
+// `webPage: false` rather than shipping two.
+// ==========================================
+export function webPageLd({
+  path = '/',
+  title,
+  description,
+  lang,
+  image,
+  type = 'WebPage',
+  hasBreadcrumb = false,
+  keywords = []
+} = {}) {
+  const code = resolveLang(lang)
+  const bare = String(path || '/').split('?')[0]
+  const canonical = absoluteUrl(localizedPath(bare, code))
+
+  const node = {
+    '@context': 'https://schema.org',
+    '@type': type,
+
+    // The id carries the language, unlike the Person node's. Two
+    // translations of one page are two documents with two
+    // addresses and two sets of bytes - the hreflang cluster is
+    // what says they are versions of each other, and collapsing
+    // their ids here would say something stronger and wrong.
+    '@id': canonical + '#webpage',
+    url: canonical,
+    name: title,
+    inLanguage: code,
+    isPartOf: { '@id': absoluteUrl('/#website') },
+    about: { '@id': absoluteUrl('/#organization') }
+  }
+
+  if (description) node.description = description
+  if (keywords.length) node.keywords = keywords.join(', ')
+  if (image) node.primaryImageOfPage = { '@type': 'ImageObject', url: absoluteUrl(image) }
+
+  // Only when the page actually rendered one. A BreadcrumbList is
+  // emitted by the caller, so pointing at one that is not on the
+  // page would be a dangling reference.
+  if (hasBreadcrumb) node.breadcrumb = { '@id': canonical + '#breadcrumb' }
+
+  return node
+}
+
+
+// ==========================================
+// itemListLd
+// A catalogue, as a list.
+//
+// /games, /tools and every leaderboard built this inline, three
+// times, with three slightly different shapes. One builder means a
+// crawler reads the same structure on all of them, and a fourth
+// catalogue page cannot invent a fourth shape by accident.
+// ==========================================
+export function itemListLd({ name, items = [], lang, ordered = false } = {}) {
+  const entries = (items || []).filter(item => item && item.name)
+  if (!entries.length) return null
+
+  const node = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name,
+    numberOfItems: entries.length,
+    itemListElement: entries.map((item, index) => {
+      const element = {
+        '@type': 'ListItem',
+        position: item.position || index + 1,
+        name: item.name
+      }
+      if (item.url) element.url = absoluteUrl(item.url)
+      if (item.description) element.description = item.description
+      if (item.image) element.image = absoluteUrl(item.image)
+      return element
+    })
+  }
+
+  if (ordered) node.itemListOrder = 'https://schema.org/ItemListOrderDescending'
+  if (lang) node.inLanguage = resolveLang(lang)
   return node
 }
 
@@ -463,6 +946,8 @@ export function seoHead({
   siteNodes = true,
   siteName = 'AmirCollider',
   keywords = [],
+  webPage = true,
+  pageType = 'WebPage',
   graph = []
 } = {}) {
   const code = resolveLang(lang)
@@ -496,19 +981,93 @@ export function seoHead({
         + escapeHtml(absoluteUrl(localizedPath(bare, LANGUAGES.default))) + '">'
     : ''
 
+  // The page's own subject first, then the brand's terms. Both are
+  // present on every page - the pairing is what matters, since
+  // "AmirCollider" beside "Unity editor extension" is an
+  // association a search engine can learn and either alone is a
+  // word it already knows - but the page's own terms are the ones
+  // that must survive the cap. See KEYWORD_CAP.
+  const terms = keywordList(keywords, brandKeywords(code))
+
+  // ==========================================
+  // The graph.
+  //
+  // Order is site -> page -> whatever the caller passed, which is
+  // also the order a reader of the source would want it in. Two
+  // things happen here that no caller has to know about:
+  //
+  //   1. A BreadcrumbList in the caller's graph gets this page's
+  //      own `@id` stamped on it, so the WebPage node below can
+  //      point at it. Doing it here rather than in breadcrumbLd()
+  //      is what keeps all seventeen existing call sites working
+  //      unchanged - breadcrumbLd() is handed a trail and does not
+  //      know which page it is on.
+  //   2. A WebPage node is added unless the caller emits its own
+  //      page-level node. See webPageLd().
+  // ==========================================
+  let hasBreadcrumb = false
+
+  // A copy, not the caller's object. Every caller today builds its
+  // graph fresh, so mutating in place would work - right up until
+  // somebody passes a node held in a module constant or a frozen
+  // config tree, at which point one page throws in production for
+  // a reason nothing in this function would suggest.
+  const extra = (graph || []).filter(Boolean).map(node => {
+    if (node['@type'] !== 'BreadcrumbList') return node
+    hasBreadcrumb = true
+    return node['@id'] ? node : { ...node, '@id': canonical + '#breadcrumb' }
+  })
+
   const nodes = []
   if (siteNodes && !noindex) nodes.push(organizationLd(code), websiteLd(code))
-  for (const node of graph || []) if (node) nodes.push(node)
+
+  if (webPage && !noindex) {
+    nodes.push(webPageLd({
+      path: bare,
+      title,
+      description,
+      lang: code,
+      image,
+      type: pageType,
+      hasBreadcrumb,
+      keywords: terms
+    }))
+  }
+
+  for (const node of extra) nodes.push(node)
 
   const localeAlternates = LANGUAGES.supported
     .filter(entry => entry !== code)
     .map(entry => '<meta property="og:locale:alternate" content="' + OG_LOCALE[entry] + '">')
     .join('\n  ')
 
-  const keywordTag = keywords && keywords.length
-    ? '<meta name="keywords" content="' + escapeHtml(keywords.join(', ')) + '">'
+  const keywordTag = terms.length
+    ? '<meta name="keywords" content="' + escapeHtml(terms.join(', ')) + '">'
     : ''
 
+  // ==========================================
+  // The tags themselves.
+  //
+  // Three of them below are new and worth a line each, because
+  // none is obvious from its name:
+  //
+  //   og:image:alt / twitter:image:alt   A share preview is a
+  //     place a screen reader has nothing else to read and an
+  //     image crawler has nothing else to caption with. Both get
+  //     the page's own title rather than the filename.
+  //   twitter:site / twitter:creator     Derived from the X URL in
+  //     CONFIG.SOCIAL, so the card credits the account the footer
+  //     already links to. Omitted entirely when that URL is not
+  //     set - a card naming an account nobody owns is worse than
+  //     a card naming none.
+  //   content-language                   Redundant beside the
+  //     canonical, the hreflang cluster and inLanguage on three
+  //     JSON-LD nodes, and read anyway by several smaller crawlers
+  //     and most link-preview scrapers. It costs one line.
+  //
+  // The HTML comment that survives into the output is deliberate:
+  // it is read by a person viewing source during an OAuth review.
+  // ==========================================
   return `
   ${robots}
   <link rel="canonical" href="${escapeHtml(canonical)}">
@@ -531,13 +1090,19 @@ export function seoHead({
   ${description ? `<meta property="og:description" content="${escapeHtml(description)}">` : ''}
   <meta property="og:url" content="${escapeHtml(canonical)}">
   <meta property="og:image" content="${escapeHtml(imageUrl)}">
+  <meta property="og:image:alt" content="${escapeHtml(title)}">
   <meta property="og:locale" content="${OG_LOCALE[code] || 'en_US'}">
   ${localeAlternates}
   <meta name="twitter:card" content="summary_large_image">
+  ${TWITTER_HANDLE ? `<meta name="twitter:site" content="${escapeHtml(TWITTER_HANDLE)}">` : ''}
+  ${TWITTER_HANDLE ? `<meta name="twitter:creator" content="${escapeHtml(TWITTER_HANDLE)}">` : ''}
   <meta name="twitter:title" content="${escapeHtml(title)}">
   ${description ? `<meta name="twitter:description" content="${escapeHtml(description)}">` : ''}
   <meta name="twitter:image" content="${escapeHtml(imageUrl)}">
+  <meta name="twitter:image:alt" content="${escapeHtml(title)}">
   <meta name="author" content="AmirCollider">
+  <meta name="publisher" content="AmirCollider">
+  <meta http-equiv="content-language" content="${escapeHtml(code)}">
   ${nodes.map(node => jsonLd(node)).join('\n  ')}
   `
 }

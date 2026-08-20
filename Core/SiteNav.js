@@ -436,6 +436,15 @@ export function siteNavCss() {
     }
     .ac-foot-mark b { font-size: 1.02em; font-weight: 800; }
     .ac-foot-tagline { color: var(--acn-dim); font-size: 0.86em; line-height: 1.7; max-width: 42ch; }
+    /* No extra opacity. --acn-dim is already a dimmed token, and
+       fading it again took the contrast under the point where it
+       reads as text a person is meant to see - which is both an
+       accessibility failure and, on a line whose content is the
+       brand name in three scripts, exactly the pattern Google's
+       spam policy calls hidden text. It is ordinary footer text
+       and it looks like ordinary footer text. */
+    .ac-foot-alt { color: var(--acn-dim); font-size: 0.82em; line-height: 1.9; margin-block-start: 6px; }
+    .ac-foot-alt span { white-space: nowrap; }
 
     .ac-foot-col h2 {
       font-size: 0.78em; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
@@ -679,6 +688,49 @@ function byLabelLength(links) {
     .map(entry => entry.link)
 }
 
+// ==========================================
+// brandScriptLine
+// The name, in the three scripts this site is read in.
+//
+// One line in the footer of every page, and it is here rather than
+// on /about because of what "every page" buys. The name is a Latin
+// compound word; a Persian reader searching "امیرکولایدر" and a
+// Japanese reader searching "アミールコライダー" were looking for a
+// string that appeared in this site's bytes exactly nowhere, and a
+// search engine does not transliterate a brand on your behalf. The
+// structured data now declares all three (CONFIG.BRAND.ALIASES),
+// but a declaration in JSON-LD is a claim about the name and this
+// is the name, rendered, on the page, in text - which is the form
+// that actually gets matched.
+//
+// The reader's own language comes FIRST, because for them it is
+// not an SEO line, it is the spelling they recognise. The other
+// two follow, each tagged with `lang` so a screen reader switches
+// voice rather than reading katakana in Persian.
+//
+// Deliberately three, not ten. Every spelling of the name is a
+// legitimate thing for the site to declare in its markup; a footer
+// that PRINTS all of them is a footer that reads as stuffing, and
+// that reads the same way to a person and to a spam classifier.
+// ==========================================
+function brandScriptLine(code) {
+  const scripts = (CONFIG.BRAND && CONFIG.BRAND.SCRIPTS) || {}
+
+  const order = [code, ...LANGUAGES.supported.filter(entry => entry !== code)]
+  const parts = order
+    .map(entry => ({ code: entry, text: scripts[entry] }))
+    .filter(entry => entry.text)
+
+  if (!parts.length) return ''
+
+  return '<p class="ac-foot-alt">'
+    + parts.map(entry =>
+        '<span lang="' + escapeHtml(entry.code) + '">' + escapeHtml(entry.text) + '</span>'
+      ).join(' <span aria-hidden="true">&middot;</span> ')
+    + '</p>'
+}
+
+
 export function siteFooter({ lang, games = [] } = {}) {
   const code = resolveLang(lang)
   const p = pack(code)
@@ -762,6 +814,7 @@ export function siteFooter({ lang, games = [] } = {}) {
             <b>AmirCollider</b>
           </a>
           <p class="ac-foot-tagline">${escapeHtml(p.tagline)}</p>
+          ${brandScriptLine(code)}
         </div>
         ${cols}
         ${social}

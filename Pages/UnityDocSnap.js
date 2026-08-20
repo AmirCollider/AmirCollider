@@ -123,6 +123,16 @@ const I18N = {
 
     title: 'Unity DocSnap',
     tagline: 'مستندسازی خودکار پروژه‌ی یونیتی — کل پروژه، توی یک وب‌سایت آفلاین.',
+
+    // The <title> and the meta description are their OWN strings
+    // now. They used to be title + tagline and the whole lede,
+    // which produced an 82-character title and a 408-character
+    // description - both cut off by Google well before their
+    // point, and the description cut mid-clause. The lede is good
+    // page prose and stays exactly as it is; these two are
+    // written to the length a result actually shows.
+    metaTitle: 'Unity DocSnap — مستندسازی خودکار پروژه‌ی یونیتی',
+    metaDesc: 'Unity DocSnap هر سین، گیم‌آبجکت، کامپوننت و فیلد پروژه‌ی یونیتی را می‌گردد و همه را در یک وب‌سایت HTML آفلاین می‌پزد. نسخه‌ی رایگان بدون حساب کاربری.',
     lede: 'یک ابزار مستندسازی برای یونیتی. هر سین را می‌گردد — هر گیم‌آبجکت، هر کامپوننت، هر فیلد سریالایزشده، هر رفرنس — و هر پوشه‌ی اسست را با تنظیمات ایمپورتش، و همه را می‌پزد توی یک وب‌سایت HTML آفلاین که با دابل‌کلیک باز می‌شود. بدون سرور، بدون بیلد، بدون اینترنت. هم برای اینکه خودت یادت بماند چه ساخته‌ای، هم به‌عنوان یک بک‌آپ خوانا از ساختار پروژه، هم برای اینکه کل پروژه را یک‌جا بدهی دست یک دستیار هوش مصنوعی.',
 
     // The one-line answer to "what IS this". Deliberately uses the
@@ -241,6 +251,8 @@ const I18N = {
 
     title: 'Unity DocSnap',
     tagline: 'Automatic Unity project documentation — your whole project as an offline website.',
+    metaTitle: 'Unity DocSnap — Automatic Unity project documentation',
+    metaDesc: 'Unity DocSnap walks every Scene, GameObject, Component and serialized field in a Unity project and bakes it into an offline HTML site. Free edition, no account.',
     lede: 'A documentation generator for Unity. It walks every Scene — every GameObject, every Component, every serialized field, every reference — and every Asset folder with its import settings, then bakes all of it into an offline HTML website you open by double-clicking. No server, no build step, no internet. Read it to remember what you built, keep it as a legible backup of how the project is put together, or hand the whole thing to an AI assistant at once.',
 
     // The one-line answer to "what IS this". Deliberately uses the
@@ -359,6 +371,8 @@ const I18N = {
 
     title: 'Unity DocSnap',
     tagline: 'Unity プロジェクトのドキュメントを自動生成 — まるごとオフライン Web サイトに。',
+    metaTitle: 'Unity DocSnap — Unity プロジェクトの自動ドキュメント生成',
+    metaDesc: 'Unity DocSnap は Unity プロジェクトのシーン・GameObject・コンポーネント・フィールドを走査し、オフライン HTML サイトに書き出します。無料版はアカウント不要。',
     lede: 'Unity 用のドキュメント生成ツールです。すべてのシーン(GameObject、コンポーネント、シリアライズ済みフィールド、参照)と、すべてのアセットフォルダのインポート設定を走査し、ダブルクリックで開けるオフライン HTML サイトに書き出します。サーバーもビルド手順もインターネットも不要です。自分が何を作ったか思い出すためにも、プロジェクト構成の読めるバックアップとしても、AI アシスタントにまるごと渡すためにも使えます。',
 
     // The one-line answer to "what IS this". Deliberately uses the
@@ -1255,7 +1269,7 @@ function renderPage(lang, theme) {
   const p = I18N[lang]
   const site = NAV_I18N[lang] || NAV_I18N.fa
   const themeAttr = theme === 'light' || theme === 'dark' ? ` data-theme="${theme}"` : ''
-  const title = p.title + ' — ' + p.tagline
+  const title = p.metaTitle
   const trail = [
     { href: '/', label: site.home },
     { href: '/tools', label: site.tools },
@@ -1268,12 +1282,12 @@ function renderPage(lang, theme) {
   ${getPageHead({
     title,
     amirLogo: CONFIG.AMIR_LOGO,
-    description: p.lede
+    description: p.metaDesc
   })}
   ${seoHead({
     path: '/unity-docsnap',
     title,
-    description: p.lede,
+    description: p.metaDesc,
     lang,
     type: 'product',
     keywords: KEYWORDS[lang] || KEYWORDS.en,
@@ -1322,7 +1336,8 @@ function renderPage(lang, theme) {
   })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Quicksand:wght@400;500;600;700&family=Space+Mono&family=Vazirmatn:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Quicksand:wght@400;500;600;700&family=Space+Mono&family=Vazirmatn:wght@400;600;700;800&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Quicksand:wght@400;500;600;700&family=Space+Mono&family=Vazirmatn:wght@400;600;700;800&display=swap"></noscript>
   ${themeBootScript()}
   <script>document.documentElement.classList.add('js');</script>
   <style>${siteNavCss()}${css()}</style>

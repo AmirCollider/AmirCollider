@@ -405,7 +405,7 @@ export function page({
   game, lang, theme, title, description = '', active, body,
   script = '', head = '', downloadable = true, skipLabel = '',
   path = '', games = [], seoGraph = [], noindex = false, ogImage = '',
-  siteName = ''
+  siteName = '', keywords = [], pageType = 'WebPage'
 }) {
   const themeAttr = theme === 'light' || theme === 'dark' ? ` data-theme="${theme}"` : ''
   const nav = NAV[lang] || NAV.fa
@@ -437,6 +437,15 @@ export function page({
     // review reads that page as the application's home page. Every
     // other page here is a section of the site and says so.
     ...(siteName ? { siteName } : {}),
+
+    // A game's pages are the ones most likely to be searched for
+    // by a name this site does not otherwise contain - the game's
+    // Persian or Japanese spelling. Every one of them passes the
+    // same list, built once in Pages/GameLanding.js, so the
+    // landing page, the store and the board answer the same query
+    // rather than only the first of them.
+    keywords,
+    pageType,
     graph: [breadcrumbLd(trail, lang), ...(seoGraph || [])]
   })
 

@@ -59,6 +59,8 @@ import { parseCookies, resolveLang, resolveRequestLang } from '../Core/RequestCo
 import { localizedPath } from '../Core/Locale.js'
 import { readBoard } from '../Games/PlayerRecord.js'
 import { chromeTheme, langHeader, page } from './GameChrome.js'
+import { itemListLd, keywordList } from '../Core/Seo.js'
+import { gameKeywords } from './GameLanding.js'
 
 const MIN_LIMIT = 1
 const MAX_LIMIT = 1000
@@ -632,18 +634,16 @@ function createLeaderboardPage({ players, game, total, limit, lang, theme, games
     downloadable,
     head: `<style>${leaderboardCss()}</style>`,
     body,
-    seoGraph: [{
-      '@context': 'https://schema.org',
-      '@type': 'ItemList',
+    keywords: keywordList(gameKeywords(game, resolved), p.metaTitle),
+    seoGraph: [itemListLd({
       name: `${p.metaTitle} — ${game.name}`,
-      numberOfItems: players.length,
-      itemListOrder: 'https://schema.org/ItemListOrderDescending',
-      itemListElement: players.slice(0, 10).map(player => ({
-        '@type': 'ListItem',
+      lang: resolved,
+      ordered: true,
+      items: players.slice(0, 10).map(player => ({
         position: player.rank,
         name: player.displayName
       }))
-    }]
+    })]
   })
 }
 
@@ -701,12 +701,34 @@ export async function handleLeaderboardUnified(url, request, gameId, requestId, 
   }
 
   const games = Object.values(GAMES || {})
+
+  // ==========================================
+  // What a crawler gets when the board cannot be read.
+  //
+  // The JSON status is unchanged: shipped Unity builds read this
+  // endpoint and a status code is the kind of thing a client
+  // switches on, so it stays exactly what it has always been.
+  //
+  // The HTML answer is a different audience and gets a different
+  // code. This URL is in sitemap.xml at changefreq=daily, so a
+  // crawler fetches it often; a 500 tells that crawler the page is
+  // BROKEN, and a page that is broken twice is a page it drops. A
+  // 503 with Retry-After says the opposite - temporarily away, come
+  // back - which is what an unbound binding or a slow D1 actually
+  // is. Google documents 503 as the correct code for exactly this
+  // and treats it as "keep the URL, try later".
+  //
+  // Deliberately NOT noindex: a blip would otherwise remove a good
+  // page from the index permanently, and getting it back takes
+  // weeks.
+  // ==========================================
   const unavailable = (error, message, status) => {
     if (wantsJson) return createJsonResponse({ error, message, requestId }, status)
     const lang = resolveRequestLang(url, request, parseCookies(request))
     return createHtmlResponse(
       createUnavailablePage({ game, lang, theme: chromeTheme(request), games }),
-      status
+      503,
+      { 'Retry-After': '3600', 'Cache-Control': 'no-store' }
     )
   }
 
