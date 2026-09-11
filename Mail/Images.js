@@ -85,12 +85,18 @@ export function imageExtension(type) {
 // stored must still leave the message readable, and on the inbound
 // path a thrown error is a BOUNCE back to the sender.
 // ==========================================
-export async function putImage(env, { bytes, type, prefix, retentionMs, requestId }) {
+export async function putImage(env, { bytes, type, prefix, retentionMs, requestId, maxBytes }) {
   const bucket = env && env.ASSETS
   if (!bucket || !bytes || !bytes.length) return null
 
-  if (bytes.length > CONFIG.MAIL.MAX_IMAGE_BYTES) {
-    logWarning('Mail image skipped: too large', { requestId, size: bytes.length })
+  // maxBytes lets a caller be stricter than the mailbox is.
+  // A brand logo is drawn at 44 by 44 pixels and is inlined
+  // into every page of an export, so it has nothing like a
+  // mail attachment's budget - but WHAT counts as an image,
+  // and where it goes, stays this file's answer.
+  const limit = maxBytes || CONFIG.MAIL.MAX_IMAGE_BYTES
+  if (bytes.length > limit) {
+    logWarning('Image skipped: too large', { requestId, size: bytes.length, limit })
     return null
   }
   if (!looksLikeImage(type, bytes.subarray(0, 8))) return null

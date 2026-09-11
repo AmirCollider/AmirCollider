@@ -55,6 +55,13 @@ const DISALLOW = [
   '/checkout',
   '/order',
   '/license',
+
+  // The brand panel. The trailing-slash rule does not apply
+  // here the way it does to /donate: '/unity-docsnap' is the
+  // product page and belongs in the index, but the panel
+  // underneath it is a login prompt guarding a customer's
+  // account, so the full path is named rather than the parent.
+  '/unity-docsnap/panel',
   '/oauth/',
   '/auth/',
   '/database/',

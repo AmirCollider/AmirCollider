@@ -59,6 +59,7 @@ import { handleLeaderboardUnified } from './Pages/Leaderboard.js'
 import { handleMetrics } from './Pages/Metrics.js'
 import { handleReleaseNotes } from './Pages/ReleaseNotes.js'
 import { handleUnityDocSnap } from './Pages/UnityDocSnap.js'
+import { handleDocSnapPanel, handleDocSnapPanelApi } from './Pages/DocSnapPanel.js'
 import { handleUnityDirectTmp } from './Pages/UnityDirectTmp.js'
 import { handleTools } from './Pages/Tools.js'
 import { handleContact, handleContactSend } from './Pages/Contact.js'
@@ -283,6 +284,17 @@ const ROUTES = [
   { path: '/unity-docsnap', method: 'GET', handler: handleUnityDocSnap },
   { path: '/docsnap', method: 'GET', handler: handleUnityDocSnap },
   { path: '/license', method: 'GET', handler: handleLicensePage },
+
+  // The brand panel: a customer's logo, footer and locked
+  // sections, saved against their key so they configure them
+  // once rather than once per Unity project.
+  //
+  // The Editor never calls this. It reads a FILE the customer
+  // downloads here and imports - see Pages/DocSnapPanel.js for
+  // why that indirection is the whole point rather than a
+  // limitation.
+  { path: '/unity-docsnap/panel', method: 'GET', handler: handleDocSnapPanel },
+  { path: '/unity-docsnap/panel/api', method: 'POST', handler: handleDocSnapPanelApi },
   { path: '/license/activate', method: 'POST', handler: handleLicenseActivate },
   { path: '/license/validate', method: 'POST', handler: handleLicenseValidate },
   { path: '/license/deactivate', method: 'POST', handler: handleLicenseDeactivate },

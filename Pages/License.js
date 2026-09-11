@@ -514,6 +514,14 @@ function renderLicensePage() {
       <a class="btn" href="/unity-docsnap">Compare all three</a>
     </section>
 
+    <section class="card muted">
+      <h2>Your logo, your footer, your locked sections</h2>
+      <p>Set them once in the brand panel, download a small file, and import it in each Unity
+         project &mdash; the same way you brought your key in. Unity never talks to this site,
+         so an export still works on a machine with no internet at all.</p>
+      <a class="btn" href="/unity-docsnap/panel">Open the brand panel</a>
+    </section>
+
     ${siteFooter({ lang: 'en' })}
   </div>
 

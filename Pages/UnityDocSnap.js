@@ -144,6 +144,7 @@ const I18N = {
     ctaPrices: 'قیمت‌ها را ببین',
     ctaDemo: 'یک خروجی واقعی را ببین',
     demoNote: 'یک پروژه‌ی نمونه که با همین ابزار مستند شده — بدون نصب چیزی، همین‌جا بازش کن.',
+    demoPartial: 'این یک خروجی واقعی از یک پروژه‌ی واقعی است. فقط دو چیز از نسخه‌ی منتشرشده برداشته شده — پوشه‌ی کپی فایل‌ها و بکاپ ‎.unitypackage‎ — چون انتشارشان یعنی انتشار سورسِ همان پروژه. در خروجی خودت هر دو سر جایشان هستند.',
     priceNote: 'خرید یک‌باره · یک سیستم · بدون اشتراک ماهانه',
 
     sectionWhat: 'چه‌کار می‌کند',
@@ -269,6 +270,7 @@ const I18N = {
     ctaPrices: 'See pricing',
     ctaDemo: 'Open a real export',
     demoNote: 'A sample project documented by this tool. Nothing to install — open it and click around.',
+    demoPartial: 'This is a real export of a real project. Two things have been taken out of the published copy — the file-copies folder and the whole-project .unitypackage — because publishing those would publish that project\u2019s source. Both are present in your own export.',
     priceNote: 'One-off purchase · one machine · no subscription',
 
     sectionWhat: 'What it does',
@@ -394,6 +396,7 @@ const I18N = {
     ctaPrices: '価格を見る',
     ctaDemo: '実際の出力を見る',
     demoNote: 'このツールで実際に書き出したサンプルプロジェクトです。インストール不要、そのまま開いてご覧いただけます。',
+    demoPartial: 'これは実在のプロジェクトを書き出した本物の出力です。公開版からは 2 つだけ取り除いてあります — ファイルのコピーを収めたフォルダーと、プロジェクト全体の .unitypackage です。公開するとそのプロジェクトのソースを公開することになるためで、お手元の出力には両方とも含まれます。',
     priceNote: '買い切り · 1 台まで · サブスクリプションなし',
 
     sectionWhat: 'できること',
@@ -802,14 +805,36 @@ function renderHero(p) {
   // CONFIG.DOCSNAP.DEMO_URL points at an export that has actually
   // been uploaded - a demo button that 404s costs more trust than
   // a missing one ever loses.
+  //
+  // The link carries ?home=, which an export from 1.0.4 onwards
+  // reads and turns into a "back to the site" link in its own
+  // sidebar. Older exports ignore it and get a bar injected by
+  // Api/AssetApi.js instead, so a visitor is never stranded inside
+  // the demo either way - but the export's own link is the better
+  // of the two, because it belongs to the page rather than
+  // floating over it.
+  const demoHref = CONFIG.DOCSNAP.DEMO_URL
+    ? `${CONFIG.DOCSNAP.DEMO_URL}?home=${encodeURIComponent(`${CONFIG.SITE_URL}/unity-docsnap`)}`
+    : ''
+
   const demo = CONFIG.DOCSNAP.DEMO_URL
     ? `
-        <a class="btn ghost" href="${escapeHtml(CONFIG.DOCSNAP.DEMO_URL)}">${icon('eye')}<span>${escapeHtml(p.ctaDemo)}</span></a>`
+        <a class="btn ghost" href="${escapeHtml(demoHref)}">${icon('eye')}<span>${escapeHtml(p.ctaDemo)}</span></a>`
     : ''
 
   const demoNote = CONFIG.DOCSNAP.DEMO_URL
     ? `
       <p class="fine">${escapeHtml(p.demoNote)}</p>`
+    : ''
+
+  // Said before the click, not after it. Somebody who opens the
+  // export, goes looking for the file copies the pricing table
+  // promises and finds them missing has learned something untrue
+  // about the product - and an absence nobody explains always
+  // reads as a broken feature rather than a deliberate omission.
+  const demoCaveat = CONFIG.DOCSNAP.DEMO_URL && CONFIG.DOCSNAP.DEMO_PARTIAL
+    ? `
+      <p class="fine demo-caveat">${escapeHtml(p.demoPartial)}</p>`
     : ''
 
   return `
@@ -822,7 +847,7 @@ function renderHero(p) {
         <a class="btn" href="${escapeHtml(REPO_URL)}" rel="noopener">${icon('download')}<span>${escapeHtml(p.ctaFree)}</span></a>
         <a class="btn ghost" href="#pricing">${icon('tag')}<span>${escapeHtml(p.ctaPrices)}</span></a>${demo}
       </div>
-      <p class="fine">${escapeHtml(p.priceNote)}</p>${demoNote}
+      <p class="fine">${escapeHtml(p.priceNote)}</p>${demoNote}${demoCaveat}
     </header>`
 }
 
@@ -1743,6 +1768,16 @@ function css() {
     .lede { color: var(--text-dim); max-width: 640px; margin: 12px auto 0; }
     .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-block-start: 24px; }
     .fine { color: var(--text-dim); font-size: 0.85em; margin-block-start: 12px; }
+
+    /* The demo caveat is a footnote, not a warning: it explains a
+       deliberate omission, and setting it in the same red a real
+       problem would use would make a reader distrust the export
+       before opening it. Narrower than the lede on purpose, so it
+       reads as an aside rather than as part of the pitch. */
+    .demo-caveat {
+      font-size: 0.79em; max-width: 62ch; margin-inline: auto;
+      margin-block-start: 8px; color: var(--text-faint); line-height: 1.75;
+    }
     .center { text-align: center; }
 
     /* ---------- buttons ---------- */
