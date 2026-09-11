@@ -816,15 +816,15 @@ function getCSS() {
       --maxw: 1000px;
 
       --bg-1: #071110;
-      --bg-2: #14383b;
+      --bg-2: #0f2b2e;
       --surface: rgba(47,179,192,0.058);
       --surface-2: rgba(47,179,192,0.105);
       --surface-3: rgba(47,179,192,0.032);
       --border: rgba(47,179,192,0.19);
       --border-soft: rgba(47,179,192,0.11);
-      --text: rgba(236,250,250,0.93);
-      --text-dim: rgba(236,250,250,0.63);
-      --text-faint: rgba(236,250,250,0.43);
+      --text: rgba(255,255,255,0.95);
+      --text-dim: rgba(255,255,255,0.70);
+      --text-faint: rgba(255,255,255,0.50);
       --accent: #2fb3c0;
       --shadow: 0 18px 44px rgba(0,0,0,0.42);
       color-scheme: dark;
@@ -839,9 +839,9 @@ function getCSS() {
         --surface-3: rgba(11,90,99,0.035);
         --border: rgba(11,90,99,0.17);
         --border-soft: rgba(11,90,99,0.09);
-        --text: rgba(21,34,36,0.93);
-        --text-dim: rgba(21,34,36,0.62);
-        --text-faint: rgba(21,34,36,0.42);
+        --text: rgba(16,18,20,0.95);
+        --text-dim: rgba(16,18,20,0.68);
+        --text-faint: rgba(16,18,20,0.48);
         --accent: ${INK};
         --shadow: 0 18px 40px rgba(11,90,99,0.12);
         color-scheme: light;
@@ -856,24 +856,24 @@ function getCSS() {
       --surface-3: rgba(11,90,99,0.035);
       --border: rgba(11,90,99,0.17);
       --border-soft: rgba(11,90,99,0.09);
-      --text: rgba(21,34,36,0.93);
-      --text-dim: rgba(21,34,36,0.62);
-      --text-faint: rgba(21,34,36,0.42);
+      --text: rgba(16,18,20,0.95);
+      --text-dim: rgba(16,18,20,0.68);
+      --text-faint: rgba(16,18,20,0.48);
       --accent: ${INK};
       --shadow: 0 18px 40px rgba(11,90,99,0.12);
       color-scheme: light;
     }
     :root[data-theme="dark"] {
       --bg-1: #071110;
-      --bg-2: #14383b;
+      --bg-2: #0f2b2e;
       --surface: rgba(47,179,192,0.058);
       --surface-2: rgba(47,179,192,0.105);
       --surface-3: rgba(47,179,192,0.032);
       --border: rgba(47,179,192,0.19);
       --border-soft: rgba(47,179,192,0.11);
-      --text: rgba(236,250,250,0.93);
-      --text-dim: rgba(236,250,250,0.63);
-      --text-faint: rgba(236,250,250,0.43);
+      --text: rgba(255,255,255,0.95);
+      --text-dim: rgba(255,255,255,0.70);
+      --text-faint: rgba(255,255,255,0.50);
       --accent: #2fb3c0;
       --shadow: 0 18px 44px rgba(0,0,0,0.42);
       color-scheme: dark;
@@ -917,13 +917,13 @@ function getCSS() {
     body::after {
       content: '';
       position: fixed;
-      inset-block-end: -32vh;
+      inset-block-end: -42vh;
       inset-inline-start: 50%;
       transform: translateX(-50%);
       width: min(1000px, 150vw);
       height: 72vh;
       background: radial-gradient(closest-side,
-        color-mix(in srgb, var(--brass) 13%, transparent), transparent 72%);
+        color-mix(in srgb, var(--brass) 7%, transparent), transparent 72%);
       pointer-events: none;
       z-index: -1;
     }
@@ -990,7 +990,7 @@ function getCSS() {
       width: min(340px, 68vw);
       aspect-ratio: 1;
       background: radial-gradient(closest-side,
-        color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%);
+        color-mix(in srgb, var(--accent) 15%, transparent), transparent 70%);
       pointer-events: none;
       z-index: -1;
     }
