@@ -55,7 +55,7 @@ import { escapeHtml } from '../Core/Html.js'
 import { chromeScript, themeBootScript } from '../Core/PageChrome.js'
 import { seoHead, breadcrumbLd, softwareApplicationLd, faqPageLd, howToLd, videoObjectLd } from '../Core/Seo.js'
 import { localizedPath } from '../Core/Locale.js'
-import { siteNavCss, siteBreadcrumb, siteFooter, NAV_I18N } from '../Core/SiteNav.js'
+import { siteNavCss, siteBreadcrumb, siteFooter, siteBackToTop, NAV_I18N } from '../Core/SiteNav.js'
 import { langCookieHeader, parseCookies, resolveRequestLang, resolveRequestTheme } from '../Core/RequestContext.js'
 
 const PLUS = CONFIG.DOCSNAP.TIERS.plus
@@ -1493,6 +1493,7 @@ function renderPage(lang, theme) {
     </div>
     ${siteFooter({ lang })}
   </div>
+  ${siteBackToTop({ lang })}
   ${chromeScript()}
   <script>${script(lang, p)}</script>
 </body>

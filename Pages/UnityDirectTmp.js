@@ -47,12 +47,16 @@ import { CONFIG } from '../Config.js'
 import { getPageHead } from '../Core/DesignSystem.js'
 import { createHtmlResponse } from '../Core/Http.js'
 import { otherTools } from '../Content/ToolsCatalog.js'
+import {
+  VIDEOS, VIDEO_LANGS, PUBLISHED as VIDEOS_PUBLISHED,
+  videoUrl, urlMap, totalSeconds, formatDuration, isoDuration
+} from '../Content/DirectTmpVideos.js'
 
 import { escapeHtml } from '../Core/Html.js'
 import { chromeScript, themeBootScript } from '../Core/PageChrome.js'
-import { seoHead, breadcrumbLd, softwareApplicationLd, faqPageLd, howToLd } from '../Core/Seo.js'
+import { seoHead, breadcrumbLd, softwareApplicationLd, faqPageLd, howToLd, videoObjectLd } from '../Core/Seo.js'
 import { localizedPath } from '../Core/Locale.js'
-import { siteNavCss, siteBreadcrumb, siteFooter, NAV_I18N } from '../Core/SiteNav.js'
+import { siteNavCss, siteBreadcrumb, siteFooter, siteBackToTop, NAV_I18N } from '../Core/SiteNav.js'
 import { langCookieHeader, parseCookies, resolveLang, resolveRequestLang, resolveRequestTheme } from '../Core/RequestContext.js'
 
 const REPO_URL = CONFIG.DIRECTTMP.REPO_URL
@@ -187,6 +191,18 @@ const I18N = {
     fieldsTitle: 'فیلدهای کامپوننت',
     fieldsColName: 'فیلد',
     fieldsColWhat: 'کارش چیست',
+
+    // ---- videos ----
+    videosEyebrow: 'ویدیو',
+    videosTitle: 'ببین که کار می‌کند',
+    videoLede: (count, total) =>
+      `${count} کلیپ کوتاه، در مجموع ${total} — هر کدام یک کار را نشان می‌دهد، بدون مقدمه.`,
+    videoLangLabel: 'زبان ویدیو',
+    videoNoSupport: 'مرورگرت این ویدیو را پخش نمی‌کند.',
+    videoDownload: 'دانلود فایل ویدیو',
+    videoOf: (index, count) => `کلیپ ${index} از ${count}`,
+    videoNoteTitle: 'یک نکته‌ی مهم',
+    videoNoteBody: 'همه‌ی قابلیت‌هایی که در این ویدیوها می‌بینی داخل ابزار وجود دارند. اما ابزار مرتب بروزرسانی می‌شود، پس ممکن است مسیر دسترسی به بعضی از آن‌ها یا ظاهرشان با چیزی که در ویدیو نشان داده شده کمی فرق داشته باشد.',
 
     // ---- install ----
     installEyebrow: 'نصب',
@@ -325,6 +341,17 @@ const I18N = {
     fieldsColName: 'Field',
     fieldsColWhat: 'What it does',
 
+    videosEyebrow: 'Video',
+    videosTitle: 'See it work',
+    videoLede: (count, total) =>
+      `${count} short clips, ${total} in total — each one shows a single thing, with no preamble.`,
+    videoLangLabel: 'Video language',
+    videoNoSupport: 'Your browser cannot play this video.',
+    videoDownload: 'Download the video file',
+    videoOf: (index, count) => `Clip ${index} of ${count}`,
+    videoNoteTitle: 'One thing worth knowing',
+    videoNoteBody: 'Everything shown in these clips is in the tool. It does keep being updated, though — so where you reach a feature from, and what it looks like on screen, may differ from the recording.',
+
     installEyebrow: 'Install',
     installTitle: 'From the Package Manager, in four clicks',
     installStep1: 'Open Window → Package Manager',
@@ -457,6 +484,17 @@ const I18N = {
     fieldsTitle: 'コンポーネントのフィールド',
     fieldsColName: 'フィールド',
     fieldsColWhat: '役割',
+
+    videosEyebrow: '動画',
+    videosTitle: '動作をご覧ください',
+    videoLede: (count, total) =>
+      `短いクリップ ${count} 本、合計 ${total}。前置きなしで 1 本につき 1 つの機能を紹介します。`,
+    videoLangLabel: '動画の言語',
+    videoNoSupport: 'お使いのブラウザではこの動画を再生できません。',
+    videoDownload: '動画ファイルをダウンロード',
+    videoOf: (index, count) => `${count} 本中 ${index} 本目`,
+    videoNoteTitle: 'ご注意ください',
+    videoNoteBody: 'これらの動画で紹介している機能は、すべて製品に含まれています。ただし更新を重ねているため、機能へのアクセス方法や画面の見た目が動画と異なる場合があります。',
 
     installEyebrow: '導入',
     installTitle: 'Package Manager から 4 クリック',
@@ -777,16 +815,16 @@ function getCSS() {
       --radius-sm: 13px;
       --maxw: 1000px;
 
-      --bg-1: #0b1214;
-      --bg-2: #102428;
-      --surface: rgba(255,255,255,0.045);
-      --surface-2: rgba(255,255,255,0.085);
-      --surface-3: rgba(255,255,255,0.03);
-      --border: rgba(255,255,255,0.11);
-      --border-soft: rgba(255,255,255,0.07);
-      --text: rgba(255,255,255,0.92);
-      --text-dim: rgba(255,255,255,0.62);
-      --text-faint: rgba(255,255,255,0.42);
+      --bg-1: #071110;
+      --bg-2: #14383b;
+      --surface: rgba(47,179,192,0.058);
+      --surface-2: rgba(47,179,192,0.105);
+      --surface-3: rgba(47,179,192,0.032);
+      --border: rgba(47,179,192,0.19);
+      --border-soft: rgba(47,179,192,0.11);
+      --text: rgba(236,250,250,0.93);
+      --text-dim: rgba(236,250,250,0.63);
+      --text-faint: rgba(236,250,250,0.43);
       --accent: #2fb3c0;
       --shadow: 0 18px 44px rgba(0,0,0,0.42);
       color-scheme: dark;
@@ -795,47 +833,47 @@ function getCSS() {
     @media (prefers-color-scheme: light) {
       :root:not([data-theme]) {
         --bg-1: ${PAPER};
-        --bg-2: #eee6d6;
-        --surface: rgba(255,255,255,0.80);
+        --bg-2: #e6dfd0;
+        --surface: rgba(255,255,255,0.82);
         --surface-2: #ffffff;
-        --surface-3: rgba(27,23,37,0.03);
-        --border: rgba(27,23,37,0.12);
-        --border-soft: rgba(27,23,37,0.07);
-        --text: rgba(27,23,37,0.93);
-        --text-dim: rgba(27,23,37,0.62);
-        --text-faint: rgba(27,23,37,0.42);
+        --surface-3: rgba(11,90,99,0.035);
+        --border: rgba(11,90,99,0.17);
+        --border-soft: rgba(11,90,99,0.09);
+        --text: rgba(21,34,36,0.93);
+        --text-dim: rgba(21,34,36,0.62);
+        --text-faint: rgba(21,34,36,0.42);
         --accent: ${INK};
-        --shadow: 0 18px 40px rgba(27,23,37,0.10);
+        --shadow: 0 18px 40px rgba(11,90,99,0.12);
         color-scheme: light;
       }
     }
 
     :root[data-theme="light"] {
       --bg-1: ${PAPER};
-      --bg-2: #eee6d6;
-      --surface: rgba(255,255,255,0.80);
+      --bg-2: #e6dfd0;
+      --surface: rgba(255,255,255,0.82);
       --surface-2: #ffffff;
-      --surface-3: rgba(27,23,37,0.03);
-      --border: rgba(27,23,37,0.12);
-      --border-soft: rgba(27,23,37,0.07);
-      --text: rgba(27,23,37,0.93);
-      --text-dim: rgba(27,23,37,0.62);
-      --text-faint: rgba(27,23,37,0.42);
+      --surface-3: rgba(11,90,99,0.035);
+      --border: rgba(11,90,99,0.17);
+      --border-soft: rgba(11,90,99,0.09);
+      --text: rgba(21,34,36,0.93);
+      --text-dim: rgba(21,34,36,0.62);
+      --text-faint: rgba(21,34,36,0.42);
       --accent: ${INK};
-      --shadow: 0 18px 40px rgba(27,23,37,0.10);
+      --shadow: 0 18px 40px rgba(11,90,99,0.12);
       color-scheme: light;
     }
     :root[data-theme="dark"] {
-      --bg-1: #0b1214;
-      --bg-2: #102428;
-      --surface: rgba(255,255,255,0.045);
-      --surface-2: rgba(255,255,255,0.085);
-      --surface-3: rgba(255,255,255,0.03);
-      --border: rgba(255,255,255,0.11);
-      --border-soft: rgba(255,255,255,0.07);
-      --text: rgba(255,255,255,0.92);
-      --text-dim: rgba(255,255,255,0.62);
-      --text-faint: rgba(255,255,255,0.42);
+      --bg-1: #071110;
+      --bg-2: #14383b;
+      --surface: rgba(47,179,192,0.058);
+      --surface-2: rgba(47,179,192,0.105);
+      --surface-3: rgba(47,179,192,0.032);
+      --border: rgba(47,179,192,0.19);
+      --border-soft: rgba(47,179,192,0.11);
+      --text: rgba(236,250,250,0.93);
+      --text-dim: rgba(236,250,250,0.63);
+      --text-faint: rgba(236,250,250,0.43);
       --accent: #2fb3c0;
       --shadow: 0 18px 44px rgba(0,0,0,0.42);
       color-scheme: dark;
@@ -863,6 +901,29 @@ function getCSS() {
       width: min(1200px, 160vw);
       height: 90vh;
       background: radial-gradient(closest-side, var(--bg-2), transparent 72%);
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    /* The brass counterweight, low on the page.
+
+       The package has two colours, not one: teal is the ink and
+       brass is what the badges and the mascot's highlights are
+       drawn in. With only the teal glow the page read as a plain
+       dark rectangle with a slightly blue top - the second colour
+       is what makes it read as a theme rather than as a default.
+       Fixed and pointer-transparent for the same reasons as the
+       layer above. */
+    body::after {
+      content: '';
+      position: fixed;
+      inset-block-end: -32vh;
+      inset-inline-start: 50%;
+      transform: translateX(-50%);
+      width: min(1000px, 150vw);
+      height: 72vh;
+      background: radial-gradient(closest-side,
+        color-mix(in srgb, var(--brass) 13%, transparent), transparent 72%);
       pointer-events: none;
       z-index: -1;
     }
@@ -914,8 +975,26 @@ function getCSS() {
     .icon-btn svg { width: 19px; height: 19px; }
 
     /* ---------- hero ---------- */
-    .hero { text-align: center; padding-block: 6px 46px; }
-    .inky { display: block; margin-inline: auto; margin-block-end: 4px; }
+    .hero { text-align: center; padding-block: 6px 46px; position: relative; }
+
+    /* The blot Inky sits in. Without it the mascot floats on flat
+       background and the top of the page has nothing in it but
+       text; with it the hero reads as ink on a surface, which is
+       the whole idea the package is named for. */
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset-block-start: -4%;
+      inset-inline-start: 50%;
+      transform: translateX(-50%);
+      width: min(340px, 68vw);
+      aspect-ratio: 1;
+      background: radial-gradient(closest-side,
+        color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%);
+      pointer-events: none;
+      z-index: -1;
+    }
+    .inky { display: block; margin-inline: auto; margin-block-end: 4px; position: relative; }
     .hero h1 {
       font-size: clamp(2.1em, 6.4vw, 3.3em); font-weight: 800;
       letter-spacing: -0.022em; line-height: 1.18;
@@ -977,11 +1056,20 @@ function getCSS() {
 
     /* ---------- sections ---------- */
     section { margin-block-end: 56px; scroll-margin-block-start: 20px; }
+    /* Every section is introduced by this, so it is the cheapest
+       place to put the brand: teal was already the colour of half
+       the page furniture, and having the eyebrow in it too meant
+       the brass never appeared at all outside the badge row. */
     .eyebrow {
-      display: inline-block; font-size: 0.74em; font-weight: 800;
+      display: inline-flex; align-items: center; gap: 9px;
+      font-size: 0.74em; font-weight: 800;
       letter-spacing: 0.11em; text-transform: uppercase;
-      color: color-mix(in srgb, var(--accent) 74%, var(--text-dim));
+      color: color-mix(in srgb, var(--brass) 78%, var(--text));
       margin-block-end: 7px;
+    }
+    .eyebrow::before {
+      content: ''; flex: none; width: 20px; height: 2px; border-radius: 2px;
+      background: linear-gradient(to right, var(--accent), var(--brass));
     }
     .section-title {
       font-size: clamp(1.35em, 3.4vw, 1.7em); font-weight: 800;
@@ -1206,6 +1294,74 @@ function getCSS() {
     .shelf-name { font-weight: 800; }
     .shelf-desc { font-size: 0.88em; color: var(--text-dim); }
     .shelf-cta { font-weight: 700; font-size: 0.9em; color: color-mix(in srgb, var(--accent) 60%, var(--text)); }
+
+    /* ---------- videos ----------
+       The stage and the playlist sit side by side while there is
+       room and stack below 900px, which is where a 16 by 9 video
+       next to a 300px list stops leaving either of them usable.
+
+       The playlist scrolls inside its own box rather than
+       stretching the section: nine rows is taller than the
+       player, and a list that sets the section height leaves a
+       column of empty space beside the video on every screen
+       wide enough to show both. */
+    .dvhead {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+      gap: 12px; margin-block-end: 16px;
+    }
+    .dvlede { color: var(--text-dim); font-size: 0.93em; flex: 1 1 320px; }
+    .dvlang { display: flex; align-items: center; gap: 10px; flex: none; }
+    .dvlang-label { font-size: 0.82em; color: var(--text-faint); }
+
+    .dvplayer { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
+    @media (max-width: 900px) { .dvplayer { grid-template-columns: minmax(0, 1fr); } }
+
+    .dvstage {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow);
+    }
+    .dvstage video {
+      display: block; width: 100%; aspect-ratio: 16 / 9;
+      background: var(--bg-1); object-fit: contain;
+    }
+    .dvnow { padding: 14px 17px; border-block-start: 1px solid var(--border-soft); }
+    .dvnow b { display: block; font-weight: 800; font-size: 0.98em; line-height: 1.5; }
+    .dvnow small { display: block; color: var(--text-dim); font-size: 0.85em; line-height: 1.7; margin-block-start: 5px; }
+    .dvcount {
+      display: inline-block; margin-block-start: 9px; font-size: 0.76em;
+      color: var(--text-faint); letter-spacing: 0.02em;
+    }
+
+    .dvlist {
+      list-style: none; margin: 0; padding: 0;
+      max-height: 520px; overflow-y: auto; overscroll-behavior: contain;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      background: var(--surface-3);
+    }
+    .dvlist li + li { border-block-start: 1px solid var(--border-soft); }
+    .dvitem {
+      display: flex; align-items: flex-start; gap: 11px;
+      padding: 12px 13px; text-decoration: none; color: var(--text);
+      transition: background 0.16s ease;
+    }
+    .dvitem:hover { text-decoration: none; background: var(--surface-2); }
+    .dvitem.is-on { background: color-mix(in srgb, var(--ink) 22%, transparent); }
+    .dvnum {
+      flex: none; font-size: 0.72em; font-weight: 800; letter-spacing: 0.04em;
+      color: var(--text-faint); padding-block-start: 3px; font-variant-numeric: tabular-nums;
+    }
+    .dvitem.is-on .dvnum { color: var(--brass); }
+    .dvtext { flex: 1 1 auto; min-width: 0; }
+    .dvtext b { display: block; font-weight: 700; font-size: 0.87em; line-height: 1.5; }
+    .dvtext small { display: block; color: var(--text-dim); font-size: 0.78em; line-height: 1.6; margin-block-start: 3px; }
+    .dvdur {
+      flex: none; font-size: 0.74em; color: var(--text-faint);
+      padding-block-start: 3px; font-variant-numeric: tabular-nums;
+    }
+
+    .dvnote { margin-block-start: 16px; border-inline-start: 3px solid var(--brass); }
+    .dvnote h3 { font-size: 0.95em; font-weight: 800; margin-block-end: 7px; }
+    .dvnote p { color: var(--text-dim); font-size: 0.88em; line-height: 1.85; }
 
     /* ---------- nav ---------- */
     .nav { display: flex; justify-content: center; margin-block: 8px 26px; }
@@ -1457,6 +1613,256 @@ function renderUsage(lang) {
         </table>
       </div>
     </section>`
+}
+
+
+// ==========================================
+// The poster frame
+//
+// A video element with nothing loaded paints its own background,
+// which on this page is a flat grey rectangle where the picture
+// should be until somebody presses play. It reads as a broken
+// embed rather than as a video.
+//
+// There is no poster image to point at - the clips are bare MP4s
+// on the download host and nothing generates a thumbnail for
+// them - so the frame is taken from the clip itself. A media
+// fragment asks the browser to seek to that timestamp, and
+// preload of metadata gives it permission to fetch the little it
+// needs to decode there, which is a range request and not the
+// whole clip.
+//
+// A tenth of a second rather than zero: some encoders put a
+// black frame at exactly 0, and Safari treats a bare fragment of
+// t=0 as no fragment at all and paints nothing.
+// ==========================================
+const POSTER_FRAGMENT = '#t=0.1'
+
+
+// ==========================================
+// renderVideos
+// The demo clips, as a player with a playlist beside it.
+//
+// The clip language and the PAGE language are two different
+// things and are deliberately not tied together. A Persian
+// reader comparing the English narration against the Persian one
+// should not have the interface change under them, so the
+// playlist titles stay in the page language and only the file
+// being played follows the switcher.
+// ==========================================
+function renderVideos(lang) {
+  const p = pack(lang)
+  const resolved = resolveLang(lang)
+  const startLang = VIDEO_LANGS.indexOf(resolved) !== -1 ? resolved : 'en'
+
+  const langButtons = VIDEO_LANGS.map(code => `
+    <button type="button" data-dvlang="${code}" lang="${code}"
+            aria-pressed="${code === startLang ? 'true' : 'false'}">
+      ${escapeHtml(pack(code).langName || code.toUpperCase())}
+    </button>`).join('')
+
+  // Anchors, not buttons, and the href is the clip's own address.
+  //
+  // This is the difference between nine videos a crawler can
+  // follow and one: everything past the first clip would
+  // otherwise exist only as a string inside the player script,
+  // reachable only by running it. As anchors they are nine real
+  // links, the player still intercepts a plain left click, and a
+  // reader with no JavaScript gets the file rather than a dead
+  // button.
+  const items = VIDEOS.map((clip, index) => `
+    <li>
+      <a class="dvitem${index === 0 ? ' is-on' : ''}" data-id="${clip.id}"
+         href="${escapeHtml(videoUrl(startLang, clip))}"
+         aria-current="${index === 0 ? 'true' : 'false'}">
+        <span class="dvnum">${String(clip.id).padStart(2, '0')}</span>
+        <span class="dvtext">
+          <b>${escapeHtml(clip.title[resolved])}</b>
+          <small>${escapeHtml(clip.blurb[resolved])}</small>
+        </span>
+        <span class="dvdur" dir="ltr">${formatDuration(clip.seconds)}</span>
+      </a>
+    </li>`).join('')
+
+  const first = VIDEOS[0]
+
+  return `
+    <section id="videos">
+      <span class="eyebrow">${escapeHtml(p.videosEyebrow)}</span>
+      <h2 class="section-title">${escapeHtml(p.videosTitle)}</h2>
+
+      <div class="dvhead">
+        <p class="dvlede">${escapeHtml(p.videoLede(VIDEOS.length, formatDuration(totalSeconds())))}</p>
+        <div class="dvlang">
+          <span class="dvlang-label">${escapeHtml(p.videoLangLabel)}</span>
+          <div class="seg" role="group" aria-label="${escapeHtml(p.videoLangLabel)}">${langButtons}</div>
+        </div>
+      </div>
+
+      <div class="dvplayer">
+        <div class="dvstage">
+          <video id="dvEl" controls preload="metadata" playsinline
+                 src="${escapeHtml(videoUrl(startLang, first) + POSTER_FRAGMENT)}"
+                 aria-describedby="dvTitle">
+            <p>${escapeHtml(p.videoNoSupport)}
+               <a id="dvDl" href="${escapeHtml(videoUrl(startLang, first))}">${escapeHtml(p.videoDownload)}</a></p>
+          </video>
+          <div class="dvnow">
+            <b id="dvTitle">${escapeHtml(first.title[resolved])}</b>
+            <small id="dvBlurb">${escapeHtml(first.blurb[resolved])}</small>
+            <span class="dvcount" id="dvCount">${escapeHtml(p.videoOf(1, VIDEOS.length))}</span>
+          </div>
+        </div>
+        <ol class="dvlist" id="dvList">${items}</ol>
+      </div>
+
+      <div class="panel dvnote">
+        <h3>${escapeHtml(p.videoNoteTitle)}</h3>
+        <p>${escapeHtml(p.videoNoteBody)}</p>
+      </div>
+    </section>`
+}
+
+
+// ==========================================
+// videoGraph
+// Every clip in this language, as structured data.
+//
+// One VideoObject per clip rather than one for the section, and
+// all nine declared in the markup whatever the player happens to
+// be showing - because a crawler runs no JavaScript and would
+// otherwise find a page with nine videos on it that declares
+// one.
+//
+// contentUrl is the file on the download host, absolute. That is
+// the field that decides whether a self-hosted clip can be
+// indexed at all: a video the crawler cannot fetch is not
+// indexed, whatever else the node says.
+// ==========================================
+function videoGraph(lang) {
+  const resolved = resolveLang(lang)
+  const clipLang = VIDEO_LANGS.indexOf(resolved) !== -1 ? resolved : 'en'
+
+  return VIDEOS.map(clip => videoObjectLd({
+    name: clip.title[resolved],
+    description: clip.blurb[resolved],
+    contentUrl: videoUrl(clipLang, clip),
+    lang: resolved,
+    uploadDate: VIDEOS_PUBLISHED,
+    durationSeconds: clip.seconds
+  })).filter(Boolean)
+}
+
+
+// ==========================================
+// videoScript
+// The player.
+//
+// Simpler than the DocSnap page's equivalent, because there is
+// nothing to resolve at runtime: every address is built on the
+// server by Content/DirectTmpVideos.js and handed over as a map,
+// so switching clip or language is a lookup rather than a guess
+// at a storage key.
+// ==========================================
+function videoScript(lang) {
+  const resolved = resolveLang(lang)
+  const p = pack(lang)
+  const startLang = VIDEO_LANGS.indexOf(resolved) !== -1 ? resolved : 'en'
+
+  const meta = {}
+  for (const clip of VIDEOS) {
+    meta[clip.id] = { t: clip.title[resolved], b: clip.blurb[resolved] }
+  }
+
+  return `<script>
+    (function () {
+      var URLS = ${JSON.stringify(urlMap())};
+      var META = ${JSON.stringify(meta)};
+      var IDS = ${JSON.stringify(VIDEOS.map(clip => clip.id))};
+      var OF = ${JSON.stringify(p.videoOf('__I__', '__N__'))};
+      var POSTER = ${JSON.stringify(POSTER_FRAGMENT)};
+
+      var video = document.getElementById('dvEl');
+      if (!video) return;
+
+      var list = document.getElementById('dvList');
+      var titleEl = document.getElementById('dvTitle');
+      var blurbEl = document.getElementById('dvBlurb');
+      var countEl = document.getElementById('dvCount');
+      var dlEl = document.getElementById('dvDl');
+
+      var vlang = ${JSON.stringify(startLang)};
+      var current = IDS[0];
+
+      // Loading a clip is a src swap plus load(), never a new
+      // video element. Replacing the element would throw away the
+      // volume and fullscreen the reader has already set, which
+      // on a nine-item playlist means re-muting eight times.
+      function select(id, autoplay) {
+        current = id;
+        var url = URLS[vlang][id];
+
+        video.src = url + POSTER;
+        video.load();
+        if (autoplay) {
+          var playing = video.play();
+          // Autoplay is refused by some configurations even after
+          // a click, and an unhandled rejection in the console is
+          // noise nobody needs.
+          if (playing && playing.catch) playing.catch(function () {});
+        }
+
+        if (titleEl) titleEl.textContent = META[id].t;
+        if (blurbEl) blurbEl.textContent = META[id].b;
+        if (dlEl) dlEl.href = url;
+        if (countEl) {
+          countEl.textContent = OF
+            .replace('__I__', String(IDS.indexOf(id) + 1))
+            .replace('__N__', String(IDS.length));
+        }
+
+        Array.prototype.forEach.call(list.querySelectorAll('.dvitem'), function (link) {
+          var on = Number(link.getAttribute('data-id')) === id;
+          link.classList.toggle('is-on', on);
+          link.setAttribute('aria-current', on ? 'true' : 'false');
+          // The href follows the clip language, so the link a
+          // reader copies is the clip they are looking at.
+          link.setAttribute('href', URLS[vlang][link.getAttribute('data-id')]);
+        });
+      }
+
+      Array.prototype.forEach.call(list.querySelectorAll('.dvitem'), function (link) {
+        link.addEventListener('click', function (event) {
+          // The href is real and is what a crawler and a reader
+          // without JavaScript follow. With the player running,
+          // staying on the page is the better answer - but only
+          // for a plain left click. A middle click or ctrl-click
+          // means "open the file separately" and is left alone.
+          if (event.defaultPrevented) return;
+          if (event.button !== 0 || event.metaKey || event.ctrlKey
+              || event.shiftKey || event.altKey) return;
+          event.preventDefault();
+          select(Number(link.getAttribute('data-id')), true);
+        });
+      });
+
+      // Switching the clip language keeps the clip you were on,
+      // because every clip exists in all three. Jumping back to
+      // the first one would punish exactly the person who is
+      // comparing one clip across two languages.
+      Array.prototype.forEach.call(document.querySelectorAll('[data-dvlang]'), function (button) {
+        button.addEventListener('click', function () {
+          var next = button.getAttribute('data-dvlang');
+          if (next === vlang) return;
+          vlang = next;
+          Array.prototype.forEach.call(document.querySelectorAll('[data-dvlang]'), function (other) {
+            other.setAttribute('aria-pressed', other === button ? 'true' : 'false');
+          });
+          select(current, false);
+        });
+      });
+    })();
+  </script>`
 }
 
 
@@ -1716,7 +2122,8 @@ function createPage(lang, theme) {
         tool: 'Unity Package Manager',
         steps: installSteps
       }),
-      faqPageLd(p.faq, resolved)
+      faqPageLd(p.faq, resolved),
+      ...videoGraph(resolved)
     ]
   })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1735,6 +2142,7 @@ function createPage(lang, theme) {
       ${renderSymptoms(resolved)}
       ${renderSpecimen(resolved)}
       ${renderFeatures(resolved)}
+      ${renderVideos(resolved)}
       ${renderUsage(resolved)}
       ${renderInstall(resolved)}
       ${renderLimits(resolved)}
@@ -1744,8 +2152,10 @@ function createPage(lang, theme) {
     </main>
     ${siteFooter({ lang: resolved })}
   </div>
+  ${siteBackToTop({ lang: resolved })}
   ${chromeScript()}
   ${copyUrlScript()}
+  ${videoScript(resolved)}
 </body>
 </html>`
 }

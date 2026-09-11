@@ -54,7 +54,14 @@ export const SECURITY = deepFreeze({
       "frame-ancestors 'none'",
       "form-action 'self'",
       "img-src 'self' data: https:",
-      "media-src 'self'",
+      // The DocSnap clips are served by this Worker out of R2, so
+      // they are 'self'. The DirectTMP clips are not: they sit on
+      // the download host, which is a different origin, and a
+      // cross-origin <video> is refused by this policy with no
+      // visible error - the element simply never loads and the
+      // page looks like the files are missing. Naming the host is
+      // what makes those nine clips play.
+      "media-src 'self' https://dl.amircollider.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' data: https://fonts.gstatic.com",
       "script-src 'self' 'unsafe-inline'",

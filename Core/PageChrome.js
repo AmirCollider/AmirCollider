@@ -78,6 +78,51 @@ export function chromeScript() {
         return false;
       };
 
+      // Back to top.
+      //
+      // The behaviour lives here rather than on each page because
+      // the button is the same button everywhere: siteBackToTop()
+      // in Core/SiteNav.js renders it and siteNavCss() styles it,
+      // so a page that wants one should not also have to carry
+      // twenty lines of scroll handling. Every branch is guarded on
+      // the element existing, so a page that renders no button is
+      // unaffected by this running.
+      //
+      // The markup arrives carrying [hidden] from the server, so a
+      // reader with no JavaScript never sees a control that cannot
+      // work; taking that off is the first thing done here.
+      //
+      // Kept in step with the same block in siteChromeScript()
+      // (Core/SiteNav.js). A page may load both scripts, and both
+      // doing the same harmless thing twice is fine - the listeners
+      // are idempotent - while the two DISAGREEING would be a
+      // button whose behaviour depends on script order.
+      var acTop = document.getElementById('acTopBtn');
+      if (acTop) {
+        acTop.hidden = false;
+        var acTicking = false;
+        var acSyncTop = function () {
+          acTicking = false;
+          var y = window.pageYOffset || document.documentElement.scrollTop || 0;
+          acTop.classList.toggle('is-on', y > 320);
+        };
+        window.addEventListener('scroll', function () {
+          if (acTicking) return;
+          acTicking = true;
+          window.requestAnimationFrame(acSyncTop);
+        }, { passive: true });
+        acTop.addEventListener('click', function () {
+          var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
+          // Focus goes back to where the page starts, so a keyboard
+          // reader lands at the top rather than staying parked on a
+          // button that has just scrolled out of sight.
+          var first = document.querySelector('.ac-brand') || document.body;
+          if (first && first.focus) first.focus({ preventScroll: true });
+        });
+        acSyncTop();
+      }
+
       acApplyThemeLabel();
     })();
   </script>`
