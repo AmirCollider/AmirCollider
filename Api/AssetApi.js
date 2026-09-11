@@ -6,6 +6,7 @@
 import { createJsonResponse } from '../Core/Http.js'
 import { escapeHtml } from '../Core/Html.js'
 import { parseCookies, resolveRequestLang } from '../Core/RequestContext.js'
+import { logWarning } from '../Core/Logging.js'
 
 /**
  * Fallbacks for when R2 has no contentType of its own.
@@ -43,6 +44,13 @@ const CONTENT_TYPES = {
  * itself.
  */
 const DEMO_PREFIX = 'demo/docsnap/'
+
+/**
+ * The largest page this will read into memory to add a link to. A
+ * DocSnap dashboard is tens of kilobytes; anything past this is
+ * something else, and it gets streamed untouched.
+ */
+const MAX_INJECT_BYTES = 4 * 1024 * 1024
 
 /**
  * The way back to this site, injected into a published DocSnap
@@ -169,6 +177,41 @@ function safeKey(key) {
 }
 
 
+
+/**
+ * The injection, and the only place allowed to fail.
+ *
+ * Returns the modified HTML, or null when it could not be done for
+ * any reason at all - too large to buffer, unreadable, not the
+ * shape we expected. A null is not an error the caller reports to
+ * the reader; it means "serve the file the old way".
+ */
+async function tryInject(object, url, request, key, requestId) {
+  try {
+    // A page bigger than this is not a page, and buffering it to
+    // add one link is a worse trade than not adding the link.
+    if (typeof object.size === 'number' && object.size > MAX_INJECT_BYTES) {
+      logWarning('Demo back bar skipped: page too large to buffer', { requestId, key, size: object.size })
+      return null
+    }
+
+    const html = await object.text()
+
+    // Exports from 1.0.4 onwards carry their own back link, filled
+    // in from ?home=. A second one over the top of it would be two
+    // ways out of the same page. The marker is the attribute that
+    // link is rendered with, so the check is exact rather than a
+    // guess at a version number.
+    if (html.includes('data-site-back')) { return null }
+
+    const lang = resolveRequestLang(url, request, parseCookies(request))
+    return injectBackBar(html, demoBackBar(lang))
+  } catch (error) {
+    logWarning('Demo back bar could not be added', { requestId, key, error: error.message })
+    return null
+  }
+}
+
 export async function handleAsset(url, request, gameId, requestId, GAMES, env) {
   const key = decodeKey(url.pathname.replace('/assets/', ''))
   if (!safeKey(key)) {
@@ -189,20 +232,27 @@ export async function handleAsset(url, request, gameId, requestId, GAMES, env) {
   const contentType = object.httpMetadata?.contentType || CONTENT_TYPES[extension] || 'application/octet-stream'
 
   // A page of the published demo gets a way back to this site put
-  // into it on the way out. Read as text rather than streamed,
-  // which is the cost of the feature and is bounded: this branch is
-  // HTML under one prefix, never the whole bucket.
+  // into it on the way out.
   //
-  // The guard matters. Exports from 1.0.4 onwards carry their own
-  // back link, filled in from ?home= - injecting a second bar over
-  // the top of it would be two ways out of the same page. The
-  // marker is the attribute that link is rendered with, so the
-  // check is exact rather than a guess at a version number.
+  // Everything about this branch is written so it cannot take the
+  // asset route down with it. Before this feature existed, /assets/
+  // did one thing: hand R2's stream to the client. It could not
+  // fail in a way that produced a 500. Adding a read, a parse and a
+  // string splice to that path added three ways it could - and the
+  // first thing the live site did was return
+  // "An unexpected error occurred" for the demo, which is the whole
+  // demo gone because of a decoration on it.
+  //
+  // So: the injection is attempted, and if ANY part of it does not
+  // work the object is served exactly as it would have been
+  // without the feature. The reader gets the demo. The failure goes
+  // to the log with the key that caused it, where `npx wrangler
+  // tail` will show it, because a fallback that hides the reason is
+  // how a bug survives a year.
   if (key.startsWith(DEMO_PREFIX) && contentType.startsWith('text/html')) {
-    const html = await object.text()
-    if (!html.includes('data-site-back')) {
-      const lang = resolveRequestLang(url, request, parseCookies(request))
-      return new Response(injectBackBar(html, demoBackBar(lang)), {
+    const injected = await tryInject(object, url, request, key, requestId)
+    if (injected !== null) {
+      return new Response(injected, {
         status: 200,
         headers: {
           'Content-Type': contentType,
@@ -213,6 +263,22 @@ export async function handleAsset(url, request, gameId, requestId, GAMES, env) {
         }
       })
     }
+
+    // The body may have been partly consumed by the attempt, so the
+    // object is fetched again rather than reused. One extra read of
+    // one file, only when something already went wrong.
+    const fresh = await bucket.get(key)
+    if (fresh) {
+      return new Response(fresh.body, {
+        status: 200,
+        headers: {
+          'Content-Type': contentType,
+          'Cache-Control': 'public, max-age=300',
+          'ETag': fresh.httpEtag
+        }
+      })
+    }
+    return createJsonResponse({ error: 'asset_not_found', message: `Asset "${key}" not found`, requestId }, 404)
   }
 
   return new Response(object.body, {

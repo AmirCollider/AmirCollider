@@ -24,7 +24,28 @@ export function parseCookies(request) {
   for (const part of header.split(';')) {
     const separator = part.indexOf('=')
     if (separator === -1) continue
-    cookies[part.slice(0, separator).trim()] = decodeURIComponent(part.slice(separator + 1).trim())
+
+    const name = part.slice(0, separator).trim()
+    const raw = part.slice(separator + 1).trim()
+
+    // decodeURIComponent throws URIError on a malformed percent
+    // sequence - a bare '%', a truncated '%2'. Cookies are not all
+    // ours: anything on this domain, now or three years ago, from
+    // an analytics script to something a browser extension wrote,
+    // sits in this header, and one of them containing a stray '%'
+    // must not be able to 500 a page.
+    //
+    // This is the same failure decodeKey() in Api/AssetApi.js was
+    // hardened against, for the same reason, and it is worth
+    // saying plainly: an undecodable value is kept as it arrived
+    // rather than dropped, because a theme or language cookie that
+    // reads slightly wrong is a preference ignored, while a throw
+    // here is the whole page gone.
+    try {
+      cookies[name] = decodeURIComponent(raw)
+    } catch {
+      cookies[name] = raw
+    }
   }
   return cookies
 }

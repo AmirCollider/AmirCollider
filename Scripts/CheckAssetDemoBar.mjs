@@ -117,5 +117,87 @@ ok('an empty segment is refused', r.status === 400, String(r.status))
 r = await get('/assets/demo/docsnap/9.9.9/missing.html')
 ok('a missing file is still a 404', r.status === 404, String(r.status))
 
+// ---- the feature must never be able to 500 the asset route ----
+//
+// Before the back bar existed, /assets/ did one thing: hand R2's
+// stream to the client. It could not fail in a way that produced a
+// 500. A read, a parse and a string splice added three ways it
+// could, and the live site found one of them within an hour: the
+// demo answered "An unexpected error occurred", which is the whole
+// demo gone because of a decoration on it.
+//
+// Each case below breaks the injection in a different place and
+// asserts the reader still gets the page.
+{
+  const HTML = '<html><body><aside class="ds-sidebar"></aside></body></html>'
+  const brokenEnvs = {
+    'text() throws': {
+      async get() {
+        return { body: HTML, httpEtag: '"e"', httpMetadata: { contentType: 'text/html' },
+                 async text() { throw new Error('stream exploded') } }
+      }
+    },
+    'text() returns nothing': {
+      async get() {
+        return { body: HTML, httpEtag: '"e"', httpMetadata: { contentType: 'text/html' },
+                 async text() { return null } }
+      }
+    },
+    'the object claims to be enormous': {
+      async get() {
+        return { body: HTML, size: 99 * 1024 * 1024, httpEtag: '"e"',
+                 httpMetadata: { contentType: 'text/html' }, async text() { return HTML } }
+      }
+    }
+  }
+
+  for (const [name, ASSETS] of Object.entries(brokenEnvs)) {
+    const u = new URL('https://amircollider.com/assets/demo/docsnap/1.0.3/index.html')
+    let res, body = ''
+    try {
+      res = await handleAsset(u, new Request(u), null, 'req', {}, { ASSETS })
+      body = await res.text()
+    } catch (e) {
+      res = { status: 'THREW: ' + e.message }
+    }
+    ok(`fails open when ${name}`, res.status === 200, String(res.status))
+    ok(`  and the reader still gets the page`, body.includes('ds-sidebar'), body.slice(0, 80))
+  }
+}
+
+// ---- the cookie that took the demo down ----
+//
+// This is what the live 500 was. decodeURIComponent throws URIError
+// on a malformed percent sequence, and parseCookies called it
+// unguarded. Any cookie on the domain is in that header - an
+// analytics value like "ga=100%", something an extension wrote,
+// something set three years ago - and one stray '%' was enough.
+//
+// /assets/ had never parsed cookies before the back bar needed the
+// reader's language, which is why this surfaced there first and
+// nowhere else. The guard is in parseCookies, so every page is
+// covered, not just this route.
+{
+  const HTML = '<html><body><aside class="ds-sidebar"></aside></body></html>'
+  const ASSETS = {
+    async get() {
+      return { body: HTML, httpEtag: '"e"', httpMetadata: { contentType: 'text/html' }, async text() { return HTML } }
+    }
+  }
+  const poison = ['ga=100%', 'x=%2', 'y=%E0%A4%A', 'z=%%', 'ok=fine; lang=fa; bad=50%']
+  for (const cookie of poison) {
+    const u = new URL('https://amircollider.com/assets/demo/docsnap/1.0.3/index.html')
+    let res, body = ''
+    try {
+      res = await handleAsset(u, new Request(u, { headers: { Cookie: cookie } }), null, 'req', {}, { ASSETS })
+      body = await res.text()
+    } catch (e) {
+      res = { status: 'THREW: ' + e.name }
+    }
+    ok(`a cookie of "${cookie}" does not break the demo`, res.status === 200, String(res.status))
+    ok(`  and the bar is still added`, body.includes('unity-docsnap'), body.slice(0, 80))
+  }
+}
+
 console.log('\nFAILURES: ' + fails)
 process.exit(fails ? 1 : 0)
