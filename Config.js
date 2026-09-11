@@ -392,7 +392,27 @@ export const CONFIG = deepFreeze({
     // this to '/assets/demo/docsnap/index.html'. Nested keys under
     // /assets/ are served (safeKey in Api/AssetApi.js), so the
     // export's own relative links keep working.
-    DEMO_URL: null
+    DEMO_URL: null,
+
+    // The share card: the picture that appears when this page's
+    // link is pasted into Instagram, Discord, X, Slack or an
+    // email.
+    //
+    // Without one, seoHead() falls back to DEFAULT_OG_IMAGE - the
+    // AmirCollider logo - which is the same square mark on every
+    // page of this site. So a link to a Unity editor extension
+    // and a link to a privacy policy produce an identical card,
+    // and the one moment a stranger decides whether to click is
+    // spent on a mark that says nothing about the product.
+    //
+    // 1200x630 is the size to make one at; it is what every
+    // scraper crops to, and it is NOT the 2:1 an OpenUPM listing
+    // wants - two different images for two different places.
+    //
+    // Null until the file is actually uploaded, because a card
+    // pointing at a 404 is worse than the logo: scrapers cache
+    // the miss and keep serving it.
+    CARD_URL: null
   },
 
   // Unity DirectTMP - free and MIT, so no checkout and no tiers.
@@ -402,7 +422,27 @@ export const CONFIG = deepFreeze({
   DIRECTTMP: {
     REPO_URL: 'https://github.com/AmirCollider/UnityDirectTMP',
     VERSION: '2.1.13',
-    GIT_URL: 'https://github.com/AmirCollider/UnityDirectTMP.git'
+    GIT_URL: 'https://github.com/AmirCollider/UnityDirectTMP.git',
+
+    // The share card: the picture that appears when this page's
+    // link is pasted into Instagram, Discord, X, Slack or an
+    // email.
+    //
+    // Without one, seoHead() falls back to DEFAULT_OG_IMAGE - the
+    // AmirCollider logo - which is the same square mark on every
+    // page of this site. So a link to a Unity editor extension
+    // and a link to a privacy policy produce an identical card,
+    // and the one moment a stranger decides whether to click is
+    // spent on a mark that says nothing about the product.
+    //
+    // 1200x630 is the size to make one at; it is what every
+    // scraper crops to, and it is NOT the 2:1 an OpenUPM listing
+    // wants - two different images for two different places.
+    //
+    // Null until the file is actually uploaded, because a card
+    // pointing at a 404 is worse than the logo: scrapers cache
+    // the miss and keep serving it.
+    CARD_URL: null
   },
 
   // The licence checkout. Every number here is a promise made to a
