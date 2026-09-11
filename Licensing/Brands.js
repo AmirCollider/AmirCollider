@@ -99,18 +99,32 @@ export async function saveBrand(database, keyHash, input) {
   const now = Date.now()
   const id = input.id && /^[a-z0-9-]{6,40}$/.test(input.id) ? input.id : newBrandId()
 
-  const name = clamp(input.name, 60) || 'Untitled'
-  const footerFa = clamp(input.footerFa, 120)
-  const footerEn = clamp(input.footerEn, 120)
-  const footerJa = clamp(input.footerJa, 120)
-  const footerUrl = safeUrl(input.footerUrl)
-
-  const lockMode = LOCK_MODES.includes(input.lockMode) ? input.lockMode : ''
-  const locked = Array.isArray(input.locked)
-    ? input.locked.filter(s => LOCKABLE_SECTIONS.includes(s))
-    : []
-
   const existing = await getBrand(database, keyHash, id)
+
+  // One rule for every field: `undefined` means "not being changed",
+  // anything else means "set it to this".
+  //
+  // It used to be one rule for the logo and another for the rest,
+  // and the rest lost. A save carrying only a new name wiped the lock
+  // mode and the list of locked sections, because a missing lockMode
+  // normalised to "" and a missing array normalised to []. The panel
+  // always sends every field so nothing looked wrong - but "a partial
+  // save silently unlocks the sections you locked" is the worst thing
+  // this file could do quietly, and it was one careless caller away.
+  const keep = (field, next, normalise) =>
+    next === undefined ? (existing ? existing[field] : normalise(undefined)) : normalise(next)
+
+  const name = keep('name', input.name, v => clamp(v, 60) || 'Untitled')
+  const footerFa = keep('footerFa', input.footerFa, v => clamp(v, 120))
+  const footerEn = keep('footerEn', input.footerEn, v => clamp(v, 120))
+  const footerJa = keep('footerJa', input.footerJa, v => clamp(v, 120))
+  const footerUrl = keep('footerUrl', input.footerUrl, safeUrl)
+
+  const lockMode = keep('lockMode', input.lockMode,
+    v => (LOCK_MODES.includes(v) ? v : ''))
+  const locked = keep('locked', input.locked,
+    v => (Array.isArray(v) ? v.filter(s => LOCKABLE_SECTIONS.includes(s)) : []))
+
   if (!existing) {
     const { n } = await database
       .prepare('SELECT COUNT(*) AS n FROM docsnap_brands WHERE key_hash = ?')
@@ -121,12 +135,10 @@ export async function saveBrand(database, keyHash, input) {
     }
   }
 
-  // A logo is replaced only when a new one was uploaded in
-  // this request. Leaving it out of a save must not wipe it -
-  // saving a footer change should not cost somebody their
-  // logo.
-  const logoKey = input.logoKey !== undefined ? input.logoKey : (existing ? existing.logoKey : null)
-  const logoType = input.logoType !== undefined ? input.logoType : (existing ? existing.logoType : null)
+  // The same rule, and the case it was originally written for: a
+  // save that carries no logo is a save about something else.
+  const logoKey = keep('logoKey', input.logoKey, v => v || null)
+  const logoType = keep('logoType', input.logoType, v => v || null)
 
   await database
     .prepare(`INSERT INTO docsnap_brands
