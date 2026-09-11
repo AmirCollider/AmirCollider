@@ -16,7 +16,10 @@ import { handleAsset } from '../Api/AssetApi.js'
 
 const store = new Map()
 const put = (key, body, contentType) => store.set(key, { body, contentType })
-put('demo/docsnap/1.0.3/index.html', '<html><body><h1>Demo</h1></body></html>', 'text/html; charset=utf-8')
+put('demo/docsnap/1.0.3/index.html',
+    '<html><body><div class="ds-shell"><aside class="ds-sidebar">\n<div class="ds-brand">LOGO</div></aside>'
+    + '<main class="ds-main"><h1>Demo</h1></main></div></body></html>', 'text/html; charset=utf-8')
+put('demo/docsnap/0.9.0/no-shell.html', '<html><body><p>old</p></body></html>', 'text/html; charset=utf-8')
 put('demo/docsnap/1.0.4/index.html', '<html><body><a data-site-back href="#">back</a></body></html>', 'text/html; charset=utf-8')
 put('demo/docsnap/1.0.3/theme/app.js', 'console.log(1)', null)          // no stored type
 put('demo/docsnap/1.0.3/theme/logo.png', 'PNGDATA', 'image/png')
@@ -49,7 +52,11 @@ let r = await get('/assets/demo/docsnap/1.0.3/index.html')
 let html = await r.text()
 ok('the 1.0.3 demo gets a back bar (default language is fa)',
    html.includes('\u0628\u0627\u0632\u06af\u0634\u062a \u0628\u0647 \u0633\u0627\u06cc\u062a') && html.includes('href="/unity-docsnap"'), html.slice(-220))
-ok('the bar is injected before </body>', html.indexOf('unity-docsnap') < html.indexOf('</body>'))
+ok('the bar goes INSIDE the sidebar, not floating over the page',
+   html.indexOf('unity-docsnap') > html.indexOf('<aside class="ds-sidebar">')
+   && html.indexOf('unity-docsnap') < html.indexOf('<div class="ds-brand">'), html)
+ok('it does not use position:fixed any more', !html.includes('position:fixed'), html)
+ok('it borrows the export\'s own theme tokens', html.includes('var(--border'), html)
 ok('the original content survives', html.includes('<h1>Demo</h1>'))
 ok('the injected page is not cached for a year', !r.headers.get('Cache-Control').includes('31536000'), r.headers.get('Cache-Control'))
 
@@ -57,8 +64,13 @@ r = await get('/assets/demo/docsnap/1.0.3/index.html', { 'Accept-Language': 'fa'
 html = await r.text()
 ok('Persian gets the Persian label and the unprefixed path',
    html.includes('بازگشت به سایت') && html.includes('href="/unity-docsnap"'), html.slice(-240))
-ok('the bar uses a logical inline start, not left',
-   html.includes('inset-inline-start') && !/;left:/.test(html.slice(-400)))
+// It sits in the sidebar's flow now, so it needs no positioning at
+// all - which is the point. What still matters is that nothing
+// physical crept in: a `left` or a `margin-left` on an element that
+// renders in both directions is the bug this placement removed.
+ok('no physical left/right anywhere in the injected markup',
+   !/(^|[;"\s])(left|right|margin-left|margin-right|padding-left|padding-right)\s*:/.test(html), html)
+ok('the chevron points back in Persian (right-to-left)', html.includes('\u203A'), html)
 
 r = await get('/assets/demo/docsnap/1.0.4/index.html')
 html = await r.text()
@@ -69,6 +81,12 @@ r = await get('/assets/demo/docsnap/1.0.3/index.html', { 'Accept-Language': 'en'
 html = await r.text()
 ok('English gets the English label and the /en/ path',
    html.includes('Back to the site') && html.includes('href="/en/unity-docsnap"'), html.slice(-220))
+ok('the chevron points back in English (left-to-right)', html.includes('\u2039'), html)
+
+r = await get('/assets/demo/docsnap/0.9.0/no-shell.html')
+html = await r.text()
+ok('an export with no recognised shell still gets a link, before </body>',
+   html.includes('unity-docsnap') && html.indexOf('unity-docsnap') < html.indexOf('</body>'), html)
 
 r = await get('/assets/demo/docsnap/1.0.3/theme/app.js')
 ok('a js file with no stored type is served as javascript',

@@ -45,21 +45,30 @@ const CONTENT_TYPES = {
 const DEMO_PREFIX = 'demo/docsnap/'
 
 /**
- * The bar injected at the top of every page of the published demo.
+ * The way back to this site, injected into a published DocSnap
+ * export.
  *
- * A visitor who opens the demo is inside a complete, self-contained
- * website with its own sidebar and its own navigation, and the
- * moment they click anything in it the site they came from is
- * several history entries back. They are not lost because the demo
- * is bad - they are lost because it is convincing. So the way home
- * travels with them, on every page.
+ * A visitor who opens the demo is inside a complete,
+ * self-contained website with its own sidebar and its own
+ * navigation, and the moment they click anything in it the site
+ * they came from is several history entries back. They are not
+ * lost because the demo is bad - they are lost because it is
+ * convincing. So the way home travels with them, on every page.
  *
- * No script, no external stylesheet, nothing loaded from anywhere:
- * one element with inline styles, which is why this needs no change
- * to the Content-Security-Policy. `position: fixed` with
- * `inset-inline-start` rather than `left`, because the export is
- * right-to-left in Persian and a bar pinned to the left edge would
- * sit over its sidebar there.
+ * It goes INSIDE the export's sidebar, at the top, in exactly the
+ * place an export from 1.0.4 onwards puts its own back link. The
+ * first version of this floated a dark pill over the top-left
+ * corner with position:fixed, and on a right-to-left export that
+ * corner is where the sidebar's logo and title are: the pill
+ * landed on top of the brand and looked like a rendering fault.
+ * A link that belongs to the page beats one that hovers over it,
+ * and this way the 1.0.3 demo and a 1.0.4 export look the same.
+ *
+ * Styled with the export's OWN CSS variables, so it inherits
+ * whichever of the four themes and two skins the reader has
+ * chosen rather than fighting them. No script, no external
+ * stylesheet, nothing loaded from anywhere - which is why this
+ * needs no change to the Content-Security-Policy.
  */
 function demoBackBar(lang) {
   const label = lang === 'fa'
@@ -68,20 +77,47 @@ function demoBackBar(lang) {
       ? 'サイトに戻る'
       : 'Back to the site'
   const note = lang === 'fa'
-    ? 'نمونه‌ی خروجی Unity DocSnap'
+    ? 'این یک نمونه‌ی خروجی Unity DocSnap است'
     : lang === 'ja'
-      ? 'Unity DocSnap の出力サンプル'
-      : 'A sample Unity DocSnap export'
+      ? 'これは Unity DocSnap の出力サンプルです'
+      : 'This is a sample Unity DocSnap export'
 
   const href = lang === 'fa' ? '/unity-docsnap' : `/${lang}/unity-docsnap`
-  const box = 'position:fixed;z-index:2147483647;inset-block-start:10px;inset-inline-start:10px;'
-    + 'display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:10px;'
-    + 'background:rgba(17,17,24,0.92);color:#fff;font:600 13px/1.2 system-ui,sans-serif;'
-    + 'text-decoration:none;box-shadow:0 6px 20px rgba(0,0,0,0.35);backdrop-filter:blur(6px);'
+
+  // var() with a fallback, because this markup is injected into an
+  // export built by a version of the tool that may predate any of
+  // these tokens.
+  const box = 'display:flex;align-items:center;gap:6px;margin:0 0 10px;padding:5px 9px;'
+    + 'border:1px solid var(--border,rgba(128,128,160,0.25));border-radius:var(--radius-sm,7px);'
+    + 'color:var(--text-dim,#9aa);font:600 12px/1.35 inherit;text-decoration:none;'
+
+  // The chevron points the way the reader's language reads, so it
+  // means "back" in both directions instead of pointing into the
+  // page on a right-to-left one.
+  const arrow = lang === 'fa' ? '\u203A' : '\u2039'
 
   return `<a href="${escapeHtml(href)}" style="${box}" title="${escapeHtml(note)}">`
-    + `<span style="font-size:15px;line-height:1;">\u2039</span>`
+    + `<span style="font-size:14px;line-height:1;" aria-hidden="true">${arrow}</span>`
     + `<span>${escapeHtml(label)}</span></a>`
+}
+
+/**
+ * Where the bar goes.
+ *
+ * Inside the sidebar when there is one - which is every DocSnap
+ * export, and is the placement that looks deliberate. Before
+ * </body> only as a fallback, for an export whose shell this does
+ * not recognise; there it is a plain link at the end of the
+ * document rather than a pill over the content, because a
+ * fallback that misplaces itself is worse than a plain one.
+ */
+function injectBackBar(html, bar) {
+  const sidebar = html.indexOf('<aside class="ds-sidebar">')
+  if (sidebar >= 0) {
+    const at = html.indexOf('>', sidebar) + 1
+    return html.slice(0, at) + bar + html.slice(at)
+  }
+  return html.includes('</body>') ? html.replace('</body>', `${bar}</body>`) : html + bar
 }
 
 /**
@@ -166,11 +202,7 @@ export async function handleAsset(url, request, gameId, requestId, GAMES, env) {
     const html = await object.text()
     if (!html.includes('data-site-back')) {
       const lang = resolveRequestLang(url, request, parseCookies(request))
-      const bar = demoBackBar(lang)
-      const withBar = html.includes('</body>')
-        ? html.replace('</body>', `${bar}</body>`)
-        : html + bar
-      return new Response(withBar, {
+      return new Response(injectBackBar(html, demoBackBar(lang)), {
         status: 200,
         headers: {
           'Content-Type': contentType,
