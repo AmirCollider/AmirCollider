@@ -2095,6 +2095,12 @@ function createPage(lang, theme) {
     lang: resolved,
     type: 'product',
     keywords: KEYWORDS[resolved] || KEYWORDS.en,
+    // The share card, when one has been uploaded. Omitting the key
+    // entirely (rather than passing null) is what lets seoHead keep
+    // its own default: a null would override the fallback with
+    // nothing and emit an empty og:image, which is worse than the
+    // logo. See CARD_URL in Config.js.
+    ...(CONFIG.DIRECTTMP.CARD_URL ? { image: CONFIG.DIRECTTMP.CARD_URL } : {}),
     graph: [
       breadcrumbLd(trail, resolved),
       softwareApplicationLd({
