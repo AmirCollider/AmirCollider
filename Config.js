@@ -392,7 +392,7 @@ export const CONFIG = deepFreeze({
     // this to '/assets/demo/docsnap/index.html'. Nested keys under
     // /assets/ are served (safeKey in Api/AssetApi.js), so the
     // export's own relative links keep working.
-    DEMO_URL: null,
+    DEMO_URL: '/assets/demo/docsnap/1.0.3/index.html',
 
     // The share card: the picture that appears when this page's
     // link is pasted into Instagram, Discord, X, Slack or an
@@ -412,7 +412,7 @@ export const CONFIG = deepFreeze({
     // Null until the file is actually uploaded, because a card
     // pointing at a 404 is worse than the logo: scrapers cache
     // the miss and keep serving it.
-    CARD_URL: null
+    CARD_URL: 'https://dl.amircollider.com/cards/docsnap.png'
   },
 
   // Unity DirectTMP - free and MIT, so no checkout and no tiers.
@@ -442,7 +442,7 @@ export const CONFIG = deepFreeze({
     // Null until the file is actually uploaded, because a card
     // pointing at a 404 is worse than the logo: scrapers cache
     // the miss and keep serving it.
-    CARD_URL: null
+    CARD_URL: 'https://dl.amircollider.com/cards/directtmp.png'
   },
 
   // The licence checkout. Every number here is a promise made to a
