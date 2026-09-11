@@ -394,6 +394,29 @@ export const CONFIG = deepFreeze({
     // export's own relative links keep working.
     DEMO_URL: '/assets/demo/docsnap/1.0.3/index.html',
 
+    // Whether the published demo has had its file copies removed.
+    //
+    // The export linked above is a real one, taken from a real
+    // project - which is what makes it worth linking. But two of
+    // the things a Pro export produces are the project's own
+    // bytes: `source-files/` and the whole-project .unitypackage.
+    // Publishing those publishes the source of the project the
+    // demo was made from, which is not a trade worth making for a
+    // demo.
+    //
+    // So they are deleted from the uploaded copy, and this flag
+    // makes the page SAY that they were - because a reader who
+    // clicks into an export, looks for the file copies the pricing
+    // table promised, and finds nothing has been told something
+    // untrue about the product. An absence nobody explains reads
+    // as a feature that does not work.
+    //
+    // The real fix is to stop having anything to hide: build a
+    // small demo project made for this purpose, export it whole,
+    // and publish all of it. When that replaces this export, set
+    // this to false and the caveat disappears on its own.
+    DEMO_PARTIAL: false,
+
     // The share card: the picture that appears when this page's
     // link is pasted into Instagram, Discord, X, Slack or an
     // email.
