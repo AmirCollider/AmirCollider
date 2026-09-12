@@ -364,7 +364,7 @@ export const CONFIG = deepFreeze({
     // link to the repository and let somebody work it out.
     GIT_URL: 'https://github.com/AmirCollider/UnityDocSnap.git',
 
-    VERSION: '1.0.3',
+    VERSION: '1.0.4',
     TIERS: {
       plus: { name: 'Plus', price: '19.99', buyUrl: '/checkout?tier=plus' },
       pro: { name: 'Pro', price: '49.99', buyUrl: '/checkout?tier=pro' }
