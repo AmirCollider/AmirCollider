@@ -12,6 +12,9 @@
 // or the real bucket.
 // ==========================================
 
+import { installHtmlRewriterShim } from './HtmlRewriterShim.mjs'
+installHtmlRewriterShim()
+
 import { handleAsset } from '../Api/AssetApi.js'
 
 const store = new Map()
@@ -158,12 +161,14 @@ ok('a demo image is served untouched', r.headers.get('Content-Type') === 'image/
   h = await (await get(entry, { Cookie: 'lang=en; theme=light' })).res.text()
   ok('a different reader gets their own', /lang="en"/.test(h) && /dir="ltr"/.test(h) && /data-theme="light"/.test(h), h.slice(0, 140))
 
-  // Inside the demo there is no ?home=, and the reader's own
-  // choices there must not be overruled on every click.
+  // Inside the demo there is no ?home=, and the reader gets the
+  // same page anyway. Adopting on arrival ALONE was the second
+  // half of the theme-flipping report: the first click fetched a
+  // page nobody had touched.
   h = await (await get('/assets/demo/docsnap/1.0.3/index.html', { Cookie: 'lang=fa; theme=dark' })).res.text()
-  ok('navigating INSIDE the demo does not overrule its own switcher',
-     /lang="ja"/.test(h) && /data-theme="light"/.test(h), h.slice(0, 140))
-  ok('  but the way out is still there', h.includes('unity-docsnap'))
+  ok('a page reached by clicking inside the demo gets it too',
+     /<html[^>]*lang="fa"/.test(h) && /<html[^>]*data-theme="dark"/.test(h), h.slice(0, 200))
+  ok('  and the way out is still there', h.includes('unity-docsnap'))
 }
 
 r = await get('/assets/contact/2026-01-01/photo.png')
@@ -320,19 +325,40 @@ ok('a missing file is still a 404', r.status === 404, String(r.status))
     ok(label + ': takes the site language', attr(html, 'lang') === 'fa', String(attr(html, 'lang')))
     ok(label + ': takes the direction with it', attr(html, 'dir') === 'rtl', String(attr(html, 'dir')))
     ok(label + ': takes the site theme', attr(html, 'data-theme') === 'dark', String(attr(html, 'data-theme')))
-    // THE invariant. The two halves of the export read different
-    // places; if they disagree the demo's own switchers stop
-    // surviving a click.
-    ok(label + ': the baked constant agrees with the tag (language)',
-       global(html, '__DOCSNAP_LANG__') === attr(html, 'lang'),
-       global(html, '__DOCSNAP_LANG__') + ' vs ' + attr(html, 'lang'))
-    ok(label + ': the baked constant agrees with the tag (theme)',
-       global(html, '__DOCSNAP_THEME__') === attr(html, 'data-theme'),
-       global(html, '__DOCSNAP_THEME__') + ' vs ' + attr(html, 'data-theme'))
+    // THE invariant, and the reason the injected script exists at
+    // all. The export reads its appearance from two places that
+    // must agree: its pre-paint script reads the attributes on
+    // the html element, app.js reads the two baked constants and
+    // writes the marker that same script checks. Change one and
+    // not the other and the marker can never match, and every
+    // choice the reader makes with the demo's OWN switchers is
+    // thrown away on their next click.
+    //
+    // The markup is no longer rewritten for this - the page is
+    // streamed, so nothing reads it - and a script at the end of
+    // the body sets the two constants instead. What is asserted
+    // is therefore: the script is there, it carries the same
+    // values as the tag, and it is positioned where it wins.
+    const injected = html.slice(html.lastIndexOf('<script>(function(){'))
+    ok(label + ': the preference script is injected', injected.startsWith('<script>(function(){'), 'not found')
+    ok(label + ': it carries the same language as the tag',
+       injected.includes('var w="' + attr(html, 'lang') + '"'), injected.slice(0, 90))
+    ok(label + ': it carries the same theme as the tag',
+       injected.includes(',t="' + attr(html, 'data-theme') + '"'), injected.slice(0, 90))
+    ok(label + ': it runs AFTER the export writes its own constants',
+       html.lastIndexOf('<script>(function(){') > html.indexOf('window.__DOCSNAP_EXPORT__'),
+       'injected too early - the export would overwrite it')
+    ok(label + ': it is not deferred, so it runs before app.js',
+       !/<script[^>]+defer[^>]*>\(function\(\)\{/.test(html))
+
+    // Nothing in the export's own markup is touched any more.
     ok(label + ': the export stamp is left alone', html.includes('"stamp-9"'))
     ok(label + ': the language registry is left alone',
        html.includes('window.__DOCSNAP_LANGS__=["en","ja","fa"]'), 'the array constant was rewritten')
     ok(label + ': the skin is left alone', global(html, '__DOCSNAP_SKIN__') === 'lite')
+    ok(label + ': the export\'s own constants are not rewritten',
+       global(html, '__DOCSNAP_LANG__') === 'en' && global(html, '__DOCSNAP_THEME__') === 'light',
+       'the markup was edited after all')
   }
 
   // Two pages of one visit must come out identical, or the marker
@@ -358,16 +384,22 @@ ok('a missing file is still a 404', r.status === 404, String(r.status))
     ok('  while the language is still adopted', attr(html, 'lang') === 'fa', String(attr(html, 'lang')))
   }
 
-  // A language this export does not carry is not forced onto it -
-  // every visible string in that page would stay English with the
-  // document claiming otherwise, which is worse than leaving it.
+  // A language this export does not carry must not be forced onto
+  // it - every visible string would stay English with the
+  // document claiming otherwise. Only the PAGE knows which
+  // languages its export has, so the check moved into the
+  // injected script, which puts the export's own language back.
   {
     put('demo/docsnap/1.0.4/en-only.html',
         shell('en', 'light').replace('["en","ja","fa"]', '["en"]'),
         'text/html; charset=utf-8')
     const html = await (await get('/assets/demo/docsnap/1.0.4/en-only.html', { Cookie: 'lang=fa; theme=dark' })).text()
-    ok('a language the export does not have is left alone', attr(html, 'lang') === 'en', String(attr(html, 'lang')))
-    ok('  but the theme is still adopted', attr(html, 'data-theme') === 'dark', String(attr(html, 'data-theme')))
+    const injected = html.slice(html.lastIndexOf('<script>(function(){'))
+    ok('the injected script checks the export\'s own language list',
+       injected.includes('window.__DOCSNAP_LANGS__') && injected.includes('indexOf(w)<0'), injected.slice(0, 120))
+    ok('  and puts the export\'s own language back when it has to',
+       injected.includes('d.setAttribute("lang",baked)'), injected.slice(0, 160))
+    ok('  the theme is still adopted', attr(html, 'data-theme') === 'dark', String(attr(html, 'data-theme')))
     ok('  and the bar is still in the reader\'s language',
        html.includes('\u0628\u0627\u0632\u06af\u0634\u062a \u0628\u0647 \u0633\u0627\u06cc\u062a'), 'bar not in Persian')
   }
@@ -377,7 +409,13 @@ ok('a missing file is still a 404', r.status === 404, String(r.status))
     const r = await get('/assets/demo/docsnap/0.8.0/old.html', { Cookie: 'lang=fa; theme=dark' })
     const html = await r.text()
     ok('a page with no baked constants still gets the tag rewritten', attr(html, 'lang') === 'fa', String(attr(html, 'lang')))
-    ok('  and no constant is invented for it', !html.includes('__DOCSNAP_LANG__'), 'an assignment was added')
+    // The injected script is written for an export that HAS
+    // those constants and is harmless on one that does not: it
+    // assigns two globals nothing will read. What it must not do
+    // is throw, which would take the rest of the page's scripts
+    // with it.
+    ok('  the injected script is still there and cannot throw',
+       html.includes('window.__DOCSNAP_LANGS__') && html.includes('||[]'), html.slice(-200))
     ok('  and it still gets a way back to the site', html.includes('unity-docsnap'))
   }
 
@@ -439,6 +477,82 @@ ok('a missing file is still a 404', r.status === 404, String(r.status))
     const again = await get('/assets/AmirColliderLogo.png', { 'If-None-Match': first.headers.get('ETag') })
     ok('and a replaceable asset still answers 304 when unchanged', again.status === 304, String(again.status))
   }
+}
+
+
+// ==========================================
+// The page that is too big — the bug this was rewritten for
+//
+// This used to read the whole page into a string to add a link
+// to it, with a 4 MB cap above which it gave up and served the
+// export untouched. A DocSnap Assets page listing a real Unity
+// project - every file, with its import settings, its shader
+// properties, its Prefab contents - is megabytes of HTML.
+//
+// So on that ONE page the reader got an export nobody had
+// touched: its own baked theme instead of theirs, and no way
+// back to the site. Every other page in the same demo behaved,
+// which is exactly what made it look like a caching fault and
+// not a size limit.
+//
+// HTMLRewriter streams, so there is no page too large. The
+// fixture below is deliberately past the old cap.
+// ==========================================
+{
+  const rows = []
+  for (let i = 0; i < 60000; i++) {
+    rows.push('<li class="ds-file"><span>Assets/Art/Textures/tex_' + i + '.png</span>'
+      + '<span>2048x2048 · sRGB · mipmaps</span></li>')
+  }
+  const huge = '<!doctype html>\n<html lang="en" dir="ltr" data-theme="light" data-skin="lite" data-export="stamp-big">'
+    + '<head></head><body><div class="ds-shell"><aside class="ds-sidebar"></aside>'
+    + '<main class="ds-main"><ul>' + rows.join('') + '</ul></main></div>'
+    + '<script>window.__DOCSNAP_LANG__="en";window.__DOCSNAP_LANGS__=["en","ja","fa"];'
+    + 'window.__DOCSNAP_THEME__="light";window.__DOCSNAP_EXPORT__="stamp-big";<\/script>'
+    + '</body></html>'
+
+  put('demo/docsnap/1.0.4/assets/Assets.html', huge, 'text/html; charset=utf-8')
+  ok('the fixture is past the cap that used to give up',
+     huge.length > 4 * 1024 * 1024, (huge.length / 1024 / 1024).toFixed(1) + ' MB')
+
+  const r = await get('/assets/demo/docsnap/1.0.4/assets/Assets.html', { Cookie: 'lang=fa; theme=dark' })
+  const html = await r.text()
+  ok('a multi-megabyte Assets page still answers 200', r.status === 200, String(r.status))
+  ok('  and takes the reader\'s language', /<html[^>]*lang="fa"/.test(html), html.slice(0, 160))
+  ok('  and their direction', /<html[^>]*dir="rtl"/.test(html), html.slice(0, 160))
+  ok('  and their theme - this is the one that was reported',
+     /<html[^>]*data-theme="dark"/.test(html), html.slice(0, 160))
+  ok('  and gets a way back to the site',
+     html.includes('\u0628\u0627\u0632\u06af\u0634\u062a \u0628\u0647 \u0633\u0627\u06cc\u062a'), 'no bar')
+  ok('  and the preference script', html.includes('var w="fa",t="dark"'), html.slice(-260))
+  ok('  and every one of its rows survived intact',
+     html.includes('tex_0.png') && html.includes('tex_59999.png')
+     && html.split('ds-file').length - 1 === 60000, 'rows lost in the rewrite')
+  ok('  and it is still cached per reader', (r.headers.get('Vary') || '').includes('Cookie'),
+     String(r.headers.get('Vary')))
+}
+
+
+// ==========================================
+// A runtime with no HTMLRewriter still serves the demo
+//
+// It is part of the Workers runtime and will be there. What must
+// never happen is that its absence - or any failure setting the
+// rewrite up - turns a demo page into a 500. A page nobody could
+// rewrite is still a page; a page nobody could serve is a broken
+// link on the product page.
+// ==========================================
+{
+  const real = globalThis.HTMLRewriter
+  delete globalThis.HTMLRewriter
+  const r = await get('/assets/demo/docsnap/1.0.4/index.html', { Cookie: 'lang=fa; theme=dark' })
+  const html = await r.text()
+  globalThis.HTMLRewriter = real
+
+  ok('with no HTMLRewriter the page is still served', r.status === 200, String(r.status))
+  ok('  untouched rather than half-rewritten',
+     html.includes('<h1>Demo</h1>') || html.includes('ds-sidebar'), html.slice(0, 120))
+  ok('  and it is not a 500', r.status !== 500)
 }
 
 

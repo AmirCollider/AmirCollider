@@ -47,12 +47,6 @@ const CONTENT_TYPES = {
  */
 const DEMO_PREFIX = 'demo/docsnap/'
 
-/**
- * The largest page this will read into memory to add a link to. A
- * DocSnap dashboard is tens of kilobytes; anything past this is
- * something else, and it gets streamed untouched.
- */
-const MAX_INJECT_BYTES = 4 * 1024 * 1024
 
 /**
  * The way back to this site, injected into a published DocSnap
@@ -112,22 +106,111 @@ function demoBackBar(lang) {
 }
 
 /**
- * Where the bar goes.
+ * The script that hands the export the reader's preferences.
  *
- * Inside the sidebar when there is one - which is every DocSnap
- * export, and is the placement that looks deliberate. Before
- * </body> only as a fallback, for an export whose shell this does
- * not recognise; there it is a plain link at the end of the
- * document rather than a pill over the content, because a
- * fallback that misplaces itself is worse than a plain one.
+ * It is a plain inline script at the very end of the body, and
+ * both of those are load-bearing:
+ *
+ *   at the end   the export writes window.__DOCSNAP_LANG__ and
+ *                window.__DOCSNAP_THEME__ in a script near the
+ *                end of its own body. Anything injected earlier
+ *                would be overwritten by it.
+ *
+ *   plain        app.js is deferred, so it runs after the
+ *                document is parsed. A non-deferred script
+ *                anywhere in the body runs BEFORE it. So this
+ *                always wins, and app.js reads the values it
+ *                leaves.
+ *
+ * Why it matters at all: the export decides what to show in two
+ * places that must agree. Its pre-paint script reads the
+ * attributes on the html element; app.js reads these two
+ * constants and writes the marker that same script checks. Change
+ * one and not the other and the marker can never match, and every
+ * choice the reader makes with the demo's OWN switchers is
+ * discarded on their next click.
+ *
+ * The language check is done here rather than on the server
+ * because only the page knows which languages its export carries.
+ * An export that does not have the reader's language gets its own
+ * back, attributes included.
  */
-function injectBackBar(html, bar) {
-  const sidebar = html.indexOf('<aside class="ds-sidebar">')
-  if (sidebar >= 0) {
-    const at = html.indexOf('>', sidebar) + 1
-    return html.slice(0, at) + bar + html.slice(at)
-  }
-  return html.includes('</body>') ? html.replace('</body>', `${bar}</body>`) : html + bar
+function demoPreferenceScript(lang, theme) {
+  const want = JSON.stringify(lang)
+  const wanted = JSON.stringify(theme === 'light' || theme === 'dark' ? theme : '')
+  return '<script>(function(){'
+    + 'var w=' + want + ',t=' + wanted + ';'
+    + 'var d=document.documentElement;'
+    + 'var L=window.__DOCSNAP_LANGS__,baked=window.__DOCSNAP_LANG__;'
+    + 'if(L&&L.indexOf&&L.indexOf(w)<0){'
+    + 'if(baked){d.setAttribute("lang",baked);'
+    + 'd.setAttribute("dir",(window.__DOCSNAP_RTL__||[]).indexOf(baked)>=0?"rtl":"ltr");}'
+    + '}else{window.__DOCSNAP_LANG__=w;}'
+    + 'if(t){window.__DOCSNAP_THEME__=t;}'
+    + '})();<\/script>'
+}
+
+
+/**
+ * Everything this site changes on a demo page, as a streaming
+ * pass over the bytes rather than a string in memory.
+ *
+ * This used to read the whole page with object.text(), rewrite it
+ * with regular expressions and serve the result, with a size cap
+ * above which it gave up and served the file untouched. The cap
+ * was the bug: an Assets page listing a real project's files is
+ * megabytes of HTML, so on that ONE page the reader got an
+ * export nobody had touched - its own baked theme instead of
+ * theirs, and no way back to the site. Every other page in the
+ * same demo behaved, which is exactly what made it look like a
+ * caching fault.
+ *
+ * HTMLRewriter is Cloudflare's own parser and it streams: nothing
+ * is buffered, there is no page too large, and the cost does not
+ * grow with the file. It needs no dependency - it is part of the
+ * runtime - so rule 7 is untouched.
+ *
+ *   html                the reader's language, direction and
+ *                       theme, before the export's pre-paint
+ *                       script reads them
+ *   a[data-site-back]   the export's own back link, removed so
+ *                       there is exactly one and it is this
+ *                       site's. An export from 1.0.4 fills that
+ *                       link in from ?home= using app.js, and a
+ *                       browser holding an older cached app.js
+ *                       leaves it hidden forever.
+ *   aside.ds-sidebar    where the bar goes, at the top, in the
+ *                       place the export puts its own
+ *   body (end tag)      the preference script, and the bar too if
+ *                       this export has no sidebar to put it in
+ */
+function demoRewriter(lang, theme) {
+  const bar = demoBackBar(lang)
+  const script = demoPreferenceScript(lang, theme)
+  let placed = false
+
+  return new HTMLRewriter()
+    .on('html', {
+      element(element) {
+        element.setAttribute('lang', lang)
+        element.setAttribute('dir', dirFor(lang))
+        if (theme === 'light' || theme === 'dark') { element.setAttribute('data-theme', theme) }
+      }
+    })
+    .on('a[data-site-back]', {
+      element(element) { element.remove() }
+    })
+    .on('aside.ds-sidebar', {
+      element(element) { placed = true; element.prepend(bar, { html: true }) }
+    })
+    .on('body', {
+      element(element) {
+        element.onEndTag(end => {
+          if (!placed) { end.before(bar, { html: true }) }
+          end.before(script, { html: true })
+        })
+      }
+    })
 }
 
 /**
@@ -223,7 +306,7 @@ function weakEtag(objectEtag, lang, theme) {
  * a cached copy of the old bar gets the new one rather than
  * revalidating into it forever.
  */
-const BAR_VERSION = 3
+const BAR_VERSION = 4
 
 function matchesEtag(request, etag) {
   const header = request && request.headers ? request.headers.get('If-None-Match') : null
@@ -240,167 +323,19 @@ function notModified(etag, headers) {
 }
 
 /**
- * Everything this site changes on its way out of a demo page, and
- * the only place allowed to fail.
+ * The reader's preferences, as this request carries them.
  *
- * Returns { html, lang, theme }, or null when it could not be done
- * for any reason at all. A null is not an error the caller reports
- * to the reader; it means "serve the file the old way".
+ * Kept in one place because the ETag has to be built from exactly
+ * the same two values the page is built from - otherwise a reader
+ * revalidates their way into the page built for somebody else's
+ * language.
  */
-async function tryInject(object, url, request, key, requestId) {
-  try {
-    // A page bigger than this is not a page, and buffering it to
-    // add one link is a worse trade than not adding the link.
-    if (typeof object.size === 'number' && object.size > MAX_INJECT_BYTES) {
-      logWarning('Demo back bar skipped: page too large to buffer', { requestId, key, size: object.size })
-      return null
-    }
-
-    const html = await object.text()
-    if (typeof html !== 'string' || !html) { return null }
-
-    const cookies = parseCookies(request)
-    const lang = resolveLang(resolveRequestLang(url, request, cookies))
-    const theme = resolveRequestTheme(cookies)
-
-    // On EVERY page of the demo, not only the one the reader
-    // arrived on. Doing it on arrival alone was the second half
-    // of the theme-flipping report: the first click inside the
-    // demo fetched a page nobody had rewritten, and the reader
-    // went from the dark Persian page they arrived on to the
-    // export's own light English one.
-    //
-    // Why this does not overrule the demo's own switchers is
-    // adoptSitePreferences' whole subject - read the note there.
-    const out = injectBackBar(stripExportBackLink(adoptSitePreferences(html, lang, theme)), demoBackBar(lang))
-    return { html: out, lang, theme: theme || 'auto' }
-  } catch (error) {
-    logWarning('Demo back bar could not be added', { requestId, key, error: error.message })
-    return null
+function demoPreferences(url, request) {
+  const cookies = parseCookies(request)
+  return {
+    lang: resolveLang(resolveRequestLang(url, request, cookies)),
+    theme: resolveRequestTheme(cookies)
   }
-}
-
-
-/**
- * Opens the demo the way the reader was already reading the site -
- * and keeps it that way as they click through it, without taking
- * the demo's own language and theme switchers away from them.
- *
- * Somebody browsing in Persian on a dark page who clicks "see a
- * real export" and lands on a light English one has been handed a
- * different product. So the export's baked defaults are replaced
- * with the reader's.
- *
- * ---------------------------------------------------------------
- * WHY IT REWRITES THE TWO SCRIPT CONSTANTS AS WELL AS THE TAG
- * ---------------------------------------------------------------
- * This is the part that took a bug report to get right, so it is
- * written down. The export decides what to show in three steps:
- *
- *   1. A pre-paint script reads lang and data-theme OFF THE HTML
- *      ELEMENT, and restores the reader's saved choice only when
- *      localStorage holds the marker "<stamp>|<that lang>|<that
- *      theme>".
- *   2. app.js reads window.__DOCSNAP_LANG__ and
- *      window.__DOCSNAP_THEME__ - the values BAKED INTO THE BODY,
- *      which step 1 never touches - and writes that marker.
- *   3. The switchers write the reader's choice beside it.
- *
- * Rewriting only the html element makes 1 and 2 disagree forever:
- * the marker app.js writes can never match the marker the boot
- * script computes, so every saved choice is discarded on every
- * page and the demo's own switchers stop surviving a click.
- *
- * Rewriting both makes the site's preference look exactly like an
- * export whose defaults were those values. Then the marker
- * matches, and the order of precedence comes out right on its own:
- * the reader's choice inside the demo beats the site's cookie,
- * which beats the export's baked default.
- *
- * The values must be the SAME on every page of one visit or the
- * marker breaks again - they come from a cookie and an
- * Accept-Language header, so they are.
- */
-function adoptSitePreferences(html, lang, theme) {
-  // Only a language this export actually carries. The list is
-  // baked into the page; if it is not there, this is not a page
-  // built by a version that knows about languages at all, and the
-  // safe answer is to leave the language alone.
-  const known = html.match(/window\.__DOCSNAP_LANGS__\s*=\s*(\[[^\]]*\])/)
-  let useLang = lang
-  if (known) {
-    try {
-      const codes = JSON.parse(known[1])
-      if (!Array.isArray(codes) || !codes.includes(lang)) { useLang = null }
-    } catch { useLang = null }
-  }
-
-  const useTheme = theme === 'light' || theme === 'dark' ? theme : null
-
-  let out = html
-  const open = out.indexOf('<html')
-  if (open >= 0) {
-    const close = out.indexOf('>', open)
-    if (close >= 0) {
-      let tag = out.slice(open, close)
-      if (useLang) {
-        tag = setAttr(tag, 'lang', useLang)
-        tag = setAttr(tag, 'dir', dirFor(useLang))
-      }
-      if (useTheme) { tag = setAttr(tag, 'data-theme', useTheme) }
-      out = out.slice(0, open) + tag + out.slice(close)
-    }
-  }
-
-  if (useLang) { out = setGlobal(out, '__DOCSNAP_LANG__', useLang) }
-  if (useTheme) { out = setGlobal(out, '__DOCSNAP_THEME__', useTheme) }
-  return out
-}
-
-
-/**
- * Replaces one `window.__X__="value"` assignment in the page's
- * baked constants.
- *
- * Deliberately narrow: it matches an assignment of a double-quoted
- * string and nothing else, so it cannot touch the export
- * constants that hold arrays or objects. A page that does not
- * carry the constant is returned untouched rather than patched
- * with a new one - an assignment invented here would run before
- * the script that defines the rest and mean nothing.
- */
-function setGlobal(html, name, value) {
-  const pattern = new RegExp('(window\\.' + name + '\\s*=\\s*)"[^"]*"')
-  if (!pattern.test(html)) { return html }
-  return html.replace(pattern, '$1"' + String(value).replace(/["\\]/g, '') + '"')
-}
-
-
-/** Replaces an attribute on an opening tag, or adds it. */
-function setAttr(tag, name, value) {
-  const pattern = new RegExp('\\\\s' + name + '="[^"]*"')
-  const next = ` ${name}="${value}"`
-  return pattern.test(tag) ? tag.replace(pattern, next) : tag + next
-}
-
-
-/**
- * Removes the export's own back link so there is exactly one, and
- * it is this site's.
- *
- * Exports from 1.0.4 carry a hidden link that their own script
- * fills in from ?home=. Leaving it and skipping the injection
- * looked like the tidier answer and was not: the script that fills
- * it is theme/app.js, which a browser may be holding a cached copy
- * of from an older export, in which case the link stays hidden and
- * the reader has no way out at all. That is precisely what
- * happened.
- *
- * The site's own bar does not depend on any version of any file in
- * the export, so it is the one that ships.
- */
-function stripExportBackLink(html) {
-  return html.replace(/<a[^>]*\bdata-site-back\b[^>]*>[\s\S]*?<\/a>/gi, '')
 }
 
 
@@ -451,31 +386,28 @@ export async function handleAsset(url, request, gameId, requestId, GAMES, env) {
   // is what a demo needs.
   // ==========================================
   if (isDemo && contentType.startsWith('text/html')) {
-    const injected = await tryInject(object, url, request, key, requestId)
-    if (injected !== null) {
-      // The body now depends on the reader's cookies, so the
-      // validator has to as well, and so does Vary - without it a
-      // shared cache could hand one reader the page built for
-      // another reader's language.
-      const etag = weakEtag(object.httpEtag, injected.lang, injected.theme)
-      if (matchesEtag(request, etag)) { return notModified(etag, demoHeaders(contentType, true)) }
-      return new Response(injected.html, {
-        status: 200,
-        headers: { ...demoHeaders(contentType, true), ETag: etag }
-      })
-    }
+    const { lang, theme } = demoPreferences(url, request)
 
-    // The body may have been partly consumed by the attempt, so the
-    // object is fetched again rather than reused. One extra read of
-    // one file, only when something already went wrong.
-    const fresh = await bucket.get(key)
-    if (fresh) {
-      return new Response(fresh.body, {
-        status: 200,
-        headers: { ...demoHeaders(contentType, false), ETag: fresh.httpEtag }
-      })
+    // The body depends on the reader's cookies, so the validator
+    // has to as well, and so does Vary - without it a shared cache
+    // could hand one reader the page built for another reader's
+    // language. Both are known before a single byte is read, which
+    // is what lets the rest of this stream.
+    const etag = weakEtag(object.httpEtag, lang, theme || 'auto')
+    if (matchesEtag(request, etag)) { return notModified(etag, demoHeaders(contentType, true)) }
+
+    const headers = { ...demoHeaders(contentType, true), ETag: etag }
+    const original = new Response(object.body, { status: 200, headers })
+
+    // Fail open, always. A demo page nobody could rewrite is
+    // still a demo page; a demo page nobody could SERVE is a
+    // broken link on the product page.
+    try {
+      return demoRewriter(lang, theme).transform(original)
+    } catch (error) {
+      logWarning('Demo rewrite could not be set up', { requestId, key, error: error.message })
+      return original
     }
-    return createJsonResponse({ error: 'asset_not_found', message: `Asset "${key}" not found`, requestId }, 404)
   }
 
   if (isDemo) {
