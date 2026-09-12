@@ -17,7 +17,7 @@
 // ==========================================
 
 import { validateGameId, getGameAudiences } from '../Config.js'
-import { createJsonResponse } from '../Core/Http.js'
+import { createJsonResponse, readJsonObject } from '../Core/Http.js'
 import { logInfo, logWarning, logError } from '../Core/Logging.js'
 import { verifyIdToken } from '../Core/GoogleOAuth.js'
 import { emailMatchesRow, playerIdConflict } from '../Core/PlayerIdentity.js'
@@ -38,11 +38,7 @@ function publicPlayer(player) {
 }
 
 async function readJsonBody(request) {
-  try {
-    return { body: await request.json() }
-  } catch {
-    return { body: null }
-  }
+  return { body: await readJsonObject(request) }
 }
 
 /**

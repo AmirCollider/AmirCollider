@@ -32,7 +32,7 @@
 // ==========================================
 
 import { CONFIG } from '../Config.js'
-import { createJsonResponse } from '../Core/Http.js'
+import { createJsonResponse, readJsonObject } from '../Core/Http.js'
 import { textFromHtml } from '../Core/Html.js'
 import { logInfo, logWarning } from '../Core/Logging.js'
 import { sendNow, mailSendable } from '../Commerce/Mailer.js'
@@ -133,10 +133,8 @@ export async function handleMailApi(url, request, gameId, requestId, GAMES, env)
     return createJsonResponse({ error: 'unauthorized', message: 'Sign in at /mail.', requestId }, 401)
   }
 
-  let body = {}
-  try {
-    body = await request.json()
-  } catch {
+  const body = await readJsonObject(request)
+  if (!body) {
     return createJsonResponse({ error: 'bad_json', message: 'Body must be JSON.', requestId }, 400)
   }
 

@@ -25,7 +25,7 @@
 // ==========================================
 
 import { CONFIG } from '../Config.js'
-import { createJsonResponse, timingSafeEqual } from '../Core/Http.js'
+import { createJsonResponse, timingSafeEqual, readJsonObject } from '../Core/Http.js'
 import { logInfo, logWarning } from '../Core/Logging.js'
 import { isTestSiteSession } from './TestSite.js'
 import { handleCheckoutWebhook } from './Checkout.js'
@@ -141,12 +141,7 @@ export async function handleCheckoutTest(url, request, gameId, requestId, GAMES,
 
   const database = db(env)
 
-  let body
-  try {
-    body = await request.json()
-  } catch {
-    body = {}
-  }
+  const body = (await readJsonObject(request)) || {}
 
   const action = String(body.action || 'config').toLowerCase()
 

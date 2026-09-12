@@ -33,7 +33,7 @@
 // ==========================================
 
 import { CONFIG } from '../Config.js'
-import { createHtmlResponse, createJsonResponse, clientIp } from '../Core/Http.js'
+import { createHtmlResponse, createJsonResponse, clientIp, readJsonObject } from '../Core/Http.js'
 import { logInfo } from '../Core/Logging.js'
 import { supportTemplate, mailtoFor, SUPPORT_TAGS } from '../Content/SupportTemplates.js'
 import { signOrderToken } from '../Commerce/Seal.js'
@@ -236,10 +236,8 @@ export async function handleOrderLookup(url, request, gameId, requestId, GAMES, 
   const database = db(env)
   if (!database) return createJsonResponse({ ok: false, error: 'not_configured' }, 503)
 
-  let body
-  try {
-    body = await request.json()
-  } catch {
+  const body = await readJsonObject(request)
+  if (!body) {
     return createJsonResponse({ ok: false, error: 'bad_request', message: t.s4bad }, 400)
   }
 
@@ -403,7 +401,17 @@ function renderPage(lang, theme) {
       var handle = raw;
       var match = raw.match(/[?&]o=([^&\\s]+)/);
       if (match) {
-        handle = decodeURIComponent(match[1]);
+        // decodeURIComponent throws a URIError on a lone '%', and
+        // this is a box somebody PASTES into. Unguarded, the
+        // exception killed the click handler: the button did
+        // nothing at all, with no message and nothing in the page
+        // to explain it.
+        try {
+          handle = decodeURIComponent(match[1]);
+        } catch (e) {
+          put(oidOut, 'bad', L.badId);
+          return;
+        }
       } else if (raw.indexOf('ord_') === 0) {
         handle = raw;
       } else {

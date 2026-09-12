@@ -52,7 +52,7 @@ import { themeBootScript } from '../Core/PageChrome.js'
 import {
   dirFor, parseCookies, resolveLang, resolveRequestLang
 } from '../Core/RequestContext.js'
-import { createJsonResponse, createHtmlResponse, clientIp } from '../Core/Http.js'
+import { createJsonResponse, createHtmlResponse, clientIp, readJsonObject } from '../Core/Http.js'
 import { escapeHtml } from '../Core/Html.js'
 import { logInfo, logWarning } from '../Core/Logging.js'
 import { findLicense, isRateLimited, recordFailedAttempt } from '../Licensing/Store.js'
@@ -378,10 +378,8 @@ export async function handleDocSnapPanelApi(url, request, gameId, requestId, GAM
     return createJsonResponse({ error: 'db_not_bound', message: 'LICENSE_DB is not bound', requestId }, 500)
   }
 
-  let body
-  try {
-    body = await request.json()
-  } catch {
+  const body = await readJsonObject(request)
+  if (!body) {
     return createJsonResponse({ error: 'bad_json', message: 'Body must be JSON', requestId }, 400)
   }
 

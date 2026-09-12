@@ -11,7 +11,7 @@
 // ==========================================
 
 import { CONFIG } from '../Config.js'
-import { createHtmlResponse, createJsonResponse, clientIp } from '../Core/Http.js'
+import { createHtmlResponse, createJsonResponse, clientIp, readJsonObject } from '../Core/Http.js'
 import { logInfo, logWarning, logError } from '../Core/Logging.js'
 import { verifyIpnSignature } from '../Commerce/Seal.js'
 import { claimWebhook } from '../Commerce/Orders.js'
@@ -404,12 +404,7 @@ export async function handleGameStoreBuy(url, request, gameId, requestId, GAMES,
     }, 403)
   }
 
-  let body
-  try {
-    body = await request.json()
-  } catch {
-    body = {}
-  }
+  const body = (await readJsonObject(request)) || {}
 
   const result = await startPurchase(env, database, {
     game,

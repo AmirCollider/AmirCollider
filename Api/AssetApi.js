@@ -5,7 +5,9 @@
 
 import { createJsonResponse } from '../Core/Http.js'
 import { escapeHtml } from '../Core/Html.js'
-import { parseCookies, resolveRequestLang } from '../Core/RequestContext.js'
+import {
+  dirFor, parseCookies, resolveLang, resolveRequestLang, resolveRequestTheme
+} from '../Core/RequestContext.js'
 import { logWarning } from '../Core/Logging.js'
 
 /**
@@ -179,12 +181,71 @@ function safeKey(key) {
 
 
 /**
- * The injection, and the only place allowed to fail.
+ * Headers for anything under the demo prefix.
  *
- * Returns the modified HTML, or null when it could not be done for
- * any reason at all - too large to buffer, unreadable, not the
- * shape we expected. A null is not an error the caller reports to
- * the reader; it means "serve the file the old way".
+ * max-age=0 with must-revalidate means the browser may keep the
+ * copy but has to ask before using it, which an ETag turns into a
+ * 304 with no body. The demo is a showcase, not a hot path: being
+ * right the moment a new export is uploaded is worth far more than
+ * the saved round trip.
+ *
+ * `personal` marks a response whose body was built from the
+ * reader's own cookies, which must never be served to a different
+ * reader out of a shared cache.
+ */
+function demoHeaders(contentType, personal) {
+  const headers = {
+    'Content-Type': contentType,
+    'Cache-Control': personal
+      ? 'private, max-age=0, must-revalidate'
+      : 'public, max-age=0, must-revalidate'
+  }
+  if (personal) { headers.Vary = 'Cookie, Accept-Language' }
+  return headers
+}
+
+/**
+ * A validator for a body this site BUILT, rather than one R2
+ * stored. It has to change when the source object changes and when
+ * the language or theme it was built for changes, or a reader
+ * would revalidate their way into somebody else's page.
+ *
+ * Weak, because the bytes are a transformation of the object
+ * rather than the object itself.
+ */
+function weakEtag(objectEtag, lang, theme) {
+  const base = String(objectEtag || '').replace(/^W\//, '').replace(/"/g, '')
+  return `W/"${base}-${lang || 'x'}-${theme || 'x'}-${BAR_VERSION}"`
+}
+
+/**
+ * Bumped whenever the injected markup changes, so a reader holding
+ * a cached copy of the old bar gets the new one rather than
+ * revalidating into it forever.
+ */
+const BAR_VERSION = 3
+
+function matchesEtag(request, etag) {
+  const header = request && request.headers ? request.headers.get('If-None-Match') : null
+  if (!header || !etag) { return false }
+  const wanted = String(etag).replace(/^W\//, '')
+  return header.split(',').some(part => part.trim().replace(/^W\//, '') === wanted)
+}
+
+function notModified(etag, headers) {
+  const out = new Headers(headers)
+  out.set('ETag', etag)
+  out.delete('Content-Type')
+  return new Response(null, { status: 304, headers: out })
+}
+
+/**
+ * Everything this site changes on its way out of a demo page, and
+ * the only place allowed to fail.
+ *
+ * Returns { html, lang, theme }, or null when it could not be done
+ * for any reason at all. A null is not an error the caller reports
+ * to the reader; it means "serve the file the old way".
  */
 async function tryInject(object, url, request, key, requestId) {
   try {
@@ -196,21 +257,152 @@ async function tryInject(object, url, request, key, requestId) {
     }
 
     const html = await object.text()
+    if (typeof html !== 'string' || !html) { return null }
 
-    // Exports from 1.0.4 onwards carry their own back link, filled
-    // in from ?home=. A second one over the top of it would be two
-    // ways out of the same page. The marker is the attribute that
-    // link is rendered with, so the check is exact rather than a
-    // guess at a version number.
-    if (html.includes('data-site-back')) { return null }
+    const cookies = parseCookies(request)
+    const lang = resolveLang(resolveRequestLang(url, request, cookies))
+    const theme = resolveRequestTheme(cookies)
 
-    const lang = resolveRequestLang(url, request, parseCookies(request))
-    return injectBackBar(html, demoBackBar(lang))
+    // On EVERY page of the demo, not only the one the reader
+    // arrived on. Doing it on arrival alone was the second half
+    // of the theme-flipping report: the first click inside the
+    // demo fetched a page nobody had rewritten, and the reader
+    // went from the dark Persian page they arrived on to the
+    // export's own light English one.
+    //
+    // Why this does not overrule the demo's own switchers is
+    // adoptSitePreferences' whole subject - read the note there.
+    const out = injectBackBar(stripExportBackLink(adoptSitePreferences(html, lang, theme)), demoBackBar(lang))
+    return { html: out, lang, theme: theme || 'auto' }
   } catch (error) {
     logWarning('Demo back bar could not be added', { requestId, key, error: error.message })
     return null
   }
 }
+
+
+/**
+ * Opens the demo the way the reader was already reading the site -
+ * and keeps it that way as they click through it, without taking
+ * the demo's own language and theme switchers away from them.
+ *
+ * Somebody browsing in Persian on a dark page who clicks "see a
+ * real export" and lands on a light English one has been handed a
+ * different product. So the export's baked defaults are replaced
+ * with the reader's.
+ *
+ * ---------------------------------------------------------------
+ * WHY IT REWRITES THE TWO SCRIPT CONSTANTS AS WELL AS THE TAG
+ * ---------------------------------------------------------------
+ * This is the part that took a bug report to get right, so it is
+ * written down. The export decides what to show in three steps:
+ *
+ *   1. A pre-paint script reads lang and data-theme OFF THE HTML
+ *      ELEMENT, and restores the reader's saved choice only when
+ *      localStorage holds the marker "<stamp>|<that lang>|<that
+ *      theme>".
+ *   2. app.js reads window.__DOCSNAP_LANG__ and
+ *      window.__DOCSNAP_THEME__ - the values BAKED INTO THE BODY,
+ *      which step 1 never touches - and writes that marker.
+ *   3. The switchers write the reader's choice beside it.
+ *
+ * Rewriting only the html element makes 1 and 2 disagree forever:
+ * the marker app.js writes can never match the marker the boot
+ * script computes, so every saved choice is discarded on every
+ * page and the demo's own switchers stop surviving a click.
+ *
+ * Rewriting both makes the site's preference look exactly like an
+ * export whose defaults were those values. Then the marker
+ * matches, and the order of precedence comes out right on its own:
+ * the reader's choice inside the demo beats the site's cookie,
+ * which beats the export's baked default.
+ *
+ * The values must be the SAME on every page of one visit or the
+ * marker breaks again - they come from a cookie and an
+ * Accept-Language header, so they are.
+ */
+function adoptSitePreferences(html, lang, theme) {
+  // Only a language this export actually carries. The list is
+  // baked into the page; if it is not there, this is not a page
+  // built by a version that knows about languages at all, and the
+  // safe answer is to leave the language alone.
+  const known = html.match(/window\.__DOCSNAP_LANGS__\s*=\s*(\[[^\]]*\])/)
+  let useLang = lang
+  if (known) {
+    try {
+      const codes = JSON.parse(known[1])
+      if (!Array.isArray(codes) || !codes.includes(lang)) { useLang = null }
+    } catch { useLang = null }
+  }
+
+  const useTheme = theme === 'light' || theme === 'dark' ? theme : null
+
+  let out = html
+  const open = out.indexOf('<html')
+  if (open >= 0) {
+    const close = out.indexOf('>', open)
+    if (close >= 0) {
+      let tag = out.slice(open, close)
+      if (useLang) {
+        tag = setAttr(tag, 'lang', useLang)
+        tag = setAttr(tag, 'dir', dirFor(useLang))
+      }
+      if (useTheme) { tag = setAttr(tag, 'data-theme', useTheme) }
+      out = out.slice(0, open) + tag + out.slice(close)
+    }
+  }
+
+  if (useLang) { out = setGlobal(out, '__DOCSNAP_LANG__', useLang) }
+  if (useTheme) { out = setGlobal(out, '__DOCSNAP_THEME__', useTheme) }
+  return out
+}
+
+
+/**
+ * Replaces one `window.__X__="value"` assignment in the page's
+ * baked constants.
+ *
+ * Deliberately narrow: it matches an assignment of a double-quoted
+ * string and nothing else, so it cannot touch the export
+ * constants that hold arrays or objects. A page that does not
+ * carry the constant is returned untouched rather than patched
+ * with a new one - an assignment invented here would run before
+ * the script that defines the rest and mean nothing.
+ */
+function setGlobal(html, name, value) {
+  const pattern = new RegExp('(window\\.' + name + '\\s*=\\s*)"[^"]*"')
+  if (!pattern.test(html)) { return html }
+  return html.replace(pattern, '$1"' + String(value).replace(/["\\]/g, '') + '"')
+}
+
+
+/** Replaces an attribute on an opening tag, or adds it. */
+function setAttr(tag, name, value) {
+  const pattern = new RegExp('\\\\s' + name + '="[^"]*"')
+  const next = ` ${name}="${value}"`
+  return pattern.test(tag) ? tag.replace(pattern, next) : tag + next
+}
+
+
+/**
+ * Removes the export's own back link so there is exactly one, and
+ * it is this site's.
+ *
+ * Exports from 1.0.4 carry a hidden link that their own script
+ * fills in from ?home=. Leaving it and skipping the injection
+ * looked like the tidier answer and was not: the script that fills
+ * it is theme/app.js, which a browser may be holding a cached copy
+ * of from an older export, in which case the link stays hidden and
+ * the reader has no way out at all. That is precisely what
+ * happened.
+ *
+ * The site's own bar does not depend on any version of any file in
+ * the export, so it is the one that ships.
+ */
+function stripExportBackLink(html) {
+  return html.replace(/<a[^>]*\bdata-site-back\b[^>]*>[\s\S]*?<\/a>/gi, '')
+}
+
 
 export async function handleAsset(url, request, gameId, requestId, GAMES, env) {
   const key = decodeKey(url.pathname.replace('/assets/', ''))
@@ -230,37 +422,46 @@ export async function handleAsset(url, request, gameId, requestId, GAMES, env) {
 
   const extension = key.split('.').pop().toLowerCase()
   const contentType = object.httpMetadata?.contentType || CONTENT_TYPES[extension] || 'application/octet-stream'
+  const isDemo = key.startsWith(DEMO_PREFIX)
 
-  // A page of the published demo gets a way back to this site put
-  // into it on the way out.
+  // ==========================================
+  // Caching, and the bug it is written for.
   //
-  // Everything about this branch is written so it cannot take the
-  // asset route down with it. Before this feature existed, /assets/
-  // did one thing: hand R2's stream to the client. It could not
-  // fail in a way that produced a 500. Adding a read, a parse and a
-  // string splice to that path added three ways it could - and the
-  // first thing the live site did was return
-  // "An unexpected error occurred" for the demo, which is the whole
-  // demo gone because of a decoration on it.
+  // Everything here used to be served
+  // "max-age=31536000, immutable". That promise is only
+  // true when a URL's bytes never change, which is the case
+  // for an uploaded photo under a dated prefix and is NOT
+  // the case for the published demo: a new export is
+  // uploaded over the old one, at the same addresses, every
+  // time. So a reader who had opened it once kept
+  // theme/app.js and theme/style.css from a year-long cache
+  // and got them mixed with freshly-fetched HTML.
   //
-  // So: the injection is attempted, and if ANY part of it does not
-  // work the object is served exactly as it would have been
-  // without the feature. The reader gets the demo. The failure goes
-  // to the log with the key that caused it, where `npx wrangler
-  // tail` will show it, because a fallback that hides the reason is
-  // how a bug survives a year.
-  if (key.startsWith(DEMO_PREFIX) && contentType.startsWith('text/html')) {
+  // That is not a cosmetic staleness. The export's boot
+  // script matches the reader's saved theme against a stamp
+  // baked into each page, so a cached page and a new one
+  // disagree and the theme flips between pages. The version
+  // badge read 1.0.1 on a 1.0.4 export. The back link was
+  // missing because the cached app.js predated it. Three
+  // separate bug reports, one wrong header.
+  //
+  // The demo revalidates on every request instead. With an
+  // ETag that costs a 304 and no body, so it is cheap; and
+  // it is correct the moment anything is re-uploaded, which
+  // is what a demo needs.
+  // ==========================================
+  if (isDemo && contentType.startsWith('text/html')) {
     const injected = await tryInject(object, url, request, key, requestId)
     if (injected !== null) {
-      return new Response(injected, {
+      // The body now depends on the reader's cookies, so the
+      // validator has to as well, and so does Vary - without it a
+      // shared cache could hand one reader the page built for
+      // another reader's language.
+      const etag = weakEtag(object.httpEtag, injected.lang, injected.theme)
+      if (matchesEtag(request, etag)) { return notModified(etag, demoHeaders(contentType, true)) }
+      return new Response(injected.html, {
         status: 200,
-        headers: {
-          'Content-Type': contentType,
-          // Deliberately not immutable: the bar is this site's, not
-          // the export's, and a year-long cache of a page carrying
-          // it would outlive any change to it.
-          'Cache-Control': 'public, max-age=300'
-        }
+        headers: { ...demoHeaders(contentType, true), ETag: etag }
       })
     }
 
@@ -271,22 +472,64 @@ export async function handleAsset(url, request, gameId, requestId, GAMES, env) {
     if (fresh) {
       return new Response(fresh.body, {
         status: 200,
-        headers: {
-          'Content-Type': contentType,
-          'Cache-Control': 'public, max-age=300',
-          'ETag': fresh.httpEtag
-        }
+        headers: { ...demoHeaders(contentType, false), ETag: fresh.httpEtag }
       })
     }
     return createJsonResponse({ error: 'asset_not_found', message: `Asset "${key}" not found`, requestId }, 404)
   }
 
+  if (isDemo) {
+    if (matchesEtag(request, object.httpEtag)) {
+      return notModified(object.httpEtag, demoHeaders(contentType, false))
+    }
+    return new Response(object.body, {
+      status: 200,
+      headers: { ...demoHeaders(contentType, false), ETag: object.httpEtag }
+    })
+  }
+
+  // Everything else, split by whether the ADDRESS can ever hold
+  // different bytes - which is the only question `immutable`
+  // actually asks.
+  const caching = writeOnce(key)
+    ? 'public, max-age=31536000, immutable'
+    : 'public, max-age=3600, must-revalidate'
+
+  if (matchesEtag(request, object.httpEtag)) {
+    return notModified(object.httpEtag, { 'Content-Type': contentType, 'Cache-Control': caching })
+  }
   return new Response(object.body, {
     status: 200,
-    headers: {
-      'Content-Type': contentType,
-      'Cache-Control': 'public, max-age=31536000, immutable',
-      'ETag': object.httpEtag
-    }
+    headers: { 'Content-Type': contentType, 'Cache-Control': caching, 'ETag': object.httpEtag }
   })
+}
+
+
+/**
+ * Whether an address in this bucket can be trusted never to hold
+ * different bytes.
+ *
+ * `immutable` is a promise to every cache between here and the
+ * reader that they need never ask again for a year. It is true of
+ * an attachment, which is written once under a dated prefix with
+ * a UUID for a name and can never be written again:
+ *
+ *     contact/2026-09-11/9f3c....png
+ *     mail/2026-09-11/2b71....jpg
+ *
+ * It is NOT true of anything uploaded by hand at a name somebody
+ * chose - the site logo, a screenshot a landing page points at.
+ * Those get replaced at the same address, and the whole point of
+ * replacing them is that people see the new one. A year of
+ * `immutable` on those means the old one, in the browser of
+ * everybody who ever loaded it, until they clear their cache.
+ *
+ * That is the same mistake the published demo was serving under,
+ * and it produced three bug reports that read like three
+ * different bugs. The rule is written once, here: a date in the
+ * key is the evidence, and without it the answer is an hour and a
+ * revalidation.
+ */
+function writeOnce(key) {
+  return /(^|\/)\d{4}-\d{2}-\d{2}\//.test(String(key || ''))
 }

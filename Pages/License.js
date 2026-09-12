@@ -29,10 +29,15 @@
 // ==========================================
 
 import { CONFIG } from '../Config.js'
-import { getPageHead } from '../Core/DesignSystem.js'
-import { seoHead } from '../Core/Seo.js'
-import { siteNavCss, siteFooter, siteBackToTop, siteChromeScript } from '../Core/SiteNav.js'
-import { createJsonResponse, createHtmlResponse, clientIp, timingSafeEqual } from '../Core/Http.js'
+import { getPageHead, pageFoundationCss } from '../Core/DesignSystem.js'
+import { seoHead, breadcrumbLd } from '../Core/Seo.js'
+import {
+  siteNavCss, siteHeader, siteBreadcrumb, siteFooter, siteBackToTop, siteChromeScript, NAV_I18N
+} from '../Core/SiteNav.js'
+import { themeBootScript } from '../Core/PageChrome.js'
+import { dirFor, parseCookies, resolveLang, resolveRequestLang } from '../Core/RequestContext.js'
+import { escapeHtml } from '../Core/Html.js'
+import { createJsonResponse, createHtmlResponse, clientIp, timingSafeEqual, readJsonObject } from '../Core/Http.js'
 import { logInfo, logWarning } from '../Core/Logging.js'
 import { normalizeKey, isWellFormed, generateBatch } from '../Licensing/Keys.js'
 import { signToken, TOKEN_LIFETIME } from '../Licensing/Tokens.js'
@@ -74,12 +79,7 @@ function ok(payload = {}) {
 // The request as JSON, or null.
 // ==========================================
 async function readBody(request) {
-  try {
-    const body = await request.json()
-    return body && typeof body === 'object' ? body : null
-  } catch {
-    return null
-  }
+  return readJsonObject(request)
 }
 
 
@@ -336,7 +336,7 @@ export async function handleLicenseDevices(url, request, gameId, requestId, GAME
     devices: seats.map(s => ({
       machine: s.machine_id,
       short: String(s.machine_id).slice(0, 12),
-      label: s.machine_label || 'Unnamed machine',
+      label: s.machine_label || '',
       version: s.app_version || '',
       activatedAt: s.activated_at,
       lastSeenAt: s.last_seen_at
@@ -461,270 +461,481 @@ export async function handleLicenseAdmin(url, request, gameId, requestId, GAMES,
 // The browser side: paste a key, see the machines on it,
 // release one.
 // ==========================================
+
+// ==========================================
+// i18n
+// One pack per language, and the refusals are in it too: the
+// endpoints answer with an error CODE, so the browser looks the
+// sentence up and a Persian customer never meets an English
+// "That key was not recognised."
+//
+// The page used to be English only. It is the screen somebody
+// opens holding a receipt, in whatever language they bought in,
+// and rule 6 of CLAUDE.md is not suspended for utility pages.
+// ==========================================
+const PAGE_I18N = {
+  fa: {
+    locale: 'fa-IR',
+    metaTitle: 'لایسنس — Unity DocSnap',
+    metaDesc: 'لایسنس Unity DocSnap خود را ببین، دستگاه‌های فعال را مدیریت کن، و لوگو و فوتر خروجی‌هایت را تنظیم کن.',
+    crumb: 'لایسنس',
+    h1: 'لایسنس تو',
+    lede: 'کدت را بزن تا ببینی روی کدام دستگاه‌ها فعال است، و اگر داری به کامپیوتر تازه‌ای می‌روی یکی را آزاد کن.',
+
+    keyLabel: 'کد لایسنس',
+    check: 'بررسی',
+    keyHint: 'فاصله و بزرگی حروف مهم نیست. هیچ چیزی در مرورگرت ذخیره نمی‌شود.',
+
+    panelTitle: 'لوگو، فوتر و قفل کردن بخش‌ها',
+    panelBody: 'لوگوی استودیو و خط فوترت را یک بار بچین، فایل برند را دانلود کن، و در هر پروژه‌ی یونیتی Import کن — همان کاری که با کد لایسنس کردی. یونیتی هیچ‌وقت با سایت حرف نمی‌زند، پس خروجی روی ماشین بدون اینترنت هم کار می‌کند.',
+    panelCta: 'باز کردن پنل برند',
+
+    noKeyTitle: 'هنوز کد نداری؟',
+    noKeyBody: '<b>رایگان</b> اصلاً کد نمی‌خواهد — نصبش کن و همه‌ی خروجی‌های اصلی کار می‌کنند. <b>Plus</b> خلاصه‌های هوش مصنوعی و صفحه‌ی تغییرات را اضافه می‌کند. <b>Pro</b> تاریخچه‌ی نامحدود نسخه‌ها، بروزرسانی افزایشی، کپی فایل‌ها، بکاپ پروژه، اتوماسیون CI، لوگوی اختصاصی و قفل کردن بخش‌ها را. هر دو یک‌بار پرداخت.',
+    noKeyCta: 'مقایسه‌ی هر سه',
+
+    tierPro: 'لایسنس Pro',
+    tierPlus: 'لایسنس Plus',
+    seats: '{used} از {total} دستگاه در حال استفاده',
+    noDevices: 'هنوز هیچ ماشینی این کد را فعال نکرده. در یونیتی به Unity DocSnap ← Licence & Pro Features برو و آن‌جا واردش کن.',
+    unnamedMachine: 'دستگاه بی‌نام',
+    activated: 'فعال‌شده در',
+    release: 'آزاد کردن',
+    confirmRelease: 'این دستگاه آزاد شود؟ تا وقتی دوباره فعال نشود، قابلیت‌های Pro روی آن کار نمی‌کند.',
+
+    needKey: 'اول کدت را بزن.',
+    checking: 'در حال بررسی…',
+    releasing: 'در حال آزاد کردن…',
+
+    err_bad_key: 'این کد شناخته نشد.',
+    err_revoked: 'این کد باطل شده. اگر فکر می‌کنی اشتباه است، با من تماس بگیر.',
+    err_wrong_product: 'این کد مال محصول دیگری است.',
+    err_rate_limited: 'تلاش‌های زیادی شد. چند دقیقه صبر کن و دوباره امتحان کن.',
+    err_bad_request: 'درخواست درست ساخته نشد.',
+    err_bad_machine: 'شناسه‌ی دستگاه درست نبود.',
+    err_not_configured: 'سرور لایسنس الآن در دسترس نیست.',
+    err_generic: 'یک جای کار درست پیش نرفت.',
+    err_network: 'ارتباط با سرور لایسنس برقرار نشد. دوباره امتحان کن.'
+  },
+
+  en: {
+    locale: 'en-GB',
+    metaTitle: 'Licence — Unity DocSnap',
+    metaDesc: 'Check your Unity DocSnap licence, manage the machines it is activated on, and set the logo and footer your exports carry.',
+    crumb: 'Licence',
+    h1: 'Your licence',
+    lede: 'Paste your key to see which machines it is activated on, and release one if you are moving to a new computer.',
+
+    keyLabel: 'Licence key',
+    check: 'Check',
+    keyHint: "Spacing and capitalisation don't matter. Nothing is stored in your browser.",
+
+    panelTitle: 'Your logo, footer and locked sections',
+    panelBody: 'Set your studio logo and footer line once, download the brand file, and import it in each Unity project — the same way you carried your licence key. Unity never talks to this site, so an export still works on a machine with no internet at all.',
+    panelCta: 'Open the brand panel',
+
+    noKeyTitle: "Don't have a key yet?",
+    noKeyBody: '<b>Free</b> needs no key at all — install it and every core export works. <b>Plus</b> adds the AI summary outputs and the Changes page. <b>Pro</b> adds unlimited version history, incremental updates, file copies, project backups, CI automation, a custom logo and section locking. Both are one-off.',
+    noKeyCta: 'Compare all three',
+
+    tierPro: 'Pro licence',
+    tierPlus: 'Plus licence',
+    seats: '{used} of {total} devices in use',
+    noDevices: 'No machine has activated this key yet. Paste it into Unity DocSnap › Licence & Pro Features to get started.',
+    unnamedMachine: 'Unnamed machine',
+    activated: 'activated',
+    release: 'Release',
+    confirmRelease: 'Release this device? Pro features stop there until it is activated again.',
+
+    needKey: 'Paste your licence key first.',
+    checking: 'Checking…',
+    releasing: 'Releasing…',
+
+    err_bad_key: 'That key was not recognised.',
+    err_revoked: 'That key has been revoked. If you think that is wrong, get in touch.',
+    err_wrong_product: 'That key belongs to a different product.',
+    err_rate_limited: 'Too many attempts. Wait a few minutes and try again.',
+    err_bad_request: 'The request was not well formed.',
+    err_bad_machine: 'The machine identifier was missing or malformed.',
+    err_not_configured: 'The licence server is unavailable right now.',
+    err_generic: 'Something went wrong.',
+    err_network: 'Could not reach the licence server. Please try again.'
+  },
+
+  ja: {
+    locale: 'ja-JP',
+    metaTitle: 'ライセンス — Unity DocSnap',
+    metaDesc: 'Unity DocSnap のライセンス確認、アクティベート済み端末の管理、エクスポートのロゴとフッターの設定。',
+    crumb: 'ライセンス',
+    h1: 'ライセンス',
+    lede: 'キーを貼り付けると、どの端末で有効になっているかを確認できます。新しいPCへ移る場合はここで解放してください。',
+
+    keyLabel: 'ライセンスキー',
+    check: '確認',
+    keyHint: '空白や大文字小文字は問いません。ブラウザには何も保存されません。',
+
+    panelTitle: 'ロゴ・フッター・セクションのロック',
+    panelBody: '自社ロゴとフッターの一行を一度設定してブランドファイルをダウンロードし、各 Unity プロジェクトで読み込みます。ライセンスキーと同じ流れです。Unity はこのサイトと通信しないため、インターネットのない環境でもエクスポートは動きます。',
+    panelCta: 'ブランドパネルを開く',
+
+    noKeyTitle: 'キーをお持ちでない場合',
+    noKeyBody: '<b>無料版</b>にキーは不要です — インストールすれば主要なエクスポートはすべて動きます。<b>Plus</b> は AI サマリー出力と変更点ページを追加します。<b>Pro</b> は無制限のバージョン履歴、増分更新、ファイル本体のコピー、プロジェクトバックアップ、CI 自動化、独自ロゴ、セクションのロックを追加します。いずれも買い切りです。',
+    noKeyCta: '3つを比較する',
+
+    tierPro: 'Pro ライセンス',
+    tierPlus: 'Plus ライセンス',
+    seats: '{total} 台中 {used} 台が使用中',
+    noDevices: 'このキーはまだどの端末でも有効化されていません。Unity DocSnap ▸ Licence & Pro Features で入力してください。',
+    unnamedMachine: '名称未設定の端末',
+    activated: '有効化日',
+    release: '解放',
+    confirmRelease: 'この端末を解放しますか?再度有効化するまで Pro 機能は使えなくなります。',
+
+    needKey: '先にライセンスキーを入力してください。',
+    checking: '確認中…',
+    releasing: '解放中…',
+
+    err_bad_key: 'そのキーは認識されませんでした。',
+    err_revoked: 'このキーは失効しています。お心当たりがなければご連絡ください。',
+    err_wrong_product: 'そのキーは別の製品のものです。',
+    err_rate_limited: '試行回数が多すぎます。数分待ってからもう一度お試しください。',
+    err_bad_request: 'リクエストの形式が正しくありません。',
+    err_bad_machine: '端末識別子が不正です。',
+    err_not_configured: 'ライセンスサーバーに現在アクセスできません。',
+    err_generic: '処理に失敗しました。',
+    err_network: 'ライセンスサーバーに接続できませんでした。もう一度お試しください。'
+  }
+}
+
+const LICENSE_PATH = '/license'
+
+// The DocSnap accent — the violet the product page and the
+// exported site's own sidebar use.
+const DOCSNAP_VIOLET = '#7a52b8'
+
+// What the browser half needs, named rather than shipping the
+// whole pack including this page's meta description.
+const LICENSE_CLIENT_KEYS = [
+  'tierPro', 'tierPlus', 'seats', 'noDevices', 'unnamedMachine', 'activated', 'release',
+  'confirmRelease', 'needKey', 'checking', 'releasing',
+  'err_bad_key', 'err_revoked', 'err_wrong_product', 'err_rate_limited',
+  'err_bad_request', 'err_bad_machine', 'err_not_configured',
+  'err_generic', 'err_network'
+]
+
 export async function handleLicensePage(url, request) {
-  return createHtmlResponse(renderLicensePage())
+  const lang = resolveLang(resolveRequestLang(url, request, parseCookies(request)))
+  return createHtmlResponse(renderLicensePage(lang))
 }
 
 
-function renderLicensePage() {
+function renderLicensePage(lang) {
+  const t = PAGE_I18N[lang] || PAGE_I18N.fa
+  const dir = dirFor(lang)
+  const nav = NAV_I18N[lang] || NAV_I18N.fa
+
+  const trail = [
+    { href: '/', label: nav.home },
+    { href: '/unity-docsnap', label: 'Unity DocSnap' },
+    { href: LICENSE_PATH, label: t.crumb }
+  ]
+
+  const clientStrings = {}
+  for (const key of LICENSE_CLIENT_KEYS) { clientStrings[key] = t[key] }
+
   return `<!DOCTYPE html>
-<html lang="en" dir="ltr">
+<html lang="${lang}" dir="${dir}">
 <head>
-  ${getPageHead({
-    title: 'Licence — Unity DocSnap',
-    amirLogo: CONFIG.AMIR_LOGO,
-    description: 'Check your Unity DocSnap Pro licence and manage the machines it is activated on.'
+  ${getPageHead({ title: t.metaTitle, amirLogo: CONFIG.AMIR_LOGO, description: t.metaDesc })}
+  ${seoHead({
+    path: LICENSE_PATH,
+    title: t.metaTitle,
+    description: t.metaDesc,
+    lang,
+    noindex: true,
+    graph: [breadcrumbLd(trail, lang)]
   })}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;600;700;800&display=swap" rel="stylesheet">
-  ${seoHead({
-    path: '/license',
-    title: 'Licence — Unity DocSnap',
-    description: 'Check your Unity DocSnap licence and manage the machines it is activated on.',
-    noindex: true
-  })}
-  <style>${siteNavCss()}${licenseCss()}</style>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap"></noscript>
+  ${themeBootScript()}
+  <style>${pageFoundationCss({ brand: DOCSNAP_VIOLET, maxWidth: '820px' })}${siteNavCss()}${licenseCss()}</style>
 </head>
 <body>
+  ${siteHeader({ lang, path: LICENSE_PATH, accent: DOCSNAP_VIOLET })}
   <div class="wrap">
-    <header class="head">
-      <a class="back" href="/unity-docsnap">&larr; Unity DocSnap</a>
-      <h1>Your licence</h1>
-      <p class="sub">Paste your key to see which machines it is activated on, and release one if you are moving to a new computer.</p>
-    </header>
+    ${siteBreadcrumb({ lang, trail })}
+    <main id="main" class="lc">
+      <header class="lc-head">
+        <h1>${escapeHtml(t.h1)}</h1>
+        <p>${escapeHtml(t.lede)}</p>
+      </header>
 
-    <section class="card">
-      <label class="lbl" for="key">Licence key</label>
-      <div class="row">
-        <input id="key" type="text" spellcheck="false" autocomplete="off"
-               placeholder="DSNAP-XXXXX-XXXXX-XXXXX" aria-describedby="hint">
-        <button id="check" type="button">Check</button>
-      </div>
-      <p id="hint" class="hint">Spacing and capitalisation don't matter. Nothing is stored in your browser.</p>
-      <div id="out" class="out" role="status" aria-live="polite"></div>
-    </section>
+      <section class="lc-card">
+        <label class="lc-lbl" for="key">${escapeHtml(t.keyLabel)}</label>
+        <div class="lc-row">
+          <input id="key" type="text" spellcheck="false" autocomplete="off" dir="ltr"
+                 placeholder="DSNAP-XXXXX-XXXXX-XXXXX" aria-describedby="hint">
+          <button id="check" type="button" class="lc-btn">${escapeHtml(t.check)}</button>
+        </div>
+        <p id="hint" class="lc-fine">${escapeHtml(t.keyHint)}</p>
+        <div id="out" class="lc-out" role="status" aria-live="polite"></div>
+      </section>
 
-    <section class="card muted">
-      <h2>Don't have a key yet?</h2>
-      <p><b>Free</b> needs no key at all — install it and every core export works.
-         <b>Plus</b> ($${CONFIG.DOCSNAP.TIERS.plus.price}) adds the AI summary outputs and the Changes page.
-         <b>Pro</b> ($${CONFIG.DOCSNAP.TIERS.pro.price}) adds unlimited version history, incremental updates,
-         file copies, project backups, CI automation and a custom logo. Both are one-off.</p>
-      <a class="btn" href="/unity-docsnap">Compare all three</a>
-    </section>
+      <!--
+        The brand panel, as a card with its own call to action
+        rather than a sentence in a paragraph. It was a line of
+        text at the bottom of this page and nobody could find the
+        place to set a logo and a footer - which is the whole
+        reason somebody with a Pro key opens this page at all.
+      -->
+      <section class="lc-card lc-feature">
+        <div class="lc-feature-mark" aria-hidden="true">\u{1F3A8}</div>
+        <div class="lc-feature-body">
+          <h2>${escapeHtml(t.panelTitle)}</h2>
+          <p>${escapeHtml(t.panelBody)}</p>
+          <a class="lc-btn" href="/unity-docsnap/panel">${escapeHtml(t.panelCta)}</a>
+        </div>
+      </section>
 
-    <section class="card muted">
-      <h2>Your logo, your footer, your locked sections</h2>
-      <p>Set them once in the brand panel, download a small file, and import it in each Unity
-         project &mdash; the same way you brought your key in. Unity never talks to this site,
-         so an export still works on a machine with no internet at all.</p>
-      <a class="btn" href="/unity-docsnap/panel">Open the brand panel</a>
-    </section>
-
-    ${siteFooter({ lang: 'en' })}
+      <section class="lc-card lc-muted">
+        <h2>${escapeHtml(t.noKeyTitle)}</h2>
+        <p>${t.noKeyBody}</p>
+        <a class="lc-btn ghost" href="/unity-docsnap">${escapeHtml(t.noKeyCta)}</a>
+      </section>
+    </main>
   </div>
-
-  ${siteBackToTop({ lang: 'en' })}
+  ${siteFooter({ lang })}
+  ${siteBackToTop({ lang })}
   ${siteChromeScript()}
+  <script id="lcStrings" type="application/json">${
+    JSON.stringify({ t: clientStrings, locale: t.locale || 'en' }).replace(/</g, '\\u003c')
+  }</script>
   <script>${licenseScript()}</script>
 </body>
 </html>`
 }
 
 
+// ==========================================
+// licenseCss
+// On pageFoundationCss, so light, dark and the reader's system
+// preference are already handled, accented with the DocSnap
+// violet so this reads as the product's own screen.
+// ==========================================
 function licenseCss() {
   return `
-    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-    html { scrollbar-width: none; -ms-overflow-style: none; }
-    html::-webkit-scrollbar { width: 0; height: 0; display: none; }
+    .lc { padding: 8px 0 56px; }
+    .lc-head { margin-bottom: 22px; }
+    .lc-head h1 { font-size: clamp(26px, 5vw, 34px); line-height: 1.3; margin-bottom: 8px; }
+    .lc-head p { color: var(--text-dim); font-size: 15px; max-width: 62ch; }
 
-    :root {
-      --brand: #6c63ff; --brand-2: #a78bfa;
-      --ok: #4caf50; --warn: #ff9800; --err: #f44336;
-      --radius: 16px;
-      --bg-1: #0b0e16; --bg-2: #141a2e;
-      --surface: rgba(255,255,255,0.05);
-      --surface-2: rgba(255,255,255,0.09);
-      --border: rgba(255,255,255,0.12);
-      --text: rgba(255,255,255,0.92);
-      --text-dim: rgba(255,255,255,0.58);
-      color-scheme: dark;
+    .lc-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 16px;
+      backdrop-filter: blur(8px);
     }
-    @media (prefers-color-scheme: light) {
-      :root:not([data-theme]) {
-        --bg-1: #f4f6fb; --bg-2: #e7ecf7;
-        --surface: rgba(255,255,255,0.72); --surface-2: #ffffff;
-        --border: rgba(20,22,33,0.12);
-        --text: rgba(22,24,33,0.92); --text-dim: rgba(22,24,33,0.58);
-        color-scheme: light;
-      }
+    .lc-card h2 { font-size: 17px; margin-bottom: 10px; }
+    .lc-card p { color: var(--text-dim); font-size: 14px; line-height: 1.85; margin-bottom: 14px; }
+    .lc-muted p { font-size: 13.5px; }
+
+    .lc-feature { display: flex; gap: 16px; align-items: flex-start; border-inline-start: 3px solid var(--brand); }
+    .lc-feature-mark { font-size: 28px; line-height: 1.2; flex: none; }
+    .lc-feature-body { min-width: 0; }
+
+    .lc-lbl { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 700; }
+    .lc-fine { margin: 8px 0 0; color: var(--muted); font-size: 12.5px; line-height: 1.8; }
+    .lc-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .lc input[type=text] {
+      flex: 1 1 260px;
+      font: inherit; font-size: 14px;
+      padding: 11px 13px;
+      color: var(--text);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+    .lc input:focus-visible {
+      outline: none;
+      border-color: var(--brand);
+      box-shadow: 0 0 0 3px rgba(var(--brand-rgb), 0.18);
     }
 
-    body {
-      font-family: 'Vazirmatn', 'Segoe UI', Tahoma, Arial, sans-serif;
-      min-height: 100vh; padding: 40px 20px; color: var(--text); line-height: 1.7;
-      background:
-        radial-gradient(1000px 480px at 80% -10%, color-mix(in srgb, var(--brand) 20%, transparent), transparent 60%),
-        linear-gradient(160deg, var(--bg-1), var(--bg-2));
-      background-attachment: fixed;
+    .lc-btn {
+      display: inline-block;
+      font: inherit; font-size: 14px; font-weight: 700;
+      padding: 11px 20px;
+      color: #fff; background: var(--brand);
+      border: 1px solid transparent; border-radius: 12px;
+      cursor: pointer; text-decoration: none;
+      transition: filter .12s ease;
     }
-    .wrap { max-width: 680px; margin-inline: auto; }
+    .lc-btn:hover { filter: brightness(1.08); }
+    .lc-btn.ghost { color: var(--brand); background: transparent; border-color: var(--border); }
+    .lc-btn.ghost:hover { border-color: var(--brand); }
+    .lc-btn:disabled { opacity: .45; cursor: default; filter: none; }
 
-    .back { color: var(--text-dim); text-decoration: none; font-size: 0.9em; }
-    .back:hover { color: var(--text); }
-    .head { margin-block-end: 26px; }
-    .head h1 { font-size: clamp(1.8em, 4vw, 2.3em); font-weight: 800; margin-block: 10px 6px; }
-    .sub { color: var(--text-dim); }
-
-    .card {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 24px; margin-block-end: 18px;
-      backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    .lc-out { margin-top: 14px; }
+    .lc-note {
+      padding: 11px 13px; border-radius: 12px;
+      border: 1px solid var(--border); background: var(--surface-2);
+      font-size: 13.5px; color: var(--text-dim);
     }
-    .card.muted h2 { font-size: 1.1em; margin-block-end: 8px; }
-    .card.muted p { color: var(--text-dim); font-size: 0.95em; margin-block-end: 14px; }
+    .lc-note.ok { border-color: rgba(var(--brand-rgb), 0.45); color: var(--text); }
+    .lc-note.bad { border-color: var(--err); color: var(--err); }
+    .lc-seats { margin: 12px 0 8px; font-size: 13px; color: var(--muted); }
 
-    .lbl { display: block; font-weight: 700; font-size: 0.9em; margin-block-end: 8px; }
-    .row { display: flex; gap: 10px; flex-wrap: wrap; }
-    input {
-      flex: 1 1 260px; min-width: 0; font: inherit; letter-spacing: 0.06em;
-      padding: 12px 14px; border-radius: 12px; color: var(--text);
-      background: var(--surface-2); border: 1px solid var(--border);
+    .lc-dev {
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      padding: 11px 13px; margin-bottom: 8px;
+      border: 1px solid var(--border); border-radius: 12px;
     }
-    input:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-
-    button, .btn {
-      font: inherit; font-weight: 700; cursor: pointer; text-decoration: none;
-      padding: 12px 22px; border: 0; border-radius: 12px; color: #fff;
-      display: inline-flex; align-items: center; gap: 8px;
-      background: linear-gradient(135deg, var(--brand), var(--brand-2));
-      transition: transform 0.16s ease, filter 0.16s ease;
+    .lc-dev-text { min-width: 0; }
+    .lc-dev b { display: block; font-size: 14px; }
+    .lc-dev small { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; unicode-bidi: plaintext; }
+    .lc-dev button {
+      margin-inline-start: auto;
+      font: inherit; font-size: 12.5px; font-weight: 700;
+      padding: 7px 14px;
+      color: var(--err); background: transparent;
+      border: 1px solid var(--border); border-radius: 10px; cursor: pointer;
     }
-    button:hover, .btn:hover { transform: translateY(-2px); }
-    button:disabled { opacity: 0.55; cursor: default; transform: none; }
+    .lc-dev button:hover { border-color: var(--err); }
 
-    .hint { color: var(--text-dim); font-size: 0.85em; margin-block-start: 10px; }
-
-    .out { margin-block-start: 18px; }
-    .out:empty { display: none; }
-    .note { padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); }
-    .note.ok  { border-color: color-mix(in srgb, var(--ok) 55%, transparent); }
-    .note.bad { border-color: color-mix(in srgb, var(--err) 55%, transparent); }
-
-    .seat-line { font-size: 0.9em; color: var(--text-dim); margin-block: 14px 8px; }
-
-    .dev {
-      display: flex; align-items: center; justify-content: space-between; gap: 12px;
-      flex-wrap: wrap; padding: 12px 14px; border-radius: 12px;
-      border: 1px solid var(--border); background: var(--surface-2); margin-block-end: 8px;
+    @media (max-width: 560px) {
+      .lc-card { padding: 16px; }
+      .lc-row .lc-btn { flex: 1 1 100%; }
+      .lc-feature { flex-direction: column; gap: 10px; }
     }
-    .dev b { display: block; }
-    .dev small { color: var(--text-dim); }
-    .dev button {
-      padding: 8px 14px; font-size: 0.85em;
-      background: transparent; color: var(--text); border: 1px solid var(--border);
-    }
-    .dev button:hover { border-color: var(--err); color: var(--err); }
-
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after { transition-duration: 0.001ms !important; }
-    }
+    @media (prefers-reduced-motion: reduce) { .lc-btn { transition: none; } }
   `
 }
 
 
 // ==========================================
 // licenseScript
-// The page's client half.
+// One script for all three languages; the sentences come out of
+// the JSON block the page wrote from the reader's pack, and the
+// refusals are looked up by the CODE the endpoint returns rather
+// than printed from its English message.
 // ==========================================
 function licenseScript() {
   return `
-    var keyEl = document.getElementById('key');
-    var outEl = document.getElementById('out');
-    var checkEl = document.getElementById('check');
+(function () {
+  var CFG = {};
+  try { CFG = JSON.parse(document.getElementById('lcStrings').textContent); } catch (e) { return; }
+  var T = CFG.t || {};
 
-    function esc(v) {
-      return String(v == null ? '' : v)
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  var keyEl = document.getElementById('key');
+  var outEl = document.getElementById('out');
+  var checkEl = document.getElementById('check');
+
+  function fill(s, vars) {
+    return String(s || '').replace(/\\{(\\w+)\\}/g, function (m, k) {
+      return vars && vars[k] !== undefined ? vars[k] : m;
+    });
+  }
+
+  // Built as nodes rather than a string of HTML. The old version
+  // escaped by hand into innerHTML, which works right up until
+  // somebody forgets one call - and a device label is a name
+  // somebody typed on their own machine.
+  function el(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) { node.className = className; }
+    if (text !== undefined) { node.textContent = text; }
+    return node;
+  }
+
+  function note(kind, text) {
+    outEl.textContent = '';
+    outEl.appendChild(el('div', 'lc-note' + (kind ? ' ' + kind : ''), text));
+  }
+
+  function reason(data) {
+    var code = data && data.error;
+    return (code && T['err_' + code]) || T.err_generic;
+  }
+
+  function when(ms) {
+    if (!ms) { return ''; }
+    try { return new Date(ms).toLocaleDateString(CFG.locale || undefined); } catch (e) { return ''; }
+  }
+
+  function post(path, payload) {
+    return fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(function (res) {
+      return res.json().then(function (d) { return d; }, function () { return { error: 'generic' }; });
+    }, function () {
+      return { error: 'network' };
+    });
+  }
+
+  function render(data) {
+    outEl.textContent = '';
+
+    var tierName = data.tier === 'pro' ? T.tierPro : data.tier === 'plus' ? T.tierPlus : data.tier;
+    var head = el('div', 'lc-note ok');
+    var strong = el('b', null, data.key);
+    head.appendChild(strong);
+    head.appendChild(document.createTextNode(' — ' + tierName));
+    outEl.appendChild(head);
+
+    outEl.appendChild(el('p', 'lc-seats', fill(T.seats, { used: data.seatsUsed, total: data.seatsTotal })));
+
+    if (!data.devices || !data.devices.length) {
+      outEl.appendChild(el('div', 'lc-note', T.noDevices));
+      return;
     }
 
-    function note(kind, text) {
-      outEl.innerHTML = '<div class="note ' + kind + '">' + esc(text) + '</div>';
-    }
+    data.devices.forEach(function (d) {
+      var row = el('div', 'lc-dev');
+      var text = el('div', 'lc-dev-text');
+      text.appendChild(el('b', null, d.label || T.unnamedMachine));
+      var bits = d.short + '… · ' + T.activated + ' ' + when(d.activatedAt) + (d.version ? ' · v' + d.version : '');
+      text.appendChild(el('small', null, bits));
+      row.appendChild(text);
 
-    function when(ms) {
-      if (!ms) return '';
-      try { return new Date(ms).toLocaleDateString(); } catch (e) { return ''; }
-    }
+      var btn = el('button', null, T.release);
+      btn.type = 'button';
+      btn.addEventListener('click', function () { release(d.machine); });
+      row.appendChild(btn);
 
-    function post(path, payload) {
-      return fetch(path, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      }).then(function (res) { return res.json(); });
-    }
+      outEl.appendChild(row);
+    });
+  }
 
-    function render(data) {
-      var tierName = data.tier === 'pro' ? 'Pro licence'
-        : data.tier === 'plus' ? 'Plus licence'
-        : data.tier;
-      var html = '<div class="note ok">Key <b>' + esc(data.key) + '</b> — ' + esc(tierName) + '</div>';
+  function load() {
+    var key = keyEl.value.trim();
+    if (!key) { note('bad', T.needKey); return; }
 
-      html += '<p class="seat-line">' + data.seatsUsed + ' of ' + data.seatsTotal
-        + ' device' + (data.seatsTotal === 1 ? '' : 's') + ' in use</p>';
+    checkEl.disabled = true;
+    note('', T.checking);
 
-      if (!data.devices.length) {
-        html += '<div class="note">No machine has activated this key yet. Paste it into '
-          + 'Unity DocSnap → Licence &amp; Pro Features to get started.</div>';
-      } else {
-        data.devices.forEach(function (d) {
-          html += '<div class="dev"><span><b>' + esc(d.label) + '</b>'
-            + '<small>' + esc(d.short) + '… · activated ' + esc(when(d.activatedAt))
-            + (d.version ? ' · v' + esc(d.version) : '') + '</small></span>'
-            + '<button type="button" data-machine="' + esc(d.machine) + '">Release</button></div>';
-        });
-      }
+    post('/license/devices', { product: 'unity-docsnap', key: key }).then(function (data) {
+      checkEl.disabled = false;
+      if (data && data.ok) { render(data); } else { note('bad', reason(data)); }
+    });
+  }
 
-      outEl.innerHTML = html;
-
-      Array.prototype.forEach.call(outEl.querySelectorAll('[data-machine]'), function (btn) {
-        btn.addEventListener('click', function () { release(btn.getAttribute('data-machine')); });
+  function release(machine) {
+    if (!window.confirm(T.confirmRelease)) { return; }
+    note('', T.releasing);
+    post('/license/deactivate', { product: 'unity-docsnap', key: keyEl.value.trim(), machine: machine })
+      .then(function (data) {
+        if (data && data.ok) { load(); } else { note('bad', reason(data)); }
       });
-    }
+  }
 
-    function load() {
-      var key = keyEl.value.trim();
-      if (!key) { note('bad', 'Paste your licence key first.'); return; }
-
-      checkEl.disabled = true;
-      note('', 'Checking…');
-
-      post('/license/devices', { product: 'unity-docsnap', key: key })
-        .then(function (data) {
-          checkEl.disabled = false;
-          if (data.ok) { render(data); } else { note('bad', data.message || 'That key was not recognised.'); }
-        })
-        .catch(function () {
-          checkEl.disabled = false;
-          note('bad', 'Could not reach the licence server. Please try again.');
-        });
-    }
-
-    function release(machine) {
-      if (!window.confirm('Release this device? Pro features stop there until it is activated again.')) return;
-
-      note('', 'Releasing…');
-      post('/license/deactivate', { product: 'unity-docsnap', key: keyEl.value.trim(), machine: machine })
-        .then(function (data) {
-          if (data.ok) { load(); } else { note('bad', data.message || 'Could not release that device.'); }
-        })
-        .catch(function () { note('bad', 'Could not reach the licence server. Please try again.'); });
-    }
-
-    checkEl.addEventListener('click', load);
-    keyEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') load(); });
+  checkEl.addEventListener('click', load);
+  keyEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); load(); } });
+})();
   `
 }

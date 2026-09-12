@@ -10,7 +10,7 @@
 // ==========================================
 
 import { CONFIG, LANGUAGES, validateGameId } from '../Config.js'
-import { createJsonResponse, createHtmlResponse } from '../Core/Http.js'
+import { createJsonResponse, createHtmlResponse, readJsonObject } from '../Core/Http.js'
 import { logInfo, logWarning, logError } from '../Core/Logging.js'
 import { parseCookies, resolveLang, resolveRequestLang, resolveRequestTheme } from '../Core/RequestContext.js'
 import {
@@ -327,10 +327,8 @@ export async function handleRefreshToken(url, request, gameId, requestId, GAMES)
     return createJsonResponse({ error: 'invalid_game', message: 'Game configuration not found', requestId }, 400)
   }
 
-  let body
-  try {
-    body = await request.json()
-  } catch {
+  const body = await readJsonObject(request)
+  if (!body) {
     return createJsonResponse({ error: 'invalid_json', message: 'Request body must be valid JSON', requestId }, 400)
   }
 

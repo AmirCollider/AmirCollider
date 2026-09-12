@@ -16,11 +16,17 @@ import { handleAsset } from '../Api/AssetApi.js'
 
 const store = new Map()
 const put = (key, body, contentType) => store.set(key, { body, contentType })
-put('demo/docsnap/1.0.3/index.html',
-    '<html><body><div class="ds-shell"><aside class="ds-sidebar">\n<div class="ds-brand">LOGO</div></aside>'
-    + '<main class="ds-main"><h1>Demo</h1></main></div></body></html>', 'text/html; charset=utf-8')
+const EXPORT_SHELL =
+  '<!doctype html>\n<html lang="ja" dir="ltr" data-theme="light" data-skin="cozy" data-export="stamp-1">'
+  + '<head></head><body><div class="ds-shell"><aside class="ds-sidebar">\n'
+  + '<a class="ds-site-back" data-site-back href="#" hidden><span>old link</span></a>\n'
+  + '<div class="ds-brand">LOGO</div></aside>'
+  + '<main class="ds-main"><h1>Demo</h1></main></div></body></html>'
+put('demo/docsnap/1.0.3/index.html', EXPORT_SHELL, 'text/html; charset=utf-8')
 put('demo/docsnap/0.9.0/no-shell.html', '<html><body><p>old</p></body></html>', 'text/html; charset=utf-8')
-put('demo/docsnap/1.0.4/index.html', '<html><body><a data-site-back href="#">back</a></body></html>', 'text/html; charset=utf-8')
+put('demo/docsnap/1.0.4/index.html',
+    '<html><body><aside class="ds-sidebar"></aside><a class="ds-site-back" data-site-back href="#" hidden>back</a></body></html>',
+    'text/html; charset=utf-8')
 put('demo/docsnap/1.0.3/theme/app.js', 'console.log(1)', null)          // no stored type
 put('demo/docsnap/1.0.3/theme/logo.png', 'PNGDATA', 'image/png')
 put('contact/2026-01-01/photo.png', 'PNGDATA', 'image/png')             // untouched path
@@ -40,9 +46,10 @@ const env = {
   }
 }
 
-const get = (path, headers = {}) => {
+const get = async (path, headers = {}) => {
   const url = new URL('https://amircollider.com' + path)
-  return handleAsset(url, new Request(url, { headers }), null, 'req', {}, env)
+  const res = await handleAsset(url, new Request(url, { headers }), null, 'req', {}, env)
+  return Object.assign(res, { res })
 }
 
 let fails = 0
@@ -72,10 +79,11 @@ ok('no physical left/right anywhere in the injected markup',
    !/(^|[;"\s])(left|right|margin-left|margin-right|padding-left|padding-right)\s*:/.test(html), html)
 ok('the chevron points back in Persian (right-to-left)', html.includes('\u203A'), html)
 
-r = await get('/assets/demo/docsnap/1.0.4/index.html')
+r = await get('/assets/demo/docsnap/1.0.4/index.html', { 'Accept-Language': 'en' })
 html = await r.text()
-ok('an export with its OWN back link is not double-barred',
-   html.includes('data-site-back') && !html.includes('Back to the site'), html)
+ok('the export\'s own back link is removed, not left beside ours',
+   !html.includes('data-site-back'), html)
+ok('  and exactly one way out remains', (html.match(/unity-docsnap/g) || []).length === 1, html)
 
 r = await get('/assets/demo/docsnap/1.0.3/index.html', { 'Accept-Language': 'en' })
 html = await r.text()
@@ -94,8 +102,69 @@ ok('a js file with no stored type is served as javascript',
 ok('a non-html demo file is NOT barred', !(await r.text()).includes('Back to the site'))
 
 r = await get('/assets/demo/docsnap/1.0.3/theme/logo.png')
-ok('a demo image is untouched and still immutable',
-   r.headers.get('Content-Type') === 'image/png' && r.headers.get('Cache-Control').includes('immutable'))
+ok('a demo image is served untouched', r.headers.get('Content-Type') === 'image/png')
+
+// ---- the cache header that caused three of the bug reports ----
+//
+// The demo is overwritten in place at the same addresses on every
+// re-export, so "immutable" was a promise the site could not keep:
+// readers held theme/app.js and theme/style.css from a year-long
+// cache and mixed them with fresh HTML. The version badge read
+// 1.0.1 on a 1.0.4 export, the theme flipped between pages, and
+// the back link was missing because the cached script predated it.
+{
+  const demoPaths = [
+    '/assets/demo/docsnap/1.0.3/index.html',
+    '/assets/demo/docsnap/1.0.3/theme/app.js',
+    '/assets/demo/docsnap/1.0.3/theme/logo.png'
+  ]
+  for (const path of demoPaths) {
+    const res = (await get(path)).res
+    const cc = res.headers.get('Cache-Control') || ''
+    ok(`demo revalidates: ${path.split('/').pop()}`, cc.includes('must-revalidate') && !cc.includes('immutable'), cc)
+    ok(`  and carries a validator`, !!res.headers.get('ETag'), 'no ETag')
+  }
+
+  // A non-demo asset is genuinely write-once and keeps its year.
+  const other = (await get('/assets/contact/2026-01-01/photo.png')).res
+  ok('a dated upload is still immutable', (other.headers.get('Cache-Control') || '').includes('immutable'))
+
+  // Revalidation has to actually save the body, or it is just a
+  // slower way of sending the same bytes.
+  const first = (await get('/assets/demo/docsnap/1.0.3/theme/app.js')).res
+  const tag = first.headers.get('ETag')
+  const second = (await get('/assets/demo/docsnap/1.0.3/theme/app.js', { 'If-None-Match': tag })).res
+  ok('an unchanged demo file answers 304', second.status === 304, String(second.status))
+  ok('  with no body', (await second.text()) === '')
+
+  // And a personalised page must not be handed to the wrong reader.
+  const page = (await get('/assets/demo/docsnap/1.0.3/index.html?home=https://amircollider.com/x')).res
+  ok('an injected page says it varies by cookie', (page.headers.get('Vary') || '').includes('Cookie'), page.headers.get('Vary'))
+  ok('  and is private, not shared', (page.headers.get('Cache-Control') || '').includes('private'))
+  const faTag = page.headers.get('ETag')
+  const enPage = (await get('/assets/demo/docsnap/1.0.3/index.html?home=https://amircollider.com/x', { 'Accept-Language': 'en' })).res
+  ok('  and a different language is a different validator', faTag !== enPage.headers.get('ETag'), faTag)
+}
+
+// ---- the demo opens the way the reader was reading the site ----
+{
+  const entry = '/assets/demo/docsnap/1.0.3/index.html?home=https://amircollider.com/unity-docsnap'
+  let h = await (await get(entry, { Cookie: 'lang=fa; theme=dark' })).res.text()
+  ok('entering the demo adopts the site language', /<html[^>]*lang="fa"/.test(h), h.slice(0, 140))
+  ok('  and its direction', /<html[^>]*dir="rtl"/.test(h), h.slice(0, 140))
+  ok('  and its theme', /<html[^>]*data-theme="dark"/.test(h), h.slice(0, 140))
+  ok('  and leaves the rest of the tag alone', /data-skin="cozy"/.test(h) && /data-export="stamp-1"/.test(h), h.slice(0, 200))
+
+  h = await (await get(entry, { Cookie: 'lang=en; theme=light' })).res.text()
+  ok('a different reader gets their own', /lang="en"/.test(h) && /dir="ltr"/.test(h) && /data-theme="light"/.test(h), h.slice(0, 140))
+
+  // Inside the demo there is no ?home=, and the reader's own
+  // choices there must not be overruled on every click.
+  h = await (await get('/assets/demo/docsnap/1.0.3/index.html', { Cookie: 'lang=fa; theme=dark' })).res.text()
+  ok('navigating INSIDE the demo does not overrule its own switcher',
+     /lang="ja"/.test(h) && /data-theme="light"/.test(h), h.slice(0, 140))
+  ok('  but the way out is still there', h.includes('unity-docsnap'))
+}
 
 r = await get('/assets/contact/2026-01-01/photo.png')
 ok('a path outside the demo prefix is untouched',
@@ -198,6 +267,180 @@ ok('a missing file is still a 404', r.status === 404, String(r.status))
     ok(`  and the bar is still added`, body.includes('unity-docsnap'), body.slice(0, 80))
   }
 }
+
+// ==========================================
+// The reader's language and theme, on EVERY page of the demo
+//
+// Carrying them onto the page the reader ARRIVES at and no
+// further was the second half of the theme-flipping report: the
+// first click inside the demo fetched a page nobody had
+// rewritten, and a dark Persian demo turned into a light English
+// one.
+//
+// What makes this delicate is that the export decides its own
+// appearance in two places that must agree - the attributes on
+// the html element, which its pre-paint script reads, and two
+// constants baked into the body, which app.js reads to write the
+// marker that same script checks. Rewrite one and not the other
+// and the marker can never match: every choice the reader makes
+// with the demo's own switchers is discarded on the next click.
+//
+// So the invariant asserted here is not "the attribute was
+// changed". It is "the attribute and the constant say the same
+// thing", on every page, with and without ?home=.
+// ==========================================
+{
+  const shell = (lang, theme) =>
+    `<!doctype html>\n<html lang="${lang}" dir="ltr" data-theme="${theme}" data-skin="lite" data-export="stamp-9">`
+    + '<head></head><body><div class="ds-shell"><aside class="ds-sidebar"></aside>'
+    + '<main class="ds-main"><h1>Demo</h1></main></div>'
+    + '<script>window.__DOCSNAP_PREFIX__="";'
+    + 'window.__DOCSNAP_LANG__="en";'
+    + 'window.__DOCSNAP_LANGS__=["en","ja","fa"];'
+    + 'window.__DOCSNAP_RTL__=["fa"];'
+    + 'window.__DOCSNAP_THEME__="light";'
+    + 'window.__DOCSNAP_SKIN__="lite";'
+    + 'window.__DOCSNAP_EXPORT__="stamp-9";</script>'
+    + '</body></html>'
+
+  put('demo/docsnap/1.0.4/index.html', shell('en', 'light'), 'text/html; charset=utf-8')
+  put('demo/docsnap/1.0.4/files.html', shell('en', 'light'), 'text/html; charset=utf-8')
+  // A page from a version that predates the language registry.
+  put('demo/docsnap/0.8.0/old.html',
+      '<html lang="en" data-theme="light"><body><aside class="ds-sidebar"></aside></body></html>',
+      'text/html; charset=utf-8')
+
+  const attr = (html, name) => (html.match(new RegExp('<html[^>]*\\b' + name + '="([^"]*)"')) || [])[1]
+  const global = (html, name) => (html.match(new RegExp('window\\.' + name + '\\s*=\\s*"([^"]*)"')) || [])[1]
+
+  for (const [label, path] of [['the page the reader arrives at', '/assets/demo/docsnap/1.0.4/index.html?home=/unity-docsnap'],
+                               ['a page they click through to', '/assets/demo/docsnap/1.0.4/files.html']]) {
+    const r = await get(path, { Cookie: 'lang=fa; theme=dark' })
+    const html = await r.text()
+    ok(label + ': takes the site language', attr(html, 'lang') === 'fa', String(attr(html, 'lang')))
+    ok(label + ': takes the direction with it', attr(html, 'dir') === 'rtl', String(attr(html, 'dir')))
+    ok(label + ': takes the site theme', attr(html, 'data-theme') === 'dark', String(attr(html, 'data-theme')))
+    // THE invariant. The two halves of the export read different
+    // places; if they disagree the demo's own switchers stop
+    // surviving a click.
+    ok(label + ': the baked constant agrees with the tag (language)',
+       global(html, '__DOCSNAP_LANG__') === attr(html, 'lang'),
+       global(html, '__DOCSNAP_LANG__') + ' vs ' + attr(html, 'lang'))
+    ok(label + ': the baked constant agrees with the tag (theme)',
+       global(html, '__DOCSNAP_THEME__') === attr(html, 'data-theme'),
+       global(html, '__DOCSNAP_THEME__') + ' vs ' + attr(html, 'data-theme'))
+    ok(label + ': the export stamp is left alone', html.includes('"stamp-9"'))
+    ok(label + ': the language registry is left alone',
+       html.includes('window.__DOCSNAP_LANGS__=["en","ja","fa"]'), 'the array constant was rewritten')
+    ok(label + ': the skin is left alone', global(html, '__DOCSNAP_SKIN__') === 'lite')
+  }
+
+  // Two pages of one visit must come out identical, or the marker
+  // the export checks changes under the reader mid-demo.
+  {
+    const a = await (await get('/assets/demo/docsnap/1.0.4/index.html', { Cookie: 'lang=ja; theme=light' })).text()
+    const b = await (await get('/assets/demo/docsnap/1.0.4/files.html', { Cookie: 'lang=ja; theme=light' })).text()
+    ok('both pages of a visit agree on the language',
+       attr(a, 'lang') === attr(b, 'lang') && attr(a, 'lang') === 'ja')
+    ok('both pages of a visit agree on the theme',
+       attr(a, 'data-theme') === attr(b, 'data-theme') && attr(a, 'data-theme') === 'light')
+  }
+
+  // No theme cookie means the reader has expressed no preference.
+  // Inventing one here would override the export's own default
+  // for no reason.
+  {
+    const html = await (await get('/assets/demo/docsnap/1.0.4/index.html', { Cookie: 'lang=fa' })).text()
+    ok('with no theme cookie the export keeps its own theme', attr(html, 'data-theme') === 'light',
+       String(attr(html, 'data-theme')))
+    ok('  and the constant keeps it too', global(html, '__DOCSNAP_THEME__') === 'light',
+       String(global(html, '__DOCSNAP_THEME__')))
+    ok('  while the language is still adopted', attr(html, 'lang') === 'fa', String(attr(html, 'lang')))
+  }
+
+  // A language this export does not carry is not forced onto it -
+  // every visible string in that page would stay English with the
+  // document claiming otherwise, which is worse than leaving it.
+  {
+    put('demo/docsnap/1.0.4/en-only.html',
+        shell('en', 'light').replace('["en","ja","fa"]', '["en"]'),
+        'text/html; charset=utf-8')
+    const html = await (await get('/assets/demo/docsnap/1.0.4/en-only.html', { Cookie: 'lang=fa; theme=dark' })).text()
+    ok('a language the export does not have is left alone', attr(html, 'lang') === 'en', String(attr(html, 'lang')))
+    ok('  but the theme is still adopted', attr(html, 'data-theme') === 'dark', String(attr(html, 'data-theme')))
+    ok('  and the bar is still in the reader\'s language',
+       html.includes('\u0628\u0627\u0632\u06af\u0634\u062a \u0628\u0647 \u0633\u0627\u06cc\u062a'), 'bar not in Persian')
+  }
+
+  // An older export with no constants at all must still work.
+  {
+    const r = await get('/assets/demo/docsnap/0.8.0/old.html', { Cookie: 'lang=fa; theme=dark' })
+    const html = await r.text()
+    ok('a page with no baked constants still gets the tag rewritten', attr(html, 'lang') === 'fa', String(attr(html, 'lang')))
+    ok('  and no constant is invented for it', !html.includes('__DOCSNAP_LANG__'), 'an assignment was added')
+    ok('  and it still gets a way back to the site', html.includes('unity-docsnap'))
+  }
+
+  // The validator has to move with the body, or a reader
+  // revalidates their way into the page built for the language
+  // they had yesterday.
+  {
+    const one = await get('/assets/demo/docsnap/1.0.4/index.html', { Cookie: 'lang=fa; theme=dark' })
+    const two = await get('/assets/demo/docsnap/1.0.4/index.html', { Cookie: 'lang=ja; theme=light' })
+    ok('the ETag differs between two readers', one.headers.get('ETag') !== two.headers.get('ETag'),
+       one.headers.get('ETag'))
+    const again = await get('/assets/demo/docsnap/1.0.4/index.html',
+                            { Cookie: 'lang=fa; theme=dark', 'If-None-Match': one.headers.get('ETag') })
+    ok('the same reader gets a 304', again.status === 304, String(again.status))
+    ok('and the answer still says it varies by cookie',
+       (one.headers.get('Vary') || '').includes('Cookie'), String(one.headers.get('Vary')))
+  }
+}
+
+
+// ==========================================
+// `immutable` means the address can never hold other bytes
+//
+// It is a promise to every cache between here and the reader
+// that they need never ask again for a year, and it was being
+// made about addresses somebody uploads over: the site logo, a
+// screenshot a landing page points at. Replacing one of those is
+// the whole point of replacing it, and a year of `immutable`
+// means nobody who already loaded it ever sees the new one.
+//
+// A date in the key is what makes the promise true - an
+// attachment is written once under a dated prefix with a UUID
+// for a name and can never be written again.
+// ==========================================
+{
+  put('contact/2026-09-11/9f3c0000.png', 'PNGDATA', 'image/png')
+  put('mail/2026-09-11/2b710000.jpg', 'JPGDATA', 'image/jpeg')
+  put('AmirColliderLogo.png', 'PNGDATA', 'image/png')
+  put('screens/neon-hero.png', 'PNGDATA', 'image/png')
+
+  const cc = async (path) => (await get(path)).headers.get('Cache-Control')
+
+  for (const key of ['contact/2026-09-11/9f3c0000.png', 'mail/2026-09-11/2b710000.jpg']) {
+    const header = await cc('/assets/' + key)
+    ok(key + ': a dated, uuid-named attachment keeps the year',
+       header === 'public, max-age=31536000, immutable', String(header))
+  }
+
+  for (const key of ['AmirColliderLogo.png', 'screens/neon-hero.png']) {
+    const header = await cc('/assets/' + key)
+    ok(key + ': an address somebody uploads over does NOT promise a year',
+       header === 'public, max-age=3600, must-revalidate', String(header))
+  }
+
+  // Cheap to be right: it still revalidates rather than
+  // re-downloading.
+  {
+    const first = await get('/assets/AmirColliderLogo.png')
+    const again = await get('/assets/AmirColliderLogo.png', { 'If-None-Match': first.headers.get('ETag') })
+    ok('and a replaceable asset still answers 304 when unchanged', again.status === 304, String(again.status))
+  }
+}
+
 
 console.log('\nFAILURES: ' + fails)
 process.exit(fails ? 1 : 0)

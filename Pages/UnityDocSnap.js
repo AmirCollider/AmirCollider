@@ -219,6 +219,7 @@ const I18N = {
     everythingInPlus: 'هرچه در Plus هست، به‌علاوه:',
     buyFine: 'کد فوراً بعد از پرداخت تحویل داده می‌شود. روی یک سیستم فعال می‌شود و هر وقت خواستی خودت می‌توانی آزادش کنی و ببری روی سیستم دیگر.',
     haveKey: 'کد دارم',
+    setBrand: 'تنظیم لوگو، فوتر و قفل بخش‌ها',
     orderHelp: 'سفارشم نرسیده',
     popular: 'محبوب‌ترین',
 
@@ -345,6 +346,7 @@ const I18N = {
     everythingInPlus: 'Everything in Plus, plus:',
     buyFine: 'Your key is delivered the moment payment clears. It activates on one machine, and you can release it yourself any time to move to another.',
     haveKey: 'I have a key',
+    setBrand: 'Set your logo, footer and locked sections',
     orderHelp: 'My order has not arrived',
     popular: 'Most popular',
 
@@ -471,6 +473,7 @@ const I18N = {
     everythingInPlus: 'Plus のすべてに加えて:',
     buyFine: '決済完了と同時にキーが届きます。1 台で有効化でき、別のマシンへはいつでも自分で移せます。',
     haveKey: 'キーを持っています',
+    setBrand: 'ロゴ・フッター・ロックを設定する',
     orderHelp: '注文が届かない',
     popular: '人気',
 
@@ -632,9 +635,20 @@ const ROWS = [
   {
     free: false, plus: false, pro: true,
     label: {
-      fa: '✨ لوگوی خودت توی سایدبار',
-      en: '✨ Your own logo in the sidebar',
-      ja: '✨ サイドバーに自社ロゴ'
+      fa: '✨ لوگو و خط فوتر خودت روی هر خروجی',
+      en: '✨ Your own logo and footer line on every export',
+      ja: '✨ すべてのエクスポートに自社ロゴとフッター'
+    }
+  },
+  {
+    // Sold nowhere on this page until 6.9.1, which is a strange
+    // thing to leave out of the edition that has it: it is the
+    // feature that makes an export safe to hand to a client.
+    free: false, plus: false, pro: true,
+    label: {
+      fa: '🔐 قفل کردن بخش‌ها — حذف یا رمزنگاری بخشی از خروجی',
+      en: '🔐 Section locking — leave part of an export out, or encrypt it',
+      ja: '🔐 セクションのロック — 一部を除外、または暗号化'
     }
   }
 ]
@@ -1258,7 +1272,11 @@ function renderPricing(p, lang) {
 
       </div>
       <p class="fine center">${escapeHtml(p.buyFine)}</p>
-      <p class="center"><a class="quiet" href="/license">${escapeHtml(p.haveKey)} →</a></p>
+      <p class="center">
+        <a class="quiet" href="/license">${escapeHtml(p.haveKey)} →</a>
+        <span class="quiet-sep" aria-hidden="true">·</span>
+        <a class="quiet" href="/unity-docsnap/panel">${escapeHtml(p.setBrand)} →</a>
+      </p>
     </section>`
 }
 
@@ -2011,6 +2029,7 @@ function css() {
     .tier-for { font-size: 0.82em; color: var(--text-dim); text-align: start; }
     .quiet { color: var(--text-dim); font-size: 0.9em; text-decoration: none; }
     .quiet:hover { color: var(--text); }
+    .quiet-sep { color: var(--text-dim); opacity: .6; margin: 0 8px; font-size: 0.9em; }
 
     /* ---------- what it is / is not ----------
        Two columns of the same weight. The denial is not a footnote

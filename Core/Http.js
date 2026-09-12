@@ -68,3 +68,39 @@ export function timingSafeEqual(a, b) {
   for (let i = 0; i < left.length; i++) diff |= left.charCodeAt(i) ^ right.charCodeAt(i)
   return diff === 0
 }
+
+
+// ==========================================
+// readJsonObject
+// A request body, or null - and never anything in between.
+//
+// `await request.json()` throws on text that is not JSON, which
+// every handler here already catches. What it does NOT throw on
+// is JSON that parses to something other than an object: the
+// four bytes `null`, a bare number, a string, an array. Those
+// come back as a value, the catch never runs, and the next line
+// - `body.action`, `body.email`, `body.o` - is a TypeError on
+// null and a silent undefined on the rest.
+//
+// That was a real 500 on four endpoints, including the panel's
+// API and the order lookup, reachable by anybody who could
+// type curl. A 500 is also the wrong ANSWER: the honest reply
+// to a body that is not a request is "that is not a request",
+// with the code the caller can act on.
+//
+// Returns the object, or null for everything else - including a
+// body that was not sent at all. Arrays are refused on purpose:
+// no endpoint here takes one at the top level, and `[].action`
+// is undefined rather than an error, which is how a malformed
+// call turns into a confusing refusal instead of a clear one.
+// ==========================================
+export async function readJsonObject(request) {
+  let parsed
+  try {
+    parsed = await request.json()
+  } catch {
+    return null
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+  return parsed
+}

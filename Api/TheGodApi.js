@@ -17,7 +17,7 @@
 //      return text; running it is a human with wrangler.
 // ==========================================
 
-import { createJsonResponse, timingSafeEqual } from '../Core/Http.js'
+import { createJsonResponse, timingSafeEqual, readJsonObject } from '../Core/Http.js'
 import { logInfo, logWarning } from '../Core/Logging.js'
 import { panelPassword } from '../Core/PanelSession.js'
 import { getGameProduct, getGameEnvNames } from '../Config.js'
@@ -672,12 +672,7 @@ export async function handleTheGodApi(url, request, gameId, requestId, GAMES, en
   const refusal = await authorize(request, env)
   if (refusal) return refusal
 
-  let body
-  try {
-    body = await request.json()
-  } catch {
-    body = {}
-  }
+  const body = (await readJsonObject(request)) || {}
 
   const action = String(body.action || '').toLowerCase()
 

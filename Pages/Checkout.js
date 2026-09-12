@@ -15,7 +15,7 @@
 
 import { CONFIG } from '../Config.js'
 import { getPageHead } from '../Core/DesignSystem.js'
-import { createHtmlResponse, createJsonResponse, clientIp } from '../Core/Http.js'
+import { createHtmlResponse, createJsonResponse, clientIp, readJsonObject } from '../Core/Http.js'
 import { logInfo, logWarning, logError } from '../Core/Logging.js'
 import { supportTemplate, mailtoFor } from '../Content/SupportTemplates.js'
 import { signOrderToken, readOrderToken, verifyIpnSignature } from '../Commerce/Seal.js'
@@ -413,10 +413,8 @@ export async function handleCheckoutCreate(url, request, gameId, requestId, GAME
     return createJsonResponse({ ok: false, error: 'not_configured', message: t.errOff }, 503)
   }
 
-  let body
-  try {
-    body = await request.json()
-  } catch {
+  const body = await readJsonObject(request)
+  if (!body) {
     return createJsonResponse({ ok: false, error: 'bad_request', message: t.errEmail }, 400)
   }
 
@@ -552,10 +550,8 @@ export async function handleCheckoutResend(url, request, gameId, requestId, GAME
   const database = db(env)
   if (!database) return createJsonResponse({ ok: false, error: 'not_configured' }, 503)
 
-  let body
-  try {
-    body = await request.json()
-  } catch {
+  const body = await readJsonObject(request)
+  if (!body) {
     return createJsonResponse({ ok: false, error: 'bad_request' }, 400)
   }
 

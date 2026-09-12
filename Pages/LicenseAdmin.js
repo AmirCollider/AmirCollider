@@ -20,7 +20,7 @@
 //   order    a checkout order id         (from the order panel)
 // ==========================================
 
-import { createJsonResponse, timingSafeEqual } from '../Core/Http.js'
+import { createJsonResponse, timingSafeEqual, readJsonObject } from '../Core/Http.js'
 import { logInfo, logWarning } from '../Core/Logging.js'
 import { isTestSiteSession } from './TestSite.js'
 import {
@@ -134,12 +134,7 @@ export async function handleLicenseAdminPanel(url, request, gameId, requestId, G
     }, 503)
   }
 
-  let body
-  try {
-    body = await request.json()
-  } catch {
-    body = {}
-  }
+  const body = (await readJsonObject(request)) || {}
 
   const action = String(body.action || 'list').toLowerCase()
 

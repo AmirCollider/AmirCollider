@@ -25,7 +25,7 @@
 import { CONFIG, CORS_HEADERS, LANGUAGES, SECURITY, getGamesConfig, validateEnvironment } from './Config.js'
 import { createJsonResponse, createErrorResponse } from './Core/Http.js'
 import { logInfo, logError, generateRequestId } from './Core/Logging.js'
-import { isLangRoutable, localizedPath, splitLangPath } from './Core/Locale.js'
+import { isLangRoutable, localizedPath, splitLangPath, stripLangPath } from './Core/Locale.js'
 import { matchRequestLang } from './Core/RequestContext.js'
 
 import { handleOAuthAuth, handleOAuthCallback, handleTokenExchange, handleRefreshToken } from './Api/OAuthApi.js'
@@ -456,6 +456,78 @@ function decodeParam(value) {
   }
 }
 
+// ==========================================
+// applyCaching
+// What a cache may do with a page, said out loud.
+//
+// Every HTML document on this site used to leave with no
+// Cache-Control at all, which is not "do not cache" - it is "work
+// it out yourself". A browser with no instruction applies
+// heuristic freshness and will happily hand a page back on a
+// Back navigation, and the page it hands back can be one written
+// for whoever was signed in before. On a shared computer that is
+// somebody else's account page: their address, their username,
+// their scores, after they signed out.
+//
+// So the rule is the ownership of the bytes:
+//
+//   no-store          A page written for ONE reader: anything
+//                     behind a session, and the pages that carry
+//                     an order or a licence key. Never written to
+//                     disk, never returned to a Back button.
+//
+//   max-age=0,
+//   must-revalidate   Everything else. A bare path is always the
+//                     default language and a prefixed one always
+//                     its own, so a public page is decided by its
+//                     URL alone and is safe to share - but it is
+//                     also rewritten by every deploy, so it is
+//                     checked every time rather than assumed
+//                     fresh. This is what browsers were doing
+//                     anyway; it is now what they are told.
+//
+// A handler that set its own header keeps it. Several already
+// do, and they know more about their page than this does.
+// ==========================================
+const PERSONAL_PATHS = [
+  '/thegod', '/testsite', CONFIG.MAIL.PATH,
+  '/checkout', '/order', '/license',
+  '/unity-docsnap/panel'
+]
+
+// The cookies that mean "this request is somebody in particular".
+// A page built while one of these was present must not be handed
+// to the next person at this keyboard.
+const SESSION_COOKIES = [
+  'amir_thegod_auth', 'amir_testsite_auth', 'amir_mail_auth', 'ac_player='
+]
+
+function isPersonal(request, path) {
+  const bare = stripLangPath(path)
+  if (PERSONAL_PATHS.some(prefix => bare === prefix || bare.startsWith(prefix + '/'))) return true
+  if (/^\/[^/]+\/account(\/|$)/.test(bare)) return true
+  const cookie = (request && request.headers && request.headers.get('Cookie')) || ''
+  return SESSION_COOKIES.some(name => cookie.includes(name))
+}
+
+function applyCaching(request, headers) {
+  if (headers.has('Cache-Control')) return
+
+  const type = headers.get('Content-Type') || ''
+  if (!type.includes('text/html')) return
+
+  let path = '/'
+  try { path = new URL(request.url).pathname } catch { /* the default is fine */ }
+
+  if (isPersonal(request, path)) {
+    headers.set('Cache-Control', 'no-store')
+    headers.set('Vary', 'Cookie')
+    return
+  }
+  headers.set('Cache-Control', 'public, max-age=0, must-revalidate')
+}
+
+
 function pathMatches(route, path) {
   if (route.prefix) return path.startsWith(route.path)
   if (route.dynamic) return patternToRegex(route.path).test(path)
@@ -836,6 +908,7 @@ async function handleRequest(request, env) {
     for (const [key, value] of Object.entries(CORS_HEADERS)) headers.set(key, value)
     for (const [key, value] of Object.entries(SECURITY.SECURE_HEADERS)) headers.set(key, value)
     headers.set('X-Request-ID', requestId)
+    applyCaching(request, headers)
 
     const finalResponse = new Response(response.body, {
       status: response.status,

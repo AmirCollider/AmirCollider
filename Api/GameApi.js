@@ -11,7 +11,7 @@
 //   GET  /:gameId/download                   the download link, gated
 // ==========================================
 
-import { createJsonResponse, createHtmlResponse } from '../Core/Http.js'
+import { createJsonResponse, createHtmlResponse, readJsonObject } from '../Core/Http.js'
 import { logInfo, logWarning } from '../Core/Logging.js'
 import { getPageHead } from '../Core/DesignSystem.js'
 import { CONFIG, getGameProduct } from '../Config.js'
@@ -169,10 +169,8 @@ export async function handleGameConsume(url, request, gameId, requestId, GAMES, 
     return createJsonResponse({ ok: false, error: 'unauthorized' }, 401)
   }
 
-  let body
-  try {
-    body = await request.json()
-  } catch {
+  const body = await readJsonObject(request)
+  if (!body) {
     return createJsonResponse({ ok: false, error: 'bad_request' }, 400)
   }
 

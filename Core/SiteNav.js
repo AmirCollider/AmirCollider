@@ -138,6 +138,7 @@ export const NAV_I18N = {
     directtmp: 'Unity DirectTMP',
     metrics: 'متریک‌ها',
     license: 'مدیریت لایسنس',
+    brandPanel: 'پنل برند DocSnap',
     orderHelp: 'پیگیری سفارش',
     privacy: 'حریم خصوصی',
     terms: 'شرایط استفاده',
@@ -174,6 +175,7 @@ export const NAV_I18N = {
     directtmp: 'Unity DirectTMP',
     metrics: 'Metrics',
     license: 'Manage licence',
+    brandPanel: 'DocSnap brand panel',
     orderHelp: 'Order help',
     privacy: 'Privacy',
     terms: 'Terms',
@@ -210,6 +212,7 @@ export const NAV_I18N = {
     directtmp: 'Unity DirectTMP',
     metrics: 'メトリクス',
     license: 'ライセンス管理',
+    brandPanel: 'DocSnap ブランドパネル',
     orderHelp: '注文サポート',
     privacy: 'プライバシー',
     terms: '利用規約',
@@ -337,7 +340,7 @@ export function siteNavCss() {
        adds none of its own and the two always agree. */
     .ac-nav-in {
       max-width: var(--acn-maxw); margin-inline: auto;
-      display: flex; align-items: center; gap: 14px;
+      display: flex; align-items: center; flex-wrap: wrap; gap: 14px;
       padding-block: 10px; min-height: 60px;
     }
 
@@ -364,9 +367,31 @@ export function siteNavCss() {
     .ac-brand-name { font-weight: 800; font-size: 0.98em; letter-spacing: 0.2px; }
     .ac-brand-sub { font-size: 0.72em; color: var(--acn-dim); white-space: nowrap; }
 
+    /* Wraps rather than scrolls, and that is the whole point of
+       this rule. It used to be a one-line strip with overflow-x
+       auto and the scrollbar hidden, which on a phone is exactly
+       right - a thumb swipes it - and on a laptop is a trap: the
+       last link was cut off mid-word with nothing on screen to
+       say it was there, and a mouse has no way to scroll a
+       horizontal strip. "Unity DirectTMP" read "Unity Di" at
+       every desktop width in English, on every page of the site,
+       because the English labels are longer than the Persian ones
+       the layout was eyeballed against.
+       Below 900px the nav becomes its own full-width row and the
+       one-line scroller comes back - see the media query. */
     .ac-links {
-      display: flex; align-items: center; gap: 4px;
-      flex: 1 1 auto; min-width: 0; overflow-x: auto;
+      display: flex; align-items: center; flex-wrap: wrap;
+      gap: 4px; row-gap: 2px;
+      /* The basis is the whole trick. When there is at least this
+         much room beside the brand and the controls - enough for the
+         longest of the three label sets - the links sit
+         between them on one line. When there is not - a page whose
+         reading column is 820px, read in English, where the labels
+         are longer than the Persian ones this was eyeballed
+         against - the whole strip wraps onto its own line instead,
+         where it has the full width and fits. Two tidy rows rather
+         than one row with a link broken across it. */
+      flex: 1 1 520px; min-width: 0;
       scrollbar-width: none; -ms-overflow-style: none;
     }
     .ac-links::-webkit-scrollbar { height: 0; display: none; }
@@ -384,7 +409,10 @@ export function siteNavCss() {
       border-color: color-mix(in srgb, var(--acn-accent) 38%, transparent);
     }
 
-    .ac-ctl { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+    /* Always at the far end of its row, which matters on the line
+       it shares with the brand alone after the links have wrapped
+       away. */
+    .ac-ctl { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; margin-inline-start: auto; }
     .ac-seg {
       display: inline-flex; padding: 3px; gap: 2px; border-radius: 11px;
       background: var(--acn-surface); border: 1px solid var(--acn-border);
@@ -508,8 +536,9 @@ export function siteNavCss() {
 
     @media (max-width: 900px) {
       .ac-nav-in { flex-wrap: wrap; gap: 10px; padding-block: 10px; }
-      .ac-links { order: 3; width: 100%; padding-block-end: 2px; }
-      .ac-ctl { margin-inline-start: auto; }
+      /* A phone: a single swipeable line, and below the controls
+         rather than between them. */
+      .ac-links { order: 3; width: 100%; padding-block-end: 2px; flex-wrap: nowrap; overflow-x: auto; }
     }
     @media (max-width: 560px) {
       .ac-brand-sub { display: none; }
@@ -914,6 +943,12 @@ export function siteFooter({ lang, games = [] } = {}) {
         { href: '/privacy', label: p.privacy },
         { href: '/terms', label: p.terms },
         { href: '/license', label: p.license },
+        // Where a Pro customer sets their studio logo, their
+        // footer line and which sections are locked. It was
+        // linked from exactly one page, two clicks in, and the
+        // first thing anybody who bought Pro for the logo said
+        // was that they could not find it.
+        { href: '/unity-docsnap/panel', label: p.brandPanel },
         { href: '/order', label: p.orderHelp },
         // The form first, the raw address second. Somebody who
         // wants to write a message gets a box to write it in; the
