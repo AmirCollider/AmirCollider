@@ -41,7 +41,7 @@ right-to-left — which is how one of these tools happened at all.
 
 | | what it is | where |
 |---|---|---|
-| 🌸 | **Neon Katana** — neon action sword game | [page](https://amircollider.com/en/neon-katana) · [Myket](https://myket.ir/app/com.AmirColliderGames.NeonKatana) |
+| 🌸 | **Neon Katana** — neon action sword game | [page](https://amircollider.com/en/neon-katana) · [APK](https://amircollider.com/neon-katana/download?store=apk) |
 | 🗡 | **Chrono Blades** — one knife, one spinning target, a stage that never ends | [page](https://amircollider.com/en/chronoblades) · [APK](https://dl.amircollider.com/APK/ChronoBlades.apk) |
 | 🧋 | **Unity DocSnap** — automatic Unity project documentation, as an offline website | [page](https://amircollider.com/en/unity-docsnap) · [repo](https://github.com/AmirCollider/UnityDocSnap) |
 | 🖋 | **Unity DirectTMP** — hand TextMeshPro the font file itself, and every language just works | [page](https://amircollider.com/en/unity-directtmp) · [repo](https://github.com/AmirCollider/UnityDirectTMP) · [OpenUPM](https://openupm.com/packages/com.amircollider.unitydirecttmp/) |
@@ -57,34 +57,26 @@ installing anything.
 </details>
 
 <details>
-<summary><b>🇮🇷 &nbsp;فارسی</b> &nbsp;·&nbsp; <i>یه‌کم درباره‌ی من</i> ⋆˙⟡</summary>
+<summary dir="rtl" align="right"><b>🇮🇷 &nbsp;فارسی</b> &nbsp;·&nbsp; <i>یه‌کم درباره‌ی من</i> ⋆˙⟡</summary>
 
 <br>
 
 <div dir="rtl" align="right">
 
-من **امیر کلایدر**م — یه توسعه‌دهنده‌ی مستقل که بازی‌های کوچیک می‌سازه، و
-ابزارهای یونیتی‌ای که وسطِ ساختنِ همون بازی‌ها از دلشون در اومدن. INFP‌ام، برای
-همین هر پروژه با یه حس شروع می‌شه و با یه پنجره‌ی تنظیمات که هیچ‌کس نخواسته بود
-تموم می‌شه `(๑˃ᴗ˂)ﻭ`
+من **امیر کلایدر**م — یه توسعه‌دهنده‌ی مستقل که بازی‌های کوچیک می‌سازه و ابزارهای یونیتی‌ای که از دل ساخت همون بازی‌ها بیرون اومدن. تیپم INFP‌ه، برای همین هر پروژه با یه حس درونی شروع می‌شه و با یه پنجره‌ی تنظیمات که هیشکی نخواسته بود تموم می‌شه <span dir="ltr">`(๑˃ᴗ˂)و`</span>
 
-هر چیزی که منتشر می‌کنم **فارسی، انگلیسی و ژاپنی** حرف می‌زنه — و فارسی
-راست‌به‌چپه، که اصلاً دلیلِ به‌دنیا اومدنِ یکی از همین ابزارهاست.
+هر چیزی که منتشر می‌کنم **فارسی، انگلیسی و ژاپنی** رو پشتیبانی می‌کنه — و راست‌به‌چپ بودن زبان فارسی، دلیل اصلی خلق‌شدن یکی از همین ابزارهاست.
 
 | | چیه | کجا |
 |---|---|---|
-| 🌸 | **Neon Katana** — بازی اکشن شمشیر نئونی | [صفحه](https://amircollider.com/neon-katana) · [مایکت](https://myket.ir/app/com.AmirColliderGames.NeonKatana) |
-| 🗡 | **Chrono Blades** — یک چاقو، یک هدف در حال چرخش، و مرحله‌ای که هیچ‌وقت تموم نمی‌شه | [صفحه](https://amircollider.com/chronoblades) · [APK](https://dl.amircollider.com/APK/ChronoBlades.apk) |
-| 🧋 | **Unity DocSnap** — مستندسازی خودکار پروژه‌ی یونیتی، توی یه وب‌سایت آفلاین | [صفحه](https://amircollider.com/unity-docsnap) · [مخزن](https://github.com/AmirCollider/UnityDocSnap) |
-| 🖋 | **Unity DirectTMP** — فایل فونت رو مستقیم بده به TextMeshPro، هر زبونی همون‌جوری که هست | [صفحه](https://amircollider.com/unity-directtmp) · [مخزن](https://github.com/AmirCollider/UnityDirectTMP) · [OpenUPM](https://openupm.com/packages/com.amircollider.unitydirecttmp/) |
+| 🌸 | **Neon Katana** — بازی اکشن شمشیر نئونی | [صفحه](https://amircollider.com/neon-katana) · [APK](https://amircollider.com/neon-katana/download?store=apk) |
+| 🗡 | **Chrono Blades** — یک چاقو، یک هدف در حال چرخش و مرحله‌ای بی‌انتها | [صفحه](https://amircollider.com/chronoblades) · [APK](https://dl.amircollider.com/APK/ChronoBlades.apk) |
+| 🧋 | **Unity DocSnap** — مستندسازی خودکار پروژه‌ی یونیتی در قالب یک وب‌سایت آفلاین | [صفحه](https://amircollider.com/unity-docsnap) · [مخزن](https://github.com/AmirCollider/UnityDocSnap) |
+| 🖋 | **Unity DirectTMP** — اتصال مستقیم فایل فونت به TextMeshPro بدون دردسر | [صفحه](https://amircollider.com/unity-directtmp) · [مخزن](https://github.com/AmirCollider/UnityDirectTMP) · [OpenUPM](https://openupm.com/packages/com.amircollider.unitydirecttmp/) |
 
-**DirectTMP** رایگان و MIT‌ه — حروف فارسی و عربی واقعاً به هم می‌چسبن،
-راست‌به‌چپ خونده می‌شن، و شکلِ چسبیده‌شون از جدول OpenType خودِ فونت در میاد.
-**DocSnap** یه نسخه‌ی رایگان داره که نه کد می‌خواد نه حساب کاربری، و می‌تونی
-[یه خروجی واقعیش رو](https://amircollider.com/unity-docsnap) قبل از نصبِ هر
-چیزی بگردی.
+پکیج **DirectTMP** کاملاً رایگان و تحت لایسنس MIT است؛ حروف فارسی و عربی به زیبایی به هم می‌چسبند، راست‌به‌چپ خوانده می‌شوند و کاراکترها مستقیماً از جدول OpenType خود فایل فونت خوانده می‌شوند. ابزار **DocSnap** هم یک نسخه‌ی رایگان بدون نیاز به کلید یا حساب کاربری دارد که می‌توانی [خروجی واقعی آن را](https://amircollider.com/unity-docsnap) پیش از نصب بررسی کنی.
 
-💌 &nbsp;[amircollider.com/contact](https://amircollider.com/contact) — خودم می‌خونم و خودم جواب می‌دم.
+💌 ارتباط مستقیم: [amircollider.com/contact](https://amircollider.com/contact) — خودم پیام‌ها را می‌خوانم و پاسخ می‌دهم.
 
 </div>
 
@@ -104,7 +96,7 @@ installing anything.
 
 | | なにか | どこ |
 |---|---|---|
-| 🌸 | **Neon Katana** — ネオンの剣アクションゲーム | [ページ](https://amircollider.com/ja/neon-katana) · [Myket](https://myket.ir/app/com.AmirColliderGames.NeonKatana) |
+| 🌸 | **Neon Katana** — ネオンの剣アクションゲーム | [ページ](https://amircollider.com/ja/neon-katana) · [APK](https://amircollider.com/neon-katana/download?store=apk) |
 | 🗡 | **Chrono Blades** — 一本のナイフ、回る標的、そして終わらないステージ | [ページ](https://amircollider.com/ja/chronoblades) · [APK](https://dl.amircollider.com/APK/ChronoBlades.apk) |
 | 🧋 | **Unity DocSnap** — Unity プロジェクトのドキュメントを自動生成し、オフライン Web サイトに | [ページ](https://amircollider.com/ja/unity-docsnap) · [リポジトリ](https://github.com/AmirCollider/UnityDocSnap) |
 | 🖋 | **Unity DirectTMP** — フォントファイルをそのまま TextMeshPro へ。どんな言語も、そのまま | [ページ](https://amircollider.com/ja/unity-directtmp) · [リポジトリ](https://github.com/AmirCollider/UnityDirectTMP) · [OpenUPM](https://openupm.com/packages/com.amircollider.unitydirecttmp/) |
