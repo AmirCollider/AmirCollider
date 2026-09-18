@@ -69,7 +69,7 @@ installing anything.
 
 | | چیه | کجا |
 |---|---|---|
-| 🌸 | **Neon Katana** — بازی فروت نینجا با تم نئونی | [صفحه](https://amircollider.com/neon-katana) · [APK](https://amircollider.com/neon-katana/download?store=apk) |
+| 🌸 | **Neon Katana** — یک بازی فروت نینجا با تم نئونی | [صفحه](https://amircollider.com/neon-katana) · [APK](https://amircollider.com/neon-katana/download?store=apk) |
 | 🗡 | **Chrono Blades** — یک چاقو، یک هدف در حال چرخش و مرحله‌ای بی‌انتها | [صفحه](https://amircollider.com/chronoblades) · [APK](https://dl.amircollider.com/APK/ChronoBlades.apk) |
 | 🧋 | **Unity DocSnap** — مستندسازی خودکار پروژه‌ی یونیتی در قالب یک وب‌سایت آفلاین | [صفحه](https://amircollider.com/unity-docsnap) · [مخزن](https://github.com/AmirCollider/UnityDocSnap) |
 | 🖋 | **Unity DirectTMP** — اتصال مستقیم فایل فونت به TextMeshPro بدون دردسر | [صفحه](https://amircollider.com/unity-directtmp) · [مخزن](https://github.com/AmirCollider/UnityDirectTMP) · [OpenUPM](https://openupm.com/packages/com.amircollider.unitydirecttmp/) |
