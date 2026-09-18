@@ -41,7 +41,7 @@ right-to-left — which is how one of these tools happened at all.
 
 | | what it is | where |
 |---|---|---|
-| 🌸 | **Neon Katana** — neon action sword game | [page](https://amircollider.com/en/neon-katana) · [APK](https://amircollider.com/neon-katana/download?store=apk) |
+| 🌸 | **Neon Katana** — neon-themed Fruit Ninja style game | [page](https://amircollider.com/en/neon-katana) · [APK](https://amircollider.com/neon-katana/download?store=apk) |
 | 🗡 | **Chrono Blades** — one knife, one spinning target, a stage that never ends | [page](https://amircollider.com/en/chronoblades) · [APK](https://dl.amircollider.com/APK/ChronoBlades.apk) |
 | 🧋 | **Unity DocSnap** — automatic Unity project documentation, as an offline website | [page](https://amircollider.com/en/unity-docsnap) · [repo](https://github.com/AmirCollider/UnityDocSnap) |
 | 🖋 | **Unity DirectTMP** — hand TextMeshPro the font file itself, and every language just works | [page](https://amircollider.com/en/unity-directtmp) · [repo](https://github.com/AmirCollider/UnityDirectTMP) · [OpenUPM](https://openupm.com/packages/com.amircollider.unitydirecttmp/) |
@@ -69,7 +69,7 @@ installing anything.
 
 | | چیه | کجا |
 |---|---|---|
-| 🌸 | **Neon Katana** — بازی اکشن شمشیر نئونی | [صفحه](https://amircollider.com/neon-katana) · [APK](https://amircollider.com/neon-katana/download?store=apk) |
+| 🌸 | **Neon Katana** — بازی فروت نینجا با تم نئونی | [صفحه](https://amircollider.com/neon-katana) · [APK](https://amircollider.com/neon-katana/download?store=apk) |
 | 🗡 | **Chrono Blades** — یک چاقو، یک هدف در حال چرخش و مرحله‌ای بی‌انتها | [صفحه](https://amircollider.com/chronoblades) · [APK](https://dl.amircollider.com/APK/ChronoBlades.apk) |
 | 🧋 | **Unity DocSnap** — مستندسازی خودکار پروژه‌ی یونیتی در قالب یک وب‌سایت آفلاین | [صفحه](https://amircollider.com/unity-docsnap) · [مخزن](https://github.com/AmirCollider/UnityDocSnap) |
 | 🖋 | **Unity DirectTMP** — اتصال مستقیم فایل فونت به TextMeshPro بدون دردسر | [صفحه](https://amircollider.com/unity-directtmp) · [مخزن](https://github.com/AmirCollider/UnityDirectTMP) · [OpenUPM](https://openupm.com/packages/com.amircollider.unitydirecttmp/) |
@@ -96,7 +96,7 @@ installing anything.
 
 | | なにか | どこ |
 |---|---|---|
-| 🌸 | **Neon Katana** — ネオンの剣アクションゲーム | [ページ](https://amircollider.com/ja/neon-katana) · [APK](https://amircollider.com/neon-katana/download?store=apk) |
+| 🌸 | **Neon Katana** — ネオンテーマのフルーツニンジャ風ゲーム | [ページ](https://amircollider.com/ja/neon-katana) · [APK](https://amircollider.com/neon-katana/download?store=apk) |
 | 🗡 | **Chrono Blades** — 一本のナイフ、回る標的、そして終わらないステージ | [ページ](https://amircollider.com/ja/chronoblades) · [APK](https://dl.amircollider.com/APK/ChronoBlades.apk) |
 | 🧋 | **Unity DocSnap** — Unity プロジェクトのドキュメントを自動生成し、オフライン Web サイトに | [ページ](https://amircollider.com/ja/unity-docsnap) · [リポジトリ](https://github.com/AmirCollider/UnityDocSnap) |
 | 🖋 | **Unity DirectTMP** — フォントファイルをそのまま TextMeshPro へ。どんな言語も、そのまま | [ページ](https://amircollider.com/ja/unity-directtmp) · [リポジトリ](https://github.com/AmirCollider/UnityDirectTMP) · [OpenUPM](https://openupm.com/packages/com.amircollider.unitydirecttmp/) |
