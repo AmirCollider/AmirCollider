@@ -33,7 +33,7 @@
 
 ---
 
-<details open>
+<details>
 <summary><b>🇬🇧 &nbsp;English</b> &nbsp;·&nbsp; <i>a little about me</i> ⋆˙⟡</summary>
 
 <br>
