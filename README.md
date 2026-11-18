@@ -2,9 +2,9 @@
 
 ### سلام! ⋆ ｡°✩ Hi there! ✩°｡ ⋆ やっほー！
 
-**`( ˶ˆᗜˆ˵ )` I make games, the tools I wish I'd had — and lately, books**
+**`( ˶ˆᗜˆ˵ )` I make games, apps, the tools I wish I'd had — and lately, books**
 
-<sub>بازی می‌سازم، ابزارهایی که کاش خودم داشتم، و این روزها کتاب ⋆ ゲームと、欲しかった道具と、最近は本もつくっています</sub>
+<sub>بازی و اپ می‌سازم، ابزارهایی که کاش خودم داشتم، و این روزها کتاب ⋆ ゲームやアプリ、欲しかった道具と、最近は本もつくっています</sub>
 
 <br>
 
@@ -13,6 +13,7 @@
 [![Crazy Pong](https://img.shields.io/badge/%F0%9F%8F%93_Crazy_Pong-9B5DE5?style=flat-square&logoColor=white)](https://amircollider.com/en/crazypong)
 [![Frayed Red String](https://img.shields.io/badge/%F0%9F%A7%B5_Frayed_Red_String-D6336C?style=flat-square&logoColor=white)](https://amircollider.com/en/the-frayed-red-string)
 
+[![Pure Love](https://img.shields.io/badge/%F0%9F%92%97_Pure_Love-E5537A?style=flat-square&logoColor=white)](https://amircollider.com/en/purelove)
 [![Vocana](https://img.shields.io/badge/%F0%9F%8E%99_Vocana-2F7A4D?style=flat-square&logoColor=white)](https://amircollider.com/en/vocana)
 [![Unity DocSnap](https://img.shields.io/badge/%F0%9F%A7%8B_Unity_DocSnap-A78BFA?style=flat-square&logoColor=white)](https://amircollider.com/en/unity-docsnap)
 [![Unity DirectTMP](https://img.shields.io/badge/%F0%9F%96%8B_Unity_DirectTMP-4ECDC4?style=flat-square&logoColor=white)](https://amircollider.com/en/unity-directtmp)
@@ -38,7 +39,7 @@
 
 <br>
 
-I'm **AmirCollider** — an indie dev from Iran. I make small games, the tools that
+I'm **AmirCollider** — an indie dev from Iran. I make small games, apps, the tools that
 came out of making them, and printable workbooks for learning Japanese. INFP, so
 every project starts as a feeling and ends as a settings window nobody asked for `(๑˃ᴗ˂)ﻭ`
 
@@ -53,6 +54,12 @@ right-to-left — which is how one of these tools happened at all.
 | 🗡 | **Chrono Blades** — one knife, one spinning target, a stage that never ends | [page](https://amircollider.com/en/chronoblades) · [APK](https://dl.amircollider.com/APK/ChronoBlades.apk) |
 | 🏓 | **Crazy Pong** — neon pong in your browser, nothing to install | [play](https://amircollider.com/en/crazypong) |
 | 🧵 | **Frayed Red String** — a psychological visual novel; the demo is out for PC and Android | [page](https://amircollider.com/en/the-frayed-red-string) |
+
+**📱 Apps**
+
+| | what it is | where |
+|---|---|---|
+| 💗 | **Pure Love** — daily tasks & reminders, a focus timer that builds a city, and a quit-anything tracker, with Mini Amir (Android 7.1+) | [page](https://amircollider.com/en/purelove) · [APK](https://amircollider.com/assets/PureLove/PureLove-1.2.0.apk) · [web](https://amircollider.com/en/purelove/app) |
 
 **🧰 Tools**
 
@@ -70,7 +77,8 @@ right-to-left — which is how one of these tools happened at all.
 | ア | **Katakana Day by Day** — the same path, for katakana | [book](https://amircollider.com/en/books/katakana) |
 | かな | **Hiragana & Katakana Day by Day** — both, as one course | [book](https://amircollider.com/en/books/hiragana-katakana) |
 
-**Vocana** and **DirectTMP** are free (DirectTMP is MIT), and **DocSnap** has a free
+**Pure Love** is free on Android (with optional Plus/Pro tiers and web sync), **Vocana**
+and **DirectTMP** are free (DirectTMP is MIT), and **DocSnap** has a free
 edition that needs no key and no account — you can
 [click around a real export](https://amircollider.com/en/unity-docsnap) before installing
 anything. Every letter of the books has a free stroke-order page at
@@ -87,7 +95,7 @@ anything. Every letter of the books has a free stroke-order page at
 
 <div dir="rtl" align="right">
 
-من **امیر کلایدر**م — یه توسعه‌دهنده‌ی مستقل از ایران که بازی‌های کوچیک می‌سازه، ابزارهایی که از دل ساخت همون بازی‌ها بیرون اومدن، و کتاب‌های کار چاپی برای یادگرفتن ژاپنی. تیپم INFP‌ه، برای همین هر پروژه با یه حس درونی شروع می‌شه و با یه پنجره‌ی تنظیمات که هیشکی نخواسته بود تموم می‌شه <span dir="ltr">`(๑˃ᴗ˂)و`</span>
+من **امیر کلایدر**م — یه توسعه‌دهنده‌ی مستقل از ایران که بازی‌های کوچیک و اپ می‌سازه، ابزارهایی که از دل ساخت همون پروژه‌ها بیرون اومدن، و کتاب‌های کار چاپی برای یادگرفتن ژاپنی. تیپم INFP‌ه، برای همین هر پروژه با یه حس درونی شروع می‌شه و با یه پنجره‌ی تنظیمات که هیشکی نخواسته بود تموم می‌شه <span dir="ltr">`(๑˃ᴗ˂)و`</span>
 
 هر چیزی که منتشر می‌کنم **فارسی، انگلیسی و ژاپنی** رو پشتیبانی می‌کنه — و راست‌به‌چپ بودن فارسی، دلیل اصلی خلق‌شدن یکی از همین ابزارهاست.
 
@@ -99,6 +107,12 @@ anything. Every letter of the books has a free stroke-order page at
 | 🗡 | **Chrono Blades** — یک چاقو، یک هدف در حال چرخش و مرحله‌ای بی‌انتها | [صفحه](https://amircollider.com/chronoblades) · [APK](https://dl.amircollider.com/APK/ChronoBlades.apk) |
 | 🏓 | **Crazy Pong** — پینگ‌پنگ نئونی توی مرورگر، بدون نصب | [بازی کن](https://amircollider.com/crazypong) |
 | 🧵 | **Frayed Red String** — یک ویژوال ناول روان‌شناختی؛ دموی آن برای PC و اندروید منتشر شده | [صفحه](https://amircollider.com/the-frayed-red-string) |
+
+**📱 اپ‌ها**
+
+| | چیه | کجا |
+|---|---|---|
+| 💗 | **Pure Love** — کارها و یادآورهای روزانه، تایمر تمرکزی که شهر می‌سازه و ترک هر عادتی، همراه با مینی‌امیر (اندروید ۷.۱+) | [صفحه](https://amircollider.com/purelove) · [APK](https://amircollider.com/assets/PureLove/PureLove-1.2.0.apk) · [وب](https://amircollider.com/purelove/app) |
 
 **🧰 ابزارها**
 
@@ -116,7 +130,7 @@ anything. Every letter of the books has a free stroke-order page at
 | ア | **کاتاکانا روزبه‌روز** — همان مسیر، برای کاتاکانا | [کتاب](https://amircollider.com/books/katakana) |
 | かな | **هیراگانا و کاتاکانا روزبه‌روز** — هر دو، در یک دوره | [کتاب](https://amircollider.com/books/hiragana-katakana) |
 
-**Vocana** و **DirectTMP** رایگان‌اند (DirectTMP تحت لایسنس MIT)، و **DocSnap** یک نسخه‌ی رایگان بدون نیاز به کلید یا حساب کاربری دارد که می‌توانی [خروجی واقعی آن را](https://amircollider.com/unity-docsnap) پیش از نصب ببینی. هر حرف کتاب‌ها هم یک صفحه‌ی رایگان ترتیب نوشتن دارد: [amircollider.com/books](https://amircollider.com/books).
+**Pure Love** روی اندروید رایگان است (با پلن‌های اختیاری Plus و Pro و همگام‌سازی روی وب)، **Vocana** و **DirectTMP** رایگان‌اند (DirectTMP تحت لایسنس MIT)، و **DocSnap** یک نسخه‌ی رایگان بدون نیاز به کلید یا حساب کاربری دارد که می‌توانی [خروجی واقعی آن را](https://amircollider.com/unity-docsnap) پیش از نصب ببینی. هر حرف کتاب‌ها هم یک صفحه‌ی رایگان ترتیب نوشتن دارد: [amircollider.com/books](https://amircollider.com/books).
 
 💌 ارتباط مستقیم: [amircollider.com/contact](https://amircollider.com/contact) — خودم پیام‌ها را می‌خوانم و پاسخ می‌دهم.
 
@@ -129,7 +143,7 @@ anything. Every letter of the books has a free stroke-order page at
 
 <br>
 
-**AmirCollider** です。イランの個人開発者で、小さなゲームと、その制作中に生まれた
+**AmirCollider** です。イランの個人開発者で、小さなゲームやアプリと、その制作中に生まれた
 ツール、そして日本語を学ぶための印刷できるワークブックをつくっています。INFP なので、
 どの企画も «気分» からはじまって、誰も頼んでいない設定ウィンドウで終わります `(๑˃ᴗ˂)ﻭ`
 
@@ -144,6 +158,12 @@ anything. Every letter of the books has a free stroke-order page at
 | 🗡 | **Chrono Blades** — 一本のナイフ、回る標的、そして終わらないステージ | [ページ](https://amircollider.com/ja/chronoblades) · [APK](https://dl.amircollider.com/APK/ChronoBlades.apk) |
 | 🏓 | **Crazy Pong** — ブラウザで遊べるネオンのポン。インストール不要 | [あそぶ](https://amircollider.com/ja/crazypong) |
 | 🧵 | **Frayed Red String（赤い糸）** — 心理系ビジュアルノベル。PC・Android 向け体験版を公開中 | [ページ](https://amircollider.com/ja/the-frayed-red-string) |
+
+**📱 アプリ**
+
+| | なにか | どこ |
+|---|---|---|
+| 💗 | **Pure Love** — 毎日のタスクとリマインダー、街が育つ集中タイマー、何でもやめられる習慣トラッカー（ミニアミール付き · Android 7.1+） | [ページ](https://amircollider.com/ja/purelove) · [APK](https://amircollider.com/assets/PureLove/PureLove-1.2.0.apk) · [Web](https://amircollider.com/ja/purelove/app) |
 
 **🧰 ツール**
 
@@ -161,10 +181,10 @@ anything. Every letter of the books has a free stroke-order page at
 | ア | **カタカナ まいにち** — 同じ道のりを、カタカナで | [本](https://amircollider.com/ja/books/katakana) |
 | かな | **ひらがな・カタカナ まいにち** — 2 冊を 1 つのコースに | [本](https://amircollider.com/ja/books/hiragana-katakana) |
 
-**Vocana** と **DirectTMP** は無料（DirectTMP は MIT ライセンス）、**DocSnap** には
+**Pure Love** は Android 向けに無料（Plus / Pro プランと Web 同期あり）、**Vocana** と **DirectTMP** は無料（DirectTMP は MIT ライセンス）、**DocSnap** には
 キーもアカウントも不要な無料版があり、何かを導入する前に
 [実際の出力を](https://amircollider.com/ja/unity-docsnap)そのまま触って確かめられます。
-本の全文字に、無料の書き順ページもあります: [amircollider.com/books](https://amircollider.com/ja/books)
+本の全文字に、無料の書き順ページもあります: [amircollider.com/books](https://amircollider.com/books)
 
 💌 &nbsp;[amircollider.com/contact](https://amircollider.com/ja/contact) — 自分で読んで、自分で返信しています。
 
